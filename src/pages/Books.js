@@ -11,6 +11,8 @@ export default function Books() {
   const [editingId, setEditingId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [showImport, setShowImport] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [formData, setFormData] = useState({
     book_id: '',
@@ -64,7 +66,46 @@ export default function Books() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'price' || name === 'sales_price' || name === 'quantity_total' || name === 'quantity_available' ? parseFloat(value) : value }));
+    const updatedData = { ...formData, [name]: name === 'price' || name === 'sales_price' || name === 'quantity_total' || name === 'quantity_available' ? parseFloat(value) : value };
+    setFormData(updatedData);
+    
+    if (name === 'book_image') {
+      setImagePreview(value);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      // Use Imgur or similar free service
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      // Using imgbb free image hosting API
+      const response = await fetch('https://api.imgbb.com/1/upload?key=IMGBB_KEY_REMOVED', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const imageUrl = data.data.display_url;
+        setFormData(prev => ({ ...prev, book_image: imageUrl }));
+        setImagePreview(imageUrl);
+        alert('Image uploaded successfully!');
+      } else {
+        alert('Failed to upload image. Please try a valid image file.');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Error uploading image: ' + error.message);
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleAddBook = async (e) => {
@@ -96,6 +137,7 @@ export default function Books() {
         quantity_available: 1,
         book_image: '',
       });
+      setImagePreview('');
       setShowAddForm(false);
       fetchBooks();
       alert(editingId ? 'Book updated!' : 'Book added!');
@@ -107,6 +149,7 @@ export default function Books() {
 
   const handleEditBook = (book) => {
     setFormData(book);
+    setImagePreview(book.book_image || '');
     setEditingId(book.id);
     setShowAddForm(true);
   };
@@ -144,6 +187,7 @@ export default function Books() {
             onClick={() => {
               setShowAddForm(true);
               setEditingId(null);
+              setImagePreview('');
               setFormData({
                 book_id: '',
                 title: '',
@@ -192,9 +236,50 @@ export default function Books() {
 
       {showAddForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '600px', width: '90%' }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '700px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingId ? 'Edit Book' : 'Add New Book'}</h2>
             <form onSubmit={handleAddBook}>
+              {/* IMAGE PREVIEW SECTION */}
+              <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px', textAlign: 'center' }}>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>📸 Book Cover Image</label>
+                {imagePreview && (
+                  <img 
+                    src={imagePreview} 
+                    alt="Book Cover" 
+                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px' }}
+                    onError={() => alert('Image URL is invalid. Please check the URL.')}
+                  />
+                )}
+                {!imagePreview && <p style={{ color: '#999' }}>No image selected</p>}
+              </div>
+
+              {/* IMAGE URL INPUT */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Book Image URL</label>
+                <input
+                  type="text"
+                  name="book_image"
+                  value={formData.book_image}
+                  onChange={handleInputChange}
+                  placeholder="https://covers.openlibrary.org/b/id/7741150-M.jpg"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+                <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>Get free images from: https://openlibrary.org</p>
+              </div>
+
+              {/* IMAGE UPLOAD BUTTON */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Or Upload Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', cursor: uploadingImage ? 'not-allowed' : 'pointer' }}
+                />
+                {uploadingImage && <p style={{ color: '#667eea', marginTop: '5px' }}>⏳ Uploading...</p>}
+              </div>
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Title *</label>
                 <input
@@ -253,7 +338,7 @@ export default function Books() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Price (₹)</label>
                   <input
@@ -278,9 +363,6 @@ export default function Books() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
                   />
                 </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Total Copies</label>
                   <input
@@ -292,27 +374,18 @@ export default function Books() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Available</label>
-                  <input
-                    type="number"
-                    name="quantity_available"
-                    value={formData.quantity_available}
-                    onChange={handleInputChange}
-                    min="0"
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Book Image URL</label>
-                  <input
-                    type="text"
-                    name="book_image"
-                    value={formData.book_image}
-                    onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Available Copies</label>
+                <input
+                  type="number"
+                  name="quantity_available"
+                  value={formData.quantity_available}
+                  onChange={handleInputChange}
+                  min="0"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
