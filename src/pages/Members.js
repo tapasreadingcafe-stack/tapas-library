@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BulkImport from '../BulkImport';
 import { supabase } from '../utils/supabase';
 
 export default function Members() {
@@ -8,6 +9,7 @@ export default function Members() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [showImport, setShowImport] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -133,25 +135,33 @@ export default function Members() {
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>👥 Members</h1>
-        <button 
-          onClick={() => {
-            setShowAddForm(true);
-            setEditingId(null);
-            setFormData({
-              name: '',
-              phone: '',
-              email: '',
-              plan: 'basic',
-              subscription_start: new Date().toISOString().split('T')[0],
-              subscription_end: '',
-              borrow_limit: 2,
-              status: 'active',
-            });
-          }}
-          style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          ➕ Add Member
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => {
+              setShowAddForm(true);
+              setEditingId(null);
+              setFormData({
+                name: '',
+                phone: '',
+                email: '',
+                plan: 'basic',
+                subscription_start: new Date().toISOString().split('T')[0],
+                subscription_end: '',
+                borrow_limit: 2,
+                status: 'active',
+              });
+            }}
+            style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            ➕ Add Member
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            📤 Import CSV
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -333,6 +343,14 @@ export default function Members() {
           </table>
         )}
       </div>
+
+      {showImport && (
+        <BulkImport
+          type="members"
+          onSuccess={fetchMembers}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }

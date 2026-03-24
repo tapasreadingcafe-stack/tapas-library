@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BulkImport from '../BulkImport';
 import { supabase } from '../utils/supabase';
 
 export default function Books() {
@@ -9,6 +10,7 @@ export default function Books() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [showImport, setShowImport] = useState(false);
 
   const [formData, setFormData] = useState({
     book_id: '',
@@ -17,8 +19,10 @@ export default function Books() {
     isbn: '',
     category: '',
     price: 0,
+    sales_price: 0,
     quantity_total: 1,
     quantity_available: 1,
+    book_image: '',
   });
 
   useEffect(() => {
@@ -60,7 +64,7 @@ export default function Books() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'price' || name === 'quantity_total' || name === 'quantity_available' ? parseFloat(value) : value }));
+    setFormData(prev => ({ ...prev, [name]: name === 'price' || name === 'sales_price' || name === 'quantity_total' || name === 'quantity_available' ? parseFloat(value) : value }));
   };
 
   const handleAddBook = async (e) => {
@@ -87,8 +91,10 @@ export default function Books() {
         isbn: '',
         category: '',
         price: 0,
+        sales_price: 0,
         quantity_total: 1,
         quantity_available: 1,
+        book_image: '',
       });
       setShowAddForm(false);
       fetchBooks();
@@ -133,25 +139,35 @@ export default function Books() {
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>📚 Books</h1>
-        <button 
-          onClick={() => {
-            setShowAddForm(true);
-            setEditingId(null);
-            setFormData({
-              book_id: '',
-              title: '',
-              author: '',
-              isbn: '',
-              category: '',
-              price: 0,
-              quantity_total: 1,
-              quantity_available: 1,
-            });
-          }}
-          style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          ➕ Add Book
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => {
+              setShowAddForm(true);
+              setEditingId(null);
+              setFormData({
+                book_id: '',
+                title: '',
+                author: '',
+                isbn: '',
+                category: '',
+                price: 0,
+                sales_price: 0,
+                quantity_total: 1,
+                quantity_available: 1,
+                book_image: '',
+              });
+            }}
+            style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            ➕ Add Book
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            📤 Import CSV
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -237,7 +253,7 @@ export default function Books() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Price (₹)</label>
                   <input
@@ -250,6 +266,21 @@ export default function Books() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
                   />
                 </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Sales Price (₹)</label>
+                  <input
+                    type="number"
+                    name="sales_price"
+                    value={formData.sales_price}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Total Copies</label>
                   <input
@@ -269,6 +300,16 @@ export default function Books() {
                     value={formData.quantity_available}
                     onChange={handleInputChange}
                     min="0"
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Book Image URL</label>
+                  <input
+                    type="text"
+                    name="book_image"
+                    value={formData.book_image}
+                    onChange={handleInputChange}
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
                   />
                 </div>
@@ -336,6 +377,14 @@ export default function Books() {
           </table>
         )}
       </div>
+
+      {showImport && (
+        <BulkImport
+          type="books"
+          onSuccess={fetchBooks}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }
