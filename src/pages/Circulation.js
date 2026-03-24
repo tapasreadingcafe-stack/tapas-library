@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 
 export default function Circulation() {
@@ -17,6 +18,8 @@ export default function Circulation() {
   const [returnForm, setReturnForm] = useState({
     circulation_id: '',
   });
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerMode, setScannerMode] = useState('book');
 
   useEffect(() => {
     fetchData();
@@ -51,28 +54,24 @@ export default function Circulation() {
     }
 
     try {
-      // Check member subscription
       const member = members.find(m => m.id === checkoutForm.member_id);
       if (!member || member.status !== 'active') {
         alert('Member is not active or subscription expired!');
         return;
       }
 
-      // Check borrow limit
       const memberCheckouts = circulation.filter(c => c.member_id === checkoutForm.member_id);
       if (memberCheckouts.length >= member.borrow_limit) {
         alert(`Member has reached borrow limit of ${member.borrow_limit}`);
         return;
       }
 
-      // Check book availability
       const book = books.find(b => b.id === checkoutForm.book_id);
       if (!book || book.quantity_available <= 0) {
         alert('Book is not available');
         return;
       }
 
-      // Create checkout record
       const { error } = await supabase.from('circulation').insert([{
         member_id: checkoutForm.member_id,
         book_id: checkoutForm.book_id,
@@ -83,7 +82,6 @@ export default function Circulation() {
 
       if (error) throw error;
 
-      // Update book availability
       await supabase
         .from('books')
         .update({ quantity_available: book.quantity_available - 1 })
@@ -104,7 +102,6 @@ export default function Circulation() {
     try {
       const circulation_record = circulation.find(c => c.id === circulationId);
       
-      // Update circulation status
       const { error } = await supabase
         .from('circulation')
         .update({ status: 'returned', return_date: new Date().toISOString().split('T')[0] })
@@ -112,7 +109,6 @@ export default function Circulation() {
 
       if (error) throw error;
 
-      // Update book availability
       const book = books.find(b => b.id === circulation_record.book_id);
       await supabase
         .from('books')
@@ -175,6 +171,23 @@ export default function Circulation() {
         <div style={{ background: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
           <h2>New Checkout</h2>
           <form onSubmit={handleCheckout}>
+            <div style={{ marginBottom: '15px' }}>
+              <button
+                type="button"
+                onClick={() => { setScannerMode('member'); setShowScanner(true); }}
+                style={{ padding: '8px 12px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '10px' }}
+              >
+                📱 Scan Member
+              </button>
+              <button
+                type="button"
+                onClick={() => { setScannerMode('book'); setShowScanner(true); }}
+                style={{ padding: '8px 12px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                📱 Scan Book
+              </button>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Member *</label>
@@ -226,6 +239,31 @@ export default function Circulation() {
               ✓ Checkout Book
             </button>
           </form>
+
+          {showScanner && (
+            <BarcodeScanner
+              onScan={(data) => {
+                if (scannerMode === 'member') {
+                  const member = members.find(m => m.phone === data || m.id === data);
+                  if (member) {
+                    setCheckoutForm({ ...checkoutForm, member_id: member.id });
+                    setShowScanner(false);
+                  } else {
+                    alert('Member not found');
+                  }
+                } else {
+                  const book = books.find(b => b.book_id === data || b.id === data);
+                  if (book) {
+                    setCheckoutForm({ ...checkoutForm, book_id: book.id });
+                    setShowScanner(false);
+                  } else {
+                    alert('Book not found');
+                  }
+                }
+              }}
+              onClose={() => setShowScanner(false)}
+            />
+          )}
         </div>
       )}
 
