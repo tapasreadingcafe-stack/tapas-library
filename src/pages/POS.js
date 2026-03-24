@@ -7,9 +7,13 @@ export default function POS() {
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [sortBy, setSortBy] = useState('newest');
   const [categories, setCategories] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [allBooks, setAllBooks] = useState([]);
 
   useEffect(() => {
     fetchBooks();
@@ -20,14 +24,9 @@ export default function POS() {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      let query = supabase.from('books').select('*');
-      
-      if (selectedCategory !== 'all') {
-        query = query.eq('category', selectedCategory);
-      }
-      
-      const { data, error } = await query;
+      const { data, error } = await supabase.from('books').select('*');
       if (error) throw error;
+      setAllBooks(data || []);
       setBooks(data || []);
     } catch (error) {
       console.error('Error fetching books:', error);
@@ -53,17 +52,59 @@ export default function POS() {
         .select('category', { distinct: true });
       if (error) throw error;
       const uniqueCategories = [...new Set(data?.map(b => b.category).filter(Boolean))];
-      setCategories(uniqueCategories);
+      setCategories(uniqueCategories.sort());
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
   };
 
-  const filteredBooks = books.filter(book =>
-    (book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (selectedCategory === 'all' || book.category === selectedCategory)
-  );
+  const applyFilters = () => {
+    let filtered = allBooks;
+
+    // Search filter
+    filtered = filtered.filter(book =>
+      book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      book.author.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(book => book.category === selectedCategory);
+    }
+
+    // Price range filter
+    filtered = filtered.filter(book => book.price >= priceRange[0] && book.price <= priceRange[1]);
+
+    // Sort
+    if (sortBy === 'newest') {
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else if (sortBy === 'price-low') {
+      filtered.sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-high') {
+      filtered.sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'title-az') {
+      filtered.sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    setBooks(filtered);
+    setShowFilters(false);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('all');
+    setPriceRange([0, 1000]);
+    setSortBy('newest');
+    setBooks(allBooks);
+  };
+
+  const handlePriceChange = (e, index) => {
+    const newRange = [...priceRange];
+    newRange[index] = parseInt(e.target.value);
+    if (newRange[0] <= newRange[1]) {
+      setPriceRange(newRange);
+    }
+  };
 
   const addToCart = (book) => {
     const existingItem = cart.find(item => item.id === book.id);
@@ -111,42 +152,191 @@ export default function POS() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '20px' }}>
         {/* PRODUCTS SECTION */}
         <div>
-          {/* SEARCH & FILTER */}
-          <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+          {/* COMPACT SEARCH & FILTER BAR */}
+          <div style={{
+            marginBottom: '20px',
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}>
+            {/* SEARCH BOX */}
             <input
               type="text"
-              placeholder="Search books..."
+              placeholder="🔍 Search by title or author..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 flex: 1,
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px'
+                minWidth: '250px',
+                padding: '10px 12px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500'
               }}
             />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+
+            {/* FILTERS BUTTON */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
               style={{
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer'
+                padding: '10px 16px',
+                background: showFilters ? '#667eea' : '#fff',
+                color: showFilters ? 'white' : '#333',
+                border: showFilters ? 'none' : '2px solid #e0e0e0',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              <option value="all">All Categories</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+              ⚙️ Filters {showFilters ? '▲' : '▼'}
+            </button>
+
+            {/* RESET BUTTON */}
+            <button
+              onClick={resetFilters}
+              style={{
+                padding: '10px 14px',
+                background: '#f0f0f0',
+                color: '#666',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '500'
+              }}
+              title="Reset all filters"
+            >
+              ↻ Reset
+            </button>
           </div>
+
+          {/* FILTER PANEL (COLLAPSIBLE) */}
+          {showFilters && (
+            <div style={{
+              background: 'white',
+              borderRadius: '8px',
+              padding: '20px',
+              marginBottom: '20px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr auto',
+              gap: '20px',
+              alignItems: 'end'
+            }}>
+              {/* CATEGORY FILTER */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold', color: '#333' }}>Category</label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* PRICE RANGE FILTER */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold', color: '#333' }}>Price Range</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    value={priceRange[0]}
+                    onChange={(e) => handlePriceChange(e, 0)}
+                    style={{
+                      width: '70px',
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                    min="0"
+                    max={priceRange[1]}
+                  />
+                  <span style={{ color: '#999', fontSize: '12px' }}>to</span>
+                  <input
+                    type="number"
+                    value={priceRange[1]}
+                    onChange={(e) => handlePriceChange(e, 1)}
+                    style={{
+                      width: '70px',
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                    min={priceRange[0]}
+                    max="10000"
+                  />
+                </div>
+              </div>
+
+              {/* SORT FILTER */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold', color: '#333' }}>Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                  <option value="title-az">Title: A to Z</option>
+                </select>
+              </div>
+
+              {/* APPLY BUTTON */}
+              <button
+                onClick={applyFilters}
+                style={{
+                  padding: '10px 20px',
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 'bold'
+                }}
+              >
+                ✓ Apply
+              </button>
+            </div>
+          )}
+
+          {/* PRODUCT COUNT */}
+          <p style={{ color: '#999', fontSize: '13px', marginBottom: '15px', fontWeight: '500' }}>
+            Found {books.length} books
+          </p>
 
           {/* PRODUCT GRID */}
           {loading ? (
             <p style={{ textAlign: 'center', color: '#999' }}>Loading books...</p>
-          ) : filteredBooks.length === 0 ? (
+          ) : books.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#999' }}>No books found</p>
           ) : (
             <div style={{
@@ -154,7 +344,7 @@ export default function POS() {
               gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
               gap: '15px'
             }}>
-              {filteredBooks.map(book => (
+              {books.map(book => (
                 <div
                   key={book.id}
                   style={{
@@ -383,7 +573,7 @@ export default function POS() {
 
           {/* CHECKOUT BUTTON */}
           <button
-            onClick={() => alert('Checkout - Coming in Feature 5!')}
+            onClick={() => alert('Checkout - Coming soon!')}
             disabled={cart.length === 0}
             style={{
               width: '100%',
