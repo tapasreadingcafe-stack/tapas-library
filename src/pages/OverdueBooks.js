@@ -21,23 +21,22 @@ export default function OverdueBooks() {
   const fetchOverdueBooks = async () => {
     setLoading(true);
     try {
+      const today = new Date().toISOString().split('T')[0];
       const { data: circulationData, error } = await supabase
         .from('circulation')
-        .select('*, members(name, phone, email), books(title, author)')
+        .select('id, due_date, checkout_date, fine_paid, members(name, phone, email), books(title, author)')
         .eq('status', 'checked_out')
-        .order('due_date', { ascending: true });
+        .lt('due_date', today)
+        .order('due_date', { ascending: true })
+        .limit(200);
 
       if (error) throw error;
 
-      // Filter overdue books
-      const today = new Date();
-      const overdue = circulationData.filter(item => {
-        const dueDate = new Date(item.due_date);
-        return dueDate < today;
-      }).map(item => ({
+      const now = new Date();
+      const overdue = (circulationData || []).map(item => ({
         ...item,
-        daysOverdue: Math.floor((today - new Date(item.due_date)) / (1000 * 60 * 60 * 24)),
-        fineAmount: Math.floor((today - new Date(item.due_date)) / (1000 * 60 * 60 * 24)) * FINE_RATE_PER_DAY
+        daysOverdue: Math.floor((now - new Date(item.due_date)) / (1000 * 60 * 60 * 24)),
+        fineAmount: Math.floor((now - new Date(item.due_date)) / (1000 * 60 * 60 * 24)) * FINE_RATE_PER_DAY,
       }));
 
       setOverdueBooks(overdue);

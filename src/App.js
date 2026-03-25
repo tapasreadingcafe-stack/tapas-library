@@ -1,29 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-
-import Dashboard from './pages/Dashboard';
-import Members from './pages/Members';
-import Books from './pages/Books';
-import Borrow from './pages/Borrow';
-import POS from './pages/POS';
-import Reports from './pages/Reports';
-import MemberProfile from './pages/MemberProfile';
-import OverdueBooks from './pages/OverdueBooks';
-import BookAvailability from './pages/BookAvailability';
-import BorrowStatistics from './pages/BorrowStatistics';
-import Reservations from './pages/Reservations';
-import Fines from './pages/Fines';
-import Reviews from './pages/Reviews';
-import Wishlist from './pages/Wishlist';
-import Recommendations from './pages/Recommendations';
-import ChildProfile from './pages/ChildProfile';
-import Login from './pages/Login';
-import StaffManagement from './pages/StaffManagement';
-
 import './App.css';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Lazy-loaded pages ─────────────────────────────────────────────────────────
+const Dashboard      = React.lazy(() => import('./pages/Dashboard'));
+const Members        = React.lazy(() => import('./pages/Members'));
+const Books          = React.lazy(() => import('./pages/Books'));
+const Borrow         = React.lazy(() => import('./pages/Borrow'));
+const POS            = React.lazy(() => import('./pages/POS'));
+const Reports        = React.lazy(() => import('./pages/Reports'));
+const MemberProfile  = React.lazy(() => import('./pages/MemberProfile'));
+const OverdueBooks   = React.lazy(() => import('./pages/OverdueBooks'));
+const BookAvailability = React.lazy(() => import('./pages/BookAvailability'));
+const BorrowStatistics = React.lazy(() => import('./pages/BorrowStatistics'));
+const Reservations   = React.lazy(() => import('./pages/Reservations'));
+const Fines          = React.lazy(() => import('./pages/Fines'));
+const Reviews        = React.lazy(() => import('./pages/Reviews'));
+const Wishlist       = React.lazy(() => import('./pages/Wishlist'));
+const Recommendations = React.lazy(() => import('./pages/Recommendations'));
+const ChildProfile   = React.lazy(() => import('./pages/ChildProfile'));
+const Login          = React.lazy(() => import('./pages/Login'));
+const StaffManagement = React.lazy(() => import('./pages/StaffManagement'));
+
+// ── Page loader (shown during lazy chunk download) ────────────────────────────
+
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '20px' }}>
+      <div style={{ fontSize: '40px', animation: 'pulse 1.4s ease-in-out infinite' }}>📚</div>
+      <div style={{ width: '200px', height: '4px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%',
+          width: '40%',
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          borderRadius: '4px',
+          animation: 'slide 1.2s ease-in-out infinite',
+        }} />
+      </div>
+      <style>{`
+        @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.1);opacity:0.8} }
+        @keyframes slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(550%)} }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getInitials(name) {
   if (!name) return '?';
@@ -42,7 +65,7 @@ function AccessDenied({ message = 'You do not have permission to view this page.
   );
 }
 
-// ── Loading spinner ───────────────────────────────────────────────────────────
+// ── Loading spinner (auth check) ──────────────────────────────────────────────
 
 function LoadingSpinner() {
   return (
@@ -188,56 +211,30 @@ function AppShell() {
           <h1 className="app-title">📚 Tapas Library</h1>
         </div>
         <div className="navbar-right" style={{ position: 'relative' }}>
-          {/* Avatar + Name */}
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '6px 10px', borderRadius: '10px',
-              transition: 'background 0.15s',
-            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 10px', borderRadius: '10px', transition: 'background 0.15s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
-            <div style={{
-              width: '34px', height: '34px', borderRadius: '50%',
-              background: avatarColor, color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: '700', fontSize: '13px', flexShrink: 0,
-              border: '2px solid rgba(255,255,255,0.4)',
-            }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: avatarColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '13px', flexShrink: 0, border: '2px solid rgba(255,255,255,0.4)' }}>
               {initials}
             </div>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: 'white', lineHeight: 1.2 }}>
-                {staff?.name || staff?.email}
-              </div>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', lineHeight: 1.2 }}>
-                {admin ? 'Administrator' : 'Staff'}
-              </div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: 'white', lineHeight: 1.2 }}>{staff?.name || staff?.email}</div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', lineHeight: 1.2 }}>{admin ? 'Administrator' : 'Staff'}</div>
             </div>
             <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>▼</span>
           </button>
 
-          {/* Dropdown */}
           {userMenuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setUserMenuOpen(false)} />
-              <div style={{
-                position: 'absolute', top: '100%', right: '0', marginTop: '6px',
-                background: 'white', borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
-                minWidth: '180px', zIndex: 999, overflow: 'hidden',
-                border: '1px solid #eee',
-              }}>
+              <div style={{ position: 'absolute', top: '100%', right: '0', marginTop: '6px', background: 'white', borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', minWidth: '180px', zIndex: 999, overflow: 'hidden', border: '1px solid #eee' }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#333' }}>{staff?.name}</div>
                   <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>{staff?.email}</div>
-                  <span style={{
-                    display: 'inline-block', marginTop: '6px',
-                    padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
-                    background: admin ? '#f0edff' : '#e8f4fd', color: admin ? '#667eea' : '#3498db',
-                  }}>
+                  <span style={{ display: 'inline-block', marginTop: '6px', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: admin ? '#f0edff' : '#e8f4fd', color: admin ? '#667eea' : '#3498db' }}>
                     {admin ? 'Admin' : 'Staff'}
                   </span>
                 </div>
@@ -282,29 +279,29 @@ function AppShell() {
 
       {/* MAIN CONTENT */}
       <main className={`main-content ${sidebarOpen ? 'expanded' : 'full'}`}>
-        <Routes>
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
-          <Route path="/books" element={<ProtectedRoute><Books /></ProtectedRoute>} />
-          <Route path="/Borrow" element={<ProtectedRoute><Borrow /></ProtectedRoute>} />
-          <Route path="/overdue" element={<ProtectedRoute><OverdueBooks /></ProtectedRoute>} />
-          <Route path="/availability" element={<ProtectedRoute><BookAvailability /></ProtectedRoute>} />
-          <Route path="/statistics" element={<ProtectedRoute><BorrowStatistics /></ProtectedRoute>} />
-          <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
-          <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
-          <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
-          <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-          <Route path="/member/:memberId" element={<ProtectedRoute><MemberProfile /></ProtectedRoute>} />
-          <Route path="/member/:memberId/child/:childId" element={<ProtectedRoute><ChildProfile /></ProtectedRoute>} />
-          {/* Admin-only routes */}
-          <Route path="/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
-          <Route path="/fines" element={<ProtectedRoute adminOnly><Fines /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute adminOnly><Reports /></ProtectedRoute>} />
-          <Route path="/staff" element={<ProtectedRoute adminOnly><StaffManagement /></ProtectedRoute>} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
+            <Route path="/books" element={<ProtectedRoute><Books /></ProtectedRoute>} />
+            <Route path="/Borrow" element={<ProtectedRoute><Borrow /></ProtectedRoute>} />
+            <Route path="/overdue" element={<ProtectedRoute><OverdueBooks /></ProtectedRoute>} />
+            <Route path="/availability" element={<ProtectedRoute><BookAvailability /></ProtectedRoute>} />
+            <Route path="/statistics" element={<ProtectedRoute><BorrowStatistics /></ProtectedRoute>} />
+            <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
+            <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
+            <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
+            <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
+            <Route path="/member/:memberId" element={<ProtectedRoute><MemberProfile /></ProtectedRoute>} />
+            <Route path="/member/:memberId/child/:childId" element={<ProtectedRoute><ChildProfile /></ProtectedRoute>} />
+            <Route path="/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
+            <Route path="/fines" element={<ProtectedRoute adminOnly><Fines /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute adminOnly><Reports /></ProtectedRoute>} />
+            <Route path="/staff" element={<ProtectedRoute adminOnly><StaffManagement /></ProtectedRoute>} />
+          </Routes>
+        </Suspense>
       </main>
 
-      {/* Change Password Modal */}
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </div>
   );
@@ -317,10 +314,12 @@ function App() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/*" element={<AppShell />} />
-    </Routes>
+    <Suspense fallback={<LoadingSpinner />}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/*" element={<AppShell />} />
+      </Routes>
+    </Suspense>
   );
 }
 

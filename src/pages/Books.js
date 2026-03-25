@@ -49,10 +49,15 @@ export default function Books() {
 
   const [formData, setFormData] = useState(emptyForm);
 
+  // Run probe + categories only once on mount
   useEffect(() => {
     probeCondition();
-    fetchBooks();
     fetchCategories();
+  }, []);
+
+  // Re-fetch books whenever filter changes
+  useEffect(() => {
+    fetchBooks();
   }, [filterCategory]);
 
   const probeCondition = async () => {
@@ -63,13 +68,17 @@ export default function Books() {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      let query = supabase.from('books').select('*');
-      
+      let query = supabase
+        .from('books')
+        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, quantity_total, quantity_available, book_image, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
       if (filterCategory !== 'all') {
         query = query.eq('category', filterCategory);
       }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
       if (error) throw error;
       setBooks(data || []);
     } catch (error) {
@@ -102,29 +111,42 @@ export default function Books() {
     }
   };
 
+  const compressImage = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 800;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, 'image/jpeg', 0.82);
+    };
+    img.src = url;
+  });
+
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setUploadingImage(true);
     try {
-      // Use Imgur or similar free service
-      const formData = new FormData();
-      formData.append('image', file);
-      
-      // Using imgbb free image hosting API
+      const compressed = await compressImage(file);
+      const fd = new FormData();
+      fd.append('image', compressed, 'cover.jpg');
+
       const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`, {
         method: 'POST',
-        body: formData
+        body: fd,
       });
-      
+
       const data = await response.json();
-      
       if (data.success) {
         const imageUrl = data.data.display_url;
         setFormData(prev => ({ ...prev, book_image: imageUrl }));
         setImagePreview(imageUrl);
-        alert('Image uploaded successfully!');
       } else {
         alert('Failed to upload image. Please try a valid image file.');
       }
@@ -262,11 +284,12 @@ export default function Books() {
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px', textAlign: 'center' }}>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>📸 Book Cover Image</label>
                 {imagePreview && (
-                  <img 
-                    src={imagePreview} 
-                    alt="Book Cover" 
-                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px' }}
-                    onError={() => alert('Image URL is invalid. Please check the URL.')}
+                  <img
+                    src={imagePreview}
+                    alt="Book Cover"
+                    loading="lazy"
+                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px', background: '#f0f0f0' }}
+                    onError={e => { e.target.style.display = 'none'; }}
                   />
                 )}
                 {!imagePreview && <p style={{ color: '#999' }}>No image selected</p>}
@@ -455,7 +478,19 @@ export default function Books() {
 
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
         {loading ? (
-          <p style={{ padding: '20px', textAlign: 'center' }}>Loading books...</p>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  {[40, 20, 15, 10, 10, 5].map((w, j) => (
+                    <td key={j} style={{ padding: '14px 12px' }}>
+                      <div style={{ height: '14px', width: `${w}%`, minWidth: '40px', background: '#f0f0f0', borderRadius: '4px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : filteredBooks.length === 0 ? (
           <p style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No books found</p>
         ) : (

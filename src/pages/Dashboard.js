@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { cacheGet, cacheSet } from '../utils/cache';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
@@ -22,13 +23,29 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (force = false) => {
+    // Return cached data immediately (unless forced refresh)
+    if (!force) {
+      const cached = cacheGet('dashboard');
+      if (cached) {
+        setMetrics(cached.metrics);
+        setRecentActivity(cached.recentActivity);
+        setWeeklyData(cached.weeklyData);
+        setDueTodayBooks(cached.dueTodayBooks);
+        setCategoryData(cached.categoryData);
+        setTopMembers(cached.topMembers);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
       const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const week7ago = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0]; })();
 
-      // Parallel fetches
+      // All queries in ONE parallel batch — no sequential round-trips
       const [
         { count: membersCount },
         { count: booksCount },
@@ -39,37 +56,32 @@ export default function Dashboard() {
         { data: recentSales },
         { data: circData },
         { data: dueTodayData },
+        { data: overdueForFines },
+        { data: booksForCats },
+        { data: activeMembers },
       ] = await Promise.all([
-        supabase.from('members').select('*', { count: 'exact' }).eq('status', 'active'),
-        supabase.from('books').select('*', { count: 'exact' }),
-        supabase.from('circulation').select('*', { count: 'exact' }).eq('status', 'checked_out').eq('checkout_date', today),
-        supabase.from('circulation').select('*', { count: 'exact' }).eq('status', 'checked_out').lt('due_date', today),
-        supabase.from('circulation').select('*', { count: 'exact' }).eq('status', 'checked_out'),
+        supabase.from('members').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('books').select('id', { count: 'exact', head: true }),
+        supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('status', 'checked_out').eq('checkout_date', today),
+        supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('status', 'checked_out').lt('due_date', today),
+        supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('status', 'checked_out'),
         supabase.from('sales').select('total_amount').gte('sale_date', firstDay).eq('status', 'completed'),
-        supabase.from('sales').select('*, members(name), books(title)').order('sale_date', { ascending: false }).limit(5),
-        // Last 7 days circulation for weekly chart
-        supabase.from('circulation').select('checkout_date').gte('checkout_date', (() => {
-          const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0];
-        })()).order('checkout_date'),
-        // Books due back today
-        supabase.from('circulation').select('*, members(name), books(title)').eq('status', 'checked_out').eq('due_date', today),
+        supabase.from('sales').select('id, total_amount, sale_date, members(name)').order('sale_date', { ascending: false }).limit(5),
+        supabase.from('circulation').select('checkout_date').gte('checkout_date', week7ago).order('checkout_date').limit(500),
+        supabase.from('circulation').select('id, due_date, members(name), books(title)').eq('status', 'checked_out').eq('due_date', today).limit(50),
+        supabase.from('circulation').select('due_date, fine_paid').eq('status', 'checked_out').lt('due_date', today).eq('fine_paid', false).limit(500),
+        supabase.from('books').select('category, quantity_total').limit(500),
+        supabase.from('circulation').select('member_id, members(name)').eq('status', 'checked_out').limit(200),
       ]);
 
       const totalRevenue = salesData?.reduce((s, sale) => s + (sale.total_amount || 0), 0) || 0;
 
-      // Outstanding fines from overdue
-      const { data: overdueForFines } = await supabase
-        .from('circulation')
-        .select('due_date, fine_paid')
-        .eq('status', 'checked_out')
-        .lt('due_date', today)
-        .eq('fine_paid', false);
       const outstandingFines = (overdueForFines || []).reduce((s, item) => {
         const days = Math.max(0, Math.floor((new Date() - new Date(item.due_date)) / 86400000));
         return s + days * 10;
       }, 0);
 
-      setMetrics({
+      const metrics = {
         totalMembers: membersCount || 0,
         totalBooks: booksCount || 0,
         checkedOutToday: checkedOutCount || 0,
@@ -77,11 +89,9 @@ export default function Dashboard() {
         overdueBooks: overdueCount || 0,
         outstandingFines,
         activeCheckouts: activeCheckouts || 0,
-      });
+      };
 
-      setRecentActivity(recentSales || []);
-
-      // Weekly bar chart: count borrows per day for last 7 days
+      // Weekly bar chart
       const last7 = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
@@ -91,32 +101,34 @@ export default function Dashboard() {
         const count = (circData || []).filter(c => c.checkout_date === dateStr).length;
         last7.push({ date: dateStr, day: dayName, count, isToday: dateStr === today });
       }
-      setWeeklyData(last7);
-      setDueTodayBooks(dueTodayData || []);
 
       // Category distribution
-      const { data: booksForCats } = await supabase.from('books').select('category, quantity_total');
       const catMap = {};
       (booksForCats || []).forEach(b => {
         const cat = b.category || 'Uncategorized';
         catMap[cat] = (catMap[cat] || 0) + (b.quantity_total || 1);
       });
-      const catArr = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
-      setCategoryData(catArr);
+      const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
 
-      // Top active members by borrow count
-      const { data: activeMembers } = await supabase
-        .from('circulation')
-        .select('member_id, members(name)')
-        .eq('status', 'checked_out');
+      // Top active members
       const memberCounts = {};
       (activeMembers || []).forEach(c => {
         const id = c.member_id;
         if (!memberCounts[id]) memberCounts[id] = { name: c.members?.name, count: 0 };
         memberCounts[id].count++;
       });
-      const top = Object.values(memberCounts).sort((a, b) => b.count - a.count).slice(0, 5);
-      setTopMembers(top);
+      const topMembers = Object.values(memberCounts).sort((a, b) => b.count - a.count).slice(0, 5);
+
+      // Save to cache
+      const cachePayload = { metrics, recentActivity: recentSales || [], weeklyData: last7, dueTodayBooks: dueTodayData || [], categoryData, topMembers };
+      cacheSet('dashboard', cachePayload);
+
+      setMetrics(metrics);
+      setRecentActivity(recentSales || []);
+      setWeeklyData(last7);
+      setDueTodayBooks(dueTodayData || []);
+      setCategoryData(categoryData);
+      setTopMembers(topMembers);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -135,7 +147,7 @@ export default function Dashboard() {
           <h1 style={{ fontSize: '32px', marginBottom: '4px' }}>📊 Dashboard</h1>
           <p style={{ color: '#999' }}>Welcome back! Here's your library overview.</p>
         </div>
-        <button onClick={fetchDashboardData} disabled={loading}
+        <button onClick={() => fetchDashboardData(true)} disabled={loading}
           style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
           {loading ? '⏳ Loading...' : '🔄 Refresh'}
         </button>
@@ -143,21 +155,32 @@ export default function Dashboard() {
 
       {/* Metric cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-        {[
-          { label: 'Active Members', value: metrics.totalMembers, color: '#667eea', icon: '👥' },
-          { label: 'Total Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚' },
-          { label: 'Checked Out Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤' },
-          { label: 'Active Borrows', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖' },
-          { label: 'Overdue Books', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️' },
-          { label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰' },
-          { label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵' },
-        ].map(s => (
-          <div key={s.label} style={{ padding: '16px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: `3px solid ${s.color}` }}>
-            <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
-            <div style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
-          </div>
-        ))}
+        {loading ? (
+          Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} style={{ padding: '16px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: '3px solid #e0e0e0' }}>
+              <div style={{ width: '28px', height: '28px', background: '#f0f0f0', borderRadius: '50%', margin: '0 auto 8px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+              <div style={{ width: '50%', height: '24px', background: '#f0f0f0', borderRadius: '4px', margin: '0 auto 8px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+              <div style={{ width: '80%', height: '10px', background: '#f0f0f0', borderRadius: '4px', margin: '0 auto', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+              <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+            </div>
+          ))
+        ) : (
+          [
+            { label: 'Active Members', value: metrics.totalMembers, color: '#667eea', icon: '👥' },
+            { label: 'Total Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚' },
+            { label: 'Checked Out Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤' },
+            { label: 'Active Borrows', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖' },
+            { label: 'Overdue Books', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️' },
+            { label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰' },
+            { label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵' },
+          ].map(s => (
+            <div key={s.label} style={{ padding: '16px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: `3px solid ${s.color}` }}>
+              <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
+              <div style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Due Today Alert */}

@@ -59,8 +59,9 @@ function Members() {
       setLoading(true);
       const { data, error } = await supabase
         .from('members')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (error) throw error;
 
@@ -83,9 +84,10 @@ function Members() {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('*')
+        .select('id, transaction_date, transaction_type, item_name, quantity, amount, status')
         .eq('member_id', memberId)
-        .order('transaction_date', { ascending: false });
+        .order('transaction_date', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       setTransactions(data || []);
@@ -347,7 +349,25 @@ function Members() {
   if (loading) {
     return (
       <div className="page-content">
-        <p>Loading members...</p>
+        <div className="page-header">
+          <h1>👥 Members Management</h1>
+        </div>
+        <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', marginTop: '16px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  {[12, 18, 8, 12, 20, 10, 8, 8, 4].map((w, j) => (
+                    <td key={j} style={{ padding: '14px 12px' }}>
+                      <div style={{ height: '13px', width: `${w * 5}px`, background: '#f0f0f0', borderRadius: '4px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+        </div>
       </div>
     );
   }
