@@ -15,6 +15,7 @@ import Reservations from './pages/Reservations';
 import Fines from './pages/Fines';
 import Reviews from './pages/Reviews';
 import Wishlist from './pages/Wishlist';
+import Recommendations from './pages/Recommendations';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -65,6 +66,10 @@ function App() {
             <span className="nav-icon">🛒</span>
             <span className="nav-label">POS</span>
           </Link>
+          <Link to="/recommendations" className="nav-link">
+            <span className="nav-icon">💡</span>
+            <span className="nav-label">Recommendations</span>
+          </Link>
           <Link to="/wishlist" className="nav-link">
             <span className="nav-icon">📋</span>
             <span className="nav-label">Wishlist</span>
@@ -105,6 +110,7 @@ function App() {
           <Route path="/fines" element={<Fines />} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/recommendations" element={<Recommendations />} />
       
     
         </Routes>
