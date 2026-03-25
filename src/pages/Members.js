@@ -1,356 +1,434 @@
 import React, { useState, useEffect } from 'react';
-import BulkImport from '../BulkImport';
 import { supabase } from '../utils/supabase';
+import FilterBar from '../components/FilterBar';
+import {
+  calculateStatusColor,
+  createMembership,
+  renewMembership,
+  filterMembersByStatus,
+  filterMembersByPlan,
+  filterMembersBySearch,
+  sortMembers,
+  formatDate,
+  PLAN_DEFAULTS,
+  calculateEndDate
+} from '../utils/membershipUtils';
 
-export default function Members() {
+function Members() {
   const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [showImport, setShowImport] = useState(false);
-
+  const [filteredMembers, setFilteredMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showFilterBar, setShowFilterBar] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [currentFilters, setCurrentFilters] = useState({
+    search: '',
+    membershipStatus: ['active', 'expiring', 'expired', 'guest'],
+    membershipPlan: ['day_pass', 'basic', 'premium', 'family', 'student', 'no_plan'],
+    sortBy: 'expiry_date',
+    sortOrder: 'asc'
+  });
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     email: '',
     plan: 'basic',
-    subscription_start: new Date().toISOString().split('T')[0],
-    subscription_end: '',
-    borrow_limit: 2,
-    status: 'active',
+    duration_days: 30,
+    borrow_limit: 3,
+    discount_percent: 0,
+    price: 100
   });
 
   useEffect(() => {
     fetchMembers();
-  }, [filterStatus]);
+  }, []);
 
   const fetchMembers = async () => {
-    setLoading(true);
     try {
-      let query = supabase.from('members').select('*');
-      
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
-      setMembers(data || []);
+
+      const membersWithStatus = data.map(member => ({
+        ...member,
+        status_color: calculateStatusColor(member)
+      }));
+
+      setMembers(membersWithStatus);
+      applyFilters(membersWithStatus, currentFilters);
     } catch (error) {
       console.error('Error fetching members:', error);
+      alert('Failed to fetch members');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const applyFilters = (membersToFilter, filters) => {
+    let result = [...membersToFilter];
+    result = filterMembersBySearch(result, filters.search);
+    result = filterMembersByStatus(result, filters.membershipStatus);
+    result = filterMembersByPlan(result, filters.membershipPlan);
+    result = sortMembers(result, filters.sortBy, filters.sortOrder);
+    setFilteredMembers(result);
   };
 
-  const calculateEndDate = (startDate, months) => {
-    const date = new Date(startDate);
-    date.setMonth(date.getMonth() + parseInt(months));
-    return date.toISOString().split('T')[0];
+  const handleFilterChange = (newFilters) => {
+    setCurrentFilters(newFilters);
+    applyFilters(members, newFilters);
+    setShowFilterBar(false);
   };
 
-  const handlePlanChange = (e) => {
-    const plan = e.target.value;
-    const monthsMap = { basic: 3, premium: 6, family: 12 };
-    setFormData(prev => ({
-      ...prev,
-      plan,
-      subscription_end: calculateEndDate(formData.subscription_start, monthsMap[plan])
-    }));
-  };
-
-  const handleAddMember = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        const { error } = await supabase
-          .from('members')
-          .update(formData)
-          .eq('id', editingId);
-        if (error) throw error;
-        setEditingId(null);
-      } else {
-        const { error } = await supabase
-          .from('members')
-          .insert([formData]);
-        if (error) throw error;
-      }
-      
-      setFormData({
-        name: '',
-        phone: '',
-        email: '',
-        plan: 'basic',
-        subscription_start: new Date().toISOString().split('T')[0],
-        subscription_end: '',
-        borrow_limit: 2,
-        status: 'active',
-      });
-      setShowAddForm(false);
-      fetchMembers();
-      alert(editingId ? 'Member updated!' : 'Member added!');
-    } catch (error) {
-      console.error('Error saving member:', error);
-      alert('Error saving member: ' + error.message);
-    }
+  const handleAddMember = () => {
+    setEditingMember(null);
+    setFormData({
+      name: '',
+      phone: '',
+      email: '',
+      plan: 'basic',
+      duration_days: 30,
+      borrow_limit: 3,
+      discount_percent: 0,
+      price: 100
+    });
+    setShowModal(true);
   };
 
   const handleEditMember = (member) => {
-    setFormData(member);
-    setEditingId(member.id);
-    setShowAddForm(true);
+    setEditingMember(member);
+    setFormData({
+      name: member.name || '',
+      phone: member.phone || '',
+      email: member.email || '',
+      plan: member.plan || 'basic',
+      duration_days: member.plan_duration_days || 30,
+      borrow_limit: member.borrow_limit || 3,
+      discount_percent: member.discount_percent || 0,
+      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'basic'].price
+    });
+    setShowModal(true);
   };
 
-  const handleDeleteMember = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this member?')) return;
-    
+  const handleRenewMembership = (member) => {
+    setEditingMember(member);
+    const renewed = renewMembership(member, {});
+    setFormData({
+      name: member.name,
+      phone: member.phone,
+      email: member.email,
+      plan: member.plan,
+      duration_days: renewed.plan_duration_days,
+      borrow_limit: renewed.borrow_limit,
+      discount_percent: renewed.discount_percent,
+      price: renewed.plan_price
+    });
+    setShowModal(true);
+  };
+
+  const handleSaveMember = async () => {
+    if (!formData.name || !formData.phone) {
+      alert('Name and phone are required');
+      return;
+    }
+
+    try {
+      if (editingMember) {
+        const updateData = {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          plan: formData.plan,
+          plan_duration_days: formData.duration_days,
+          borrow_limit: formData.borrow_limit,
+          discount_percent: formData.discount_percent,
+          plan_price: formData.price,
+          subscription_start: editingMember.subscription_start || new Date().toISOString().split('T')[0],
+          subscription_end: calculateEndDate(new Date().toISOString().split('T')[0], formData.duration_days),
+          membership_type: 'active_member',
+          status_color: 'gold'
+        };
+
+        const { error } = await supabase
+          .from('members')
+          .update(updateData)
+          .eq('id', editingMember.id);
+
+        if (error) throw error;
+        alert('Member updated successfully!');
+      } else {
+        const newMembership = createMembership(formData.plan, {
+          duration_days: formData.duration_days,
+          borrow_limit: formData.borrow_limit,
+          discount_percent: formData.discount_percent,
+          price: formData.price
+        });
+
+        const { error } = await supabase
+          .from('members')
+          .insert([{
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            ...newMembership
+          }]);
+
+        if (error) throw error;
+        alert('Member created successfully!');
+      }
+
+      setShowModal(false);
+      fetchMembers();
+    } catch (error) {
+      console.error('Error saving member:', error);
+      alert('Failed to save member');
+    }
+  };
+
+  const handleDeleteMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to delete this member?')) {
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('members')
         .delete()
-        .eq('id', id);
+        .eq('id', memberId);
+
       if (error) throw error;
+      alert('Member deleted successfully!');
       fetchMembers();
-      alert('Member deleted!');
     } catch (error) {
       console.error('Error deleting member:', error);
-      alert('Error deleting member');
+      alert('Failed to delete member');
     }
   };
 
-  const filteredMembers = members.filter(member =>
-    member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.phone.includes(searchTerm) ||
-    member.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getStatusBadge = (member) => {
+    const color = member.status_color || 'normal';
+    if (color === 'gold') return '🟡 Active';
+    if (color === 'orange') return '🟠 Expiring';
+    if (color === 'red') return '🔴 Expired';
+    return '⚪ Guest';
+  };
+
+  const getPlanBadge = (member) => {
+    if (!member.plan) return '-';
+    const planName = member.plan.replace('_', ' ').toUpperCase();
+    return planName;
+  };
+
+  if (loading) {
+    return <div className="page-content"><p>Loading members...</p></div>;
+  }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>👥 Members</h1>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingId(null);
-              setFormData({
-                name: '',
-                phone: '',
-                email: '',
-                plan: 'basic',
-                subscription_start: new Date().toISOString().split('T')[0],
-                subscription_end: '',
-                borrow_limit: 2,
-                status: 'active',
-              });
-            }}
-            style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            ➕ Add Member
+    <div className="page-content">
+      <div className="page-header">
+        <h1>👥 Members Management</h1>
+        <div className="header-actions">
+          <button className="btn btn-primary" onClick={handleAddMember}>
+            + Add New Member
           </button>
-          <button
-            onClick={() => setShowImport(true)}
-            style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            📤 Import CSV
+          <button className="btn btn-secondary" onClick={() => setShowFilterBar(!showFilterBar)}>
+            🔍 Filters
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <input
-          type="text"
-          placeholder="Search by name, phone, or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-        />
-        <select 
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-        >
-          <option value="all">All Members</option>
-          <option value="active">Active</option>
-          <option value="expired">Expired</option>
-        </select>
+      {showFilterBar && (
+        <FilterBar onFilterChange={handleFilterChange} onClose={() => setShowFilterBar(false)} />
+      )}
+
+      <div className="members-stats-compact">
+        <div className="stat-item">
+          <span className="stat-label">Total:</span>
+          <span className="stat-number">{members.length}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Active:</span>
+          <span className="stat-number">{members.filter(m => m.status_color === 'gold').length}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Expiring:</span>
+          <span className="stat-number">{members.filter(m => m.status_color === 'orange').length}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Expired:</span>
+          <span className="stat-number">{members.filter(m => m.status_color === 'red').length}</span>
+        </div>
       </div>
 
-      {showAddForm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '600px', width: '90%' }}>
-            <h2>{editingId ? 'Edit Member' : 'Add New Member'}</h2>
-            <form onSubmit={handleAddMember}>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Name *</label>
+      <div className="members-table-wrapper">
+        <table className="members-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>Status</th>
+              <th>Expires</th>
+              <th>Borrow</th>
+              <th>Discount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredMembers.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="text-center">No members found</td>
+              </tr>
+            ) : (
+              filteredMembers.map(member => (
+                <tr key={member.id} className={`member-row ${member.status_color === 'normal' ? 'guest-row' : 'member-row-gold'}`}>
+                  <td className="font-bold">{member.name}</td>
+                  <td>{member.phone}</td>
+                  <td>{member.email || '-'}</td>
+                  <td><span className="plan-badge">{getPlanBadge(member)}</span></td>
+                  <td>{getStatusBadge(member)}</td>
+                  <td>{member.subscription_end ? formatDate(member.subscription_end) : '-'}</td>
+                  <td className="text-center">{member.borrow_limit || 0}</td>
+                  <td className="text-center">{member.discount_percent || 0}%</td>
+                  <td className="actions-cell">
+                    <button className="btn btn-small btn-primary" onClick={() => handleEditMember(member)}>Edit</button>
+                    {member.plan && <button className="btn btn-small btn-secondary" onClick={() => handleRenewMembership(member)}>Renew</button>}
+                    <button className="btn btn-small btn-delete" onClick={() => handleDeleteMember(member.id)}>Delete</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingMember ? 'Edit Member' : 'Add New Member'}</h2>
+              <button className="btn-close" onClick={() => setShowModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Name *</label>
                 <input
                   type="text"
-                  name="name"
                   value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Member name"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Phone *</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    required
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Email *</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Phone *</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="Phone number"
+                />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Plan *</label>
-                  <select
-                    name="plan"
-                    value={formData.plan}
-                    onChange={handlePlanChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  >
-                    <option value="basic">Basic (3 months)</option>
-                    <option value="premium">Premium (6 months)</option>
-                    <option value="family">Family (12 months)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Borrow Limit</label>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Email address"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Membership Plan</label>
+                <select
+                  value={formData.plan}
+                  onChange={(e) => {
+                    const plan = e.target.value;
+                    const defaults = PLAN_DEFAULTS[plan];
+                    setFormData({
+                      ...formData,
+                      plan,
+                      duration_days: defaults.duration_days,
+                      borrow_limit: defaults.borrow_limit,
+                      discount_percent: defaults.discount_percent,
+                      price: defaults.price
+                    });
+                  }}
+                >
+                  {Object.keys(PLAN_DEFAULTS).map(key => (
+                    <option key={key} value={key}>
+                      {PLAN_DEFAULTS[key].name} (₹{PLAN_DEFAULTS[key].price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Duration (days)</label>
                   <input
                     type="number"
-                    name="borrow_limit"
-                    value={formData.borrow_limit}
-                    onChange={handleInputChange}
+                    value={formData.duration_days}
+                    onChange={(e) => setFormData({ ...formData, duration_days: parseInt(e.target.value) })}
                     min="1"
-                    max="10"
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Borrow Limit</label>
+                  <input
+                    type="number"
+                    value={formData.borrow_limit}
+                    onChange={(e) => setFormData({ ...formData, borrow_limit: parseInt(e.target.value) })}
+                    min="0"
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Start Date</label>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Discount %</label>
                   <input
-                    type="date"
-                    name="subscription_start"
-                    value={formData.subscription_start}
-                    onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    type="number"
+                    value={formData.discount_percent}
+                    onChange={(e) => setFormData({ ...formData, discount_percent: parseFloat(e.target.value) })}
+                    min="0"
+                    max="100"
+                    step="0.1"
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>End Date</label>
+                <div className="form-group">
+                  <label>Price</label>
                   <input
-                    type="date"
-                    name="subscription_end"
-                    value={formData.subscription_end}
-                    onChange={handleInputChange}
-                    readOnly
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5' }}
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                    min="0"
+                    step="0.01"
                   />
                 </div>
               </div>
+            </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="submit" style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                  {editingId ? 'Update Member' : 'Add Member'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  style={{ padding: '8px 16px', background: '#e0e0e0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSaveMember}>
+                {editingMember ? 'Update Member' : 'Create Member'}
+              </button>
+            </div>
           </div>
         </div>
-      )}
-
-      <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
-        {loading ? (
-          <p style={{ padding: '20px', textAlign: 'center' }}>Loading members...</p>
-        ) : filteredMembers.length === 0 ? (
-          <p style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No members found</p>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: '#f5f5f5', borderBottom: '2px solid #e0e0e0' }}>
-              <tr>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Name</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Phone</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Email</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Plan</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Status</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMembers.map((member) => (
-                <tr key={member.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '12px' }}>{member.name}</td>
-                  <td style={{ padding: '12px' }}>{member.phone}</td>
-                  <td style={{ padding: '12px' }}>{member.email}</td>
-                  <td style={{ padding: '12px', textTransform: 'capitalize' }}>{member.plan}</td>
-                  <td style={{ padding: '12px' }}>
-                    <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '12px', background: member.status === 'active' ? '#d4edda' : '#f8d7da', color: member.status === 'active' ? '#155724' : '#721c24' }}>
-                      {member.status === 'active' ? '✓' : '✗'} {member.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px', display: 'flex', gap: '5px' }}>
-                    <button
-                      onClick={() => handleEditMember(member)}
-                      style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => handleDeleteMember(member.id)}
-                      style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                    >
-                      🗑️
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {showImport && (
-        <BulkImport
-          type="members"
-          onSuccess={fetchMembers}
-          onClose={() => setShowImport(false)}
-        />
       )}
     </div>
   );
 }
+
+export default Members;
