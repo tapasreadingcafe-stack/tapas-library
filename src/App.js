@@ -16,6 +16,7 @@ import Fines from './pages/Fines';
 import Reviews from './pages/Reviews';
 import Wishlist from './pages/Wishlist';
 import Recommendations from './pages/Recommendations';
+import ChildProfile from './pages/ChildProfile';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -111,6 +112,7 @@ function App() {
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/member/:memberId/child/:childId" element={<ChildProfile />} />
       
     
         </Routes>

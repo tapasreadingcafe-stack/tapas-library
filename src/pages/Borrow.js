@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 
@@ -51,6 +52,8 @@ function tierColor(m) {
 }
 
 export default function Borrow() {
+  const location = useLocation();
+
   const [activeTab, setActiveTab] = useState('checkout');
   const [members, setMembers] = useState([]);
   const [books, setBooks] = useState([]);
@@ -66,6 +69,11 @@ export default function Borrow() {
   const [dueDate, setDueDate] = useState('');
   const [memberResults, setMemberResults] = useState([]);
   const [bookResults, setBookResults] = useState([]);
+
+  // Child borrowing state
+  const [childrenOfMember, setChildrenOfMember] = useState([]);
+  const [selectedChild, setSelectedChild] = useState(null); // null = borrowing for parent
+  const [hasChildIdCol, setHasChildIdCol] = useState(false);
 
   // Active borrows filters
   const [filter, setFilter] = useState('all');
@@ -103,7 +111,34 @@ export default function Borrow() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    probeChildIdColumn();
+  }, []);
+
+  // Pre-select parent + child if navigated from ChildProfile
+  useEffect(() => {
+    if (location.state?.parentId && members.length > 0) {
+      const parent = members.find(m => m.id === location.state.parentId);
+      if (parent) {
+        selectMember(parent);
+        // Child will be pre-selected after children load via selectMember's fetchChildren
+      }
+    }
+  }, [location.state, members]);
+
+  // Pre-select child after children load (from ChildProfile navigation)
+  useEffect(() => {
+    if (location.state?.childId && childrenOfMember.length > 0) {
+      const child = childrenOfMember.find(c => c.id === location.state.childId);
+      if (child) setSelectedChild(child);
+    }
+  }, [location.state, childrenOfMember]);
+
+  const probeChildIdColumn = async () => {
+    const { error } = await supabase.from('circulation').select('child_id').limit(0);
+    setHasChildIdCol(!error);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -173,13 +208,29 @@ export default function Borrow() {
     );
   }, [bookSearch, books]);
 
+  const fetchChildrenForMember = async (memberId) => {
+    try {
+      const { data, error } = await supabase
+        .from('family_members')
+        .select('*')
+        .eq('parent_member_id', memberId)
+        .order('created_at');
+      if (!error) setChildrenOfMember(data || []);
+    } catch {
+      setChildrenOfMember([]);
+    }
+  };
+
   const selectMember = (m) => {
     setSelectedMember(m);
     setMemberSearch(m.name);
     setMemberResults([]);
+    setSelectedChild(null);
+    setChildrenOfMember([]);
     const d = new Date();
     d.setDate(d.getDate() + getLoanDays(m));
     setDueDate(d.toISOString().split('T')[0]);
+    fetchChildrenForMember(m.id);
   };
 
   const selectBook = (b) => {
@@ -211,24 +262,38 @@ export default function Borrow() {
       return;
     }
     try {
-      const { error } = await supabase.from('circulation').insert([{
+      const circRecord = {
         member_id: selectedMember.id,
         book_id: selectedBook.id,
         checkout_date: new Date().toISOString().split('T')[0],
         due_date: dueDate,
         status: 'checked_out',
         renewal_count: 0,
-      }]);
-      if (error) throw error;
+      };
+
+      // Include child_id if borrowing on behalf of a child
+      if (selectedChild && hasChildIdCol) {
+        circRecord.child_id = selectedChild.id;
+      }
+
+      const { error } = await supabase.from('circulation').insert([circRecord]);
+      if (error) {
+        // Retry without child_id if column issue
+        delete circRecord.child_id;
+        const { error: e2 } = await supabase.from('circulation').insert([circRecord]);
+        if (e2) throw e2;
+      }
 
       await supabase
         .from('books')
         .update({ quantity_available: selectedBook.quantity_available - 1 })
         .eq('id', selectedBook.id);
 
-      setReceiptModal({ member: selectedMember, book: selectedBook, dueDate });
+      setReceiptModal({ member: selectedMember, book: selectedBook, dueDate, child: selectedChild });
       setSelectedMember(null);
       setSelectedBook(null);
+      setSelectedChild(null);
+      setChildrenOfMember([]);
       setMemberSearch('');
       setBookSearch('');
       setDueDate('');
@@ -592,6 +657,54 @@ export default function Borrow() {
             )}
           </div>
 
+          {/* Borrowing for child — full width, shown when member has children */}
+          {selectedMember && childrenOfMember.length > 0 && (
+            <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', border: '2px solid #e8f4fd' }}>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#555', whiteSpace: 'nowrap' }}>📋 Borrowing for:</span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setSelectedChild(null)}
+                  style={{
+                    padding: '7px 16px', border: '2px solid', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                    borderColor: !selectedChild ? '#667eea' : '#ddd',
+                    background: !selectedChild ? '#667eea' : 'white',
+                    color: !selectedChild ? 'white' : '#555',
+                  }}
+                >
+                  👤 {selectedMember.name} (myself)
+                </button>
+                {childrenOfMember.map((child, idx) => {
+                  const CHILD_COLORS = ['#3498db', '#27ae60', '#9b59b6', '#f39c12', '#e91e63'];
+                  const color = CHILD_COLORS[idx % CHILD_COLORS.length];
+                  const active = selectedChild?.id === child.id;
+                  return (
+                    <button
+                      key={child.id}
+                      onClick={() => setSelectedChild(child)}
+                      style={{
+                        padding: '7px 16px', border: `2px solid ${active ? color : '#ddd'}`, borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                        background: active ? color : 'white',
+                        color: active ? 'white' : '#555',
+                      }}
+                    >
+                      {child.relationship === 'Daughter' ? '👧' : '👦'} {child.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedChild && (
+                <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '600', marginLeft: 'auto' }}>
+                  ✓ Book will appear under {selectedChild.name}'s profile
+                </span>
+              )}
+              {!hasChildIdCol && (
+                <span style={{ fontSize: '11px', color: '#f39c12', marginLeft: 'auto' }}>
+                  ⚠️ child_id column missing — borrow will use parent account only
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Due date + checkout — full width */}
           <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div>
@@ -764,6 +877,12 @@ export default function Borrow() {
                 <span style={{ color: '#888' }}>Member:</span>
                 <span style={{ fontWeight: '700' }}>{receiptModal.member.name}</span>
               </div>
+              {receiptModal.child && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#888' }}>For:</span>
+                  <span style={{ fontWeight: '700', color: '#667eea' }}>👦 {receiptModal.child.name}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#888' }}>Book:</span>
                 <span style={{ fontWeight: '700', maxWidth: '200px', textAlign: 'right' }}>{receiptModal.book.title}</span>
