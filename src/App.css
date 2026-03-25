@@ -14,6 +14,7 @@ body {
 
 .app-container {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
@@ -42,12 +43,19 @@ body {
 }
 
 .menu-toggle {
-  display: none;
+  display: block;
   background: none;
   border: none;
   color: white;
   font-size: 24px;
   cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .app-title {
@@ -99,8 +107,11 @@ body {
 
 .sidebar.closed {
   width: 0;
-  padding: 0;
-  border: none;
+  overflow: hidden;
+}
+
+.sidebar.open {
+  width: 250px;
 }
 
 .sidebar-nav {
@@ -122,6 +133,7 @@ body {
   color: #666;
   font-size: 14px;
   font-weight: 500;
+  text-decoration: none;
 }
 
 .nav-link:hover {
@@ -138,6 +150,7 @@ body {
 
 .nav-icon {
   font-size: 18px;
+  min-width: 24px;
 }
 
 .nav-label {
@@ -155,6 +168,10 @@ body {
   transition: margin-left 0.3s ease;
 }
 
+.main-content.expanded {
+  margin-left: 250px;
+}
+
 .main-content.full {
   margin-left: 0;
 }
@@ -170,13 +187,26 @@ body {
     left: -250px;
     height: 100%;
     top: 60px;
+    width: 250px;
   }
 
   .sidebar.open {
     left: 0;
   }
 
+  .sidebar.closed {
+    left: -250px;
+  }
+
   .main-content {
+    margin-left: 0;
+  }
+
+  .main-content.expanded {
+    margin-left: 250px;
+  }
+
+  .main-content.full {
     margin-left: 0;
   }
 
