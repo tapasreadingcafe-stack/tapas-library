@@ -116,8 +116,35 @@ export default function Borrow() {
         .update({ quantity_available: book.quantity_available + 1 })
         .eq('id', circulation_record.book_id);
 
+      // Notify next reservation in queue for this book
+      const { data: nextRes } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('book_id', circulation_record.book_id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (nextRes && nextRes.length > 0) {
+        const expires = new Date();
+        expires.setHours(expires.getHours() + 48);
+        // Try updating with expires_at; if column doesn't exist, fall back without it
+        const { error: resUpdateErr } = await supabase
+          .from('reservations')
+          .update({ status: 'available', expires_at: expires.toISOString() })
+          .eq('id', nextRes[0].id);
+        if (resUpdateErr) {
+          await supabase
+            .from('reservations')
+            .update({ status: 'available' })
+            .eq('id', nextRes[0].id);
+        }
+        alert('Book returned! A member had a reservation — they have 48 hours to pick it up.');
+      } else {
+        alert('Book returned successfully!');
+      }
+
       fetchData();
-      alert('Book returned successfully!');
     } catch (error) {
       console.error('Error during return:', error);
       alert('Error: ' + error.message);

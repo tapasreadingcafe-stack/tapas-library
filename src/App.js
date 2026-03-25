@@ -11,6 +11,7 @@ import MemberProfile from './pages/MemberProfile';
 import OverdueBooks from './pages/OverdueBooks';
 import BookAvailability from './pages/BookAvailability';
 import BorrowStatistics from './pages/BorrowStatistics';
+import Reservations from './pages/Reservations';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -61,6 +62,10 @@ function App() {
             <span className="nav-icon">🛒</span>
             <span className="nav-label">POS</span>
           </Link>
+          <Link to="/reservations" className="nav-link">
+            <span className="nav-icon">🔖</span>
+            <span className="nav-label">Reservations</span>
+          </Link>
           <Link to="/reports" className="nav-link">
             <span className="nav-icon">📈</span>
             <span className="nav-label">Reports</span>
@@ -81,6 +86,7 @@ function App() {
           <Route path="/pos" element={<POS />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/member/:memberId" element={<MemberProfile />} />
+          <Route path="/reservations" element={<Reservations />} />
       
     
         </Routes>
