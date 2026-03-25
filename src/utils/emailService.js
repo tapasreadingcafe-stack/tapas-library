@@ -1,37 +1,25 @@
-const MAILGUN_DOMAIN = process.env.REACT_APP_MAILGUN_DOMAIN;
-const MAILGUN_API_KEY = process.env.REACT_APP_MAILGUN_API_KEY;
+import { supabase } from './supabase';
+
 const LIBRARY_NAME = 'Tapas Library';
 
 export const sendEmailNotification = async (toEmail, subject, htmlContent) => {
   try {
-    const formData = new FormData();
-    formData.append('from', `${LIBRARY_NAME} <noreply@${MAILGUN_DOMAIN}>`);
-    formData.append('to', toEmail);
-    formData.append('subject', subject);
-    formData.append('html', htmlContent);
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: {
+        toEmail: toEmail,
+        subject: subject,
+        htmlContent: htmlContent,
+      },
+    });
 
-    const response = await fetch(
-      `https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${btoa(`api:${MAILGUN_API_KEY}`)}`
-        },
-        body: formData
-      }
-    );
+    if (error) throw error;
 
-    if (!response.ok) {
-      throw new Error(`Email failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
     return {
       success: true,
-      messageId: data.id,
+      messageId: data.messageId,
       toEmail: toEmail,
       subject: subject,
-      sentAt: new Date().toISOString()
+      sentAt: new Date().toISOString(),
     };
   } catch (error) {
     console.error('Email Error:', error);
@@ -41,6 +29,7 @@ export const sendEmailNotification = async (toEmail, subject, htmlContent) => {
 
 export const sendDueReminderEmail = async (memberName, memberEmail, bookTitle, dueDate) => {
   const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -80,6 +69,7 @@ export const sendDueReminderEmail = async (memberName, memberEmail, bookTitle, d
     </body>
     </html>
   `;
+  
   return sendEmailNotification(memberEmail, `📚 Reminder: "${bookTitle}" due on ${new Date(dueDate).toLocaleDateString('en-IN')}`, htmlContent);
 };
 
@@ -123,6 +113,7 @@ export const sendOverdueAlertEmail = async (memberName, memberEmail, bookTitle, 
     </body>
     </html>
   `;
+  
   return sendEmailNotification(memberEmail, `⚠️ URGENT: "${bookTitle}" is ${daysOverdue} days overdue!`, htmlContent);
 };
 
@@ -166,5 +157,6 @@ export const sendCheckoutConfirmationEmail = async (memberName, memberEmail, boo
     </body>
     </html>
   `;
+  
   return sendEmailNotification(memberEmail, `✓ Checkout Confirmed: "${bookTitle}"`, htmlContent);
 };
