@@ -11,7 +11,10 @@ import {
   sortMembers,
   formatDate,
   PLAN_DEFAULTS,
-  calculateEndDate
+  calculateEndDate,
+  calculateAge,
+  isMinor,
+  generateCustomerID
 } from '../utils/membershipUtils';
 
 function Members() {
@@ -20,11 +23,14 @@ function Members() {
   const [loading, setLoading] = useState(true);
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [editingMember, setEditingMember] = useState(null);
   const [currentFilters, setCurrentFilters] = useState({
     search: '',
     membershipStatus: ['active', 'expiring', 'expired', 'guest'],
-    membershipPlan: ['day_pass', 'basic', 'premium', 'family', 'student', 'no_plan'],
+    membershipPlan: ['day_pass', 'basic', 'premium', 'family', 'student', 'teen', 'no_plan'],
     sortBy: 'expiry_date',
     sortOrder: 'asc'
   });
@@ -32,6 +38,8 @@ function Members() {
     name: '',
     phone: '',
     email: '',
+    date_of_birth: '',
+    age: '',
     plan: 'basic',
     duration_days: 30,
     borrow_limit: 3,
@@ -68,6 +76,22 @@ function Members() {
     }
   };
 
+  const fetchTransactions = async (memberId) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('member_id', memberId)
+        .order('transaction_date', { ascending: false });
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setTransactions([]);
+    }
+  };
+
   const applyFilters = (membersToFilter, filters) => {
     let result = [...membersToFilter];
     result = filterMembersBySearch(result, filters.search);
@@ -89,6 +113,8 @@ function Members() {
       name: '',
       phone: '',
       email: '',
+      date_of_birth: '',
+      age: '',
       plan: 'basic',
       duration_days: 30,
       borrow_limit: 3,
@@ -104,6 +130,8 @@ function Members() {
       name: member.name || '',
       phone: member.phone || '',
       email: member.email || '',
+      date_of_birth: member.date_of_birth || '',
+      age: member.age || calculateAge(member.date_of_birth) || '',
       plan: member.plan || 'basic',
       duration_days: member.plan_duration_days || 30,
       borrow_limit: member.borrow_limit || 3,
@@ -120,6 +148,8 @@ function Members() {
       name: member.name,
       phone: member.phone,
       email: member.email,
+      date_of_birth: member.date_of_birth || '',
+      age: member.age || calculateAge(member.date_of_birth) || '',
       plan: member.plan,
       duration_days: renewed.plan_duration_days,
       borrow_limit: renewed.borrow_limit,
@@ -127,6 +157,15 @@ function Members() {
       price: renewed.plan_price
     });
     setShowModal(true);
+  };
+
+  const handleDateChange = (date) => {
+    const age = calculateAge(date);
+    setFormData({
+      ...formData,
+      date_of_birth: date,
+      age: age || ''
+    });
   };
 
   const handleSaveMember = async () => {
@@ -141,6 +180,9 @@ function Members() {
           name: formData.name,
           phone: formData.phone,
           email: formData.email,
+          date_of_birth: formData.date_of_birth,
+          age: formData.age,
+          customer_type: formData.age < 18 ? 'minor' : 'adult',
           plan: formData.plan,
           plan_duration_days: formData.duration_days,
           borrow_limit: formData.borrow_limit,
@@ -173,6 +215,9 @@ function Members() {
             name: formData.name,
             phone: formData.phone,
             email: formData.email,
+            date_of_birth: formData.date_of_birth,
+            age: formData.age,
+            customer_type: formData.age < 18 ? 'minor' : 'adult',
             ...newMembership
           }]);
 
@@ -208,10 +253,20 @@ function Members() {
     }
   };
 
+  const handleViewHistory = (member) => {
+    setSelectedMember(member);
+    fetchTransactions(member.id);
+    setShowHistory(true);
+  };
+
   const getPlanBadge = (member) => {
     if (!member.plan) return 'GUEST';
     const planName = member.plan.replace('_', ' ').toUpperCase();
     return planName;
+  };
+
+  const getGeneratedCustomerID = (member) => {
+    return generateCustomerID(member.id, isMinor(member.date_of_birth));
   };
 
   if (loading) {
@@ -257,6 +312,7 @@ function Members() {
             <tr>
               <th>Customer ID</th>
               <th>Name</th>
+              <th>Age</th>
               <th>Phone</th>
               <th>Email</th>
               <th>Plan</th>
@@ -269,13 +325,20 @@ function Members() {
           <tbody>
             {filteredMembers.length === 0 ? (
               <tr>
-                <td colSpan="9" className="text-center">No members found</td>
+                <td colSpan="10" className="text-center">No members found</td>
               </tr>
             ) : (
               filteredMembers.map(member => (
                 <tr key={member.id} className={`member-row ${member.plan ? 'member-row-gold' : 'guest-row'}`}>
-                  <td className="customer-id">#{member.id}</td>
+                  <td className="customer-id">{getGeneratedCustomerID(member)}</td>
                   <td className="font-bold">{member.name}</td>
+                  <td className="text-center">
+                    {member.age ? (
+                      <span className={member.age < 18 ? 'minor-badge' : 'adult-badge'}>
+                        {member.age} yrs
+                      </span>
+                    ) : '-'}
+                  </td>
                   <td>{member.phone}</td>
                   <td>{member.email || '-'}</td>
                   <td><span className={`plan-badge ${member.plan ? '' : 'guest-badge'}`}>{getPlanBadge(member)}</span></td>
@@ -283,9 +346,10 @@ function Members() {
                   <td className="text-center">{member.borrow_limit || 0}</td>
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
-                    <button className="btn btn-small btn-primary" onClick={() => handleEditMember(member)}>✏️ Edit</button>
-                    {member.plan && <button className="btn btn-small btn-secondary" onClick={() => handleRenewMembership(member)}>🔄 Renew</button>}
-                    <button className="btn btn-small btn-delete" onClick={() => handleDeleteMember(member.id)}>🗑️ Delete</button>
+                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit">✏️</button>
+                    {member.plan && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew">🔄</button>}
+                    <button className="btn-icon" onClick={() => handleViewHistory(member)} title="History">📋</button>
+                    <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>
                   </td>
                 </tr>
               ))
@@ -294,6 +358,7 @@ function Members() {
         </table>
       </div>
 
+      {/* Add Member / Edit Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -331,6 +396,27 @@ function Members() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="Email address"
                 />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date of Birth 📅</label>
+                  <input
+                    type="date"
+                    value={formData.date_of_birth}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Age (Auto-calculated)</label>
+                  <input
+                    type="text"
+                    value={formData.age ? `${formData.age} years` : ''}
+                    readOnly
+                    placeholder="Auto-calculated"
+                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -410,6 +496,69 @@ function Members() {
               </button>
               <button className="btn btn-primary" onClick={handleSaveMember}>
                 {editingMember ? 'Update Member' : 'Create Member'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistory && selectedMember && (
+        <div className="modal-overlay" onClick={() => setShowHistory(false)}>
+          <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📋 Transaction History - {selectedMember.name}</h2>
+              <button className="btn-close" onClick={() => setShowHistory(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              {transactions.length === 0 ? (
+                <p className="text-center" style={{ color: '#999', padding: '20px' }}>
+                  No transaction history found
+                </p>
+              ) : (
+                <div className="history-table-wrapper">
+                  <table className="history-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((transaction) => (
+                        <tr key={transaction.id}>
+                          <td>{formatDate(transaction.transaction_date)}</td>
+                          <td>
+                            <span className={`transaction-badge ${transaction.transaction_type}`}>
+                              {transaction.transaction_type === 'borrow' ? '📚 Borrow' : '🛒 Purchase'}
+                            </span>
+                          </td>
+                          <td>{transaction.item_name}</td>
+                          <td className="text-center">{transaction.quantity}</td>
+                          <td className="text-right">
+                            {transaction.amount ? `₹${transaction.amount}` : '-'}
+                          </td>
+                          <td>
+                            <span className={`status-badge ${transaction.status}`}>
+                              {transaction.status === 'returned' ? '✓ Returned' : 'Active'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowHistory(false)}>
+                Close
               </button>
             </div>
           </div>

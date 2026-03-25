@@ -1,3 +1,37 @@
+// Add these NEW functions at the top of the file:
+
+export const calculateAge = (dateOfBirth) => {
+  if (!dateOfBirth) return null;
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  
+  return age;
+};
+
+export const isMinor = (dateOfBirth) => {
+  const age = calculateAge(dateOfBirth);
+  return age !== null && age < 18;
+};
+
+export const generateCustomerID = (memberId, isMinor) => {
+  if (!memberId) return '';
+  // Take last 4 digits of UUID and convert to number
+  const lastDigits = memberId.replace(/-/g, '').slice(-8);
+  const numericId = parseInt(lastDigits, 16) % 10000;
+  const paddedId = String(numericId).padStart(4, '0');
+  
+  return isMinor ? `MIN${paddedId}` : `CUST${paddedId}`;
+};
+
+export const getCustomerIDPrefix = (dateOfBirth) => {
+  return isMinor(dateOfBirth) ? 'MIN' : 'CUST';
+};
 // src/utils/membershipUtils.js
 // Membership utility functions for Tapas Library
 
