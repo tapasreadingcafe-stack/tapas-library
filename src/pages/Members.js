@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import FilterBar from '../components/FilterBar';
+
 import {
   calculateStatusColor,
   createMembership,
@@ -18,6 +20,7 @@ import {
 } from '../utils/membershipUtils';
 
 function Members() {
+  const navigate = useNavigate();
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -418,7 +421,7 @@ function Members() {
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
                     <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit">✏️</button>
-                    <button className="btn-icon" onClick={() => handleViewHistory(member)} title="History">📋</button>
+                    <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile">👁️</button>
                     <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>
                   </td>
                 </tr>
@@ -438,86 +441,86 @@ function Members() {
 
             <div className="modal-body">
               {modalMode !== 'addPlan' && (
-  <>
-    {editingMember ? (
-      <div className="form-group">
-        <label>Customer ID</label>
-        <input
-          type="text"
-          value={getGeneratedCustomerID(editingMember)}
-          readOnly
-          placeholder="Auto-generated"
-          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', fontFamily: 'Courier New', fontWeight: 'bold', letterSpacing: '1px' }}
-        />
-      </div>
-    ) : (
-      <div className="form-group">
-        <label>Customer ID</label>
-        <input
-          type="text"
-          value="Auto-generated on save"
-          readOnly
-          placeholder="Auto-generated on save"
-          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', color: '#999' }}
-        />
-        <small style={{ color: '#999', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-          Will be assigned after member creation (CUST#### or MIN####)
-        </small>
-      </div>
-    )}
+                <>
+                  {editingMember ? (
+                    <div className="form-group">
+                      <label>Customer ID</label>
+                      <input
+                        type="text"
+                        value={getGeneratedCustomerID(editingMember)}
+                        readOnly
+                        placeholder="Auto-generated"
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', fontFamily: 'Courier New', fontWeight: 'bold', letterSpacing: '1px' }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label>Customer ID</label>
+                      <input
+                        type="text"
+                        value="Auto-generated on save"
+                        readOnly
+                        placeholder="Auto-generated on save"
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', color: '#999' }}
+                      />
+                      <small style={{ color: '#999', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                        Will be assigned after member creation (CUST#### or MIN####)
+                      </small>
+                    </div>
+                  )}
 
-    <div className="form-group">
-      <label>Name *</label>
-      <input
-        type="text"
-        value={formData.name}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        placeholder="Member name"
-      />
-    </div>
+                  <div className="form-group">
+                    <label>Name *</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Member name"
+                    />
+                  </div>
 
-    <div className="form-group">
-      <label>Phone *</label>
-      <input
-        type="tel"
-        value={formData.phone}
-        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-        placeholder="Phone number"
-      />
-    </div>
+                  <div className="form-group">
+                    <label>Phone *</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Phone number"
+                    />
+                  </div>
 
-    <div className="form-group">
-      <label>Email</label>
-      <input
-        type="email"
-        value={formData.email}
-        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-        placeholder="Email address"
-      />
-    </div>
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="Email address"
+                    />
+                  </div>
 
-    <div className="form-row">
-      <div className="form-group">
-        <label>Date of Birth </label>
-        <input
-          type="date"
-          value={formData.date_of_birth}
-          onChange={(e) => handleDateChange(e.target.value)}
-        />
-      </div>
-      <div className="form-group">
-        <label>Age </label>
-        <input
-          type="text"
-          value={formData.age ? `${formData.age} years` : ''}
-          readOnly
-          placeholder="Age"
-          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-        />
-      </div>
-    </div>
-  </>
-)}
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Date of Birth</label>
+                      <input
+                        type="date"
+                        value={formData.date_of_birth}
+                        onChange={(e) => handleDateChange(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Age</label>
+                      <input
+                        type="text"
+                        value={formData.age ? `${formData.age} years` : ''}
+                        readOnly
+                        placeholder="Age"
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="form-group">
                 <label>Membership Plan (Optional)</label>

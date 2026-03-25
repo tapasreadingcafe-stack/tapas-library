@@ -3,10 +3,11 @@ import { Routes, Route, Link } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import Books from './pages/Books';
-import Circulation from './pages/Circulation';
+import Borrow from './pages/Borrow';
 import POS from './pages/POS';
 import Reports from './pages/Reports';
 import './App.css';
+import MemberProfile from './pages/MemberProfile';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -46,9 +47,9 @@ function App() {
             <span className="nav-icon">📖</span>
             <span className="nav-label">Books</span>
           </Link>
-          <Link to="/circulation" className="nav-link">
-            <span className="nav-icon">🔄</span>
-            <span className="nav-label">Circulation</span>
+          <Link to="/Borrow" className="nav-link">
+            <span className="nav-icon">📚</span>
+            <span className="nav-label">Borrow</span>
           </Link>
           <Link to="/pos" className="nav-link">
             <span className="nav-icon">🛒</span>
@@ -67,9 +68,10 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/members" element={<Members />} />
           <Route path="/books" element={<Books />} />
-          <Route path="/circulation" element={<Circulation />} />
+          <Route path="/Borrow" element={<Borrow />} />
           <Route path="/pos" element={<POS />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/member/:memberId" element={<MemberProfile />} />
         </Routes>
       </main>
     </div>

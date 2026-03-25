@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 
-export default function Circulation() {
+export default function Borrow() {
   const [activeTab, setActiveTab] = useState('checkout');
   const [members, setMembers] = useState([]);
   const [books, setBooks] = useState([]);
-  const [circulation, setCirculation] = useState([]);
+  const [Borrow, setCirculation] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [checkoutForm, setCheckoutForm] = useState({
@@ -16,7 +16,7 @@ export default function Circulation() {
   });
 
   const [returnForm, setReturnForm] = useState({
-    circulation_id: '',
+    borrow_id: '',
   });
   const [showScanner, setShowScanner] = useState(false);
   const [scannerMode, setScannerMode] = useState('book');
@@ -136,7 +136,7 @@ export default function Circulation() {
 
   return (
     <div style={{ padding: '20px' }}>
-      <h1>🔄 Circulation (Checkout / Return)</h1>
+      <h1> 📚 Borrow (Checkout / Return)</h1>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #ddd' }}>
         <button
