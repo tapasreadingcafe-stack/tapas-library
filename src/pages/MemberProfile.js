@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
-import { calculateAge, isMinor, generateCustomerID, formatCurrency, formatDate, calculateStatusColor } from '../utils/membershipUtils';
+import { calculateAge, isMinor, generateCustomerID, formatCurrency, formatDate, calculateStatusColor, PLAN_DEFAULTS } from '../utils/membershipUtils';
+
+const TIERS = {
+  basic:  { name: 'Basic',  icon: '🥉', borrow_limit: 2,  loan_days: 7,  color: '#95a5a6', bg: '#f4f4f4' },
+  silver: { name: 'Silver', icon: '🥈', borrow_limit: 4,  loan_days: 14, color: '#7f8c8d', bg: '#ecf0f1' },
+  gold:   { name: 'Gold',   icon: '🥇', borrow_limit: 6,  loan_days: 21, color: '#f39c12', bg: '#fefdf0' },
+};
 
 export default function MemberProfile() {
   const { memberId } = useParams();
@@ -12,6 +18,7 @@ export default function MemberProfile() {
   const [borrowingHistory, borrowingHistoryData] = useState([]);
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [upgradingTier, setUpgradingTier] = useState(false);
 
   useEffect(() => {
     fetchMemberProfile();
@@ -89,6 +96,32 @@ export default function MemberProfile() {
     }
   };
 
+  const handleTierUpgrade = async (tierKey) => {
+    if (!window.confirm(`Upgrade membership to ${TIERS[tierKey].name} tier?`)) return;
+    setUpgradingTier(true);
+    try {
+      const tier = TIERS[tierKey];
+      const { error } = await supabase
+        .from('members')
+        .update({ borrow_limit: tier.borrow_limit, membership_tier: tierKey })
+        .eq('id', memberId);
+      if (error) {
+        // membership_tier column may not exist — update just borrow_limit
+        const { error: e2 } = await supabase
+          .from('members')
+          .update({ borrow_limit: tier.borrow_limit })
+          .eq('id', memberId);
+        if (e2) throw e2;
+      }
+      alert(`Tier updated to ${tier.name}! Borrow limit: ${tier.borrow_limit} books.`);
+      fetchMemberProfile();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      setUpgradingTier(false);
+    }
+  };
+
   if (loading) {
     return <div style={{ padding: '20px', textAlign: 'center' }}>Loading profile...</div>;
   }
@@ -100,6 +133,32 @@ export default function MemberProfile() {
   const age = calculateAge(member.date_of_birth);
   const customerId = generateCustomerID(member);
   const statusColor = calculateStatusColor(member);
+
+  // Reading analytics
+  const returned = borrowingHistory.filter(b => b.status === 'returned');
+  const genreMap = {};
+  returned.forEach(b => {
+    const cat = b.books?.category;
+    if (cat) genreMap[cat] = (genreMap[cat] || 0) + 1;
+  });
+  const topGenres = Object.entries(genreMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+  // Reading streak: consecutive months with at least one borrow
+  const readMonths = new Set(
+    borrowingHistory.map(b => b.checkout_date?.slice(0, 7)).filter(Boolean)
+  );
+  let streak = 0;
+  const now = new Date();
+  let m = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (readMonths.has(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`)) {
+    streak++;
+    m.setMonth(m.getMonth() - 1);
+  }
+
+  // Determine current tier from borrow_limit
+  const bLimit = member.borrow_limit || 0;
+  const currentTierKey = bLimit <= 2 ? 'basic' : bLimit <= 4 ? 'silver' : 'gold';
+  const currentTier = TIERS[currentTierKey];
 
   return (
     <div style={{ padding: '20px', background: '#f5f5f5', minHeight: '100vh' }}>
@@ -180,6 +239,103 @@ export default function MemberProfile() {
           <h2 style={{ margin: '0', color: '#667eea', fontSize: '32px' }}>
             {formatCurrency(purchaseHistory.reduce((sum, sale) => sum + (sale.final_total || 0), 0))}
           </h2>
+        </div>
+      </div>
+
+      {/* Reading Analytics Card */}
+      <div style={{ background: 'white', padding: '25px', borderRadius: '8px', marginBottom: '25px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #667eea', paddingBottom: '10px', marginBottom: '20px' }}>
+          <h2 style={{ margin: '0', color: '#333' }}>📖 Reading Analytics</h2>
+          <button
+            onClick={() => window.print()}
+            style={{ padding: '6px 14px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}
+          >
+            🖨️ Export / Print
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+          {[
+            { label: 'Books Read', value: returned.length, color: '#27ae60', icon: '✅' },
+            { label: 'Currently Borrowed', value: borrowingHistory.filter(b => b.status === 'checked_out').length, color: '#3498db', icon: '📚' },
+            { label: 'Reading Streak', value: `${streak} mo.`, color: '#f39c12', icon: '🔥' },
+            { label: 'Genres Explored', value: Object.keys(genreMap).length, color: '#9b59b6', icon: '🗂️' },
+          ].map(s => (
+            <div key={s.label} style={{ background: '#f8f9fa', borderRadius: '8px', padding: '14px', textAlign: 'center', borderTop: `3px solid ${s.color}` }}>
+              <div style={{ fontSize: '20px' }}>{s.icon}</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: s.color, marginTop: '4px' }}>{s.value}</div>
+              <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>{s.label.toUpperCase()}</div>
+            </div>
+          ))}
+        </div>
+        {topGenres.length > 0 && (
+          <div>
+            <div style={{ fontWeight: '600', marginBottom: '10px', fontSize: '14px' }}>🎭 Favourite Genres</div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {topGenres.map(([genre, count], idx) => (
+                <div key={genre} style={{
+                  background: idx === 0 ? '#f0f4ff' : '#f8f9fa',
+                  border: `1px solid ${idx === 0 ? '#c7d2fe' : '#eee'}`,
+                  borderRadius: '20px', padding: '6px 14px', fontSize: '13px', fontWeight: idx === 0 ? '700' : '500'
+                }}>
+                  {idx === 0 ? '⭐ ' : ''}{genre} <span style={{ color: '#999', fontSize: '11px' }}>({count})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {returned.length === 0 && (
+          <p style={{ color: '#999', textAlign: 'center', padding: '10px' }}>No reading history yet.</p>
+        )}
+      </div>
+
+      {/* Membership Tier Card */}
+      <div style={{ background: 'white', padding: '25px', borderRadius: '8px', marginBottom: '25px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+        <h2 style={{ margin: '0 0 20px 0', color: '#333', borderBottom: '2px solid #667eea', paddingBottom: '10px' }}>
+          🏅 Membership Tier
+        </h2>
+        <div style={{ marginBottom: '16px', padding: '14px', background: currentTier.bg, border: `2px solid ${currentTier.color}`, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <span style={{ fontSize: '32px' }}>{currentTier.icon}</span>
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '18px', color: currentTier.color }}>{currentTier.name} Tier</div>
+            <div style={{ fontSize: '13px', color: '#666', marginTop: '3px' }}>
+              Borrow limit: {currentTier.borrow_limit} books · Loan duration: {currentTier.loan_days} days
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', fontSize: '13px', color: '#666' }}>
+            Current borrow limit: <strong>{member.borrow_limit || '—'}</strong>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          {Object.entries(TIERS).map(([key, tier]) => {
+            const isCurrentTier = key === currentTierKey;
+            return (
+              <div key={key} style={{
+                border: `2px solid ${isCurrentTier ? tier.color : '#eee'}`,
+                borderRadius: '8px', padding: '16px', textAlign: 'center',
+                background: isCurrentTier ? tier.bg : 'white',
+                opacity: isCurrentTier ? 1 : 0.8
+              }}>
+                <div style={{ fontSize: '28px', marginBottom: '6px' }}>{tier.icon}</div>
+                <div style={{ fontWeight: '700', color: tier.color }}>{tier.name}</div>
+                <div style={{ fontSize: '12px', color: '#666', margin: '6px 0' }}>
+                  {tier.borrow_limit} books · {tier.loan_days} days
+                </div>
+                {isCurrentTier ? (
+                  <span style={{ background: tier.color, color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
+                    Current
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleTierUpgrade(key)}
+                    disabled={upgradingTier}
+                    style={{ padding: '5px 14px', background: tier.color, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
+                  >
+                    {upgradingTier ? '...' : key === 'gold' ? '⬆️ Upgrade' : '⬇️ Downgrade'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
