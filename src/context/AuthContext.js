@@ -66,31 +66,49 @@ export function AuthProvider({ children }) {
 
   // ─── initialise on mount ─────────────────────────────────────────────
   useEffect(() => {
+    // Safety: if env vars are missing, bail out immediately
+    if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+      console.error('[Auth] Missing REACT_APP_SUPABASE_URL or REACT_APP_SUPABASE_ANON_KEY env vars.');
+      setLoading(false);
+      return;
+    }
+
+    // Timeout fallback: never stay stuck on loading more than 5s
+    const timeout = setTimeout(() => {
+      console.warn('[Auth] Auth check timed out after 5s — forcing loading=false');
+      setLoading(false);
+    }, 5000);
+
     const init = async () => {
+      console.log('[Auth] Starting auth check...');
       try {
         // Check if session expired due to inactivity (across page refresh)
         const last = localStorage.getItem(LAST_ACTIVITY_KEY);
         if (last && Date.now() - parseInt(last, 10) > INACTIVITY_MS) {
+          console.log('[Auth] Session expired due to inactivity');
           await supabase.auth.signOut();
           setSessionExpired(true);
-          setLoading(false);
           return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('[Auth] getSession result:', session ? 'session found' : 'no session', error || '');
         if (session?.user) {
           await loadStaffProfile(session.user);
         }
       } catch (e) {
-        console.error(e);
+        console.error('[Auth] Init error:', e);
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
+        console.log('[Auth] loading set to false');
       }
     };
 
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] onAuthStateChange event:', event);
       if (event === 'SIGNED_IN' && session?.user) {
         setSessionExpired(false);
         await loadStaffProfile(session.user);
@@ -104,7 +122,10 @@ export function AuthProvider({ children }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [loadStaffProfile]);
 
   // ─── activity tracking (only when logged in) ─────────────────────────
