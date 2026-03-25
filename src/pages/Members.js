@@ -21,13 +21,12 @@ function Members() {
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showFilterBar, setShowFilterBar] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [editingMember, setEditingMember] = useState(null);
-  const [modalMode, setModalMode] = useState('add'); // 'add', 'edit', 'addPlan'
+  const [modalMode, setModalMode] = useState('add');
   const [currentFilters, setCurrentFilters] = useState({
     search: '',
     membershipStatus: ['active', 'expiring', 'expired', 'guest'],
@@ -41,7 +40,7 @@ function Members() {
     email: '',
     date_of_birth: '',
     age: '',
-    plan: '', // Empty = no plan
+    plan: '',
     duration_days: 30,
     borrow_limit: 3,
     discount_percent: 0,
@@ -105,7 +104,6 @@ function Members() {
   const handleFilterChange = (newFilters) => {
     setCurrentFilters(newFilters);
     applyFilters(members, newFilters);
-    setShowFilterBar(false);
   };
 
   const handleAddMember = () => {
@@ -230,7 +228,6 @@ function Members() {
           customer_type: formData.age < 18 ? 'minor' : 'adult'
         };
 
-        // If plan exists, add plan data
         if (formData.plan) {
           updateData.plan = formData.plan;
           updateData.plan_duration_days = formData.duration_days;
@@ -242,7 +239,6 @@ function Members() {
           updateData.membership_type = 'active_member';
           updateData.status_color = 'gold';
         } else {
-          // Remove plan if empty
           updateData.plan = null;
           updateData.plan_duration_days = null;
           updateData.borrow_limit = null;
@@ -271,7 +267,6 @@ function Members() {
           customer_type: formData.age < 18 ? 'minor' : 'adult'
         };
 
-        // If plan is selected, create with membership
         if (formData.plan) {
           const newMembership = createMembership(formData.plan, {
             duration_days: formData.duration_days,
@@ -281,7 +276,6 @@ function Members() {
           });
           Object.assign(newData, newMembership);
         } else {
-          // Create as non-plan member (guest)
           newData.plan = null;
           newData.borrow_limit = 0;
           newData.discount_percent = 0;
@@ -348,7 +342,11 @@ function Members() {
   };
 
   if (loading) {
-    return <div className="page-content"><p>Loading members...</p></div>;
+    return (
+      <div className="page-content">
+        <p>Loading members...</p>
+      </div>
+    );
   }
 
   return (
@@ -357,17 +355,12 @@ function Members() {
         <h1>👥 Members Management</h1>
         <div className="header-actions">
           <button className="btn btn-primary" onClick={handleAddMember}>
-            + Add New Member
-          </button>
-          <button className="btn btn-secondary" onClick={() => setShowFilterBar(!showFilterBar)}>
-            🔍 Filters
+            + Add Member
           </button>
         </div>
       </div>
 
-      {showFilterBar && (
-        <FilterBar onFilterChange={handleFilterChange} onClose={() => setShowFilterBar(false)} />
-      )}
+      <FilterBar onFilterChange={handleFilterChange} onClose={() => {}} />
 
       <div className="members-stats-compact">
         <div className="stat-item">
@@ -425,11 +418,6 @@ function Members() {
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
                     <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit">✏️</button>
-                    {member.plan ? (
-                      <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew">🔄</button>
-                    ) : (
-                      <button className="btn-icon btn-add-plan" onClick={() => handleAddPlanToMember(member)} title="Add Plan">➕</button>
-                    )}
                     <button className="btn-icon" onClick={() => handleViewHistory(member)} title="History">📋</button>
                     <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>
                   </td>
@@ -440,7 +428,6 @@ function Members() {
         </table>
       </div>
 
-      {/* Add Member / Edit Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -451,59 +438,86 @@ function Members() {
 
             <div className="modal-body">
               {modalMode !== 'addPlan' && (
-                <>
-                  <div className="form-group">
-                    <label>Name *</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Member name"
-                    />
-                  </div>
+  <>
+    {editingMember ? (
+      <div className="form-group">
+        <label>Customer ID</label>
+        <input
+          type="text"
+          value={getGeneratedCustomerID(editingMember)}
+          readOnly
+          placeholder="Auto-generated"
+          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', fontFamily: 'Courier New', fontWeight: 'bold', letterSpacing: '1px' }}
+        />
+      </div>
+    ) : (
+      <div className="form-group">
+        <label>Customer ID</label>
+        <input
+          type="text"
+          value="Auto-generated on save"
+          readOnly
+          placeholder="Auto-generated on save"
+          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', color: '#999' }}
+        />
+        <small style={{ color: '#999', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+          Will be assigned after member creation (CUST#### or MIN####)
+        </small>
+      </div>
+    )}
 
-                  <div className="form-group">
-                    <label>Phone *</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Phone number"
-                    />
-                  </div>
+    <div className="form-group">
+      <label>Name *</label>
+      <input
+        type="text"
+        value={formData.name}
+        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        placeholder="Member name"
+      />
+    </div>
 
-                  <div className="form-group">
-                    <label>Email</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="Email address"
-                    />
-                  </div>
+    <div className="form-group">
+      <label>Phone *</label>
+      <input
+        type="tel"
+        value={formData.phone}
+        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+        placeholder="Phone number"
+      />
+    </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Date of Birth 📅</label>
-                      <input
-                        type="date"
-                        value={formData.date_of_birth}
-                        onChange={(e) => handleDateChange(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Age (Auto-calculated)</label>
-                      <input
-                        type="text"
-                        value={formData.age ? `${formData.age} years` : ''}
-                        readOnly
-                        placeholder="Auto-calculated"
-                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
+    <div className="form-group">
+      <label>Email</label>
+      <input
+        type="email"
+        value={formData.email}
+        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        placeholder="Email address"
+      />
+    </div>
+
+    <div className="form-row">
+      <div className="form-group">
+        <label>Date of Birth </label>
+        <input
+          type="date"
+          value={formData.date_of_birth}
+          onChange={(e) => handleDateChange(e.target.value)}
+        />
+      </div>
+      <div className="form-group">
+        <label>Age </label>
+        <input
+          type="text"
+          value={formData.age ? `${formData.age} years` : ''}
+          readOnly
+          placeholder="Age"
+          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+        />
+      </div>
+    </div>
+  </>
+)}
 
               <div className="form-group">
                 <label>Membership Plan (Optional)</label>
@@ -521,7 +535,7 @@ function Members() {
               </div>
 
               {formData.plan && (
-                <>
+                <div className="plan-conditional-fields">
                   <div className="form-row">
                     <div className="form-group">
                       <label>Duration (days)</label>
@@ -566,36 +580,22 @@ function Members() {
                       />
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
 
             <div className="modal-footer">
-              {modalMode === 'addPlan' ? (
-                <>
-                  <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                    ❌ Cancel
-                  </button>
-                  <button className="btn btn-add-plan-primary" onClick={handleSaveMember}>
-                    ➕ Add Plan
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                    ❌ Cancel
-                  </button>
-                  <button className="btn btn-primary" onClick={handleSaveMember}>
-                    ✅ {editingMember ? 'Update' : 'Create'}
-                  </button>
-                </>
-              )}
+              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSaveMember}>
+                {modalMode === 'addPlan' ? 'Add Plan to Member' : editingMember ? 'Update Member' : 'Create Member'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* History Modal */}
       {showHistory && selectedMember && (
         <div className="modal-overlay" onClick={() => setShowHistory(false)}>
           <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>

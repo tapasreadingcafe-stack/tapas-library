@@ -3,16 +3,15 @@ import React, { useState } from 'react';
 function FilterBar({ onFilterChange, onClose }) {
   const [search, setSearch] = useState('');
   const [membershipCategory, setMembershipCategory] = useState('all');
-  const [sortOrder, setSortOrder] = useState('asc');
-  const [sortBy, setSortBy] = useState('expiry_date');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   const handleSearch = (value) => {
     setSearch(value);
     applyFilters({
       search: value,
       membershipCategory,
-      sortOrder,
-      sortBy
+      sortBy: 'expiry_date',
+      sortOrder: 'asc'
     });
   };
 
@@ -21,44 +20,9 @@ function FilterBar({ onFilterChange, onClose }) {
     applyFilters({
       search,
       membershipCategory: category,
-      sortOrder,
-      sortBy
+      sortBy: 'expiry_date',
+      sortOrder: 'asc'
     });
-  };
-
-  const handleSortOrderToggle = () => {
-    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortOrder(newOrder);
-    applyFilters({
-      search,
-      membershipCategory,
-      sortOrder: newOrder,
-      sortBy
-    });
-  };
-
-  const handleClearFilters = () => {
-    setSearch('');
-    setMembershipCategory('all');
-    setSortOrder('asc');
-    setSortBy('expiry_date');
-    applyFilters({
-      search: '',
-      membershipCategory: 'all',
-      sortOrder: 'asc',
-      sortBy: 'expiry_date'
-    });
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      applyFilters({
-        search,
-        membershipCategory,
-        sortOrder,
-        sortBy
-      });
-    }
   };
 
   const applyFilters = (filters) => {
@@ -87,15 +51,15 @@ function FilterBar({ onFilterChange, onClose }) {
 
   return (
     <div className="filter-bar-horizontal">
-      {/* Search Bar */}
+      {/* Main Filter Row */}
       <div className="filter-row-main">
+        {/* Search Bar */}
         <input
           type="text"
           className="filter-search-input"
-          placeholder="Search name, phone, email..."
+          placeholder="Search name, phone, email....."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
-          onKeyPress={handleKeyPress}
         />
 
         {/* Membership Category Buttons */}
@@ -103,53 +67,63 @@ function FilterBar({ onFilterChange, onClose }) {
           <button
             className={`category-btn ${membershipCategory === 'all' ? 'active' : ''}`}
             onClick={() => handleMembershipChange('all')}
-            title="All Members"
           >
             All
           </button>
           <button
             className={`category-btn ${membershipCategory === 'subscription' ? 'active' : ''}`}
             onClick={() => handleMembershipChange('subscription')}
-            title="Subscription Members"
           >
             Members
           </button>
           <button
             className={`category-btn ${membershipCategory === 'non_subscription' ? 'active' : ''}`}
             onClick={() => handleMembershipChange('non_subscription')}
-            title="Non-Subscription Members"
           >
-            Guests
+            Non-Members
           </button>
         </div>
 
-        {/* Sort Order Icon */}
+        {/* More Filters Icon */}
         <button
-          className="btn-icon-sm"
-          onClick={handleSortOrderToggle}
-          title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+          className={`btn-icon-sm more-filters-btn ${showMoreFilters ? 'active' : ''}`}
+          onClick={() => setShowMoreFilters(!showMoreFilters)}
+          title="More Filters"
         >
-          {sortOrder === 'asc' ? '↑' : '↓'}
-        </button>
-
-        {/* Clear Button */}
-        <button
-          className="btn-icon-sm"
-          onClick={handleClearFilters}
-          title="Clear All Filters"
-        >
-          🗑️
-        </button>
-
-        {/* Close Button */}
-        <button
-          className="btn-icon-sm"
-          onClick={onClose}
-          title="Close"
-        >
-          ✕
+          ⚙️
         </button>
       </div>
+
+      {/* More Filters Section (Hidden by default) */}
+      {showMoreFilters && (
+        <div className="filter-row-expanded">
+          <div className="filter-group-inline">
+            <label className="filter-label-inline">Plan Status:</label>
+            <input type="checkbox" id="active-plan" />
+            <label htmlFor="active-plan" className="checkbox-label">Active</label>
+            <input type="checkbox" id="expiring-plan" />
+            <label htmlFor="expiring-plan" className="checkbox-label">Expiring Soon</label>
+            <input type="checkbox" id="expired-plan" />
+            <label htmlFor="expired-plan" className="checkbox-label">Expired</label>
+          </div>
+
+          <div className="filter-group-inline">
+            <label className="filter-label-inline">Member Type:</label>
+            <input type="checkbox" id="adult" />
+            <label htmlFor="adult" className="checkbox-label">Adults (18+)</label>
+            <input type="checkbox" id="minor" />
+            <label htmlFor="minor" className="checkbox-label">Minors (&lt;18)</label>
+          </div>
+
+          <div className="filter-group-inline">
+            <label className="filter-label-inline">Borrow Status:</label>
+            <input type="checkbox" id="active-borrower" />
+            <label htmlFor="active-borrower" className="checkbox-label">Active Borrowers</label>
+            <input type="checkbox" id="no-borrow" />
+            <label htmlFor="no-borrow" className="checkbox-label">No Books</label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
