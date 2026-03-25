@@ -37,6 +37,13 @@ export const PLAN_DEFAULTS = {
     duration_days: 30,
     borrow_limit: 5,
     discount_percent: 15
+  },
+  teen: {
+    name: 'Teen',
+    price: 200,
+    duration_days: 30,
+    borrow_limit: 8,
+    discount_percent: 12
   }
 };
 

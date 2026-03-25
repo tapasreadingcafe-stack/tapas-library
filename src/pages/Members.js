@@ -208,16 +208,8 @@ function Members() {
     }
   };
 
-  const getStatusBadge = (member) => {
-    const color = member.status_color || 'normal';
-    if (color === 'gold') return '🟡 Active';
-    if (color === 'orange') return '🟠 Expiring';
-    if (color === 'red') return '🔴 Expired';
-    return '⚪ Guest';
-  };
-
   const getPlanBadge = (member) => {
-    if (!member.plan) return '-';
+    if (!member.plan) return 'GUEST';
     const planName = member.plan.replace('_', ' ').toUpperCase();
     return planName;
   };
@@ -250,16 +242,12 @@ function Members() {
           <span className="stat-number">{members.length}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-label">Active:</span>
-          <span className="stat-number">{members.filter(m => m.status_color === 'gold').length}</span>
+          <span className="stat-label">Members:</span>
+          <span className="stat-number">{members.filter(m => m.plan).length}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-label">Expiring:</span>
-          <span className="stat-number">{members.filter(m => m.status_color === 'orange').length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Expired:</span>
-          <span className="stat-number">{members.filter(m => m.status_color === 'red').length}</span>
+          <span className="stat-label">Guests:</span>
+          <span className="stat-number">{members.filter(m => !m.plan).length}</span>
         </div>
       </div>
 
@@ -267,11 +255,11 @@ function Members() {
         <table className="members-table">
           <thead>
             <tr>
+              <th>Customer ID</th>
               <th>Name</th>
               <th>Phone</th>
               <th>Email</th>
               <th>Plan</th>
-              <th>Status</th>
               <th>Expires</th>
               <th>Borrow</th>
               <th>Discount</th>
@@ -285,19 +273,19 @@ function Members() {
               </tr>
             ) : (
               filteredMembers.map(member => (
-                <tr key={member.id} className={`member-row ${member.status_color === 'normal' ? 'guest-row' : 'member-row-gold'}`}>
+                <tr key={member.id} className={`member-row ${member.plan ? 'member-row-gold' : 'guest-row'}`}>
+                  <td className="customer-id">#{member.id}</td>
                   <td className="font-bold">{member.name}</td>
                   <td>{member.phone}</td>
                   <td>{member.email || '-'}</td>
-                  <td><span className="plan-badge">{getPlanBadge(member)}</span></td>
-                  <td>{getStatusBadge(member)}</td>
+                  <td><span className={`plan-badge ${member.plan ? '' : 'guest-badge'}`}>{getPlanBadge(member)}</span></td>
                   <td>{member.subscription_end ? formatDate(member.subscription_end) : '-'}</td>
                   <td className="text-center">{member.borrow_limit || 0}</td>
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
-                    <button className="btn btn-small btn-primary" onClick={() => handleEditMember(member)}>Edit</button>
-                    {member.plan && <button className="btn btn-small btn-secondary" onClick={() => handleRenewMembership(member)}>Renew</button>}
-                    <button className="btn btn-small btn-delete" onClick={() => handleDeleteMember(member.id)}>Delete</button>
+                    <button className="btn btn-small btn-primary" onClick={() => handleEditMember(member)}>✏️ Edit</button>
+                    {member.plan && <button className="btn btn-small btn-secondary" onClick={() => handleRenewMembership(member)}>🔄 Renew</button>}
+                    <button className="btn btn-small btn-delete" onClick={() => handleDeleteMember(member.id)}>🗑️ Delete</button>
                   </td>
                 </tr>
               ))
