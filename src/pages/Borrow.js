@@ -6,7 +6,7 @@ export default function Borrow() {
   const [activeTab, setActiveTab] = useState('checkout');
   const [members, setMembers] = useState([]);
   const [books, setBooks] = useState([]);
-  const [Borrow, setCirculation] = useState([]);
+  const [circulationData, setCirculationData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [checkoutForm, setCheckoutForm] = useState({
@@ -15,11 +15,11 @@ export default function Borrow() {
     due_date: '',
   });
 
-  const [returnForm, setReturnForm] = useState({
-    borrow_id: '',
-  });
   const [showScanner, setShowScanner] = useState(false);
   const [scannerMode, setScannerMode] = useState('book');
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [selectedForRenewal, setSelectedForRenewal] = useState(null);
+  const [renewalDueDate, setRenewalDueDate] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -30,7 +30,7 @@ export default function Borrow() {
     try {
       const { data: membersData } = await supabase.from('members').select('*');
       const { data: booksData } = await supabase.from('books').select('*');
-      const { data: circulationData } = await supabase
+      const { data: circulationDataFromDB } = await supabase
         .from('circulation')
         .select('*, members(name), books(title)')
         .eq('status', 'checked_out')
@@ -38,7 +38,7 @@ export default function Borrow() {
 
       setMembers(membersData || []);
       setBooks(booksData || []);
-      setCirculation(circulationData || []);
+      setCirculationData(circulationDataFromDB || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -60,7 +60,7 @@ export default function Borrow() {
         return;
       }
 
-      const memberCheckouts = circulation.filter(c => c.member_id === checkoutForm.member_id);
+      const memberCheckouts = circulationData.filter(c => c.member_id === checkoutForm.member_id);
       if (memberCheckouts.length >= member.borrow_limit) {
         alert(`Member has reached borrow limit of ${member.borrow_limit}`);
         return;
@@ -78,6 +78,7 @@ export default function Borrow() {
         checkout_date: new Date().toISOString().split('T')[0],
         due_date: checkoutForm.due_date,
         status: 'checked_out',
+        renewal_count: 0
       }]);
 
       if (error) throw error;
@@ -100,7 +101,7 @@ export default function Borrow() {
     if (!window.confirm('Confirm book return?')) return;
 
     try {
-      const circulation_record = circulation.find(c => c.id === circulationId);
+      const circulation_record = circulationData.find(c => c.id === circulationId);
       
       const { error } = await supabase
         .from('circulation')
@@ -123,6 +124,45 @@ export default function Borrow() {
     }
   };
 
+  const handleRenewal = async () => {
+    if (!selectedForRenewal || !renewalDueDate) {
+      alert('Please select a new due date');
+      return;
+    }
+
+    try {
+      const renewalCount = selectedForRenewal.renewal_count || 0;
+      if (renewalCount >= 3) {
+        alert('Maximum 3 renewals allowed per book!');
+        return;
+      }
+
+      if (new Date(renewalDueDate) < new Date()) {
+        alert('Due date cannot be in the past');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('circulation')
+        .update({ 
+          due_date: renewalDueDate,
+          renewal_count: renewalCount + 1,
+          last_renewed_date: new Date().toISOString()
+        })
+        .eq('id', selectedForRenewal.id);
+
+      if (error) throw error;
+
+      alert('Book renewed successfully! New due date: ' + new Date(renewalDueDate).toLocaleDateString('en-IN'));
+      setShowRenewalModal(false);
+      setSelectedForRenewal(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error renewing book:', error);
+      alert('Failed to renew book: ' + error.message);
+    }
+  };
+
   const isOverdue = (dueDate) => {
     return new Date(dueDate) < new Date();
   };
@@ -136,7 +176,7 @@ export default function Borrow() {
 
   return (
     <div style={{ padding: '20px' }}>
-      <h1> 📚 Borrow (Checkout / Return)</h1>
+      <h1>📚 Borrow (Checkout / Return)</h1>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #ddd' }}>
         <button
@@ -270,11 +310,11 @@ export default function Borrow() {
       {activeTab === 'active' && (
         <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
           <div style={{ padding: '20px' }}>
-            <h2>Active Checkouts ({circulation.length})</h2>
+            <h2>Active Checkouts ({circulationData.length})</h2>
           </div>
           {loading ? (
             <p style={{ padding: '20px', textAlign: 'center' }}>Loading...</p>
-          ) : circulation.length === 0 ? (
+          ) : circulationData.length === 0 ? (
             <p style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No active checkouts</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -284,12 +324,13 @@ export default function Borrow() {
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Book</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Checkout Date</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Due Date</th>
+                  <th style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>Renewals</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Status</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {circulation.map((item) => (
+                {circulationData.map((item) => (
                   <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0', background: isOverdue(item.due_date) ? '#fff3cd' : 'white' }}>
                     <td style={{ padding: '12px' }}>{item.members?.name}</td>
                     <td style={{ padding: '12px' }}>{item.books?.title}</td>
@@ -302,12 +343,47 @@ export default function Borrow() {
                         </span>
                       )}
                     </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        background: (item.renewal_count || 0) >= 3 ? '#ffebee' : '#e3f2fd',
+                        color: (item.renewal_count || 0) >= 3 ? '#c62828' : '#1565c0',
+                        fontWeight: 'bold',
+                        fontSize: '12px'
+                      }}>
+                        {item.renewal_count || 0}/3
+                      </span>
+                    </td>
                     <td style={{ padding: '12px' }}>
                       <span style={{ padding: '4px 8px', borderRadius: '4px', background: isOverdue(item.due_date) ? '#f8d7da' : '#d4edda', color: isOverdue(item.due_date) ? '#721c24' : '#155724', fontSize: '12px' }}>
                         {isOverdue(item.due_date) ? '⚠️ Overdue' : '✓ On Time'}
                       </span>
                     </td>
                     <td style={{ padding: '12px' }}>
+                      <button
+                        onClick={() => {
+                          setSelectedForRenewal(item);
+                          const currentDue = new Date(item.due_date);
+                          const newDue = new Date(currentDue);
+                          newDue.setDate(newDue.getDate() + 14);
+                          setRenewalDueDate(newDue.toISOString().split('T')[0]);
+                          setShowRenewalModal(true);
+                        }}
+                        disabled={(item.renewal_count || 0) >= 3}
+                        style={{ 
+                          padding: '6px 12px', 
+                          background: (item.renewal_count || 0) >= 3 ? '#ccc' : '#2196F3', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '4px', 
+                          cursor: (item.renewal_count || 0) >= 3 ? 'not-allowed' : 'pointer', 
+                          fontSize: '12px',
+                          marginRight: '5px'
+                        }}
+                      >
+                        ♻️ Renew
+                      </button>
                       <button
                         onClick={() => handleReturn(item.id)}
                         style={{ padding: '6px 12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
@@ -320,6 +396,123 @@ export default function Borrow() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {showRenewalModal && selectedForRenewal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => setShowRenewalModal(false)}>
+          <div style={{
+            background: 'white',
+            padding: '30px',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>♻️ Renew Book</h2>
+
+            <div style={{ marginBottom: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '4px' }}>
+              <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '12px' }}>Member</p>
+              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#333' }}>
+                {selectedForRenewal.members?.name}
+              </p>
+
+              <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '12px' }}>Book</p>
+              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#333' }}>
+                {selectedForRenewal.books?.title}
+              </p>
+
+              <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '12px' }}>Current Due Date</p>
+              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2196F3' }}>
+                {new Date(selectedForRenewal.due_date).toLocaleDateString('en-IN')}
+              </p>
+
+              <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '12px' }}>Renewal Count</p>
+              <p style={{ margin: '0', fontWeight: 'bold', color: (selectedForRenewal.renewal_count || 0) >= 3 ? '#f44336' : '#4CAF50' }}>
+                {selectedForRenewal.renewal_count || 0} / 3
+              </p>
+            </div>
+
+            {(selectedForRenewal.renewal_count || 0) >= 3 && (
+              <div style={{
+                background: '#ffebee',
+                border: '1px solid #f44336',
+                color: '#c62828',
+                padding: '12px',
+                borderRadius: '4px',
+                marginBottom: '15px',
+                fontWeight: 'bold'
+              }}>
+                ✗ Maximum renewals reached! Please return the book.
+              </div>
+            )}
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>
+                New Due Date
+              </label>
+              <input
+                type="date"
+                value={renewalDueDate}
+                onChange={(e) => setRenewalDueDate(e.target.value)}
+                disabled={(selectedForRenewal.renewal_count || 0) >= 3}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  backgroundColor: (selectedForRenewal.renewal_count || 0) >= 3 ? '#f5f5f5' : 'white',
+                  cursor: (selectedForRenewal.renewal_count || 0) >= 3 ? 'not-allowed' : 'auto'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowRenewalModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#f5f5f5',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRenewal}
+                disabled={(selectedForRenewal.renewal_count || 0) >= 3}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: (selectedForRenewal.renewal_count || 0) >= 3 ? '#ccc' : '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: (selectedForRenewal.renewal_count || 0) >= 3 ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                ♻️ Renew Book
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

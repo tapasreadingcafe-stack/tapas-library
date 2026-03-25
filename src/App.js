@@ -8,6 +8,10 @@ import POS from './pages/POS';
 import Reports from './pages/Reports';
 import './App.css';
 import MemberProfile from './pages/MemberProfile';
+import OverdueBooks from './pages/OverdueBooks';
+import BookAvailability from './pages/BookAvailability';
+import BorrowStatistics from './pages/BorrowStatistics';
+import EmailNotifications from './pages/EmailNotifications';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -51,10 +55,14 @@ function App() {
             <span className="nav-icon">📚</span>
             <span className="nav-label">Borrow</span>
           </Link>
+          <Link to="/overdue" className="nav-link"><span className="nav-icon">🔴</span><span className="nav-label">Overdue</span></Link>
+          <Link to="/availability" className="nav-link"><span className="nav-icon">📚</span><span className="nav-label">Availability</span></Link>
+          <Link to="/statistics" className="nav-link"><span className="nav-icon">📊</span><span className="nav-label">Statistics</span></Link>
           <Link to="/pos" className="nav-link">
             <span className="nav-icon">🛒</span>
             <span className="nav-label">POS</span>
           </Link>
+          <Link to="/email" className="nav-link"><span className="nav-icon">📧</span><span className="nav-label">Email</span></Link>
           <Link to="/reports" className="nav-link">
             <span className="nav-icon">📈</span>
             <span className="nav-label">Reports</span>
@@ -65,13 +73,18 @@ function App() {
       {/* MAIN CONTENT */}
       <main className={`main-content ${sidebarOpen ? 'expanded' : 'full'}`}>
         <Routes>
+          <Route path="/overdue" element={<OverdueBooks />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/members" element={<Members />} />
           <Route path="/books" element={<Books />} />
           <Route path="/Borrow" element={<Borrow />} />
+          <Route path="/availability" element={<BookAvailability />} />
+          <Route path="/statistics" element={<BorrowStatistics />} />
           <Route path="/pos" element={<POS />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/member/:memberId" element={<MemberProfile />} />
+          <Route path="/email" element={<EmailNotifications />} />
+
         </Routes>
       </main>
     </div>
