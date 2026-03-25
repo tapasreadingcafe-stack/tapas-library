@@ -2,6 +2,23 @@ import React, { useState, useEffect } from 'react';
 import BulkImport from '../BulkImport';
 import { supabase } from '../utils/supabase';
 
+const PRESET_CATEGORIES = [
+  'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
+  'Fantasy', 'Romance', 'Thriller', 'Self-Help', 'Business', 'Technology',
+  'Children', 'Young Adult', 'Poetry', 'Drama', 'Philosophy', 'Religion',
+  'Travel', 'Cooking', 'Art', 'Sports', 'Politics', 'Economics', 'Health',
+];
+
+const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
+
+const CONDITION_STYLE = {
+  New:     { bg: '#d4edda', text: '#155724' },
+  Good:    { bg: '#cce5ff', text: '#004085' },
+  Fair:    { bg: '#fff3cd', text: '#856404' },
+  Poor:    { bg: '#fde8e8', text: '#c0392b' },
+  Damaged: { bg: '#f8d7da', text: '#721c24' },
+};
+
 export default function Books() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,8 +30,10 @@ export default function Books() {
   const [showImport, setShowImport] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [hasCondition, setHasCondition] = useState(false);
+  const [filterCondition, setFilterCondition] = useState('all');
 
-  const [formData, setFormData] = useState({
+  const emptyForm = {
     book_id: '',
     title: '',
     author: '',
@@ -25,12 +44,21 @@ export default function Books() {
     quantity_total: 1,
     quantity_available: 1,
     book_image: '',
-  });
+    condition: 'Good',
+  };
+
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
+    probeCondition();
     fetchBooks();
     fetchCategories();
   }, [filterCategory]);
+
+  const probeCondition = async () => {
+    const { error } = await supabase.from('books').select('condition').limit(0);
+    setHasCondition(!error);
+  };
 
   const fetchBooks = async () => {
     setLoading(true);
@@ -111,32 +139,19 @@ export default function Books() {
   const handleAddBook = async (e) => {
     e.preventDefault();
     try {
+      const payload = { ...formData };
+      if (!hasCondition) delete payload.condition;
+
       if (editingId) {
-        const { error } = await supabase
-          .from('books')
-          .update(formData)
-          .eq('id', editingId);
+        const { error } = await supabase.from('books').update(payload).eq('id', editingId);
         if (error) throw error;
         setEditingId(null);
       } else {
-        const { error } = await supabase
-          .from('books')
-          .insert([formData]);
+        const { error } = await supabase.from('books').insert([payload]);
         if (error) throw error;
       }
-      
-      setFormData({
-        book_id: '',
-        title: '',
-        author: '',
-        isbn: '',
-        category: '',
-        price: 0,
-        sales_price: 0,
-        quantity_total: 1,
-        quantity_available: 1,
-        book_image: '',
-      });
+
+      setFormData(emptyForm);
       setImagePreview('');
       setShowAddForm(false);
       fetchBooks();
@@ -171,35 +186,29 @@ export default function Books() {
     }
   };
 
-  const filteredBooks = books.filter(book =>
-    book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    book.isbn.includes(searchTerm) ||
-    book.book_id.includes(searchTerm)
-  );
+  const filteredBooks = books.filter(book => {
+    const term = searchTerm.toLowerCase();
+    const matchSearch = (
+      book.title?.toLowerCase().includes(term) ||
+      book.author?.toLowerCase().includes(term) ||
+      book.isbn?.includes(searchTerm) ||
+      book.book_id?.includes(searchTerm)
+    );
+    const matchCondition = filterCondition === 'all' || book.condition === filterCondition;
+    return matchSearch && matchCondition;
+  });
 
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>📚 Books</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
+          <button
             onClick={() => {
               setShowAddForm(true);
               setEditingId(null);
               setImagePreview('');
-              setFormData({
-                book_id: '',
-                title: '',
-                author: '',
-                isbn: '',
-                category: '',
-                price: 0,
-                sales_price: 0,
-                quantity_total: 1,
-                quantity_available: 1,
-                book_image: '',
-              });
+              setFormData(emptyForm);
             }}
             style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
@@ -222,7 +231,7 @@ export default function Books() {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
         />
-        <select 
+        <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
           style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
@@ -232,6 +241,16 @@ export default function Books() {
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
+        {hasCondition && (
+          <select
+            value={filterCondition}
+            onChange={e => setFilterCondition(e.target.value)}
+            style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+          >
+            <option value="all">All Conditions</option>
+            {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
       </div>
 
       {showAddForm && (
@@ -333,10 +352,29 @@ export default function Books() {
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
+                    list="category-options"
+                    placeholder="Select or type a category..."
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
                   />
+                  <datalist id="category-options">
+                    {PRESET_CATEGORIES.map(c => <option key={c} value={c} />)}
+                  </datalist>
                 </div>
               </div>
+
+              {hasCondition && (
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Book Condition</label>
+                  <select
+                    name="condition"
+                    value={formData.condition || 'Good'}
+                    onChange={handleInputChange}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  >
+                    {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
@@ -405,6 +443,16 @@ export default function Books() {
         </div>
       )}
 
+      {/* Condition setup notice */}
+      {!hasCondition && (
+        <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '6px', padding: '10px 16px', marginBottom: '14px', fontSize: '12px' }}>
+          ⚠️ <strong>Book Condition Tracking:</strong> Run in Supabase SQL Editor to enable:&nbsp;
+          <code style={{ background: '#fff', padding: '2px 6px', borderRadius: '3px', fontFamily: 'monospace' }}>
+            ALTER TABLE books ADD COLUMN IF NOT EXISTS condition TEXT DEFAULT 'Good';
+          </code>
+        </div>
+      )}
+
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
         {loading ? (
           <p style={{ padding: '20px', textAlign: 'center' }}>Loading books...</p>
@@ -417,35 +465,54 @@ export default function Books() {
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Title</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Author</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Category</th>
+                {hasCondition && <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Condition</th>}
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Available</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Price</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredBooks.map((book) => (
-                <tr key={book.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '12px' }}>{book.title}</td>
-                  <td style={{ padding: '12px' }}>{book.author}</td>
-                  <td style={{ padding: '12px' }}>{book.category}</td>
-                  <td style={{ padding: '12px' }}><span style={{ padding: '4px 8px', borderRadius: '4px', background: book.quantity_available > 0 ? '#d4edda' : '#f8d7da', color: book.quantity_available > 0 ? '#155724' : '#721c24' }}>{book.quantity_available}/{book.quantity_total}</span></td>
-                  <td style={{ padding: '12px' }}>₹{book.price?.toLocaleString('en-IN')}</td>
-                  <td style={{ padding: '12px', display: 'flex', gap: '5px' }}>
-                    <button
-                      onClick={() => handleEditBook(book)}
-                      style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBook(book.id)}
-                      style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                    >
-                      🗑️
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredBooks.map((book) => {
+                const cStyle = hasCondition && book.condition ? CONDITION_STYLE[book.condition] || {} : {};
+                return (
+                  <tr key={book.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    <td style={{ padding: '12px' }}>{book.title}</td>
+                    <td style={{ padding: '12px' }}>{book.author}</td>
+                    <td style={{ padding: '12px' }}>
+                      {book.category ? (
+                        <span style={{ background: '#e8f4fd', color: '#2980b9', padding: '2px 8px', borderRadius: '10px', fontSize: '12px' }}>{book.category}</span>
+                      ) : '—'}
+                    </td>
+                    {hasCondition && (
+                      <td style={{ padding: '12px' }}>
+                        {book.condition ? (
+                          <span style={{ background: cStyle.bg, color: cStyle.text, padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600' }}>
+                            {book.condition}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    )}
+                    <td style={{ padding: '12px' }}>
+                      <span style={{ padding: '4px 8px', borderRadius: '4px', background: book.quantity_available > 0 ? '#d4edda' : '#f8d7da', color: book.quantity_available > 0 ? '#155724' : '#721c24' }}>
+                        {book.quantity_available}/{book.quantity_total}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px' }}>₹{book.price?.toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '12px' }}>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => handleEditBook(book)}
+                          style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteBook(book.id)}
+                          style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
