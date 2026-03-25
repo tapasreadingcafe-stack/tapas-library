@@ -11,7 +11,6 @@ import MemberProfile from './pages/MemberProfile';
 import OverdueBooks from './pages/OverdueBooks';
 import BookAvailability from './pages/BookAvailability';
 import BorrowStatistics from './pages/BorrowStatistics';
-import EmailNotifications from './pages/EmailNotifications';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -62,7 +61,6 @@ function App() {
             <span className="nav-icon">🛒</span>
             <span className="nav-label">POS</span>
           </Link>
-          <Link to="/email" className="nav-link"><span className="nav-icon">📧</span><span className="nav-label">Email</span></Link>
           <Link to="/reports" className="nav-link">
             <span className="nav-icon">📈</span>
             <span className="nav-label">Reports</span>
@@ -83,8 +81,8 @@ function App() {
           <Route path="/pos" element={<POS />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/member/:memberId" element={<MemberProfile />} />
-          <Route path="/email" element={<EmailNotifications />} />
-
+      
+    
         </Routes>
       </main>
     </div>
