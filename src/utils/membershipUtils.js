@@ -19,14 +19,11 @@ export const isMinor = (dateOfBirth) => {
   return age !== null && age < 18;
 };
 
-export const generateCustomerID = (memberId, isMinor) => {
-  if (!memberId) return '';
-  // Take last 4 digits of UUID and convert to number
-  const lastDigits = memberId.replace(/-/g, '').slice(-8);
-  const numericId = parseInt(lastDigits, 16) % 10000;
-  const paddedId = String(numericId).padStart(4, '0');
-  
-  return isMinor ? `MIN${paddedId}` : `CUST${paddedId}`;
+export const generateCustomerID = (member) => {
+  if (!member || !member.sequential_id) return '';
+  const paddedId = String(member.sequential_id).padStart(4, '0');
+  const isMinorFlag = isMinor(member.date_of_birth);
+  return isMinorFlag ? `MIN${paddedId}` : `CUST${paddedId}`;
 };
 
 export const getCustomerIDPrefix = (dateOfBirth) => {

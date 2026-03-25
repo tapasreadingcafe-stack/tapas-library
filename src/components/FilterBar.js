@@ -1,193 +1,155 @@
 import React, { useState } from 'react';
 
 function FilterBar({ onFilterChange, onClose }) {
-  const [filters, setFilters] = useState({
-    search: '',
-    membershipStatus: ['active', 'expiring', 'expired', 'guest'],
-    membershipPlan: ['day_pass', 'basic', 'premium', 'family', 'student', 'no_plan'],
-    sortBy: 'expiry_date',
-    sortOrder: 'asc'
-  });
-  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState('');
+  const [membershipCategory, setMembershipCategory] = useState('all');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [sortBy, setSortBy] = useState('expiry_date');
 
-  const handleStatusChange = (status) => {
-    const updated = [...filters.membershipStatus];
-    const idx = updated.indexOf(status);
-    if (idx > -1) {
-      updated.splice(idx, 1);
-    } else {
-      updated.push(status);
-    }
-    setFilters({ ...filters, membershipStatus: updated });
+  const handleSearch = (value) => {
+    setSearch(value);
+    applyFilters({
+      search: value,
+      membershipCategory,
+      sortOrder,
+      sortBy
+    });
   };
 
-  const handlePlanChange = (plan) => {
-    const updated = [...filters.membershipPlan];
-    const idx = updated.indexOf(plan);
-    if (idx > -1) {
-      updated.splice(idx, 1);
-    } else {
-      updated.push(plan);
-    }
-    setFilters({ ...filters, membershipPlan: updated });
+  const handleMembershipChange = (category) => {
+    setMembershipCategory(category);
+    applyFilters({
+      search,
+      membershipCategory: category,
+      sortOrder,
+      sortBy
+    });
   };
 
-  const handleApply = () => {
-    onFilterChange(filters);
+  const handleSortOrderToggle = () => {
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newOrder);
+    applyFilters({
+      search,
+      membershipCategory,
+      sortOrder: newOrder,
+      sortBy
+    });
   };
 
-  const handleClear = () => {
-    const cleared = {
+  const handleClearFilters = () => {
+    setSearch('');
+    setMembershipCategory('all');
+    setSortOrder('asc');
+    setSortBy('expiry_date');
+    applyFilters({
       search: '',
-      membershipStatus: ['active', 'expiring', 'expired', 'guest'],
-      membershipPlan: ['day_pass', 'basic', 'premium', 'family', 'student', 'no_plan'],
-      sortBy: 'expiry_date',
-      sortOrder: 'asc'
-    };
-    setFilters(cleared);
-    onFilterChange(cleared);
+      membershipCategory: 'all',
+      sortOrder: 'asc',
+      sortBy: 'expiry_date'
+    });
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      applyFilters({
+        search,
+        membershipCategory,
+        sortOrder,
+        sortBy
+      });
+    }
+  };
+
+  const applyFilters = (filters) => {
+    let membershipStatus = [];
+    let membershipPlan = [];
+
+    if (filters.membershipCategory === 'all') {
+      membershipStatus = ['active', 'expiring', 'expired', 'guest'];
+      membershipPlan = ['day_pass', 'basic', 'premium', 'family', 'student', 'teen', 'no_plan'];
+    } else if (filters.membershipCategory === 'subscription') {
+      membershipStatus = ['active', 'expiring', 'expired'];
+      membershipPlan = ['day_pass', 'basic', 'premium', 'family', 'student', 'teen'];
+    } else if (filters.membershipCategory === 'non_subscription') {
+      membershipStatus = ['guest'];
+      membershipPlan = ['no_plan'];
+    }
+
+    onFilterChange({
+      search: filters.search,
+      membershipStatus,
+      membershipPlan,
+      sortBy: filters.sortBy,
+      sortOrder: filters.sortOrder
+    });
   };
 
   return (
     <div className="filter-bar-horizontal">
+      {/* Search Bar */}
       <div className="filter-row-main">
         <input
           type="text"
-          placeholder="Search name, phone, email..."
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           className="filter-search-input"
+          placeholder="Search name, phone, email..."
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          onKeyPress={handleKeyPress}
         />
 
-        <select
-          value={filters.sortBy}
-          onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-          className="filter-select-small"
-        >
-          <option value="expiry_date">Sort: Expiry</option>
-          <option value="name">Sort: Name</option>
-          <option value="created_date">Sort: Created</option>
-          <option value="plan">Sort: Plan</option>
-        </select>
+        {/* Membership Category Buttons */}
+        <div className="filter-category-buttons">
+          <button
+            className={`category-btn ${membershipCategory === 'all' ? 'active' : ''}`}
+            onClick={() => handleMembershipChange('all')}
+            title="All Members"
+          >
+            All
+          </button>
+          <button
+            className={`category-btn ${membershipCategory === 'subscription' ? 'active' : ''}`}
+            onClick={() => handleMembershipChange('subscription')}
+            title="Subscription Members"
+          >
+            Members
+          </button>
+          <button
+            className={`category-btn ${membershipCategory === 'non_subscription' ? 'active' : ''}`}
+            onClick={() => handleMembershipChange('non_subscription')}
+            title="Non-Subscription Members"
+          >
+            Guests
+          </button>
+        </div>
 
-        <select
-          value={filters.sortOrder}
-          onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value })}
-          className="filter-select-small"
+        {/* Sort Order Icon */}
+        <button
+          className="btn-icon-sm"
+          onClick={handleSortOrderToggle}
+          title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
         >
-          <option value="asc">Asc</option>
-          <option value="desc">Desc</option>
-        </select>
-
-        <button 
-          className={`filter-toggle-btn ${expanded ? 'active' : ''}`}
-          onClick={() => setExpanded(!expanded)}
-        >
-          ⚙️ More Filters
+          {sortOrder === 'asc' ? '↑' : '↓'}
         </button>
 
-        <button className="btn btn-secondary btn-sm" onClick={handleClear}>
-          Clear
+        {/* Clear Button */}
+        <button
+          className="btn-icon-sm"
+          onClick={handleClearFilters}
+          title="Clear All Filters"
+        >
+          🗑️
         </button>
-        <button className="btn btn-primary btn-sm" onClick={handleApply}>
-          Apply
-        </button>
-        <button className="btn btn-secondary btn-sm" onClick={onClose}>
-          Close
+
+        {/* Close Button */}
+        <button
+          className="btn-icon-sm"
+          onClick={onClose}
+          title="Close"
+        >
+          ✕
         </button>
       </div>
-
-      {expanded && (
-        <div className="filter-row-expanded">
-          <div className="filter-group-inline">
-            <label className="filter-label-inline">Status:</label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipStatus.includes('active')}
-                onChange={() => handleStatusChange('active')}
-              />
-              Active
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipStatus.includes('expiring')}
-                onChange={() => handleStatusChange('expiring')}
-              />
-              Expiring
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipStatus.includes('expired')}
-                onChange={() => handleStatusChange('expired')}
-              />
-              Expired
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipStatus.includes('guest')}
-                onChange={() => handleStatusChange('guest')}
-              />
-              Guest
-            </label>
-          </div>
-
-          <div className="filter-group-inline">
-            <label className="filter-label-inline">Plans:</label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipPlan.includes('day_pass')}
-                onChange={() => handlePlanChange('day_pass')}
-              />
-              Day Pass
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipPlan.includes('basic')}
-                onChange={() => handlePlanChange('basic')}
-              />
-              Basic
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipPlan.includes('premium')}
-                onChange={() => handlePlanChange('premium')}
-              />
-              Premium
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipPlan.includes('family')}
-                onChange={() => handlePlanChange('family')}
-              />
-              Family
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipPlan.includes('student')}
-                onChange={() => handlePlanChange('student')}
-              />
-              Student
-            </label>
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                checked={filters.membershipPlan.includes('no_plan')}
-                onChange={() => handlePlanChange('no_plan')}
-              />
-              No Plan
-            </label>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

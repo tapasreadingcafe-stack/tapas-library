@@ -27,6 +27,7 @@ function Members() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [editingMember, setEditingMember] = useState(null);
+  const [modalMode, setModalMode] = useState('add'); // 'add', 'edit', 'addPlan'
   const [currentFilters, setCurrentFilters] = useState({
     search: '',
     membershipStatus: ['active', 'expiring', 'expired', 'guest'],
@@ -40,7 +41,7 @@ function Members() {
     email: '',
     date_of_birth: '',
     age: '',
-    plan: 'basic',
+    plan: '', // Empty = no plan
     duration_days: 30,
     borrow_limit: 3,
     discount_percent: 0,
@@ -108,6 +109,7 @@ function Members() {
   };
 
   const handleAddMember = () => {
+    setModalMode('add');
     setEditingMember(null);
     setFormData({
       name: '',
@@ -115,7 +117,7 @@ function Members() {
       email: '',
       date_of_birth: '',
       age: '',
-      plan: 'basic',
+      plan: '',
       duration_days: 30,
       borrow_limit: 3,
       discount_percent: 0,
@@ -125,6 +127,7 @@ function Members() {
   };
 
   const handleEditMember = (member) => {
+    setModalMode('edit');
     setEditingMember(member);
     setFormData({
       name: member.name || '',
@@ -132,24 +135,43 @@ function Members() {
       email: member.email || '',
       date_of_birth: member.date_of_birth || '',
       age: member.age || calculateAge(member.date_of_birth) || '',
-      plan: member.plan || 'basic',
+      plan: member.plan || '',
       duration_days: member.plan_duration_days || 30,
       borrow_limit: member.borrow_limit || 3,
       discount_percent: member.discount_percent || 0,
-      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'basic'].price
+      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'basic']?.price || 100
+    });
+    setShowModal(true);
+  };
+
+  const handleAddPlanToMember = (member) => {
+    setModalMode('addPlan');
+    setEditingMember(member);
+    setFormData({
+      name: member.name,
+      phone: member.phone,
+      email: member.email,
+      date_of_birth: member.date_of_birth,
+      age: member.age,
+      plan: '',
+      duration_days: 30,
+      borrow_limit: 3,
+      discount_percent: 0,
+      price: 100
     });
     setShowModal(true);
   };
 
   const handleRenewMembership = (member) => {
+    setModalMode('edit');
     setEditingMember(member);
     const renewed = renewMembership(member, {});
     setFormData({
       name: member.name,
       phone: member.phone,
       email: member.email,
-      date_of_birth: member.date_of_birth || '',
-      age: member.age || calculateAge(member.date_of_birth) || '',
+      date_of_birth: member.date_of_birth,
+      age: member.age,
       plan: member.plan,
       duration_days: renewed.plan_duration_days,
       borrow_limit: renewed.borrow_limit,
@@ -168,6 +190,29 @@ function Members() {
     });
   };
 
+  const handlePlanChange = (plan) => {
+    if (!plan) {
+      setFormData({
+        ...formData,
+        plan: '',
+        duration_days: 30,
+        borrow_limit: 0,
+        discount_percent: 0,
+        price: 0
+      });
+    } else {
+      const defaults = PLAN_DEFAULTS[plan];
+      setFormData({
+        ...formData,
+        plan,
+        duration_days: defaults.duration_days,
+        borrow_limit: defaults.borrow_limit,
+        discount_percent: defaults.discount_percent,
+        price: defaults.price
+      });
+    }
+  };
+
   const handleSaveMember = async () => {
     if (!formData.name || !formData.phone) {
       alert('Name and phone are required');
@@ -182,17 +227,32 @@ function Members() {
           email: formData.email,
           date_of_birth: formData.date_of_birth,
           age: formData.age,
-          customer_type: formData.age < 18 ? 'minor' : 'adult',
-          plan: formData.plan,
-          plan_duration_days: formData.duration_days,
-          borrow_limit: formData.borrow_limit,
-          discount_percent: formData.discount_percent,
-          plan_price: formData.price,
-          subscription_start: editingMember.subscription_start || new Date().toISOString().split('T')[0],
-          subscription_end: calculateEndDate(new Date().toISOString().split('T')[0], formData.duration_days),
-          membership_type: 'active_member',
-          status_color: 'gold'
+          customer_type: formData.age < 18 ? 'minor' : 'adult'
         };
+
+        // If plan exists, add plan data
+        if (formData.plan) {
+          updateData.plan = formData.plan;
+          updateData.plan_duration_days = formData.duration_days;
+          updateData.borrow_limit = formData.borrow_limit;
+          updateData.discount_percent = formData.discount_percent;
+          updateData.plan_price = formData.price;
+          updateData.subscription_start = editingMember.subscription_start || new Date().toISOString().split('T')[0];
+          updateData.subscription_end = calculateEndDate(new Date().toISOString().split('T')[0], formData.duration_days);
+          updateData.membership_type = 'active_member';
+          updateData.status_color = 'gold';
+        } else {
+          // Remove plan if empty
+          updateData.plan = null;
+          updateData.plan_duration_days = null;
+          updateData.borrow_limit = null;
+          updateData.discount_percent = null;
+          updateData.plan_price = null;
+          updateData.subscription_start = null;
+          updateData.subscription_end = null;
+          updateData.membership_type = null;
+          updateData.status_color = 'normal';
+        }
 
         const { error } = await supabase
           .from('members')
@@ -202,24 +262,36 @@ function Members() {
         if (error) throw error;
         alert('Member updated successfully!');
       } else {
-        const newMembership = createMembership(formData.plan, {
-          duration_days: formData.duration_days,
-          borrow_limit: formData.borrow_limit,
-          discount_percent: formData.discount_percent,
-          price: formData.price
-        });
+        const newData = {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          date_of_birth: formData.date_of_birth,
+          age: formData.age,
+          customer_type: formData.age < 18 ? 'minor' : 'adult'
+        };
+
+        // If plan is selected, create with membership
+        if (formData.plan) {
+          const newMembership = createMembership(formData.plan, {
+            duration_days: formData.duration_days,
+            borrow_limit: formData.borrow_limit,
+            discount_percent: formData.discount_percent,
+            price: formData.price
+          });
+          Object.assign(newData, newMembership);
+        } else {
+          // Create as non-plan member (guest)
+          newData.plan = null;
+          newData.borrow_limit = 0;
+          newData.discount_percent = 0;
+          newData.membership_type = null;
+          newData.status_color = 'normal';
+        }
 
         const { error } = await supabase
           .from('members')
-          .insert([{
-            name: formData.name,
-            phone: formData.phone,
-            email: formData.email,
-            date_of_birth: formData.date_of_birth,
-            age: formData.age,
-            customer_type: formData.age < 18 ? 'minor' : 'adult',
-            ...newMembership
-          }]);
+          .insert([newData]);
 
         if (error) throw error;
         alert('Member created successfully!');
@@ -260,13 +332,19 @@ function Members() {
   };
 
   const getPlanBadge = (member) => {
-    if (!member.plan) return 'GUEST';
+    if (!member.plan) return 'NO PLAN';
     const planName = member.plan.replace('_', ' ').toUpperCase();
     return planName;
   };
 
   const getGeneratedCustomerID = (member) => {
-    return generateCustomerID(member.id, isMinor(member.date_of_birth));
+    return generateCustomerID(member);
+  };
+
+  const getModalTitle = () => {
+    if (modalMode === 'addPlan') return `Add Plan to ${editingMember?.name}`;
+    if (modalMode === 'edit') return 'Edit Member';
+    return 'Add New Member';
   };
 
   if (loading) {
@@ -347,7 +425,11 @@ function Members() {
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
                     <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit">✏️</button>
-                    {member.plan && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew">🔄</button>}
+                    {member.plan ? (
+                      <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew">🔄</button>
+                    ) : (
+                      <button className="btn-icon btn-add-plan" onClick={() => handleAddPlanToMember(member)} title="Add Plan">➕</button>
+                    )}
                     <button className="btn-icon" onClick={() => handleViewHistory(member)} title="History">📋</button>
                     <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>
                   </td>
@@ -363,79 +445,73 @@ function Members() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingMember ? 'Edit Member' : 'Add New Member'}</h2>
+              <h2>{getModalTitle()}</h2>
               <button className="btn-close" onClick={() => setShowModal(false)}>×</button>
             </div>
 
             <div className="modal-body">
-              <div className="form-group">
-                <label>Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Member name"
-                />
-              </div>
+              {modalMode !== 'addPlan' && (
+                <>
+                  <div className="form-group">
+                    <label>Name *</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Member name"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Phone *</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Phone number"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="Email address"
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Date of Birth 📅</label>
+                      <input
+                        type="date"
+                        value={formData.date_of_birth}
+                        onChange={(e) => handleDateChange(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Age (Auto-calculated)</label>
+                      <input
+                        type="text"
+                        value={formData.age ? `${formData.age} years` : ''}
+                        readOnly
+                        placeholder="Auto-calculated"
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="form-group">
-                <label>Phone *</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="Phone number"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Email address"
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Date of Birth 📅</label>
-                  <input
-                    type="date"
-                    value={formData.date_of_birth}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Age (Auto-calculated)</label>
-                  <input
-                    type="text"
-                    value={formData.age ? `${formData.age} years` : ''}
-                    readOnly
-                    placeholder="Auto-calculated"
-                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Membership Plan</label>
+                <label>Membership Plan (Optional)</label>
                 <select
                   value={formData.plan}
-                  onChange={(e) => {
-                    const plan = e.target.value;
-                    const defaults = PLAN_DEFAULTS[plan];
-                    setFormData({
-                      ...formData,
-                      plan,
-                      duration_days: defaults.duration_days,
-                      borrow_limit: defaults.borrow_limit,
-                      discount_percent: defaults.discount_percent,
-                      price: defaults.price
-                    });
-                  }}
+                  onChange={(e) => handlePlanChange(e.target.value)}
                 >
+                  <option value="">-- No Plan (Guest) --</option>
                   {Object.keys(PLAN_DEFAULTS).map(key => (
                     <option key={key} value={key}>
                       {PLAN_DEFAULTS[key].name} (₹{PLAN_DEFAULTS[key].price})
@@ -444,59 +520,76 @@ function Members() {
                 </select>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Duration (days)</label>
-                  <input
-                    type="number"
-                    value={formData.duration_days}
-                    onChange={(e) => setFormData({ ...formData, duration_days: parseInt(e.target.value) })}
-                    min="1"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Borrow Limit</label>
-                  <input
-                    type="number"
-                    value={formData.borrow_limit}
-                    onChange={(e) => setFormData({ ...formData, borrow_limit: parseInt(e.target.value) })}
-                    min="0"
-                  />
-                </div>
-              </div>
+              {formData.plan && (
+                <>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Duration (days)</label>
+                      <input
+                        type="number"
+                        value={formData.duration_days}
+                        onChange={(e) => setFormData({ ...formData, duration_days: parseInt(e.target.value) })}
+                        min="1"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Borrow Limit</label>
+                      <input
+                        type="number"
+                        value={formData.borrow_limit}
+                        onChange={(e) => setFormData({ ...formData, borrow_limit: parseInt(e.target.value) })}
+                        min="0"
+                      />
+                    </div>
+                  </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Discount %</label>
-                  <input
-                    type="number"
-                    value={formData.discount_percent}
-                    onChange={(e) => setFormData({ ...formData, discount_percent: parseFloat(e.target.value) })}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Price</label>
-                  <input
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Discount %</label>
+                      <input
+                        type="number"
+                        value={formData.discount_percent}
+                        onChange={(e) => setFormData({ ...formData, discount_percent: parseFloat(e.target.value) })}
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Price</label>
+                      <input
+                        type="number"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleSaveMember}>
-                {editingMember ? 'Update Member' : 'Create Member'}
-              </button>
+              {modalMode === 'addPlan' ? (
+                <>
+                  <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                    ❌ Cancel
+                  </button>
+                  <button className="btn btn-add-plan-primary" onClick={handleSaveMember}>
+                    ➕ Add Plan
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                    ❌ Cancel
+                  </button>
+                  <button className="btn btn-primary" onClick={handleSaveMember}>
+                    ✅ {editingMember ? 'Update' : 'Create'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
