@@ -1,5 +1,7 @@
-// Add these NEW functions at the top of the file:
+// src/utils/membershipUtils.js
+// Membership utility functions for Tapas Library
 
+// Calculate age from date of birth
 export const calculateAge = (dateOfBirth) => {
   if (!dateOfBirth) return null;
   const today = new Date();
@@ -14,11 +16,13 @@ export const calculateAge = (dateOfBirth) => {
   return age;
 };
 
+// Check if person is minor
 export const isMinor = (dateOfBirth) => {
   const age = calculateAge(dateOfBirth);
   return age !== null && age < 18;
 };
 
+// Generate Customer ID (CUST0001 or MIN0001)
 export const generateCustomerID = (member) => {
   if (!member || !member.sequential_id) return '';
   const paddedId = String(member.sequential_id).padStart(4, '0');
@@ -26,11 +30,10 @@ export const generateCustomerID = (member) => {
   return isMinorFlag ? `MIN${paddedId}` : `CUST${paddedId}`;
 };
 
+// Get Customer ID prefix
 export const getCustomerIDPrefix = (dateOfBirth) => {
   return isMinor(dateOfBirth) ? 'MIN' : 'CUST';
 };
-// src/utils/membershipUtils.js
-// Membership utility functions for Tapas Library
 
 // Default plan values
 export const PLAN_DEFAULTS = {
@@ -124,16 +127,16 @@ export function getStatusText(member) {
 
   switch (color) {
     case 'gold':
-      return `🟡 ACTIVE (${daysLeft} days left)`;
+      return `Active (${daysLeft} days left)`;
     case 'orange':
-      return `🟠 EXPIRING SOON (${daysLeft} days left)`;
+      return `Expiring Soon (${daysLeft} days left)`;
     case 'red':
       if (daysLeft < 0) {
-        return `🔴 EXPIRED (${Math.abs(daysLeft)} days ago)`;
+        return `Expired (${Math.abs(daysLeft)} days ago)`;
       }
-      return '🔴 EXPIRED';
+      return 'Expired';
     default:
-      return '⚪ GUEST';
+      return 'Guest';
   }
 }
 
@@ -150,7 +153,7 @@ export function canBorrow(member) {
 
 // Check if member is active
 export function isActiveMember(member) {
-  if (!member.membership_type === 'active_member') return false;
+  if (member.membership_type !== 'active_member') return false;
   if (!member.subscription_end) return false;
   
   const daysLeft = calculateDaysLeft(member.subscription_end);
@@ -255,17 +258,26 @@ export function filterMembersByPlan(members, plans) {
   });
 }
 
-// Filter members by search
-export function filterMembersBySearch(members, searchText) {
-  if (!searchText) return members;
+// Filter members by search (Name, Phone, Email, Customer ID)
+export function filterMembersBySearch(members, searchTerm) {
+  if (!searchTerm || !searchTerm.trim()) return members;
   
-  const text = searchText.toLowerCase();
+  const term = searchTerm.toLowerCase();
   return members.filter(member => {
-    return (
-      member.name?.toLowerCase().includes(text) ||
-      member.phone?.includes(text) ||
-      member.email?.toLowerCase().includes(text)
-    );
+    // Search by Name
+    if (member.name?.toLowerCase().includes(term)) return true;
+
+    // Search by Phone
+    if (member.phone?.includes(term)) return true;
+
+    // Search by Email
+    if (member.email?.toLowerCase().includes(term)) return true;
+
+    // Search by Customer ID (CUST0001, MIN0001, etc.)
+    const customerId = generateCustomerID(member);
+    if (customerId?.toLowerCase().includes(term)) return true;
+
+    return false;
   });
 }
 

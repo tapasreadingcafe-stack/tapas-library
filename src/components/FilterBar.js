@@ -51,18 +51,15 @@ function FilterBar({ onFilterChange, onClose }) {
 
   return (
     <div className="filter-bar-horizontal">
-      {/* Main Filter Row */}
       <div className="filter-row-main">
-        {/* Search Bar */}
         <input
           type="text"
           className="filter-search-input"
-          placeholder="Search name, phone, email....."
+          placeholder="Search name, phone, email, customer ID....."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
         />
 
-        {/* Membership Category Buttons */}
         <div className="filter-category-buttons">
           <button
             className={`category-btn ${membershipCategory === 'all' ? 'active' : ''}`}
@@ -84,7 +81,6 @@ function FilterBar({ onFilterChange, onClose }) {
           </button>
         </div>
 
-        {/* More Filters Icon */}
         <button
           className={`btn-icon-sm more-filters-btn ${showMoreFilters ? 'active' : ''}`}
           onClick={() => setShowMoreFilters(!showMoreFilters)}
@@ -94,7 +90,6 @@ function FilterBar({ onFilterChange, onClose }) {
         </button>
       </div>
 
-      {/* More Filters Section (Hidden by default) */}
       {showMoreFilters && (
         <div className="filter-row-expanded">
           <div className="filter-group-inline">
@@ -112,7 +107,7 @@ function FilterBar({ onFilterChange, onClose }) {
             <input type="checkbox" id="adult" />
             <label htmlFor="adult" className="checkbox-label">Adults (18+)</label>
             <input type="checkbox" id="minor" />
-            <label htmlFor="minor" className="checkbox-label">Minors (&lt;18)</label>
+            <label htmlFor="minor" className="checkbox-label">Minors (less than 18)</label>
           </div>
 
           <div className="filter-group-inline">
