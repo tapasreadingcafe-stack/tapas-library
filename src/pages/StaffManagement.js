@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
-import { useAuth } from '../context/AuthContext';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '' };
 
@@ -9,8 +8,6 @@ function initials(name) {
 }
 
 export default function StaffManagement() {
-  const { staff: currentStaff, sendPasswordReset } = useAuth();
-
   const [staffList, setStaffList]       = useState([]);
   const [loading, setLoading]           = useState(true);
   const [tableExists, setTableExists]   = useState(null);
@@ -136,7 +133,10 @@ export default function StaffManagement() {
 
   const handleSendResetPassword = async (member) => {
     try {
-      await sendPasswordReset(member.email);
+      const { error } = await supabase.auth.resetPasswordForEmail(member.email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
       showToast(`Password reset email sent to ${member.email}`);
       setShowPwModal(null);
     } catch (err) {
@@ -254,75 +254,65 @@ ON CONFLICT (email) DO NOTHING;`;
               </tr>
             </thead>
             <tbody>
-              {staffList.map(member => {
-                const isCurrentUser = member.email === currentStaff?.email;
-                return (
-                  <tr key={member.id} style={{ borderBottom: '1px solid #f0f0f0', background: !member.is_active ? '#fafafa' : 'white', opacity: member.is_active ? 1 : 0.65 }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {member.avatar_url ? (
-                          <img src={member.avatar_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.target.style.display = 'none'} />
-                        ) : (
-                          <div style={{
-                            width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                            background: member.role === 'admin' ? '#9b59b6' : '#667eea',
-                            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontWeight: '700', fontSize: '13px',
-                          }}>
-                            {initials(member.name)}
-                          </div>
-                        )}
-                        <div>
-                          <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                            {member.name}
-                            {isCurrentUser && <span style={{ marginLeft: '6px', fontSize: '11px', color: '#667eea', fontWeight: '700' }}>(you)</span>}
-                          </div>
+              {staffList.map(member => (
+                <tr key={member.id} style={{ borderBottom: '1px solid #f0f0f0', background: !member.is_active ? '#fafafa' : 'white', opacity: member.is_active ? 1 : 0.65 }}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {member.avatar_url ? (
+                        <img src={member.avatar_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.target.style.display = 'none'} />
+                      ) : (
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                          background: member.role === 'admin' ? '#9b59b6' : '#667eea',
+                          color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: '700', fontSize: '13px',
+                        }}>
+                          {initials(member.name)}
                         </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: '#555' }}>{member.email}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        background: member.role === 'admin' ? '#f3e8ff' : '#e8f0ff',
-                        color: member.role === 'admin' ? '#9b59b6' : '#667eea',
-                        padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '700',
-                      }}>
-                        {member.role === 'admin' ? '🔐 Admin' : '👤 Staff'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: '#777' }}>{member.phone || '—'}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '12px', color: '#999' }}>
-                      {member.last_login
-                        ? new Date(member.last_login).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                        : 'Never'}
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        background: member.is_active ? '#d4edda' : '#f8d7da',
-                        color: member.is_active ? '#155724' : '#721c24',
-                        padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600',
-                      }}>
-                        {member.is_active ? '✓ Active' : '✗ Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button onClick={() => openEdit(member)} style={{ padding: '5px 10px', background: '#e8f0ff', color: '#667eea', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                          ✏️ Edit
-                        </button>
-                        <button onClick={() => setShowPwModal(member)} style={{ padding: '5px 10px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}>
-                          🔑 Reset PW
-                        </button>
-                        {!isCurrentUser && (
-                          <button onClick={() => toggleActive(member)} style={{ padding: '5px 10px', background: member.is_active ? '#fff5f5' : '#f0fff4', color: member.is_active ? '#e74c3c' : '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                            {member.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      )}
+                      <div style={{ fontWeight: '600', fontSize: '14px' }}>{member.name}</div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#555' }}>{member.email}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{
+                      background: member.role === 'admin' ? '#f3e8ff' : '#e8f0ff',
+                      color: member.role === 'admin' ? '#9b59b6' : '#667eea',
+                      padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '700',
+                    }}>
+                      {member.role === 'admin' ? '🔐 Admin' : '👤 Staff'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#777' }}>{member.phone || '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: '12px', color: '#999' }}>
+                    {member.last_login
+                      ? new Date(member.last_login).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                      : 'Never'}
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{
+                      background: member.is_active ? '#d4edda' : '#f8d7da',
+                      color: member.is_active ? '#155724' : '#721c24',
+                      padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600',
+                    }}>
+                      {member.is_active ? '✓ Active' : '✗ Inactive'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => openEdit(member)} style={{ padding: '5px 10px', background: '#e8f0ff', color: '#667eea', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                        ✏️ Edit
+                      </button>
+                      <button onClick={() => setShowPwModal(member)} style={{ padding: '5px 10px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}>
+                        🔑 Reset PW
+                      </button>
+                      <button onClick={() => toggleActive(member)} style={{ padding: '5px 10px', background: member.is_active ? '#fff5f5' : '#f0fff4', color: member.is_active ? '#e74c3c' : '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                        {member.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
