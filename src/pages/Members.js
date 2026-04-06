@@ -61,7 +61,7 @@ function Members() {
       setLoading(true);
       const { data, error } = await supabase
         .from('members')
-        .select('id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, created_at')
+        .select('id, sequential_id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, created_at')
         .order('created_at', { ascending: false })
         .limit(200);
 
