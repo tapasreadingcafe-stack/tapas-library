@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS cafe_inventory (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -18,6 +19,7 @@ ALTER TABLE cafe_inventory ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "open" ON cafe_inventory FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function InventoryCafe() {
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -47,7 +49,7 @@ export default function InventoryCafe() {
   const openEdit = (item) => { setEditItem(item); setForm({ item_name: item.item_name, category: item.category, unit: item.unit, current_stock: item.current_stock, min_stock_level: item.min_stock_level, cost_per_unit: item.cost_per_unit, supplier_name: item.supplier_name || '' }); setShowModal(true); };
 
   const saveItem = async () => {
-    if (!form.item_name) return alert('Item name is required');
+    if (!form.item_name) return toast.warning('Item name is required');
     const payload = { ...form, current_stock: parseFloat(form.current_stock) || 0, min_stock_level: parseFloat(form.min_stock_level) || 0, cost_per_unit: parseFloat(form.cost_per_unit) || 0, updated_at: new Date().toISOString() };
     if (editItem) await supabase.from('cafe_inventory').update(payload).eq('id', editItem.id);
     else await supabase.from('cafe_inventory').insert([payload]);

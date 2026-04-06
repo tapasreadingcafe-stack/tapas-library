@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS cafe_expenses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -13,6 +14,7 @@ CREATE POLICY "open" ON cafe_expenses FOR ALL USING (true) WITH CHECK (true);`;
 const EXP_CATEGORIES = ['ingredients', 'equipment', 'utilities', 'rent', 'salary', 'maintenance', 'marketing', 'other'];
 
 export default function AccountsExpenses() {
+  const toast = useToast();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -41,7 +43,7 @@ export default function AccountsExpenses() {
   };
 
   const addExpense = async () => {
-    if (!form.description || !form.amount) return alert('Description and amount required');
+    if (!form.description || !form.amount) return toast.warning('Description and amount required');
     await supabase.from('cafe_expenses').insert([{ ...form, amount: parseFloat(form.amount) }]);
     setShowModal(false);
     setForm({ category: 'ingredients', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0] });

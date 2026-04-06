@@ -24,10 +24,20 @@ export const isMinor = (dateOfBirth) => {
 
 // Generate Customer ID (CUST0001 or MIN0001)
 export const generateCustomerID = (member) => {
-  if (!member || !member.sequential_id) return '';
-  const paddedId = String(member.sequential_id).padStart(4, '0');
+  if (!member) return '';
+  // Use sequential_id if available, otherwise fallback to first 4 chars of UUID
+  let idPart;
+  if (member.sequential_id) {
+    idPart = String(member.sequential_id).padStart(4, '0');
+  } else if (member.id) {
+    // Extract a short numeric hash from UUID for display
+    const numericHash = parseInt(member.id.replace(/-/g, '').slice(0, 8), 16) % 10000;
+    idPart = String(numericHash).padStart(4, '0');
+  } else {
+    return '';
+  }
   const isMinorFlag = isMinor(member.date_of_birth);
-  return isMinorFlag ? `MIN${paddedId}` : `CUST${paddedId}`;
+  return isMinorFlag ? `MIN${idPart}` : `CUST${idPart}`;
 };
 
 // Get Customer ID prefix

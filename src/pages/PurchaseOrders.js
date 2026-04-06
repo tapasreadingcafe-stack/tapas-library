@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS purchase_orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY, order_number SERIAL,
@@ -20,6 +21,7 @@ CREATE POLICY "open" ON purchase_orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "open" ON purchase_order_items FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function PurchaseOrders() {
+  const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,9 +57,9 @@ export default function PurchaseOrders() {
   const removeLine = (i) => setLineItems(prev => prev.filter((_, idx) => idx !== i));
 
   const createPO = async () => {
-    if (!form.vendor_id) return alert('Select a vendor');
+    if (!form.vendor_id) return toast.warning('Select a vendor');
     const validLines = lineItems.filter(l => l.item_description);
-    if (!validLines.length) return alert('Add at least one item');
+    if (!validLines.length) return toast.warning('Add at least one item');
     const total = validLines.reduce((s, l) => s + (l.quantity * l.unit_price), 0);
     try {
       const { data: po, error } = await supabase.from('purchase_orders').insert([{ vendor_id: form.vendor_id, total_amount: total, notes: form.notes, expected_date: form.expected_date || null }]).select().single();
@@ -68,7 +70,7 @@ export default function PurchaseOrders() {
       setForm({ vendor_id: '', notes: '', expected_date: '' });
       setLineItems([{ item_description: '', quantity: 1, unit_price: 0 }]);
       fetchData();
-    } catch (err) { alert('Error: ' + err.message); }
+    } catch (err) { toast.error('Error: ' + err.message); }
   };
 
   const updateStatus = async (id, status) => {

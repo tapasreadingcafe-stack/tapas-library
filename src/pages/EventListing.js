@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor:
@@ -55,6 +56,7 @@ CREATE POLICY "open" ON event_attendance FOR ALL USING (true) WITH CHECK (true);
 `;
 
 export default function EventListing() {
+  const toast = useToast();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -121,7 +123,7 @@ export default function EventListing() {
       setRegTickets(1);
       viewEvent(selectedEvent);
     } catch (err) {
-      alert('Error: ' + (err.message.includes('idx_event_member') ? 'Member already registered' : err.message));
+      toast.error('Error: ' + (err.message.includes('idx_event_member') ? 'Member already registered' : err.message));
     }
   };
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const CATEGORIES = ['tea', 'coffee', 'juice', 'bakery', 'snacks', 'other'];
 const CAT_ICONS = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🍰', snacks: '🍿', other: '🍽️' };
 
 export default function CafeMenu() {
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -42,7 +44,7 @@ export default function CafeMenu() {
   };
 
   const saveItem = async () => {
-    if (!form.name || !form.price) return alert('Name and price are required');
+    if (!form.name || !form.price) return toast.warning('Name and price are required');
     const payload = { ...form, price: parseFloat(form.price), cost_price: parseFloat(form.cost_price) || 0, updated_at: new Date().toISOString() };
     if (editItem) {
       await supabase.from('cafe_menu_items').update(payload).eq('id', editItem.id);

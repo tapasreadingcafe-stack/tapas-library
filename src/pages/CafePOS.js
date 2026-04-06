@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor to create cafe tables:
@@ -55,6 +56,7 @@ CREATE POLICY "open" ON cafe_order_items FOR ALL USING (true) WITH CHECK (true);
 const CATEGORIES = ['All', 'Tea', 'Coffee', 'Juice', 'Bakery', 'Snacks', 'Other'];
 
 export default function CafePOS() {
+  const toast = useToast();
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,6 +167,7 @@ export default function CafePOS() {
       await supabase.from('cafe_order_items').insert(items);
 
       setLastOrder({ ...order, items: cart, customerName: orderData.customer_name });
+      toast.success(`Order placed - ₹${total.toLocaleString('en-IN')}`);
       setShowReceipt(true);
       setCart([]);
       setCustomerName('');
@@ -175,7 +178,7 @@ export default function CafePOS() {
       fetchData();
     } catch (err) {
       console.error(err);
-      alert('Error placing order: ' + err.message);
+      toast.error('Error placing order: ' + err.message);
     }
     setProcessing(false);
   };

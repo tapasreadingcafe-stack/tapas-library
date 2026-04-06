@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useToast } from '../components/Toast';
 
 export default function EventCreate() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
@@ -35,7 +37,7 @@ export default function EventCreate() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.title || !form.start_date) return alert('Title and start date are required');
+    if (!form.title || !form.start_date) return toast.warning('Title and start date are required');
     setSaving(true);
     try {
       const payload = {
@@ -51,7 +53,7 @@ export default function EventCreate() {
       }
       navigate('/events');
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
     setSaving(false);
   };

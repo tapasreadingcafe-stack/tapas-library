@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 export default function EventAttendance() {
+  const toast = useToast();
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [registrations, setRegistrations] = useState([]);
@@ -46,7 +48,7 @@ export default function EventAttendance() {
       }]);
       setAttendance(prev => [...prev, reg.member_id]);
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     }
   };
 

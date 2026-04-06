@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import FilterBar from '../components/FilterBar';
+import { useToast } from '../components/Toast';
 
 import {
   calculateStatusColor,
@@ -21,6 +22,7 @@ import {
 
 function Members() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +76,7 @@ function Members() {
       applyFilters(membersWithStatus, currentFilters);
     } catch (error) {
       console.error('Error fetching members:', error);
-      alert('Failed to fetch members');
+      toast.error('Failed to fetch members');
     } finally {
       setLoading(false);
     }
@@ -218,7 +220,7 @@ function Members() {
 
   const handleSaveMember = async () => {
     if (!formData.name || !formData.phone) {
-      alert('Name and phone are required');
+      toast.warning('Name and phone are required');
       return;
     }
 
@@ -261,7 +263,7 @@ function Members() {
           .eq('id', editingMember.id);
 
         if (error) throw error;
-        alert('Member updated successfully!');
+        toast.success('Member updated successfully!');
       } else {
         const newData = {
           name: formData.name,
@@ -293,14 +295,14 @@ function Members() {
           .insert([newData]);
 
         if (error) throw error;
-        alert('Member created successfully!');
+        toast.success('Member added successfully!');
       }
 
       setShowModal(false);
       fetchMembers();
     } catch (error) {
       console.error('Error saving member:', error);
-      alert('Failed to save member');
+      toast.error('Failed to save member');
     }
   };
 
@@ -316,11 +318,11 @@ function Members() {
         .eq('id', memberId);
 
       if (error) throw error;
-      alert('Member deleted successfully!');
+      toast.success('Member deleted successfully!');
       fetchMembers();
     } catch (error) {
       console.error('Error deleting member:', error);
-      alert('Failed to delete member');
+      toast.error('Failed to delete member');
     }
   };
 

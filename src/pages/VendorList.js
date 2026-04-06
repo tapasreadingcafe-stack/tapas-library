@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS vendors (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -11,6 +12,7 @@ ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "open" ON vendors FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function VendorList() {
+  const toast = useToast();
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -39,7 +41,7 @@ export default function VendorList() {
   const openEdit = (v) => { setEditVendor(v); setForm({ name: v.name, contact_person: v.contact_person || '', phone: v.phone || '', email: v.email || '', address: v.address || '', vendor_type: v.vendor_type, notes: v.notes || '', is_active: v.is_active }); setShowModal(true); };
 
   const saveVendor = async () => {
-    if (!form.name) return alert('Name required');
+    if (!form.name) return toast.warning('Name required');
     if (editVendor) await supabase.from('vendors').update(form).eq('id', editVendor.id);
     else await supabase.from('vendors').insert([form]);
     setShowModal(false);

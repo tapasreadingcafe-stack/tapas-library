@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now()
@@ -31,6 +32,7 @@ const SETTINGS_CONFIG = [
 ];
 
 export default function SettingsApp() {
+  const toast = useToast();
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -73,7 +75,7 @@ export default function SettingsApp() {
       await Promise.all(promises);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) { alert('Error: ' + err.message); }
+    } catch (err) { toast.error('Error: ' + err.message); }
     setSaving(false);
   };
 
