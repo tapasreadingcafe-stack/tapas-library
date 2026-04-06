@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
 
-// ── Static service items ──────────────────────────────────────────────────────
-const SERVICES = [
+// ── Default service items ─────────────────────────────────────────────────────
+const DEFAULT_SERVICES = [
   { id: 'svc_mem_new',    emoji: '📚', name: 'New Membership',     price: 500,  cat: 'Membership' },
   { id: 'svc_mem_renew',  emoji: '🔄', name: 'Membership Renewal', price: 300,  cat: 'Membership' },
   { id: 'svc_mem_gold',   emoji: '🥇', name: 'Gold Membership',    price: 800,  cat: 'Membership' },
@@ -17,6 +17,16 @@ const SERVICES = [
   { id: 'svc_donation',   emoji: '💝', name: 'Donation',           price: 0,    cat: 'Donations', custom: true },
   { id: 'svc_other',      emoji: '💡', name: 'Other Charge',       price: 0,    cat: 'Other',     custom: true },
 ];
+
+// Load services from localStorage or use defaults
+const loadServices = () => {
+  try {
+    const saved = localStorage.getItem('pos_services');
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return DEFAULT_SERVICES;
+};
+const saveServices = (svcs) => localStorage.setItem('pos_services', JSON.stringify(svcs));
 
 const CATS = ['All', 'Books', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
 const FINE_RATE = 10; // ₹ per day
@@ -51,7 +61,7 @@ ALTER TABLE pos_transaction_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "pos_items_open" ON pos_transaction_items FOR ALL USING (true) WITH CHECK (true);`;
 
 // ── Service card sub-component (own hover state) ──────────────────────────────
-function ServiceCard({ svc, onClick, fmt }) {
+function ServiceCard({ svc, onClick, onEdit, fmt }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -64,8 +74,25 @@ function ServiceCard({ svc, onClick, fmt }) {
         borderRadius: '10px', padding: '14px 10px',
         cursor: 'pointer', textAlign: 'center',
         transition: 'all 0.15s', userSelect: 'none',
+        position: 'relative',
       }}
     >
+      {onEdit && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(svc); }}
+          style={{
+            position: 'absolute', top: '4px', right: '4px',
+            background: hovered ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.05)',
+            border: 'none', borderRadius: '4px', cursor: 'pointer',
+            fontSize: '12px', padding: '2px 6px', lineHeight: 1,
+            color: hovered ? 'white' : '#999',
+            opacity: hovered ? 1 : 0.6, transition: 'all 0.15s',
+          }}
+          title="Edit service"
+        >
+          ✏️
+        </button>
+      )}
       <div style={{ fontSize: '24px', marginBottom: '5px' }}>{svc.emoji}</div>
       <div style={{ fontSize: '11px', fontWeight: '700', color: hovered ? 'white' : '#333', lineHeight: 1.3, marginBottom: '4px' }}>{svc.name}</div>
       <div style={{ fontSize: '13px', fontWeight: '800', color: hovered ? 'rgba(255,255,255,0.92)' : '#667eea' }}>
@@ -118,6 +145,12 @@ export default function POS() {
 
   // Toast
   const [toast, setToast]               = useState(null);
+
+  // Editable services
+  const [SERVICES, setSERVICES]         = useState(loadServices);
+  const [editSvcModal, setEditSvcModal] = useState(null);
+  const [editSvcForm, setEditSvcForm]   = useState({ emoji: '', name: '', price: '', cat: '' });
+  const [showAddSvc, setShowAddSvc]     = useState(false);
 
   // Refs for keyboard shortcuts
   const memberSearchRef = useRef();
@@ -521,20 +554,26 @@ export default function POS() {
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: '10px' }}>
                   {visibleServices.map(svc => (
-                    <ServiceCard key={svc.id} svc={svc} fmt={fmt} onClick={() => {
-                      if (svc.custom) {
-                        const raw = window.prompt(`Enter amount for "${svc.name}" (₹):`);
-                        if (raw === null) return;
-                        const amt = parseFloat(raw);
-                        if (isNaN(amt) || amt <= 0) { showToast('Invalid amount', 'error'); return; }
-                        addToCart({ ...svc, price: amt, cartType: 'service' });
-                      } else {
-                        addToCart({ ...svc, cartType: 'service' });
-                      }
-                      showToast(`${svc.name} added to cart`);
-                    }} />
+                    <ServiceCard key={svc.id} svc={svc} fmt={fmt}
+                      onEdit={(s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); }}
+                      onClick={() => {
+                        if (svc.custom) {
+                          const raw = window.prompt(`Enter amount for "${svc.name}" (₹):`);
+                          if (raw === null) return;
+                          const amt = parseFloat(raw);
+                          if (isNaN(amt) || amt <= 0) { showToast('Invalid amount', 'error'); return; }
+                          addToCart({ ...svc, price: amt, cartType: 'service' });
+                        } else {
+                          addToCart({ ...svc, cartType: 'service' });
+                        }
+                        showToast(`${svc.name} added to cart`);
+                      }} />
                   ))}
                 </div>
+                <button onClick={() => { setEditSvcForm({ emoji: '🆕', name: '', price: '', cat: CATS.find(c => c !== 'All' && c !== 'Books') || 'Other', custom: false }); setShowAddSvc(true); }}
+                  style={{ marginTop: '8px', padding: '6px 14px', background: 'none', border: '1px dashed #ccc', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#999' }}>
+                  + Add Service
+                </button>
               </div>
             )}
 
@@ -1031,6 +1070,82 @@ export default function POS() {
               <button onClick={() => { setShowReceipt(false); resetCart(); }}
                 style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
                 + New Sale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT SERVICE MODAL ── */}
+      {(editSvcModal || showAddSvc) && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => { setEditSvcModal(null); setShowAddSvc(false); }}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 16px', fontSize: '18px' }}>{showAddSvc ? 'Add New Service' : 'Edit Service'}</h3>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: '600', marginBottom: '2px' }}>Emoji</label>
+              <input value={editSvcForm.emoji} onChange={e => setEditSvcForm({ ...editSvcForm, emoji: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '20px' }} />
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: '600', marginBottom: '2px' }}>Name</label>
+              <input value={editSvcForm.name} onChange={e => setEditSvcForm({ ...editSvcForm, name: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} placeholder="Service name" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: '600', marginBottom: '2px' }}>Price (₹)</label>
+                <input type="number" value={editSvcForm.price} onChange={e => setEditSvcForm({ ...editSvcForm, price: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} placeholder="0 for custom" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: '600', marginBottom: '2px' }}>Category</label>
+                <select value={editSvcForm.cat} onChange={e => setEditSvcForm({ ...editSvcForm, cat: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px' }}>
+                  {CATS.filter(c => c !== 'All' && c !== 'Books').map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <input type="checkbox" checked={editSvcForm.custom || false} onChange={e => setEditSvcForm({ ...editSvcForm, custom: e.target.checked })} id="svc-custom" />
+              <label htmlFor="svc-custom" style={{ fontSize: '13px', color: '#666' }}>Custom price (ask on each use)</label>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => {
+                if (!editSvcForm.name) return;
+                const price = parseFloat(editSvcForm.price) || 0;
+                if (showAddSvc) {
+                  const newSvc = { id: 'svc_' + Date.now(), emoji: editSvcForm.emoji, name: editSvcForm.name, price, cat: editSvcForm.cat, custom: editSvcForm.custom || price === 0 };
+                  const updated = [...SERVICES, newSvc];
+                  setSERVICES(updated);
+                  saveServices(updated);
+                  showToast(`"${editSvcForm.name}" added`);
+                } else {
+                  const updated = SERVICES.map(s => s.id === editSvcModal.id ? { ...s, emoji: editSvcForm.emoji, name: editSvcForm.name, price, cat: editSvcForm.cat, custom: editSvcForm.custom || price === 0 } : s);
+                  setSERVICES(updated);
+                  saveServices(updated);
+                  showToast(`"${editSvcForm.name}" updated`);
+                }
+                setEditSvcModal(null);
+                setShowAddSvc(false);
+              }} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                {showAddSvc ? 'Add Service' : 'Save Changes'}
+              </button>
+              {editSvcModal && !showAddSvc && (
+                <button onClick={() => {
+                  if (!window.confirm(`Delete "${editSvcModal.name}"?`)) return;
+                  const updated = SERVICES.filter(s => s.id !== editSvcModal.id);
+                  setSERVICES(updated);
+                  saveServices(updated);
+                  showToast(`"${editSvcModal.name}" deleted`, 'error');
+                  setEditSvcModal(null);
+                }} style={{ padding: '10px 16px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                  Delete
+                </button>
+              )}
+              <button onClick={() => { setEditSvcModal(null); setShowAddSvc(false); }}
+                style={{ padding: '10px 16px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                Cancel
               </button>
             </div>
           </div>

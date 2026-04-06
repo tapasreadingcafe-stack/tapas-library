@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HintBubble } from './components/HintTooltip';
 import './App.css';
 
 // ── Lazy-loaded pages (Existing) ─────────────────────────────────────────────
@@ -239,26 +240,28 @@ function App() {
                 </button>
                 <div className={`nav-group-children ${openGroups[item.key] ? 'expanded' : 'collapsed'}`}>
                   {item.children.map(child => (
-                    <Link
-                      key={child.to}
-                      to={child.to}
-                      className={`nav-link nav-link-child ${isActive(child.to) ? 'active' : ''}`}
-                    >
-                      <span className="nav-icon">{child.icon}</span>
-                      <span className="nav-label">{child.label}</span>
-                    </Link>
+                    <HintBubble key={child.to} path={child.to}>
+                      <Link
+                        to={child.to}
+                        className={`nav-link nav-link-child ${isActive(child.to) ? 'active' : ''}`}
+                      >
+                        <span className="nav-icon">{child.icon}</span>
+                        <span className="nav-label">{child.label}</span>
+                      </Link>
+                    </HintBubble>
                   ))}
                 </div>
               </div>
             ) : (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`nav-link ${isActive(item.to) ? 'active' : ''}`}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span className="nav-label">{item.label}</span>
-              </Link>
+              <HintBubble key={item.to} path={item.to}>
+                <Link
+                  to={item.to}
+                  className={`nav-link ${isActive(item.to) ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                </Link>
+              </HintBubble>
             )
           )}
         </nav>
