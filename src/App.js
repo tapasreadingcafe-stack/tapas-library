@@ -1,25 +1,47 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import './App.css';
 
-// ── Lazy-loaded pages ─────────────────────────────────────────────────────────
-const Dashboard       = React.lazy(() => import('./pages/Dashboard'));
-const Members         = React.lazy(() => import('./pages/Members'));
-const Books           = React.lazy(() => import('./pages/Books'));
-const Borrow          = React.lazy(() => import('./pages/Borrow'));
-const POS             = React.lazy(() => import('./pages/POS'));
-const Reports         = React.lazy(() => import('./pages/Reports'));
-const MemberProfile   = React.lazy(() => import('./pages/MemberProfile'));
-const OverdueBooks    = React.lazy(() => import('./pages/OverdueBooks'));
-const BookAvailability  = React.lazy(() => import('./pages/BookAvailability'));
-const BorrowStatistics  = React.lazy(() => import('./pages/BorrowStatistics'));
-const Reservations    = React.lazy(() => import('./pages/Reservations'));
-const Fines           = React.lazy(() => import('./pages/Fines'));
-const Reviews         = React.lazy(() => import('./pages/Reviews'));
-const Wishlist        = React.lazy(() => import('./pages/Wishlist'));
-const Recommendations = React.lazy(() => import('./pages/Recommendations'));
-const ChildProfile    = React.lazy(() => import('./pages/ChildProfile'));
-const StaffManagement = React.lazy(() => import('./pages/StaffManagement'));
+// ── Lazy-loaded pages (Existing) ─────────────────────────────────────────────
+const Dashboard        = React.lazy(() => import('./pages/Dashboard'));
+const Members          = React.lazy(() => import('./pages/Members'));
+const Books            = React.lazy(() => import('./pages/Books'));
+const Borrow           = React.lazy(() => import('./pages/Borrow'));
+const POS              = React.lazy(() => import('./pages/POS'));
+const Reports          = React.lazy(() => import('./pages/Reports'));
+const MemberProfile    = React.lazy(() => import('./pages/MemberProfile'));
+const OverdueBooks     = React.lazy(() => import('./pages/OverdueBooks'));
+const BookAvailability = React.lazy(() => import('./pages/BookAvailability'));
+const BorrowStatistics = React.lazy(() => import('./pages/BorrowStatistics'));
+const Reservations     = React.lazy(() => import('./pages/Reservations'));
+const Fines            = React.lazy(() => import('./pages/Fines'));
+const Reviews          = React.lazy(() => import('./pages/Reviews'));
+const Wishlist         = React.lazy(() => import('./pages/Wishlist'));
+const Recommendations  = React.lazy(() => import('./pages/Recommendations'));
+const ChildProfile     = React.lazy(() => import('./pages/ChildProfile'));
+const StaffManagement  = React.lazy(() => import('./pages/StaffManagement'));
+
+// ── Lazy-loaded pages (New - Phase 2: Cafe) ──────────────────────────────────
+const CafePOS          = React.lazy(() => import('./pages/CafePOS'));
+const CafeMenu         = React.lazy(() => import('./pages/CafeMenu'));
+const CafeOrders       = React.lazy(() => import('./pages/CafeOrders'));
+const CafeReports      = React.lazy(() => import('./pages/CafeReports'));
+
+// ── Lazy-loaded pages (New - Phase 3: Events) ────────────────────────────────
+const EventListing     = React.lazy(() => import('./pages/EventListing'));
+const EventCreate      = React.lazy(() => import('./pages/EventCreate'));
+const EventAttendance  = React.lazy(() => import('./pages/EventAttendance'));
+
+// ── Lazy-loaded pages (New - Phase 4: Inventory, Accounts, Vendors, Settings)
+const InventoryLibrary      = React.lazy(() => import('./pages/InventoryLibrary'));
+const InventoryCafe         = React.lazy(() => import('./pages/InventoryCafe'));
+const VendorList            = React.lazy(() => import('./pages/VendorList'));
+const PurchaseOrders        = React.lazy(() => import('./pages/PurchaseOrders'));
+const AccountsOverview      = React.lazy(() => import('./pages/AccountsOverview'));
+const AccountsTransactions  = React.lazy(() => import('./pages/AccountsTransactions'));
+const AccountsExpenses      = React.lazy(() => import('./pages/AccountsExpenses'));
+const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
+const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -38,35 +60,146 @@ function PageLoader() {
   );
 }
 
-// ── Nav links ─────────────────────────────────────────────────────────────────
+// ── Navigation config (hierarchical) ─────────────────────────────────────────
 
-const NAV_LINKS = [
-  { to: '/',              icon: '📊', label: 'Dashboard' },
-  { to: '/members',       icon: '👥', label: 'Members' },
-  { to: '/books',         icon: '📖', label: 'Books' },
-  { to: '/Borrow',        icon: '📚', label: 'Borrow' },
-  { to: '/overdue',       icon: '🔴', label: 'Overdue' },
-  { to: '/availability',  icon: '🔍', label: 'Availability' },
-  { to: '/statistics',    icon: '📈', label: 'Statistics' },
-  { to: '/recommendations', icon: '💡', label: 'Recommendations' },
-  { to: '/wishlist',      icon: '📋', label: 'Wishlist' },
-  { to: '/reviews',       icon: '⭐', label: 'Reviews' },
-  { to: '/reservations',  icon: '🔖', label: 'Reservations' },
-  { to: '/pos',           icon: '🛒', label: 'POS' },
-  { to: '/fines',         icon: '💰', label: 'Fines' },
-  { to: '/reports',       icon: '📑', label: 'Reports' },
-  { to: '/staff',         icon: '👤', label: 'Staff Management' },
+const NAV_CONFIG = [
+  { to: '/', icon: '📊', label: 'Dashboard' },
+  {
+    icon: '📖', label: 'Library', key: 'library',
+    children: [
+      { to: '/books',           icon: '📚', label: 'Books' },
+      { to: '/Borrow',          icon: '🔄', label: 'Borrow' },
+      { to: '/overdue',         icon: '🔴', label: 'Overdue' },
+      { to: '/availability',    icon: '🔍', label: 'Availability' },
+      { to: '/statistics',      icon: '📈', label: 'Statistics' },
+      { to: '/recommendations', icon: '💡', label: 'Recommend' },
+      { to: '/wishlist',        icon: '📋', label: 'Wishlist' },
+      { to: '/reviews',         icon: '⭐', label: 'Reviews' },
+      { to: '/reservations',    icon: '🔖', label: 'Reservations' },
+      { to: '/pos',             icon: '🛒', label: 'POS' },
+    ],
+  },
+  {
+    icon: '☕', label: 'Cafe', key: 'cafe',
+    children: [
+      { to: '/cafe/menu',    icon: '🍰', label: 'Menu & POS' },
+      { to: '/cafe/manage',  icon: '📝', label: 'Manage Menu' },
+      { to: '/cafe/orders',  icon: '📋', label: 'Orders' },
+      { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },
+    ],
+  },
+  {
+    icon: '👥', label: 'Members', key: 'members',
+    children: [
+      { to: '/members', icon: '👥', label: 'Members List' },
+      { to: '/fines',   icon: '💰', label: 'Fines' },
+    ],
+  },
+  {
+    icon: '📦', label: 'Inventory', key: 'inventory',
+    children: [
+      { to: '/inventory/library', icon: '📚', label: 'Library Stock' },
+      { to: '/inventory/cafe',    icon: '☕', label: 'Cafe Stock' },
+    ],
+  },
+  {
+    icon: '🎉', label: 'Events', key: 'events',
+    children: [
+      { to: '/events',            icon: '📅', label: 'All Events' },
+      { to: '/events/create',     icon: '➕', label: 'Create Event' },
+      { to: '/events/attendance', icon: '✅', label: 'Attendance' },
+    ],
+  },
+  { to: '/reports', icon: '📑', label: 'Reports' },
+  {
+    icon: '💳', label: 'Accounts', key: 'accounts',
+    children: [
+      { to: '/accounts/overview',     icon: '📊', label: 'Overview' },
+      { to: '/accounts/transactions', icon: '💸', label: 'Transactions' },
+      { to: '/accounts/expenses',     icon: '🧾', label: 'Expenses' },
+    ],
+  },
+  { to: '/staff', icon: '👤', label: 'Staff' },
+  {
+    icon: '🏪', label: 'Vendors', key: 'vendors',
+    children: [
+      { to: '/vendors',        icon: '🏪', label: 'Vendor List' },
+      { to: '/vendors/orders', icon: '📦', label: 'Purchase Orders' },
+    ],
+  },
+  {
+    icon: '⚙️', label: 'Settings', key: 'settings',
+    children: [
+      { to: '/settings/app',     icon: '🔧', label: 'App Config' },
+      { to: '/settings/profile', icon: '👤', label: 'Profile' },
+    ],
+  },
 ];
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const isMobile = () => window.innerWidth <= 768;
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
   const location = useLocation();
+
+  // Determine which groups should start expanded (based on active route)
+  const getInitialOpenGroups = () => {
+    const open = {};
+    NAV_CONFIG.forEach(item => {
+      if (item.children) {
+        const hasActive = item.children.some(child =>
+          child.to === '/' ? location.pathname === '/' : location.pathname.startsWith(child.to)
+        );
+        if (hasActive) open[item.key] = true;
+      }
+    });
+    return open;
+  };
+
+  const [openGroups, setOpenGroups] = useState(getInitialOpenGroups);
+
+  // Close sidebar on mobile when route changes
+  useEffect(() => {
+    if (isMobile()) {
+      setSidebarOpen(false);
+    }
+    // Auto-expand group containing the active route
+    setOpenGroups(prev => {
+      const next = { ...prev };
+      NAV_CONFIG.forEach(item => {
+        if (item.children) {
+          const hasActive = item.children.some(child =>
+            child.to === '/' ? location.pathname === '/' : location.pathname.startsWith(child.to)
+          );
+          if (hasActive) next[item.key] = true;
+        }
+      });
+      return next;
+    });
+  }, [location.pathname]);
+
+  // Handle resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) setSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const isActive = (to) => {
     if (to === '/') return location.pathname === '/';
     return location.pathname.startsWith(to);
+  };
+
+  const toggleGroup = (key) => {
+    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const isGroupActive = (item) => {
+    if (!item.children) return false;
+    return item.children.some(child => isActive(child.to));
   };
 
   return (
@@ -77,27 +210,57 @@ function App() {
           <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle sidebar">
             ☰
           </button>
-          <h1 className="app-title">📚 Tapas Library</h1>
+          <h1 className="app-title">📚 Tapas Reading Cafe</h1>
         </div>
         <div className="navbar-right">
           <span className="user-info">👤 Admin</span>
         </div>
       </nav>
 
+      {/* SIDEBAR OVERLAY (mobile only) */}
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* SIDEBAR */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <nav className="sidebar-nav">
-          {NAV_LINKS.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="nav-link"
-              style={isActive(link.to) ? { background: 'rgba(102,126,234,0.15)', color: '#667eea', borderLeft: '3px solid #667eea' } : {}}
-            >
-              <span className="nav-icon">{link.icon}</span>
-              <span className="nav-label">{link.label}</span>
-            </Link>
-          ))}
+          {NAV_CONFIG.map((item, idx) =>
+            item.children ? (
+              <div key={item.key} className="nav-group">
+                <button
+                  className={`nav-group-header ${isGroupActive(item) ? 'has-active' : ''}`}
+                  onClick={() => toggleGroup(item.key)}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                  <span className={`nav-chevron ${openGroups[item.key] ? 'open' : ''}`}>›</span>
+                </button>
+                <div className={`nav-group-children ${openGroups[item.key] ? 'expanded' : 'collapsed'}`}>
+                  {item.children.map(child => (
+                    <Link
+                      key={child.to}
+                      to={child.to}
+                      className={`nav-link nav-link-child ${isActive(child.to) ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{child.icon}</span>
+                      <span className="nav-label">{child.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`nav-link ${isActive(item.to) ? 'active' : ''}`}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+              </Link>
+            )
+          )}
         </nav>
       </aside>
 
@@ -105,8 +268,10 @@ function App() {
       <main className={`main-content ${sidebarOpen ? 'expanded' : 'full'}`}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
+            {/* Dashboard */}
             <Route path="/"                                   element={<Dashboard />} />
-            <Route path="/members"                            element={<Members />} />
+
+            {/* Library */}
             <Route path="/books"                              element={<Books />} />
             <Route path="/Borrow"                             element={<Borrow />} />
             <Route path="/overdue"                            element={<OverdueBooks />} />
@@ -117,11 +282,46 @@ function App() {
             <Route path="/reviews"                            element={<Reviews />} />
             <Route path="/reservations"                       element={<Reservations />} />
             <Route path="/pos"                                element={<POS />} />
+
+            {/* Cafe */}
+            <Route path="/cafe/menu"                          element={<CafePOS />} />
+            <Route path="/cafe/manage"                        element={<CafeMenu />} />
+            <Route path="/cafe/orders"                        element={<CafeOrders />} />
+            <Route path="/cafe/reports"                       element={<CafeReports />} />
+
+            {/* Members */}
+            <Route path="/members"                            element={<Members />} />
             <Route path="/fines"                              element={<Fines />} />
-            <Route path="/reports"                            element={<Reports />} />
-            <Route path="/staff"                              element={<StaffManagement />} />
             <Route path="/member/:memberId"                   element={<MemberProfile />} />
             <Route path="/member/:memberId/child/:childId"    element={<ChildProfile />} />
+
+            {/* Inventory */}
+            <Route path="/inventory/library"                  element={<InventoryLibrary />} />
+            <Route path="/inventory/cafe"                     element={<InventoryCafe />} />
+
+            {/* Events */}
+            <Route path="/events"                             element={<EventListing />} />
+            <Route path="/events/create"                      element={<EventCreate />} />
+            <Route path="/events/attendance"                  element={<EventAttendance />} />
+
+            {/* Reports */}
+            <Route path="/reports"                            element={<Reports />} />
+
+            {/* Accounts */}
+            <Route path="/accounts/overview"                  element={<AccountsOverview />} />
+            <Route path="/accounts/transactions"              element={<AccountsTransactions />} />
+            <Route path="/accounts/expenses"                  element={<AccountsExpenses />} />
+
+            {/* Staff */}
+            <Route path="/staff"                              element={<StaffManagement />} />
+
+            {/* Vendors */}
+            <Route path="/vendors"                            element={<VendorList />} />
+            <Route path="/vendors/orders"                     element={<PurchaseOrders />} />
+
+            {/* Settings */}
+            <Route path="/settings/app"                       element={<SettingsApp />} />
+            <Route path="/settings/profile"                   element={<SettingsProfile />} />
           </Routes>
         </Suspense>
       </main>

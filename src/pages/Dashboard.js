@@ -141,27 +141,84 @@ export default function Dashboard() {
   const catColors = ['#667eea', '#1dd1a1', '#f39c12', '#e74c3c', '#9b59b6', '#3498db'];
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div className="dashboard-page">
+      <style>{`
+        .dashboard-page { padding: 20px; }
+        .dashboard-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .dashboard-header h1 { font-size: 32px; margin-bottom: 4px; }
+        .dashboard-header p { color: #999; }
+        .dashboard-refresh-btn { padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        .dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .dashboard-metric-card { padding: 16px; background: white; border-radius: 8px; text-align: center; }
+        .dashboard-metric-skeleton { padding: 16px; background: white; border-radius: 8px; text-align: center; border-top: 3px solid #e0e0e0; }
+        .dashboard-due-alert { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; }
+        .dashboard-due-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .dashboard-due-tag { background: white; border: 1px solid #ffc107; padding: 3px 10px; border-radius: 12px; font-size: 12px; }
+        .dashboard-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .dashboard-card { background: white; border-radius: 8px; padding: 20px; }
+        .dashboard-card h3 { margin: 0 0 16px 0; font-size: 15px; font-weight: 700; }
+        .dashboard-bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
+        .dashboard-bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .dashboard-bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .dashboard-member-row { display: flex; align-items: center; gap: 10px; padding: 8px; background: #f8f9fa; border-radius: 6px; }
+        .dashboard-sales-table { width: 100%; border-collapse: collapse; }
+        .dashboard-sales-table th { text-align: left; padding: 8px; font-weight: 600; font-size: 12px; color: #666; }
+        .dashboard-sales-table td { padding: 8px; font-size: 13px; }
+
+        @media (max-width: 768px) {
+          .dashboard-page { padding: 12px; }
+          .dashboard-header { flex-direction: column; align-items: stretch; }
+          .dashboard-header h1 { font-size: 22px; }
+          .dashboard-refresh-btn { align-self: flex-end; padding: 6px 14px; font-size: 13px; }
+          .dashboard-metrics { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+          .dashboard-metric-card { padding: 12px 8px; }
+          .dashboard-metric-card .metric-value { font-size: 18px !important; }
+          .dashboard-metric-card .metric-value-text { font-size: 14px !important; }
+          .dashboard-charts-row { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+          .dashboard-bottom-row { grid-template-columns: 1fr; gap: 12px; }
+          .dashboard-card { padding: 14px; }
+          .dashboard-due-alert { padding: 10px 14px; margin-bottom: 16px; }
+          .dashboard-sales-table th, .dashboard-sales-table td { padding: 6px 4px; font-size: 12px; }
+        }
+
+        @media (max-width: 480px) {
+          .dashboard-page { padding: 8px; }
+          .dashboard-header h1 { font-size: 20px; }
+          .dashboard-metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+          .dashboard-metric-card { padding: 10px 6px; }
+          .dashboard-metric-card .metric-icon { font-size: 16px !important; }
+          .dashboard-metric-card .metric-value { font-size: 16px !important; }
+          .dashboard-metric-card .metric-value-text { font-size: 12px !important; }
+          .dashboard-metric-card .metric-label { font-size: 9px !important; }
+          .dashboard-card { padding: 12px; }
+          .dashboard-card h3 { font-size: 13px; margin-bottom: 12px; }
+          .dashboard-bar-chart { height: 80px; gap: 4px; }
+          .dashboard-member-row { padding: 6px; gap: 8px; }
+          .dashboard-member-row .member-name { font-size: 13px !important; }
+          .dashboard-member-row .member-badge { font-size: 11px !important; padding: 2px 8px !important; }
+        }
+
+        @keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.4}}
+      `}</style>
+
+      <div className="dashboard-header">
         <div>
-          <h1 style={{ fontSize: '32px', marginBottom: '4px' }}>📊 Dashboard</h1>
-          <p style={{ color: '#999' }}>Welcome back! Here's your library overview.</p>
+          <h1>📊 Dashboard</h1>
+          <p>Welcome back! Here's your library overview.</p>
         </div>
-        <button onClick={() => fetchDashboardData(true)} disabled={loading}
-          style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        <button onClick={() => fetchDashboardData(true)} disabled={loading} className="dashboard-refresh-btn">
           {loading ? '⏳ Loading...' : '🔄 Refresh'}
         </button>
       </div>
 
       {/* Metric cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+      <div className="dashboard-metrics">
         {loading ? (
           Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} style={{ padding: '16px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: '3px solid #e0e0e0' }}>
+            <div key={i} className="dashboard-metric-skeleton">
               <div style={{ width: '28px', height: '28px', background: '#f0f0f0', borderRadius: '50%', margin: '0 auto 8px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
               <div style={{ width: '50%', height: '24px', background: '#f0f0f0', borderRadius: '4px', margin: '0 auto 8px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
               <div style={{ width: '80%', height: '10px', background: '#f0f0f0', borderRadius: '4px', margin: '0 auto', animation: 'shimmer 1.4s ease-in-out infinite' }} />
-              <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
             </div>
           ))
         ) : (
@@ -174,10 +231,10 @@ export default function Dashboard() {
             { label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰' },
             { label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵' },
           ].map(s => (
-            <div key={s.label} style={{ padding: '16px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: `3px solid ${s.color}` }}>
-              <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
-              <div style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
+            <div key={s.label} className="dashboard-metric-card" style={{ borderTop: `3px solid ${s.color}` }}>
+              <div className="metric-icon" style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
+              <div className={typeof s.value === 'string' ? 'metric-value-text' : 'metric-value'} style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
+              <div className="metric-label" style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
             </div>
           ))
         )}
@@ -185,13 +242,13 @@ export default function Dashboard() {
 
       {/* Due Today Alert */}
       {dueTodayBooks.length > 0 && (
-        <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
+        <div className="dashboard-due-alert">
           <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>
             📅 {dueTodayBooks.length} Book{dueTodayBooks.length !== 1 ? 's' : ''} Due Back Today
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          <div className="dashboard-due-tags">
             {dueTodayBooks.map(item => (
-              <span key={item.id} style={{ background: 'white', border: '1px solid #ffc107', padding: '3px 10px', borderRadius: '12px', fontSize: '12px' }}>
+              <span key={item.id} className="dashboard-due-tag">
                 {item.books?.title} ({item.members?.name})
               </span>
             ))}
@@ -200,13 +257,13 @@ export default function Dashboard() {
       )}
 
       {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+      <div className="dashboard-charts-row">
         {/* Weekly borrows bar chart */}
-        <div style={{ background: 'white', borderRadius: '8px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700' }}>📅 Books Borrowed This Week</h3>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '100px' }}>
+        <div className="dashboard-card">
+          <h3>📅 Books Borrowed This Week</h3>
+          <div className="dashboard-bar-chart">
             {weeklyData.map(d => (
-              <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <div key={d.date} className="dashboard-bar-item">
                 <div style={{ fontSize: '11px', color: '#667eea', fontWeight: '600', height: '14px' }}>
                   {d.count > 0 ? d.count : ''}
                 </div>
@@ -226,8 +283,8 @@ export default function Dashboard() {
         </div>
 
         {/* Category distribution */}
-        <div style={{ background: 'white', borderRadius: '8px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700' }}>🗂️ Popular Categories</h3>
+        <div className="dashboard-card">
+          <h3>🗂️ Popular Categories</h3>
           {categoryData.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px' }}>No category data yet.</p>
           ) : (
@@ -251,16 +308,16 @@ export default function Dashboard() {
       </div>
 
       {/* Bottom row: Most active members + Recent sales */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <div className="dashboard-bottom-row">
         {/* Most active members */}
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px' }}>
-          <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700' }}>🏆 Most Active Members</h3>
+        <div className="dashboard-card">
+          <h3>🏆 Most Active Members</h3>
           {topMembers.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px' }}>No active borrows.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {topMembers.map((m, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '6px' }}>
+                <div key={idx} className="dashboard-member-row">
                   <span style={{
                     width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: idx === 0 ? '#f39c12' : idx === 1 ? '#95a5a6' : idx === 2 ? '#e67e22' : '#f0f0f0',
@@ -268,8 +325,8 @@ export default function Dashboard() {
                   }}>
                     {idx + 1}
                   </span>
-                  <span style={{ flex: 1, fontSize: '14px', fontWeight: '500' }}>{m.name}</span>
-                  <span style={{ background: '#667eea', color: 'white', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
+                  <span className="member-name" style={{ flex: 1, fontSize: '14px', fontWeight: '500' }}>{m.name}</span>
+                  <span className="member-badge" style={{ background: '#667eea', color: 'white', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
                     {m.count} out
                   </span>
                 </div>
@@ -279,29 +336,31 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Sales */}
-        <div style={{ background: 'white', padding: '20px', borderRadius: '8px' }}>
-          <h2 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700' }}>📝 Recent Sales</h2>
+        <div className="dashboard-card">
+          <h3>📝 Recent Sales</h3>
           {recentActivity.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px' }}>No recent sales</p>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Member</th>
-                  <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Amount</th>
-                  <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentActivity.map((sale) => (
-                  <tr key={sale.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '8px', fontSize: '13px' }}>{sale.members?.name || 'N/A'}</td>
-                    <td style={{ padding: '8px', fontSize: '13px', fontWeight: '600', color: '#27ae60' }}>₹{sale.total_amount?.toLocaleString('en-IN')}</td>
-                    <td style={{ padding: '8px', fontSize: '12px', color: '#999' }}>{new Date(sale.sale_date).toLocaleDateString('en-IN')}</td>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table className="dashboard-sales-table">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #eee' }}>
+                    <th>Member</th>
+                    <th>Amount</th>
+                    <th>Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentActivity.map((sale) => (
+                    <tr key={sale.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td>{sale.members?.name || 'N/A'}</td>
+                      <td style={{ fontWeight: '600', color: '#27ae60' }}>₹{sale.total_amount?.toLocaleString('en-IN')}</td>
+                      <td style={{ fontSize: '12px', color: '#999' }}>{new Date(sale.sale_date).toLocaleDateString('en-IN')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

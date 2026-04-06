@@ -94,89 +94,78 @@ export default function Reports() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="reports-page">
+      <style>{`
+        .reports-page { padding: 20px; }
+        .reports-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .reports-header h1 { font-size: 28px; margin: 0; }
+        .reports-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .reports-metric { padding: 20px; background: white; border-radius: 8px; text-align: center; }
+        .reports-metric .val { font-size: 28px; font-weight: bold; }
+        .reports-metric .lbl { font-size: 12px; color: #999; margin-top: 5px; }
+        .reports-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+        .reports-tab { padding: 8px 18px; border-radius: 20px; border: 1px solid #e0e0e0; background: white; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
+        .reports-tab.active { background: #667eea; color: white; border-color: #667eea; }
+        .reports-card { background: white; padding: 20px; border-radius: 8px; overflow-x: auto; }
+        .reports-card h2 { font-size: 18px; margin: 0 0 12px; }
+        .reports-card table { width: 100%; border-collapse: collapse; }
+        .reports-card th { padding: 10px; text-align: left; font-weight: bold; border-bottom: 2px solid #e0e0e0; }
+        .reports-card td { padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        @media (max-width: 768px) {
+          .reports-page { padding: 12px; }
+          .reports-header h1 { font-size: 22px; }
+          .reports-metrics { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+          .reports-metric { padding: 14px; }
+          .reports-metric .val { font-size: 20px; }
+          .reports-card { padding: 14px; }
+          .reports-card h2 { font-size: 16px; }
+          .reports-card th, .reports-card td { padding: 8px 6px; font-size: 12px; }
+        }
+        @media (max-width: 480px) {
+          .reports-page { padding: 8px; }
+          .reports-metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .reports-metric { padding: 10px; }
+          .reports-metric .val { font-size: 16px; }
+        }
+      `}</style>
+
+      <div className="reports-header">
         <h1>📊 Reports</h1>
-        <button
-          onClick={fetchReportData}
-          style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
+        <button onClick={fetchReportData} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
           🔄 Refresh
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '30px' }}>
-        <div style={{ padding: '20px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: '3px solid #667eea' }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold' }}>₹{reportData.totalRevenue?.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
-          <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>REVENUE THIS MONTH</div>
+      <div className="reports-metrics">
+        <div className="reports-metric" style={{ borderTop: '3px solid #667eea' }}>
+          <div className="val">₹{reportData.totalRevenue?.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+          <div className="lbl">REVENUE THIS MONTH</div>
         </div>
-        <div style={{ padding: '20px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: '3px solid #1dd1a1' }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{reportData.totalMembers}</div>
-          <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>TOTAL MEMBERS</div>
+        <div className="reports-metric" style={{ borderTop: '3px solid #1dd1a1' }}>
+          <div className="val">{reportData.totalMembers}</div>
+          <div className="lbl">TOTAL MEMBERS</div>
         </div>
-        <div style={{ padding: '20px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: '3px solid #667eea' }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{reportData.activeCheckouts}</div>
-          <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>ACTIVE CHECKOUTS</div>
+        <div className="reports-metric" style={{ borderTop: '3px solid #667eea' }}>
+          <div className="val">{reportData.activeCheckouts}</div>
+          <div className="lbl">ACTIVE CHECKOUTS</div>
         </div>
-        <div style={{ padding: '20px', background: 'white', borderRadius: '8px', textAlign: 'center', borderTop: '3px solid #ff9f43' }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{reportData.overdueBooks?.length || 0}</div>
-          <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>OVERDUE BOOKS</div>
+        <div className="reports-metric" style={{ borderTop: '3px solid #ff9f43' }}>
+          <div className="val">{reportData.overdueBooks?.length || 0}</div>
+          <div className="lbl">OVERDUE BOOKS</div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #ddd' }}>
-        <button
-          onClick={() => setActiveTab('revenue')}
-          style={{
-            padding: '10px 20px',
-            background: activeTab === 'revenue' ? '#667eea' : '#f0f0f0',
-            color: activeTab === 'revenue' ? 'white' : '#333',
-            border: 'none',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'revenue' ? '3px solid #667eea' : 'none',
-          }}
-        >
-          💰 Revenue
-        </button>
-        <button
-          onClick={() => setActiveTab('topbooks')}
-          style={{
-            padding: '10px 20px',
-            background: activeTab === 'topbooks' ? '#667eea' : '#f0f0f0',
-            color: activeTab === 'topbooks' ? 'white' : '#333',
-            border: 'none',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'topbooks' ? '3px solid #667eea' : 'none',
-          }}
-        >
-          📚 Top Books
-        </button>
-        <button
-          onClick={() => setActiveTab('overdue')}
-          style={{
-            padding: '10px 20px',
-            background: activeTab === 'overdue' ? '#667eea' : '#f0f0f0',
-            color: activeTab === 'overdue' ? 'white' : '#333',
-            border: 'none',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'overdue' ? '3px solid #667eea' : 'none',
-          }}
-        >
-          ⚠️ Overdue
-        </button>
-        <button
-          onClick={() => setActiveTab('expiring')}
-          style={{
-            padding: '10px 20px',
-            background: activeTab === 'expiring' ? '#667eea' : '#f0f0f0',
-            color: activeTab === 'expiring' ? 'white' : '#333',
-            border: 'none',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'expiring' ? '3px solid #667eea' : 'none',
-          }}
-        >
-          📅 Expiring Soon
-        </button>
+      <div className="reports-tabs">
+        {[
+          { key: 'revenue', label: '💰 Revenue' },
+          { key: 'topbooks', label: '📚 Top Books' },
+          { key: 'overdue', label: '⚠️ Overdue' },
+          { key: 'expiring', label: '📅 Expiring Soon' },
+        ].map(tab => (
+          <button key={tab.key} className={`reports-tab ${activeTab === tab.key ? 'active' : ''}`} onClick={() => setActiveTab(tab.key)}>
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -184,7 +173,7 @@ export default function Reports() {
       ) : (
         <>
           {activeTab === 'revenue' && (
-            <div style={{ background: 'white', padding: '20px', borderRadius: '8px' }}>
+            <div className="reports-card">
               <h2>💰 Monthly Revenue</h2>
               <p style={{ fontSize: '14px', marginBottom: '15px' }}>Total revenue this month: <strong>₹{reportData.totalRevenue?.toLocaleString('en-IN')}</strong></p>
               <p style={{ color: '#999', fontSize: '12px' }}>Revenue is calculated from all completed sales in the current month.</p>
@@ -192,7 +181,7 @@ export default function Reports() {
           )}
 
           {activeTab === 'topbooks' && (
-            <div style={{ background: 'white', padding: '20px', borderRadius: '8px' }}>
+            <div className="reports-card">
               <h2>📚 Most Borrowed Books</h2>
               {reportData.topBooks?.length === 0 ? (
                 <p style={{ color: '#999' }}>No data available</p>
@@ -218,7 +207,7 @@ export default function Reports() {
           )}
 
           {activeTab === 'overdue' && (
-            <div style={{ background: 'white', padding: '20px', borderRadius: '8px' }}>
+            <div className="reports-card">
               <h2>⚠️ Overdue Books</h2>
               {reportData.overdueBooks?.length === 0 ? (
                 <p style={{ color: '#999' }}>No overdue books 🎉</p>
@@ -248,7 +237,7 @@ export default function Reports() {
           )}
 
           {activeTab === 'expiring' && (
-            <div style={{ background: 'white', padding: '20px', borderRadius: '8px' }}>
+            <div className="reports-card">
               <h2>📅 Subscriptions Expiring in 7 Days</h2>
               {reportData.expiringSubscriptions?.length === 0 ? (
                 <p style={{ color: '#999' }}>No subscriptions expiring soon</p>
