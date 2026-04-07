@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { cacheGet, cacheSet } from '../utils/cache';
+import { useDevMode } from '../components/DevMode';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { devMode } = useDevMode();
   const [metrics, setMetrics] = useState({
     totalMembers: 0,
     totalBooks: 0,
@@ -20,6 +22,10 @@ export default function Dashboard() {
   const [topMembers, setTopMembers] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [dueTodayBooks, setDueTodayBooks] = useState([]);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [cardOrder, setCardOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dashboard_card_order')) || null; } catch { return null; }
+  });
 
   useEffect(() => {
     fetchDashboardData();
@@ -247,25 +253,52 @@ export default function Dashboard() {
             </div>
           ))
         ) : (
-          [
-            { label: 'Active Members', value: metrics.totalMembers, color: '#667eea', icon: '👥', link: '/members' },
-            { label: 'Total Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚', link: '/books' },
-            { label: 'Checked Out Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤', link: '/Borrow' },
-            { label: 'Active Borrows', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖', link: '/Borrow' },
-            { label: 'Overdue Books', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️', link: '/overdue' },
-            { label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰', link: '/fines' },
-            { label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵', link: '/reports' },
-          ].map(s => (
-            <div key={s.label} className="dashboard-metric-card" onClick={() => navigate(s.link)}
-              style={{ borderTop: `3px solid ${s.color}`, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-              title={`Go to ${s.label}`}>
-              <div className="metric-icon" style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
-              <div className={typeof s.value === 'string' ? 'metric-value-text' : 'metric-value'} style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
-              <div className="metric-label" style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
-            </div>
-          ))
+          (() => {
+            const defaultCards = [
+              { id: 0, label: 'Active Members', value: metrics.totalMembers, color: '#667eea', icon: '👥', link: '/members' },
+              { id: 1, label: 'Total Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚', link: '/books' },
+              { id: 2, label: 'Checked Out Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤', link: '/Borrow' },
+              { id: 3, label: 'Active Borrows', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖', link: '/Borrow' },
+              { id: 4, label: 'Overdue Books', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️', link: '/overdue' },
+              { id: 5, label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰', link: '/fines' },
+              { id: 6, label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵', link: '/reports' },
+            ];
+            const ordered = cardOrder ? cardOrder.map(id => defaultCards.find(c => c.id === id)).filter(Boolean) : defaultCards;
+            // Add any cards not in saved order
+            defaultCards.forEach(c => { if (!ordered.find(o => o.id === c.id)) ordered.push(c); });
+
+            return ordered.map((s, idx) => (
+              <div key={s.id} className="dashboard-metric-card"
+                onClick={() => { if (!devMode) navigate(s.link); }}
+                draggable={devMode}
+                onDragStart={() => devMode && setDragIdx(idx)}
+                onDragOver={e => { if (devMode) e.preventDefault(); }}
+                onDrop={() => {
+                  if (!devMode || dragIdx === null) return;
+                  const newOrder = [...ordered];
+                  const [moved] = newOrder.splice(dragIdx, 1);
+                  newOrder.splice(idx, 0, moved);
+                  const ids = newOrder.map(c => c.id);
+                  setCardOrder(ids);
+                  localStorage.setItem('dashboard_card_order', JSON.stringify(ids));
+                  setDragIdx(null);
+                }}
+                style={{
+                  borderTop: `3px solid ${s.color}`, cursor: devMode ? 'grab' : 'pointer',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  opacity: dragIdx === idx ? 0.5 : 1,
+                  outline: devMode ? '1px dashed #667eea40' : 'none',
+                }}
+                onMouseEnter={e => { if (!devMode) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                title={devMode ? 'Drag to reorder • Double-click text to edit' : `Go to ${s.label}`}>
+                <div className="metric-icon" style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
+                <div className={typeof s.value === 'string' ? 'metric-value-text' : 'metric-value'} style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
+                <div className="metric-label" style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
+                {devMode && <div style={{ fontSize: '9px', color: '#667eea', marginTop: '4px' }}>⋮⋮ drag to reorder</div>}
+              </div>
+            ));
+          })()
         )}
       </div>
 
