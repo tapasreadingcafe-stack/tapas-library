@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { HintBubble, GlobalHintTooltip } from './components/HintTooltip';
+import { HintBubble } from './components/HintTooltip';
+import GlobalTooltip from './components/GlobalTooltip';
 import { useTheme } from './components/ThemeProvider';
 import NotificationBell from './components/NotificationBell';
 import './App.css';
@@ -346,7 +347,7 @@ function App() {
           </Routes>
         </Suspense>
       </main>
-      <GlobalHintTooltip />
+      <GlobalTooltip />
     </div>
   );
 }
