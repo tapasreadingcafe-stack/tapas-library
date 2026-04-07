@@ -78,51 +78,74 @@ export function DevModeProvider({ children }) {
     return () => document.removeEventListener('dblclick', handleDblClick, true);
   }, [devMode, customLabels]);
 
-  // Apply custom labels to DOM — works always (even with dev mode off)
+  // Apply custom labels to DOM — ALWAYS runs (even with dev mode off)
   // This is purely cosmetic — only replaces visible text, never data attributes or values
-  const applyLabels = useCallback(() => {
-    if (Object.keys(customLabels).length === 0) return;
+  const applyLabelsToNode = useCallback((root) => {
+    if (Object.keys(customLabels).length === 0 || !root) return;
 
-    // Only walk text nodes inside main-content and sidebar nav-labels
-    const containers = [
-      document.querySelector('.main-content'),
-      document.querySelector('.sidebar-nav'),
-      document.querySelector('.app-title'),
-    ].filter(Boolean);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const parent = node.parentElement;
+      if (!parent) continue;
+      const ptag = parent.tagName;
+      if (['INPUT','TEXTAREA','SELECT','SCRIPT','STYLE','CODE','PRE'].includes(ptag)) continue;
+      if (parent.dataset?.noEdit) continue;
+      if (parent.closest('.dev-edit-modal')) continue;
 
-    containers.forEach(container => {
-      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-      while (walker.nextNode()) {
-        const node = walker.currentNode;
-        const parent = node.parentElement;
-        // Skip inputs, textareas, scripts, styles
-        if (!parent) continue;
-        const ptag = parent.tagName;
-        if (['INPUT','TEXTAREA','SELECT','SCRIPT','STYLE','CODE','PRE'].includes(ptag)) continue;
-        // Skip elements with data-no-edit
-        if (parent.dataset?.noEdit) continue;
+      const text = node.textContent.trim();
+      if (!text) continue;
 
-        const text = node.textContent.trim();
-        if (!text) continue;
-
-        for (const [key, newVal] of Object.entries(customLabels)) {
-          const origText = key.split('__').pop();
-          if (origText && text === origText && text !== newVal) {
-            node.textContent = node.textContent.replace(origText, newVal);
-            break; // Only one replacement per node
-          }
+      for (const [key, newVal] of Object.entries(customLabels)) {
+        const origText = key.split('__').pop();
+        if (origText && text === origText && text !== newVal) {
+          node.textContent = node.textContent.replace(origText, newVal);
+          break;
         }
       }
-    });
+    }
   }, [customLabels]);
 
-  // Apply labels after every render (catches route changes, data loads)
+  const applyAllLabels = useCallback(() => {
+    [document.querySelector('.main-content'), document.querySelector('.sidebar-nav'), document.querySelector('.app-title')]
+      .filter(Boolean).forEach(c => applyLabelsToNode(c));
+  }, [applyLabelsToNode]);
+
+  // MutationObserver: watch for ANY DOM change and re-apply labels
   useEffect(() => {
-    if (Object.keys(customLabels).length > 0) {
-      const timer = setTimeout(applyLabels, 150);
-      return () => clearTimeout(timer);
-    }
-  });
+    if (Object.keys(customLabels).length === 0) return;
+
+    // Initial apply
+    const initTimer = setTimeout(applyAllLabels, 100);
+
+    // Watch for changes (React re-renders, route changes, data loads)
+    const observer = new MutationObserver((mutations) => {
+      // Debounce: apply after mutations settle
+      clearTimeout(observer._timer);
+      observer._timer = setTimeout(() => {
+        mutations.forEach(m => {
+          m.addedNodes.forEach(node => {
+            if (node.nodeType === 1) applyLabelsToNode(node);
+          });
+        });
+      }, 50);
+    });
+
+    const mainContent = document.querySelector('.main-content');
+    const sidebar = document.querySelector('.sidebar-nav');
+    if (mainContent) observer.observe(mainContent, { childList: true, subtree: true });
+    if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
+
+    // Also re-apply on a regular interval as safety net
+    const interval = setInterval(applyAllLabels, 2000);
+
+    return () => {
+      clearTimeout(initTimer);
+      clearTimeout(observer._timer);
+      clearInterval(interval);
+      observer.disconnect();
+    };
+  }, [customLabels, applyLabelsToNode, applyAllLabels]);
 
   return (
     <DevModeContext.Provider value={{
