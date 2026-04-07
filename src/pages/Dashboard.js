@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { cacheGet, cacheSet } from '../utils/cache';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState({
     totalMembers: 0,
     totalBooks: 0,
@@ -236,15 +238,19 @@ export default function Dashboard() {
           ))
         ) : (
           [
-            { label: 'Active Members', value: metrics.totalMembers, color: '#667eea', icon: '👥' },
-            { label: 'Total Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚' },
-            { label: 'Checked Out Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤' },
-            { label: 'Active Borrows', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖' },
-            { label: 'Overdue Books', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️' },
-            { label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰' },
-            { label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵' },
+            { label: 'Active Members', value: metrics.totalMembers, color: '#667eea', icon: '👥', link: '/members' },
+            { label: 'Total Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚', link: '/books' },
+            { label: 'Checked Out Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤', link: '/Borrow' },
+            { label: 'Active Borrows', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖', link: '/Borrow' },
+            { label: 'Overdue Books', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️', link: '/overdue' },
+            { label: 'Outstanding Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰', link: '/fines' },
+            { label: 'Revenue This Month', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵', link: '/reports' },
           ].map(s => (
-            <div key={s.label} className="dashboard-metric-card" style={{ borderTop: `3px solid ${s.color}` }}>
+            <div key={s.label} className="dashboard-metric-card" onClick={() => navigate(s.link)}
+              style={{ borderTop: `3px solid ${s.color}`, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+              title={`Go to ${s.label}`}>
               <div className="metric-icon" style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
               <div className={typeof s.value === 'string' ? 'metric-value-text' : 'metric-value'} style={{ fontSize: typeof s.value === 'string' ? '16px' : '24px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
               <div className="metric-label" style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{s.label.toUpperCase()}</div>
@@ -255,7 +261,7 @@ export default function Dashboard() {
 
       {/* Due Today Alert */}
       {dueTodayBooks.length > 0 && (
-        <div className="dashboard-due-alert">
+        <div className="dashboard-due-alert" onClick={() => navigate('/Borrow')} style={{ cursor: 'pointer' }} title="Go to Borrow Management">
           <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>
             📅 {dueTodayBooks.length} Book{dueTodayBooks.length !== 1 ? 's' : ''} Due Back Today
           </div>
@@ -272,7 +278,7 @@ export default function Dashboard() {
       {/* Charts row */}
       <div className="dashboard-charts-row">
         {/* Weekly borrows bar chart */}
-        <div className="dashboard-card">
+        <div className="dashboard-card" onClick={() => navigate('/statistics')} style={{ cursor: 'pointer' }} title="Go to Statistics">
           <h3>📅 Books Borrowed This Week</h3>
           <div className="dashboard-bar-chart">
             {weeklyData.map(d => (
@@ -296,7 +302,7 @@ export default function Dashboard() {
         </div>
 
         {/* Category distribution */}
-        <div className="dashboard-card">
+        <div className="dashboard-card" onClick={() => navigate('/books')} style={{ cursor: 'pointer' }} title="Go to Books">
           <h3>🗂️ Popular Categories</h3>
           {categoryData.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px' }}>No category data yet.</p>
@@ -323,7 +329,7 @@ export default function Dashboard() {
       {/* Bottom row: Most active members + Recent sales */}
       <div className="dashboard-bottom-row">
         {/* Most active members */}
-        <div className="dashboard-card">
+        <div className="dashboard-card" onClick={() => navigate('/members')} style={{ cursor: 'pointer' }} title="Go to Members">
           <h3>🏆 Most Active Members</h3>
           {topMembers.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px' }}>No active borrows.</p>
@@ -349,7 +355,7 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Sales */}
-        <div className="dashboard-card">
+        <div className="dashboard-card" onClick={() => navigate('/reports')} style={{ cursor: 'pointer' }} title="Go to Reports">
           <h3>📝 Recent Sales</h3>
           {recentActivity.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px' }}>No recent sales</p>
