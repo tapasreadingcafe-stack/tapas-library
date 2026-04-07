@@ -14,15 +14,39 @@ export default function Reports() {
   const fetchReportData = async () => {
     setLoading(true);
     try {
-      // Revenue this month
+      // Revenue this month — pull from ALL revenue sources
       const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-      const { data: revenueData } = await supabase
+
+      // Sales table (library POS)
+      const { data: salesData } = await supabase
         .from('sales')
         .select('total_amount')
         .gte('sale_date', firstDay)
         .eq('status', 'completed');
-      
-      const totalRevenue = revenueData?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
+
+      // POS transactions table (if exists)
+      let posRevenue = 0;
+      try {
+        const { data: posData } = await supabase
+          .from('pos_transactions')
+          .select('total_amount')
+          .gte('created_at', firstDay + 'T00:00:00');
+        posRevenue = (posData || []).reduce((s, t) => s + (t.total_amount || 0), 0);
+      } catch {}
+
+      // Cafe orders (if exists)
+      let cafeRevenue = 0;
+      try {
+        const { data: cafeData } = await supabase
+          .from('cafe_orders')
+          .select('total_amount')
+          .gte('created_at', firstDay + 'T00:00:00')
+          .eq('status', 'completed');
+        cafeRevenue = (cafeData || []).reduce((s, t) => s + (t.total_amount || 0), 0);
+      } catch {}
+
+      const salesRevenue = (salesData || []).reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+      const totalRevenue = salesRevenue + posRevenue + cafeRevenue;
 
       // Top books
       const { data: topBooksData } = await supabase
