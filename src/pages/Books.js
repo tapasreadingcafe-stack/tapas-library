@@ -42,8 +42,10 @@ export default function Books() {
     author: '',
     isbn: '',
     category: '',
-    price: 0,
-    sales_price: 0,
+    price: '',
+    sales_price: '',
+    mrp: '',
+    discount_percent: '',
     quantity_total: 1,
     quantity_available: 1,
     book_image: '',
@@ -137,25 +139,38 @@ export default function Books() {
     setUploadingImage(true);
     try {
       const compressed = await compressImage(file);
-      const fd = new FormData();
-      fd.append('image', compressed, 'cover.jpg');
 
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`, {
-        method: 'POST',
-        body: fd,
-      });
+      // Try imgbb first
+      let uploaded = false;
+      try {
+        const fd = new FormData();
+        fd.append('image', compressed, 'cover.jpg');
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: fd,
+        });
+        const data = await response.json();
+        if (data.success) {
+          const imageUrl = data.data.display_url;
+          setFormData(prev => ({ ...prev, book_image: imageUrl }));
+          setImagePreview(imageUrl);
+          uploaded = true;
+        }
+      } catch {}
 
-      const data = await response.json();
-      if (data.success) {
-        const imageUrl = data.data.display_url;
-        setFormData(prev => ({ ...prev, book_image: imageUrl }));
-        setImagePreview(imageUrl);
-      } else {
-        alert('Failed to upload image. Please try a valid image file.');
+      // Fallback: convert to base64 data URL
+      if (!uploaded) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target.result;
+          setFormData(prev => ({ ...prev, book_image: dataUrl }));
+          setImagePreview(dataUrl);
+        };
+        reader.readAsDataURL(compressed);
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Error uploading image: ' + error.message);
+      alert('Error: ' + error.message);
     } finally {
       setUploadingImage(false);
     }
@@ -236,6 +251,15 @@ export default function Books() {
     try {
       const payload = { ...formData };
       if (!hasCondition) delete payload.condition;
+      // Convert empty strings to proper values
+      if (payload.price === '' || payload.price === null) payload.price = 0;
+      if (payload.sales_price === '' || payload.sales_price === null) payload.sales_price = 0;
+      if (payload.mrp === '' || payload.mrp === null) payload.mrp = 0;
+      if (payload.discount_percent === '' || payload.discount_percent === null) payload.discount_percent = 0;
+      payload.price = parseFloat(payload.price) || 0;
+      payload.sales_price = parseFloat(payload.sales_price) || 0;
+      payload.mrp = parseFloat(payload.mrp) || 0;
+      payload.discount_percent = parseFloat(payload.discount_percent) || 0;
 
       if (editingId) {
         const { error } = await supabase.from('books').update(payload).eq('id', editingId);
@@ -486,31 +510,85 @@ export default function Books() {
                 </div>
               )}
 
+              {/* PRICING SECTION */}
+              <div style={{ background: '#f8f9ff', padding: '14px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e0e8ff' }}>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', fontSize: '14px', color: '#667eea' }}>💰 Pricing</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Buying Price (₹)</label>
+                    <input
+                      type="number"
+                      name="price"
+                      value={formData.price}
+                      onChange={handleInputChange}
+                      min="0"
+                      placeholder="-"
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <p style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>Your cost. Leave blank if N/A</p>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>MRP (₹)</label>
+                    <input
+                      type="number"
+                      name="mrp"
+                      value={formData.mrp}
+                      onChange={(e) => {
+                        const mrp = parseFloat(e.target.value) || 0;
+                        const disc = parseFloat(formData.discount_percent) || 0;
+                        const sellingPrice = disc > 0 ? Math.round(mrp * (1 - disc / 100)) : mrp;
+                        setFormData(prev => ({ ...prev, mrp: e.target.value, sales_price: sellingPrice || '' }));
+                      }}
+                      min="0"
+                      placeholder="Maximum Retail Price"
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Discount (%)</label>
+                    <input
+                      type="number"
+                      name="discount_percent"
+                      value={formData.discount_percent}
+                      onChange={(e) => {
+                        const disc = parseFloat(e.target.value) || 0;
+                        const mrp = parseFloat(formData.mrp) || 0;
+                        const sellingPrice = mrp > 0 ? Math.round(mrp * (1 - disc / 100)) : '';
+                        setFormData(prev => ({ ...prev, discount_percent: e.target.value, sales_price: sellingPrice || prev.sales_price }));
+                      }}
+                      min="0" max="100" step="0.5"
+                      placeholder="0"
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#667eea' }}>Selling Price (₹)</label>
+                    <input
+                      type="number"
+                      name="sales_price"
+                      value={formData.sales_price}
+                      onChange={(e) => {
+                        const sp = parseFloat(e.target.value) || 0;
+                        const mrp = parseFloat(formData.mrp) || 0;
+                        const disc = mrp > 0 ? Math.round(((mrp - sp) / mrp) * 100) : '';
+                        setFormData(prev => ({ ...prev, sales_price: e.target.value, discount_percent: disc || prev.discount_percent }));
+                      }}
+                      min="0"
+                      placeholder="Auto from MRP - Discount"
+                      style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '4px', fontWeight: '700', color: '#667eea' }}
+                    />
+                    {formData.mrp && formData.sales_price && parseFloat(formData.sales_price) < parseFloat(formData.mrp) && (
+                      <p style={{ fontSize: '11px', color: '#27ae60', marginTop: '2px', fontWeight: '600' }}>
+                        Save ₹{(parseFloat(formData.mrp) - parseFloat(formData.sales_price)).toLocaleString('en-IN')} ({formData.discount_percent}% off)
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Price (₹)</label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    min="0"
-                    step="0.01"
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Sales Price (₹)</label>
-                  <input
-                    type="number"
-                    name="sales_price"
-                    value={formData.sales_price}
-                    onChange={handleInputChange}
-                    min="0"
-                    step="0.01"
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Total Copies</label>
                   <input
