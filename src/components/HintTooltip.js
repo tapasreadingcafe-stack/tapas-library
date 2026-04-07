@@ -34,6 +34,8 @@ const HINTS = {
   '/settings/app': 'Configure library settings — fine rates, loan periods, working hours.',
   '/settings/profile': 'Edit your staff profile and change password.',
   '/settings/activity': 'View audit trail — who did what and when across the system.',
+  '/catalog': 'Public book catalog — members can search and browse books without login.',
+  '/kiosk': 'Self-checkout kiosk — members scan their card and borrow/return books themselves.',
 };
 
 export function getHint(path) {

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { HintBubble } from './components/HintTooltip';
+import { useTheme } from './components/ThemeProvider';
+import NotificationBell from './components/NotificationBell';
 import './App.css';
 
 // ── Lazy-loaded pages (Existing) ─────────────────────────────────────────────
@@ -44,6 +46,8 @@ const AccountsExpenses      = React.lazy(() => import('./pages/AccountsExpenses'
 const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
 const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
 const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
+const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
+const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -135,6 +139,8 @@ const NAV_CONFIG = [
       { to: '/settings/app',     icon: '🔧', label: 'App Config' },
       { to: '/settings/profile', icon: '👤', label: 'Profile' },
       { to: '/settings/activity', icon: '📋', label: 'Activity Log' },
+      { to: '/catalog',          icon: '🌐', label: 'Public Catalog' },
+      { to: '/kiosk',            icon: '🖥️', label: 'Kiosk Mode' },
     ],
   },
 ];
@@ -145,6 +151,7 @@ function App() {
   const isMobile = () => window.innerWidth <= 768;
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
   const location = useLocation();
+  const { dark, toggleTheme } = useTheme();
 
   // Determine which groups should start expanded (based on active route)
   const getInitialOpenGroups = () => {
@@ -216,6 +223,10 @@ function App() {
           <h1 className="app-title">📚 Tapas Reading Cafe</h1>
         </div>
         <div className="navbar-right">
+          <NotificationBell />
+          <button onClick={toggleTheme} className="menu-toggle" title={dark ? 'Light mode' : 'Dark mode'} style={{ fontSize: '18px' }}>
+            {dark ? '☀️' : '🌙'}
+          </button>
           <span className="user-info">👤 Admin</span>
         </div>
       </nav>
@@ -328,6 +339,10 @@ function App() {
             <Route path="/settings/app"                       element={<SettingsApp />} />
             <Route path="/settings/profile"                   element={<SettingsProfile />} />
             <Route path="/settings/activity"                  element={<ActivityLog />} />
+
+            {/* Public & Kiosk */}
+            <Route path="/catalog"                            element={<PublicCatalog />} />
+            <Route path="/kiosk"                              element={<KioskMode />} />
           </Routes>
         </Suspense>
       </main>

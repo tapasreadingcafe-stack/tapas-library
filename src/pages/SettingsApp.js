@@ -18,7 +18,12 @@ INSERT INTO app_settings (key, value) VALUES
   ('library_open_time', '"09:00"'),
   ('library_close_time', '"21:00"'),
   ('cafe_enabled', 'true'),
-  ('events_enabled', 'true')
+  ('events_enabled', 'true'),
+  ('fine_grace_period_days', '3'),
+  ('fine_max_cap', '200'),
+  ('fine_rate_student', '5'),
+  ('fine_rate_premium', '8'),
+  ('fine_rate_family', '5')
 ON CONFLICT (key) DO NOTHING;`;
 
 const SETTINGS_CONFIG = [
@@ -31,6 +36,11 @@ const SETTINGS_CONFIG = [
   { key: 'library_close_time', label: 'Closing Time', type: 'time' },
   { key: 'cafe_enabled', label: 'Cafe Module Enabled', type: 'toggle' },
   { key: 'events_enabled', label: 'Events Module Enabled', type: 'toggle' },
+  { key: 'fine_grace_period_days', label: 'Fine Grace Period (Days)', type: 'number' },
+  { key: 'fine_max_cap', label: 'Max Fine Cap Per Book (₹)', type: 'number' },
+  { key: 'fine_rate_student', label: 'Fine Rate - Student (₹/day)', type: 'number' },
+  { key: 'fine_rate_premium', label: 'Fine Rate - Premium (₹/day)', type: 'number' },
+  { key: 'fine_rate_family', label: 'Fine Rate - Family (₹/day)', type: 'number' },
 ];
 
 // Quick tour steps
