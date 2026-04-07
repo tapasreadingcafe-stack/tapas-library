@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const ThemeContext = createContext();
 
@@ -6,178 +6,192 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-// Dark mode inline style overrides — these use !important to beat React inline styles
-const DARK_OVERRIDE_CSS = `
-[data-theme="dark"] .main-content div[style],
-[data-theme="dark"] .main-content table[style],
-[data-theme="dark"] .main-content form[style],
-[data-theme="dark"] .main-content section[style] {
-  background-color: #16213e !important;
-  color: #d0d8e8 !important;
+// Colors to replace in dark mode
+const LIGHT_BG = ['white', '#fff', '#ffffff', 'rgb(255, 255, 255)', '#f8f9fa', '#f5f7fa', '#f8f9ff', '#f0f0f0', '#f5f5f5', '#f0f2f5', '#f0f3ff', '#f9f9f9', '#fafafa'];
+const LIGHT_BG_SET = new Set(LIGHT_BG);
+
+const DARK = {
+  cardBg: '#16213e',
+  pageBg: '#1a1a2e',
+  nestedBg: '#1a2744',
+  text: '#d0d8e8',
+  textMuted: '#8899bb',
+  border: '#2a3a5a',
+  inputBg: '#0f1a30',
+};
+
+function isLightBg(color) {
+  if (!color) return false;
+  const c = color.trim().toLowerCase();
+  if (LIGHT_BG_SET.has(c)) return true;
+  // Catch rgb(248, 249, 250) etc.
+  const m = c.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (m && parseInt(m[1]) > 230 && parseInt(m[2]) > 230 && parseInt(m[3]) > 230) return true;
+  return false;
 }
 
-[data-theme="dark"] .main-content tr[style] {
-  background-color: transparent !important;
+function isDarkText(color) {
+  if (!color) return false;
+  const c = color.trim().toLowerCase();
+  if (c === '#333' || c === '#333333' || c === '#555' || c === '#555555' || c === '#666' || c === '#666666') return true;
+  const m = c.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (m && parseInt(m[1]) < 120 && parseInt(m[2]) < 120 && parseInt(m[3]) < 120) return true;
+  return false;
 }
 
-[data-theme="dark"] .main-content td[style] {
-  color: #c8d0e0 !important;
+function applyDarkToElement(el) {
+  if (!el.style) return;
+  const computed = el.style;
+
+  // Fix backgrounds
+  if (isLightBg(computed.background)) computed.background = DARK.cardBg;
+  if (isLightBg(computed.backgroundColor)) computed.backgroundColor = DARK.cardBg;
+
+  // Fix text colors
+  if (isDarkText(computed.color)) computed.color = DARK.text;
+
+  // Fix borders
+  const bc = computed.borderColor;
+  if (bc && (bc.includes('#e0e0e0') || bc.includes('#ddd') || bc.includes('#eee') || bc.includes('#f0f0f0'))) {
+    computed.borderColor = DARK.border;
+  }
 }
 
-[data-theme="dark"] .main-content th[style] {
-  color: #8899cc !important;
-  background-color: #0d1b3e !important;
+function revertDarkFromElement(el) {
+  // We can't easily revert since we modified inline styles directly.
+  // The simplest approach: force a page re-render by React handles it.
 }
 
-[data-theme="dark"] .main-content span[style*="color"] {
-  opacity: 0.95;
+function walkAndApplyDark(root) {
+  if (!root) return;
+  const els = root.querySelectorAll('*');
+  els.forEach(el => applyDarkToElement(el));
 }
 
-[data-theme="dark"] .main-content div[style*="border"] {
-  border-color: #2a3a5a !important;
-}
+const DARK_CSS = `
+/* Base dark overrides via CSS */
+[data-theme="dark"] body { background: ${DARK.pageBg}; color: ${DARK.text}; }
+[data-theme="dark"] .sidebar { background: #0f3460; border-right-color: ${DARK.border}; }
+[data-theme="dark"] .nav-link { color: #9aa8c0; }
+[data-theme="dark"] .nav-link:hover, [data-theme="dark"] .nav-link.active { background: rgba(102,126,234,0.2); color: #667eea; }
+[data-theme="dark"] .nav-group-header { color: #9aa8c0; }
+[data-theme="dark"] .nav-group-header:hover, [data-theme="dark"] .nav-group-header.has-active { color: #667eea; }
+[data-theme="dark"] .main-content { background: ${DARK.pageBg}; color: ${DARK.text}; }
+[data-theme="dark"] .navbar { background: linear-gradient(135deg, #0f3460 0%, #533483 100%); }
+[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.7); }
+[data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.6); }
 
-[data-theme="dark"] .main-content input[style],
-[data-theme="dark"] .main-content select[style],
-[data-theme="dark"] .main-content textarea[style] {
-  background-color: #0f1a30 !important;
-  color: #d0d8e8 !important;
-  border-color: #2a3a5a !important;
+/* Global element overrides */
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3, [data-theme="dark"] h4 { color: #e8ecf4 !important; }
+[data-theme="dark"] p { color: #9aa8c0; }
+[data-theme="dark"] label { color: #8899bb !important; }
+[data-theme="dark"] th { color: #8899cc !important; background: #0d1b3e !important; }
+[data-theme="dark"] td { color: #c8d0e0 !important; }
+[data-theme="dark"] table { background: ${DARK.cardBg} !important; }
+[data-theme="dark"] thead, [data-theme="dark"] thead tr { background: #0d1b3e !important; }
+[data-theme="dark"] tbody tr { background: ${DARK.cardBg} !important; }
+[data-theme="dark"] tbody tr:hover { background: #1e3050 !important; }
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
+  background: ${DARK.inputBg} !important; color: ${DARK.text} !important; border-color: ${DARK.border} !important;
 }
-
-/* Keep colored elements readable */
-[data-theme="dark"] .main-content span[style*="background: #d4edda"],
-[data-theme="dark"] .main-content span[style*="background: #fff3cd"],
-[data-theme="dark"] .main-content span[style*="background: #f8d7da"],
-[data-theme="dark"] .main-content span[style*="background: #cce5ff"] {
-  background-color: inherit !important;
-  color: inherit !important;
-}
-
-/* Don't override buttons with specific colors (primary, success, warning, danger) */
-[data-theme="dark"] .main-content button[style*="background: #667eea"],
-[data-theme="dark"] .main-content button[style*="background: #1dd1a1"],
-[data-theme="dark"] .main-content button[style*="background: #f39c12"],
-[data-theme="dark"] .main-content button[style*="background: #ff6b6b"],
-[data-theme="dark"] .main-content button[style*="background: #e74c3c"],
-[data-theme="dark"] .main-content button[style*="background: #27ae60"],
-[data-theme="dark"] .main-content button[style*="background: linear-gradient"],
-[data-theme="dark"] .main-content a[style*="background: #667eea"] {
-  background-color: unset !important;
-  color: white !important;
-}
-
-/* Lighter dark for nested cards */
-[data-theme="dark"] .main-content div[style] div[style] {
-  background-color: #1a2744 !important;
-}
-
-/* Metric cards - keep border-top colors visible */
-[data-theme="dark"] .main-content div[style*="border-top"] {
-  background-color: #16213e !important;
-}
-
-/* Don't break images */
-[data-theme="dark"] .main-content img {
-  background-color: transparent !important;
-}
-
-/* Navbar stays as-is */
-[data-theme="dark"] .navbar {
-  background: linear-gradient(135deg, #0f3460 0%, #533483 100%) !important;
-}
-
-/* ── Catch-all: ANY element with white/light background via CSS ── */
-/* This catches elements styled via CSS classes (not just inline) */
-[data-theme="dark"] .main-content {
-  color: #d0d8e8;
-}
-
-/* Common page-level cards/panels styled via embedded <style> tags */
-[data-theme="dark"] .main-content [class*="card"],
-[data-theme="dark"] .main-content [class*="panel"],
-[data-theme="dark"] .main-content [class*="metric"],
-[data-theme="dark"] .main-content [class*="stat"],
-[data-theme="dark"] .main-content [class*="report"],
-[data-theme="dark"] .main-content [class*="form-modal"],
-[data-theme="dark"] .main-content [class*="detail"] {
-  background: #16213e !important;
-  color: #d0d8e8 !important;
-}
-
-/* Common table wrappers */
-[data-theme="dark"] .main-content [class*="table-wrap"],
-[data-theme="dark"] .main-content [class*="table"] {
-  background: #16213e !important;
-  color: #d0d8e8 !important;
-}
-
-/* Rows / list items with light backgrounds */
-[data-theme="dark"] .main-content [class*="-row"]:not(.nav-link):not(.nav-group) {
-  background: #1a2744 !important;
-  color: #c8d0e0 !important;
-}
-
-/* Category/filter buttons */
-[data-theme="dark"] .main-content [class*="tab"]:not(.active),
-[data-theme="dark"] .main-content [class*="filter-btn"]:not(.active),
-[data-theme="dark"] .main-content [class*="cat-btn"]:not(.active) {
-  background: #1a2744 !important;
-  color: #9aa8c0 !important;
-  border-color: #2a3a5a !important;
-}
-
-/* Search bars */
-[data-theme="dark"] .main-content [class*="search"] {
-  background: #0f1a30 !important;
-  color: #d0d8e8 !important;
-  border-color: #2a3a5a !important;
-}
-
-/* Overlay modals that pages create */
-[data-theme="dark"] [class*="overlay"] > div,
-[data-theme="dark"] [class*="modal"] > div {
-  background: #16213e !important;
-  color: #d0d8e8 !important;
-}
-
-/* Progress bars background tracks */
-[data-theme="dark"] .main-content [class*="progress"] {
-  background: #1a2744 !important;
-}
-
-/* Receipt/print areas */
-[data-theme="dark"] .main-content [class*="receipt"] {
-  background: #16213e !important;
-  color: #d0d8e8 !important;
-}
+[data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #556080 !important; }
+[data-theme="dark"] .btn-secondary { background: #2a3a5a !important; color: #c8d0e0 !important; }
+[data-theme="dark"] ::-webkit-scrollbar { width: 8px; }
+[data-theme="dark"] ::-webkit-scrollbar-track { background: ${DARK.pageBg}; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #2a3a5a; border-radius: 4px; }
 `;
 
 export function ThemeProvider({ children }) {
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem('theme') === 'dark'; } catch { return false; }
   });
+  const observerRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('theme', dark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 
-    // Inject/remove dark override stylesheet
-    const id = 'dark-mode-overrides';
-    let styleEl = document.getElementById(id);
+    // Inject CSS
+    const cssId = 'dark-mode-css';
+    let cssEl = document.getElementById(cssId);
     if (dark) {
-      if (!styleEl) {
-        styleEl = document.createElement('style');
-        styleEl.id = id;
-        styleEl.textContent = DARK_OVERRIDE_CSS;
-        document.head.appendChild(styleEl);
+      if (!cssEl) {
+        cssEl = document.createElement('style');
+        cssEl.id = cssId;
+        cssEl.textContent = DARK_CSS;
+        document.head.appendChild(cssEl);
       }
     } else {
-      if (styleEl) styleEl.remove();
+      if (cssEl) cssEl.remove();
     }
+
+    // Use MutationObserver to catch React re-renders and apply dark fixes
+    if (dark) {
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        // Initial pass
+        walkAndApplyDark(mainContent);
+
+        // Watch for changes
+        observerRef.current = new MutationObserver((mutations) => {
+          mutations.forEach(m => {
+            // Apply to newly added nodes
+            m.addedNodes.forEach(node => {
+              if (node.nodeType === 1) {
+                applyDarkToElement(node);
+                walkAndApplyDark(node);
+              }
+            });
+            // Apply to attribute changes (style changes)
+            if (m.type === 'attributes' && m.attributeName === 'style') {
+              applyDarkToElement(m.target);
+            }
+          });
+        });
+
+        observerRef.current.observe(mainContent, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style'],
+        });
+      }
+    } else {
+      // Disconnect observer and reload to reset inline styles
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
   }, [dark]);
 
-  const toggleTheme = () => setDark(prev => !prev);
+  // Re-apply dark mode after route changes (React re-renders content)
+  useEffect(() => {
+    if (dark) {
+      const timer = setTimeout(() => {
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) walkAndApplyDark(mainContent);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  });
+
+  const toggleTheme = () => {
+    setDark(prev => {
+      const next = !prev;
+      if (!next) {
+        // Switching to light — need to reload to clear inline style modifications
+        setTimeout(() => window.location.reload(), 50);
+      }
+      return next;
+    });
+  };
 
   return (
     <ThemeContext.Provider value={{ dark, toggleTheme }}>
