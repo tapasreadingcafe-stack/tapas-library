@@ -150,7 +150,7 @@ export default function Borrow() {
         { data: circData },
         { count: returnedToday },
       ] = await Promise.all([
-        supabase.from('members').select('*').eq('status', 'active').order('name'),
+        supabase.from('members').select('*').order('name'),
         supabase.from('books').select('*').order('title'),
         supabase
           .from('circulation')
@@ -268,7 +268,6 @@ export default function Borrow() {
         checkout_date: new Date().toISOString().split('T')[0],
         due_date: dueDate,
         status: 'checked_out',
-        renewal_count: 0,
       };
 
       // Include child_id if borrowing on behalf of a child
@@ -276,9 +275,9 @@ export default function Borrow() {
         circRecord.child_id = selectedChild.id;
       }
 
-      const { error } = await supabase.from('circulation').insert([circRecord]);
+      // Try insert — if columns like renewal_count or child_id don't exist, retry without them
+      let { error } = await supabase.from('circulation').insert([circRecord]);
       if (error) {
-        // Retry without child_id if column issue
         delete circRecord.child_id;
         const { error: e2 } = await supabase.from('circulation').insert([circRecord]);
         if (e2) throw e2;
@@ -505,12 +504,8 @@ export default function Borrow() {
                 placeholder="Search by name, phone, or ID..."
                 value={memberSearch}
                 onChange={e => { setMemberSearch(e.target.value); if (selectedMember) setSelectedMember(null); }}
-                style={{ ...inputStyle }}
+                style={{ ...inputStyle, flex: 1 }}
               />
-              <button onClick={() => { setScannerMode('member'); setShowScanner(true); }}
-                style={{ padding: '9px 12px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                📱 Scan
-              </button>
             </div>
 
             {/* Search results */}
