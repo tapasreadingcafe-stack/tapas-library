@@ -50,7 +50,18 @@ export default function AccountsExpenses() {
     fetchExpenses();
   };
 
-  const deleteExpense = async (id) => { if (window.confirm('Delete?')) { await supabase.from('cafe_expenses').delete().eq('id', id); fetchExpenses(); } };
+  const deleteExpense = async (id) => {
+    if (!window.confirm('Delete this expense?')) return;
+    try {
+      const { error } = await supabase.from('cafe_expenses').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Expense deleted');
+      fetchExpenses();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      toast.error('Failed to delete: ' + err.message);
+    }
+  };
 
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
   const byCategory = {};
