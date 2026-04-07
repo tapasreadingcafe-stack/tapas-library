@@ -21,7 +21,7 @@ export function isDevModeEnabled() {
 export function DevModeProvider({ children }) {
   const [devMode, setDevMode] = useState(isDevModeEnabled());
   const [customLabels, setCustomLabels] = useState(loadCustomLabels());
-  const [editModal, setEditModal] = useState(null); // { key, value, el }
+  const [editModal, setEditModal] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('dev_mode', devMode ? 'true' : 'false');
@@ -50,68 +50,76 @@ export function DevModeProvider({ children }) {
     saveCustomLabels({});
   };
 
-  // ── Global double-click handler for dev mode ──
+  // Global double-click handler — ONLY active when devMode is ON
   useEffect(() => {
     if (!devMode) return;
 
     const handleDblClick = (e) => {
       const el = e.target;
-      // Only edit text-containing elements
       const tag = el.tagName?.toLowerCase();
       const isTextEl = ['h1','h2','h3','h4','h5','h6','p','span','div','td','th','label','button','a'].includes(tag);
       if (!isTextEl) return;
-
-      // Must have direct text content (not just child elements)
-      const text = el.childNodes.length === 1 && el.childNodes[0].nodeType === 3
-        ? el.textContent.trim()
-        : el.innerText?.trim();
-
-      if (!text || text.length > 60 || text.length < 1) return;
-
-      // Skip inputs, modals we created
       if (el.closest('.dev-edit-modal')) return;
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return;
+      if (['INPUT','TEXTAREA','SELECT'].includes(el.tagName)) return;
+
+      // Only edit elements with direct text (not containers full of children)
+      const directText = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join('');
+      const text = directText || el.innerText?.trim();
+      if (!text || text.length > 80 || text.length < 1) return;
 
       e.preventDefault();
       e.stopPropagation();
 
-      // Generate a key from the element's path
       const key = generateKey(el, text);
-      const currentValue = customLabels[key] || text;
-
-      setEditModal({ key, value: currentValue, originalText: text });
+      setEditModal({ key, value: customLabels[key] || text, originalText: text });
     };
 
     document.addEventListener('dblclick', handleDblClick, true);
     return () => document.removeEventListener('dblclick', handleDblClick, true);
   }, [devMode, customLabels]);
 
-  // ── Apply saved labels to DOM ──
+  // Apply custom labels to DOM — works always (even with dev mode off)
+  // This is purely cosmetic — only replaces visible text, never data attributes or values
   const applyLabels = useCallback(() => {
-    if (!devMode || Object.keys(customLabels).length === 0) return;
+    if (Object.keys(customLabels).length === 0) return;
 
-    const walker = document.createTreeWalker(
-      document.querySelector('.main-content') || document.body,
-      NodeFilter.SHOW_TEXT, null, false
-    );
+    // Only walk text nodes inside main-content and sidebar nav-labels
+    const containers = [
+      document.querySelector('.main-content'),
+      document.querySelector('.sidebar-nav'),
+      document.querySelector('.app-title'),
+    ].filter(Boolean);
 
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      const text = node.textContent.trim();
-      // Check all custom labels
-      for (const [key, newVal] of Object.entries(customLabels)) {
-        const origText = key.split('__').pop();
-        if (text === origText && text !== newVal) {
-          node.textContent = node.textContent.replace(origText, newVal);
+    containers.forEach(container => {
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const parent = node.parentElement;
+        // Skip inputs, textareas, scripts, styles
+        if (!parent) continue;
+        const ptag = parent.tagName;
+        if (['INPUT','TEXTAREA','SELECT','SCRIPT','STYLE','CODE','PRE'].includes(ptag)) continue;
+        // Skip elements with data-no-edit
+        if (parent.dataset?.noEdit) continue;
+
+        const text = node.textContent.trim();
+        if (!text) continue;
+
+        for (const [key, newVal] of Object.entries(customLabels)) {
+          const origText = key.split('__').pop();
+          if (origText && text === origText && text !== newVal) {
+            node.textContent = node.textContent.replace(origText, newVal);
+            break; // Only one replacement per node
+          }
         }
       }
-    }
-  }, [devMode, customLabels]);
+    });
+  }, [customLabels]);
 
-  // Apply labels after renders
+  // Apply labels after every render (catches route changes, data loads)
   useEffect(() => {
-    if (devMode) {
-      const timer = setTimeout(applyLabels, 200);
+    if (Object.keys(customLabels).length > 0) {
+      const timer = setTimeout(applyLabels, 150);
       return () => clearTimeout(timer);
     }
   });
@@ -123,14 +131,13 @@ export function DevModeProvider({ children }) {
     }}>
       {children}
 
-      {/* Dev mode indicator */}
+      {/* Dev mode floating indicator */}
       {devMode && (
         <div style={{
           position: 'fixed', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
           background: '#667eea', color: 'white', padding: '6px 16px',
           borderRadius: '20px', fontSize: '12px', fontWeight: '600',
           zIndex: 99998, boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
-          display: 'flex', alignItems: 'center', gap: '8px',
           pointerEvents: 'none',
         }}>
           🛠 DEV MODE — Double-click any text to edit
@@ -150,37 +157,29 @@ export function DevModeProvider({ children }) {
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <span style={{ fontSize: '20px' }}>🛠</span>
-              <h3 style={{ margin: 0, fontSize: '16px' }}>Edit Text</h3>
+              <h3 style={{ margin: 0, fontSize: '16px' }} data-no-edit="true">Edit Display Name</h3>
             </div>
-            <p style={{ fontSize: '11px', color: '#999', margin: '0 0 4px' }}>Original: <em>"{editModal.originalText}"</em></p>
-            <p style={{ fontSize: '10px', color: '#bbb', margin: '0 0 10px', wordBreak: 'break-all' }}>Key: {editModal.key}</p>
+            <p style={{ fontSize: '12px', color: '#999', margin: '0 0 4px' }} data-no-edit="true">Original: "{editModal.originalText}"</p>
+            <p style={{ fontSize: '10px', color: '#667eea', margin: '0 0 10px', background: '#f0f3ff', padding: '4px 8px', borderRadius: '4px' }} data-no-edit="true">
+              This only changes the display name. All data and functionality stays the same.
+            </p>
             <input
               value={editModal.value}
               onChange={e => setEditModal({ ...editModal, value: e.target.value })}
               autoFocus
               onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  saveLabel(editModal.key, editModal.value);
-                  setEditModal(null);
-                  setTimeout(applyLabels, 100);
-                }
+                if (e.key === 'Enter') { saveLabel(editModal.key, editModal.value); setEditModal(null); }
                 if (e.key === 'Escape') setEditModal(null);
               }}
               style={{ width: '100%', padding: '10px 12px', border: '2px solid #667eea', borderRadius: '8px', fontSize: '16px', marginBottom: '12px' }}
             />
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => {
-                saveLabel(editModal.key, editModal.value);
-                setEditModal(null);
-                // Force re-apply
-                setTimeout(applyLabels, 100);
-              }} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+              <button onClick={() => { saveLabel(editModal.key, editModal.value); setEditModal(null); }}
+                style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
                 Save
               </button>
-              <button onClick={() => {
-                resetLabel(editModal.key);
-                setEditModal(null);
-              }} style={{ padding: '10px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+              <button onClick={() => { resetLabel(editModal.key); setEditModal(null); }}
+                style={{ padding: '10px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
                 Reset
               </button>
               <button onClick={() => setEditModal(null)}
@@ -195,7 +194,6 @@ export function DevModeProvider({ children }) {
   );
 }
 
-// Generate a unique key for a DOM element's text
 function generateKey(el, text) {
   const path = [];
   let node = el;
@@ -208,11 +206,10 @@ function generateKey(el, text) {
   return path.join('>') + '__' + text;
 }
 
-// ── Editable wrapper (for explicit use in App.js sidebar) ────────────────────
+// Editable wrapper for sidebar labels
 export function Editable({ id, children, as: Tag = 'span', style = {} }) {
-  const { devMode, getLabel } = useDevMode();
+  const { getLabel } = useDevMode();
   const defaultText = typeof children === 'string' ? children : '';
   const displayText = getLabel(id, defaultText);
-
   return <Tag style={style}>{displayText || children}</Tag>;
 }
