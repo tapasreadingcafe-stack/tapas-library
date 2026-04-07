@@ -111,37 +111,34 @@ export function DevModeProvider({ children }) {
       .filter(Boolean).forEach(c => applyLabelsToNode(c));
   }, [applyLabelsToNode]);
 
-  // MutationObserver: watch for ANY DOM change and re-apply labels
+  // MutationObserver: watch for ANY DOM change and re-apply labels INSTANTLY
   useEffect(() => {
     if (Object.keys(customLabels).length === 0) return;
 
-    // Initial apply
-    const initTimer = setTimeout(applyAllLabels, 100);
+    // Apply immediately, then again on next frame
+    applyAllLabels();
+    requestAnimationFrame(applyAllLabels);
 
-    // Watch for changes (React re-renders, route changes, data loads)
+    // Watch for changes — apply to new nodes IMMEDIATELY (no debounce)
     const observer = new MutationObserver((mutations) => {
-      // Debounce: apply after mutations settle
-      clearTimeout(observer._timer);
-      observer._timer = setTimeout(() => {
-        mutations.forEach(m => {
-          m.addedNodes.forEach(node => {
-            if (node.nodeType === 1) applyLabelsToNode(node);
-          });
-        });
-      }, 50);
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === 1) applyLabelsToNode(node);
+        }
+      }
     });
 
     const mainContent = document.querySelector('.main-content');
     const sidebar = document.querySelector('.sidebar-nav');
+    const appTitle = document.querySelector('.app-title');
     if (mainContent) observer.observe(mainContent, { childList: true, subtree: true });
     if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
+    if (appTitle) observer.observe(appTitle, { childList: true, subtree: true });
 
-    // Also re-apply on a regular interval as safety net
-    const interval = setInterval(applyAllLabels, 2000);
+    // Fast interval for lazy-loaded content (runs every 300ms)
+    const interval = setInterval(applyAllLabels, 300);
 
     return () => {
-      clearTimeout(initTimer);
-      clearTimeout(observer._timer);
       clearInterval(interval);
       observer.disconnect();
     };

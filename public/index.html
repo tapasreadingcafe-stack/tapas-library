@@ -8,7 +8,39 @@
       name="description"
       content="Tapas Library - Book Management System"
     />
-    <title>Tapas Library - POS System</title>
+    <title>Tapas Reading Cafe</title>
+    <script>
+      // Apply dev mode custom labels before React renders (prevents text flash)
+      try {
+        var labels = JSON.parse(localStorage.getItem('dev_custom_labels') || '{}');
+        if (Object.keys(labels).length > 0) {
+          var applyEarly = function() {
+            var containers = document.querySelectorAll('.main-content, .sidebar-nav, .app-title');
+            containers.forEach(function(c) {
+              var walker = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null, false);
+              while (walker.nextNode()) {
+                var node = walker.currentNode;
+                var text = node.textContent.trim();
+                if (!text) continue;
+                for (var key in labels) {
+                  var orig = key.split('__').pop();
+                  if (orig && text === orig && text !== labels[key]) {
+                    node.textContent = node.textContent.replace(orig, labels[key]);
+                    break;
+                  }
+                }
+              }
+            });
+          };
+          // Run as soon as DOM is ready and periodically for first 3 seconds
+          document.addEventListener('DOMContentLoaded', function() {
+            applyEarly();
+            var count = 0;
+            var iv = setInterval(function() { applyEarly(); if (++count > 15) clearInterval(iv); }, 200);
+          });
+        }
+      } catch(e) {}
+    </script>
     <style>
       * {
         margin: 0;
