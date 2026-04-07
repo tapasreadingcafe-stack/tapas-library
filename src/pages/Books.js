@@ -185,8 +185,7 @@ export default function Books() {
             newForm.book_image = olBook.cover.small.replace('http:', 'https:');
             setImagePreview(newForm.book_image);
           }
-          if (olBook.number_of_pages) newForm.pages = olBook.number_of_pages;
-          if (olBook.publishers?.length) newForm.publisher = olBook.publishers[0].name;
+          // Note: pages and publisher are not in the books table, skip them
           setFormData(newForm);
           found = true;
         }
