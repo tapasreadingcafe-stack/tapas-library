@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import supabase from '../utils/supabase';
+import { supabase } from '../utils/supabase';
 
 const STORAGE_KEY = 'tapas_dismissed_notifications';
 
