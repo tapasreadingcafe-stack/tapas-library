@@ -86,6 +86,71 @@ const DARK_OVERRIDE_CSS = `
 [data-theme="dark"] .navbar {
   background: linear-gradient(135deg, #0f3460 0%, #533483 100%) !important;
 }
+
+/* ── Catch-all: ANY element with white/light background via CSS ── */
+/* This catches elements styled via CSS classes (not just inline) */
+[data-theme="dark"] .main-content {
+  color: #d0d8e8;
+}
+
+/* Common page-level cards/panels styled via embedded <style> tags */
+[data-theme="dark"] .main-content [class*="card"],
+[data-theme="dark"] .main-content [class*="panel"],
+[data-theme="dark"] .main-content [class*="metric"],
+[data-theme="dark"] .main-content [class*="stat"],
+[data-theme="dark"] .main-content [class*="report"],
+[data-theme="dark"] .main-content [class*="form-modal"],
+[data-theme="dark"] .main-content [class*="detail"] {
+  background: #16213e !important;
+  color: #d0d8e8 !important;
+}
+
+/* Common table wrappers */
+[data-theme="dark"] .main-content [class*="table-wrap"],
+[data-theme="dark"] .main-content [class*="table"] {
+  background: #16213e !important;
+  color: #d0d8e8 !important;
+}
+
+/* Rows / list items with light backgrounds */
+[data-theme="dark"] .main-content [class*="-row"]:not(.nav-link):not(.nav-group) {
+  background: #1a2744 !important;
+  color: #c8d0e0 !important;
+}
+
+/* Category/filter buttons */
+[data-theme="dark"] .main-content [class*="tab"]:not(.active),
+[data-theme="dark"] .main-content [class*="filter-btn"]:not(.active),
+[data-theme="dark"] .main-content [class*="cat-btn"]:not(.active) {
+  background: #1a2744 !important;
+  color: #9aa8c0 !important;
+  border-color: #2a3a5a !important;
+}
+
+/* Search bars */
+[data-theme="dark"] .main-content [class*="search"] {
+  background: #0f1a30 !important;
+  color: #d0d8e8 !important;
+  border-color: #2a3a5a !important;
+}
+
+/* Overlay modals that pages create */
+[data-theme="dark"] [class*="overlay"] > div,
+[data-theme="dark"] [class*="modal"] > div {
+  background: #16213e !important;
+  color: #d0d8e8 !important;
+}
+
+/* Progress bars background tracks */
+[data-theme="dark"] .main-content [class*="progress"] {
+  background: #1a2744 !important;
+}
+
+/* Receipt/print areas */
+[data-theme="dark"] .main-content [class*="receipt"] {
+  background: #16213e !important;
+  color: #d0d8e8 !important;
+}
 `;
 
 export function ThemeProvider({ children }) {

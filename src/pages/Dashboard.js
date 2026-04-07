@@ -199,6 +199,19 @@ export default function Dashboard() {
         }
 
         @keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.4}}
+
+        [data-theme="dark"] .dashboard-page { color: #d0d8e8; }
+        [data-theme="dark"] .dashboard-metric-card,
+        [data-theme="dark"] .dashboard-metric-skeleton { background: #16213e !important; }
+        [data-theme="dark"] .dashboard-card { background: #16213e !important; color: #d0d8e8 !important; }
+        [data-theme="dark"] .dashboard-card h3 { color: #e0e8f4 !important; }
+        [data-theme="dark"] .dashboard-member-row { background: #1a2744 !important; color: #c8d0e0 !important; }
+        [data-theme="dark"] .dashboard-sales-table th { color: #8899cc !important; }
+        [data-theme="dark"] .dashboard-sales-table td { color: #c8d0e0 !important; }
+        [data-theme="dark"] .dashboard-sales-table tr { border-color: #2a3a5a !important; }
+        [data-theme="dark"] .dashboard-due-alert { background: #3d3520 !important; border-color: #665a2e !important; color: #ffc107 !important; }
+        [data-theme="dark"] .dashboard-due-tag { background: #2a2a1a !important; color: #ffc107 !important; border-color: #665a2e !important; }
+        [data-theme="dark"] .dashboard-header p { color: #8899bb !important; }
       `}</style>
 
       <div className="dashboard-header">
