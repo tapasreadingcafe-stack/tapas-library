@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '../utils/supabase';
 
 const DevModeContext = createContext();
 
@@ -6,21 +7,18 @@ export function useDevMode() {
   return useContext(DevModeContext);
 }
 
-// Load/save custom labels
-function loadCustomLabels() {
-  try { return JSON.parse(localStorage.getItem('dev_custom_labels') || '{}'); } catch { return {}; }
-}
-function saveCustomLabels(labels) {
-  localStorage.setItem('dev_custom_labels', JSON.stringify(labels));
-}
-
 export function isDevModeEnabled() {
   try { return localStorage.getItem('dev_mode') === 'true'; } catch { return false; }
 }
 
+// Load from localStorage as fast cache, then sync from DB
+function loadCachedLabels() {
+  try { return JSON.parse(localStorage.getItem('dev_custom_labels') || '{}'); } catch { return {}; }
+}
+
 export function DevModeProvider({ children }) {
   const [devMode, setDevMode] = useState(isDevModeEnabled());
-  const [customLabels, setCustomLabels] = useState(loadCustomLabels());
+  const [customLabels, setCustomLabels] = useState(loadCachedLabels());
   const [editModal, setEditModal] = useState(null);
 
   useEffect(() => {
@@ -28,26 +26,57 @@ export function DevModeProvider({ children }) {
     document.documentElement.setAttribute('data-dev-mode', devMode ? 'true' : 'false');
   }, [devMode]);
 
+  // Load labels from Supabase on mount (overrides localStorage cache)
+  useEffect(() => {
+    const loadFromDB = async () => {
+      try {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'custom_labels').single();
+        if (data?.value) {
+          const labels = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setCustomLabels(labels);
+          localStorage.setItem('dev_custom_labels', JSON.stringify(labels));
+        }
+      } catch {
+        // Table or row doesn't exist yet — use cached
+      }
+    };
+    loadFromDB();
+  }, []);
+
   const toggleDevMode = () => setDevMode(prev => !prev);
 
   const getLabel = (key, defaultLabel) => customLabels[key] || defaultLabel;
 
+  // Save to both localStorage (fast) and Supabase (synced)
+  const saveToDB = useCallback(async (labels) => {
+    localStorage.setItem('dev_custom_labels', JSON.stringify(labels));
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'custom_labels',
+        value: labels,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Failed to sync labels to DB:', err.message);
+    }
+  }, []);
+
   const saveLabel = (key, value) => {
     const updated = { ...customLabels, [key]: value };
     setCustomLabels(updated);
-    saveCustomLabels(updated);
+    saveToDB(updated);
   };
 
   const resetLabel = (key) => {
     const updated = { ...customLabels };
     delete updated[key];
     setCustomLabels(updated);
-    saveCustomLabels(updated);
+    saveToDB(updated);
   };
 
   const resetAll = () => {
     setCustomLabels({});
-    saveCustomLabels({});
+    saveToDB({});
   };
 
   // Global double-click handler — ONLY active when devMode is ON
@@ -62,7 +91,6 @@ export function DevModeProvider({ children }) {
       if (el.closest('.dev-edit-modal')) return;
       if (['INPUT','TEXTAREA','SELECT'].includes(el.tagName)) return;
 
-      // Only edit elements with direct text (not containers full of children)
       const directText = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join('');
       const text = directText || el.innerText?.trim();
       if (!text || text.length > 80 || text.length < 1) return;
@@ -78,8 +106,7 @@ export function DevModeProvider({ children }) {
     return () => document.removeEventListener('dblclick', handleDblClick, true);
   }, [devMode, customLabels]);
 
-  // Apply custom labels to DOM — ALWAYS runs (even with dev mode off)
-  // This is purely cosmetic — only replaces visible text, never data attributes or values
+  // Apply custom labels to DOM — ALWAYS runs
   const applyLabelsToNode = useCallback((root) => {
     if (Object.keys(customLabels).length === 0 || !root) return;
 
@@ -111,15 +138,13 @@ export function DevModeProvider({ children }) {
       .filter(Boolean).forEach(c => applyLabelsToNode(c));
   }, [applyLabelsToNode]);
 
-  // MutationObserver: watch for ANY DOM change and re-apply labels INSTANTLY
+  // MutationObserver + interval to apply labels
   useEffect(() => {
     if (Object.keys(customLabels).length === 0) return;
 
-    // Apply immediately, then again on next frame
     applyAllLabels();
     requestAnimationFrame(applyAllLabels);
 
-    // Watch for changes — apply to new nodes IMMEDIATELY (no debounce)
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
@@ -135,13 +160,9 @@ export function DevModeProvider({ children }) {
     if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
     if (appTitle) observer.observe(appTitle, { childList: true, subtree: true });
 
-    // Fast interval for lazy-loaded content (runs every 300ms)
     const interval = setInterval(applyAllLabels, 300);
 
-    return () => {
-      clearInterval(interval);
-      observer.disconnect();
-    };
+    return () => { clearInterval(interval); observer.disconnect(); };
   }, [customLabels, applyLabelsToNode, applyAllLabels]);
 
   return (
@@ -151,7 +172,6 @@ export function DevModeProvider({ children }) {
     }}>
       {children}
 
-      {/* Dev mode floating indicator */}
       {devMode && (
         <div style={{
           position: 'fixed', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
@@ -164,7 +184,6 @@ export function DevModeProvider({ children }) {
         </div>
       )}
 
-      {/* Edit modal */}
       {editModal && (
         <div className="dev-edit-modal" style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -181,7 +200,7 @@ export function DevModeProvider({ children }) {
             </div>
             <p style={{ fontSize: '12px', color: '#999', margin: '0 0 4px' }} data-no-edit="true">Original: "{editModal.originalText}"</p>
             <p style={{ fontSize: '10px', color: '#667eea', margin: '0 0 10px', background: '#f0f3ff', padding: '4px 8px', borderRadius: '4px' }} data-no-edit="true">
-              This only changes the display name. All data and functionality stays the same.
+              Display name only — synced across all devices.
             </p>
             <input
               value={editModal.value}
@@ -226,7 +245,6 @@ function generateKey(el, text) {
   return path.join('>') + '__' + text;
 }
 
-// Editable wrapper for sidebar labels
 export function Editable({ id, children, as: Tag = 'span', style = {} }) {
   const { getLabel } = useDevMode();
   const defaultText = typeof children === 'string' ? children : '';
