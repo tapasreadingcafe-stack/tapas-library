@@ -19,6 +19,7 @@ const SMART_HINTS = {
   'export': 'Download this data as a file',
   'search': 'Find items matching your query',
   'filter': 'Narrow down results by criteria',
+  'borrow': 'Check out books to members, manage returns, and track active borrows',
   'checkout': 'Issue a book to a member',
   'return': 'Process a book return from member',
   'renew': 'Extend the due date for this borrow',
@@ -184,7 +185,7 @@ export default function GlobalTooltip() {
                 y: rect.top,
                 w: rect.width,
               });
-            }, 2000); // 2 second delay
+            }, 400); // 0.4 seconds
           }
           return;
         }
@@ -232,50 +233,42 @@ export default function GlobalTooltip() {
 
   if (!tooltip) return null;
 
-  // Position: above element, centered
-  const left = Math.max(10, Math.min(tooltip.x, window.innerWidth - 220));
-  const top = tooltip.y - 8;
-  const showBelow = top < 50;
+  // Position: directly above element, tight gap
+  const left = Math.max(10, Math.min(tooltip.x, window.innerWidth - 130));
+  const showBelow = tooltip.y < 45;
+  const topPos = showBelow ? tooltip.y + 36 : tooltip.y - 4;
 
   return (
     <div style={{
       position: 'fixed',
       left: left,
-      top: showBelow ? tooltip.y + 40 : top,
-      transform: `translateX(-50%) translateY(${showBelow ? '0' : '-100%'})`,
+      top: topPos,
+      transform: showBelow ? 'translateX(-50%)' : 'translateX(-50%) translateY(-100%)',
       background: '#1a1a2e',
       color: '#e8ecf4',
-      padding: '8px 14px',
-      borderRadius: '8px',
-      fontSize: '12px',
-      lineHeight: '1.5',
-      maxWidth: '240px',
+      padding: '6px 12px',
+      borderRadius: '6px',
+      fontSize: '11px',
+      lineHeight: '1.4',
+      maxWidth: '220px',
       whiteSpace: 'normal',
       zIndex: 99999,
       pointerEvents: 'none',
-      boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
       border: '1px solid #2a3a5a',
-      animation: 'tooltipIn 0.15s ease',
+      animation: 'ttIn 0.12s ease',
       textAlign: 'center',
     }}>
-      <style>{`
-        @keyframes tooltipIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(${showBelow ? '-6px' : 'calc(-100% + 6px)'}); }
-          to { opacity: 1; transform: translateX(-50%) translateY(${showBelow ? '0' : '-100%'}); }
-        }
-      `}</style>
-      {/* Arrow */}
+      <style>{`@keyframes ttIn{from{opacity:0}to{opacity:1}}`}</style>
       <div style={{
         position: 'absolute',
-        [showBelow ? 'top' : 'bottom']: '-5px',
+        [showBelow ? 'top' : 'bottom']: '-4px',
         left: '50%',
         transform: 'translateX(-50%) rotate(45deg)',
-        width: '10px',
-        height: '10px',
+        width: '8px', height: '8px',
         background: '#1a1a2e',
-        border: showBelow ? '1px solid #2a3a5a' : 'none',
-        borderRight: showBelow ? 'none' : '1px solid #2a3a5a',
         borderBottom: showBelow ? 'none' : '1px solid #2a3a5a',
+        borderRight: showBelow ? 'none' : '1px solid #2a3a5a',
         borderTop: showBelow ? '1px solid #2a3a5a' : 'none',
         borderLeft: showBelow ? '1px solid #2a3a5a' : 'none',
       }} />
