@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
 import { useToast } from '../components/Toast';
+import { logActivity, ACTIONS } from '../utils/activityLog';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor to create cafe tables:
@@ -168,6 +169,7 @@ export default function CafePOS() {
 
       setLastOrder({ ...order, items: cart, customerName: orderData.customer_name });
       toast.success(`Order placed - ₹${total.toLocaleString('en-IN')}`);
+      logActivity(ACTIONS.ORDER_PLACED, `Cafe order: ₹${total} for ${orderData.customer_name}`, { amount: total, customer: orderData.customer_name, items: cart.length });
       setShowReceipt(true);
       setCart([]);
       setCustomerName('');

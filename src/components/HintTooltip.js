@@ -33,6 +33,7 @@ const HINTS = {
   '/vendors/orders': 'Create and track purchase orders to vendors.',
   '/settings/app': 'Configure library settings — fine rates, loan periods, working hours.',
   '/settings/profile': 'Edit your staff profile and change password.',
+  '/settings/activity': 'View audit trail — who did what and when across the system.',
 };
 
 export function getHint(path) {

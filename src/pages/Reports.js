@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { exportToCSV } from '../utils/exportCSV';
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState('revenue');
@@ -131,9 +132,26 @@ export default function Reports() {
 
       <div className="reports-header">
         <h1>📊 Reports</h1>
-        <button onClick={fetchReportData} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
-          🔄 Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => {
+            if (activeTab === 'topbooks' && reportData.topBooks?.length) {
+              exportToCSV(reportData.topBooks.map(b => ({ Title: b.title, 'Times Borrowed': b.count })), 'top_books_report');
+            } else if (activeTab === 'overdue' && reportData.overdueBooks?.length) {
+              exportToCSV(reportData.overdueBooks.map(b => ({ Member: b.members?.name, Book: b.books?.title, 'Due Date': b.due_date, 'Days Overdue': daysOverdue(b.due_date), 'Fine (₹)': daysOverdue(b.due_date) * 10 })), 'overdue_report');
+            } else if (activeTab === 'expiring' && reportData.expiringSubscriptions?.length) {
+              exportToCSV(reportData.expiringSubscriptions.map(m => ({ Name: m.name, Plan: m.plan, Phone: m.phone, Email: m.email, 'Expiry Date': m.subscription_end, 'Days Left': daysUntilExpiry(m.subscription_end) })), 'expiring_members_report');
+            } else if (activeTab === 'revenue') {
+              exportToCSV([{ 'Revenue This Month (₹)': reportData.totalRevenue, 'Total Members': reportData.totalMembers, 'Active Checkouts': reportData.activeCheckouts, 'Overdue Books': reportData.overdueBooks?.length || 0 }], 'revenue_summary');
+            } else {
+              alert('No data to export for this tab');
+            }
+          }} style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+            📥 Export CSV
+          </button>
+          <button onClick={fetchReportData} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       <div className="reports-metrics">

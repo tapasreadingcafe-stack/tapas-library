@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import FilterBar from '../components/FilterBar';
 import { useToast } from '../components/Toast';
+import { logActivity, ACTIONS } from '../utils/activityLog';
 
 import {
   calculateStatusColor,
@@ -264,6 +265,7 @@ function Members() {
 
         if (error) throw error;
         toast.success('Member updated successfully!');
+        logActivity(ACTIONS.MEMBER_UPDATED, `Updated member: ${formData.name}`, { member_name: formData.name });
       } else {
         const newData = {
           name: formData.name,
@@ -296,6 +298,7 @@ function Members() {
 
         if (error) throw error;
         toast.success('Member added successfully!');
+        logActivity(ACTIONS.MEMBER_ADDED, `New member added: ${formData.name}`, { member_name: formData.name, plan: formData.plan });
       }
 
       setShowModal(false);
@@ -319,6 +322,7 @@ function Members() {
 
       if (error) throw error;
       toast.success('Member deleted successfully!');
+      logActivity(ACTIONS.MEMBER_DELETED, `Member deleted`, { member_id: memberId });
       fetchMembers();
     } catch (error) {
       console.error('Error deleting member:', error);

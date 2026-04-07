@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BulkImport from '../BulkImport';
 import { supabase } from '../utils/supabase';
+import { logActivity, ACTIONS } from '../utils/activityLog';
 
 const PRESET_CATEGORIES = [
   'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
@@ -32,6 +33,7 @@ export default function Books() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [hasCondition, setHasCondition] = useState(false);
   const [filterCondition, setFilterCondition] = useState('all');
+  const [isbnLooking, setIsbnLooking] = useState(false);
 
   const emptyForm = {
     book_id: '',
@@ -158,6 +160,32 @@ export default function Books() {
     }
   };
 
+  const lookupISBN = async () => {
+    const isbn = formData.isbn?.trim();
+    if (!isbn) { alert('Enter an ISBN first'); return; }
+    setIsbnLooking(true);
+    try {
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+      const data = await res.json();
+      if (!data.items || data.items.length === 0) { alert('No book found for this ISBN'); setIsbnLooking(false); return; }
+      const info = data.items[0].volumeInfo;
+      const newForm = { ...formData };
+      if (info.title) newForm.title = info.title;
+      if (info.authors) newForm.author = info.authors.join(', ');
+      if (info.categories && info.categories.length > 0) newForm.category = info.categories[0];
+      if (info.imageLinks?.thumbnail) {
+        newForm.book_image = info.imageLinks.thumbnail.replace('http:', 'https:');
+        setImagePreview(newForm.book_image);
+      }
+      setFormData(newForm);
+      alert('Book details filled from Google Books!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to lookup ISBN');
+    }
+    setIsbnLooking(false);
+  };
+
   const handleAddBook = async (e) => {
     e.preventDefault();
     try {
@@ -178,6 +206,7 @@ export default function Books() {
       setShowAddForm(false);
       fetchBooks();
       alert(editingId ? 'Book updated!' : 'Book added!');
+      logActivity(editingId ? ACTIONS.BOOK_UPDATED : ACTIONS.BOOK_ADDED, `${editingId ? 'Updated' : 'Added'} book: ${formData.title}`, { book_title: formData.title, author: formData.author });
     } catch (error) {
       console.error('Error saving book:', error);
       alert('Error saving book: ' + error.message);
@@ -360,13 +389,21 @@ export default function Books() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>ISBN</label>
-                  <input
-                    type="text"
-                    name="isbn"
-                    value={formData.isbn}
-                    onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="text"
+                      name="isbn"
+                      value={formData.isbn}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 9780134685991"
+                      style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <button type="button" onClick={lookupISBN} disabled={isbnLooking}
+                      style={{ padding: '10px 14px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                      {isbnLooking ? '...' : '🔍 Lookup'}
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>Enter ISBN and click Lookup to auto-fill from Google Books</p>
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Category</label>

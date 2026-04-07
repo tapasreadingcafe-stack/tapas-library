@@ -43,6 +43,7 @@ const AccountsTransactions  = React.lazy(() => import('./pages/AccountsTransacti
 const AccountsExpenses      = React.lazy(() => import('./pages/AccountsExpenses'));
 const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
 const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
+const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ const NAV_CONFIG = [
     children: [
       { to: '/settings/app',     icon: '🔧', label: 'App Config' },
       { to: '/settings/profile', icon: '👤', label: 'Profile' },
+      { to: '/settings/activity', icon: '📋', label: 'Activity Log' },
     ],
   },
 ];
@@ -325,6 +327,7 @@ function App() {
             {/* Settings */}
             <Route path="/settings/app"                       element={<SettingsApp />} />
             <Route path="/settings/profile"                   element={<SettingsProfile />} />
+            <Route path="/settings/activity"                  element={<ActivityLog />} />
           </Routes>
         </Suspense>
       </main>
