@@ -2624,6 +2624,24 @@ tbody tr:hover {
   padding-right: 40px;
 }
 
+/* ── Dev Mode Highlight ─────────────────────────────────────────────────────── */
+[data-dev-mode="true"] .main-content h1:hover,
+[data-dev-mode="true"] .main-content h2:hover,
+[data-dev-mode="true"] .main-content h3:hover,
+[data-dev-mode="true"] .main-content h4:hover,
+[data-dev-mode="true"] .main-content p:hover,
+[data-dev-mode="true"] .main-content span:hover,
+[data-dev-mode="true"] .main-content th:hover,
+[data-dev-mode="true"] .main-content td:hover,
+[data-dev-mode="true"] .main-content label:hover,
+[data-dev-mode="true"] .main-content button:hover,
+[data-dev-mode="true"] .sidebar .nav-label:hover {
+  outline: 2px dashed #667eea !important;
+  outline-offset: 2px;
+  cursor: text !important;
+  border-radius: 3px;
+}
+
 /* ── Dark Mode ──────────────────────────────────────────────────────────────── */
 :root {
   --bg-primary: #f5f7fa;

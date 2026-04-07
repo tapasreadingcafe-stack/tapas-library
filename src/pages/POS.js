@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
+import { useDevMode } from '../components/DevMode';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -104,6 +105,7 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
 
 // ── Main POS component ────────────────────────────────────────────────────────
 export default function POS() {
+  const { devMode } = useDevMode();
 
   // Catalog
   const [allBooks, setAllBooks]         = useState([]);
@@ -555,7 +557,7 @@ export default function POS() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: '10px' }}>
                   {visibleServices.map(svc => (
                     <ServiceCard key={svc.id} svc={svc} fmt={fmt}
-                      onEdit={(s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); }}
+                      onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
                       onClick={() => {
                         if (svc.custom) {
                           const raw = window.prompt(`Enter amount for "${svc.name}" (₹):`);
@@ -570,10 +572,12 @@ export default function POS() {
                       }} />
                   ))}
                 </div>
-                <button onClick={() => { setEditSvcForm({ emoji: '🆕', name: '', price: '', cat: CATS.find(c => c !== 'All' && c !== 'Books') || 'Other', custom: false }); setShowAddSvc(true); }}
-                  style={{ marginTop: '8px', padding: '6px 14px', background: 'none', border: '1px dashed #ccc', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#999' }}>
-                  + Add Service
-                </button>
+                {devMode && (
+                  <button onClick={() => { setEditSvcForm({ emoji: '🆕', name: '', price: '', cat: CATS.find(c => c !== 'All' && c !== 'Books') || 'Other', custom: false }); setShowAddSvc(true); }}
+                    style={{ marginTop: '8px', padding: '6px 14px', background: 'none', border: '1px dashed #ccc', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#999' }}>
+                    + Add Service
+                  </button>
+                )}
               </div>
             )}
 
