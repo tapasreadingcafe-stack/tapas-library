@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { isHintsEnabled, setHintsEnabled } from '../components/HintTooltip';
+import { DEFAULT_HINTS, loadCustomHints, saveCustomHints } from '../components/GlobalTooltip';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now()
@@ -67,6 +68,9 @@ export default function SettingsApp() {
   const [hintsOn, setHintsOn] = useState(isHintsEnabled());
   const [showTour, setShowTour] = useState(false);
   const [tourStep, setTourStep] = useState(0);
+  const [showEditHints, setShowEditHints] = useState(false);
+  const [editingHints, setEditingHints] = useState({});
+  const [hintSearch, setHintSearch] = useState('');
 
   useEffect(() => {
     const check = async () => {
@@ -179,13 +183,17 @@ export default function SettingsApp() {
           </button>
         </div>
 
-        {/* Hover Hints Toggle */}
-        <div className="settings-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', gap: '16px' }}>
+        {/* Hover Hints Toggle + Edit */}
+        <div className="settings-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', gap: '12px' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>💬 Hover Hints</div>
-            <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>Show description tooltip when hovering sidebar items</div>
+            <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>Show tooltip when hovering buttons, tabs, and sidebar items</div>
           </div>
-          <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: 'pointer' }}>
+          <button onClick={() => { setEditingHints({ ...DEFAULT_HINTS, ...loadCustomHints() }); setShowEditHints(true); }}
+            style={{ padding: '6px 12px', background: '#f0f3ff', border: '1px solid #667eea', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', color: '#667eea', whiteSpace: 'nowrap' }}>
+            ✏️ Edit
+          </button>
+          <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: 'pointer', flexShrink: 0 }}>
             <input type="checkbox" checked={hintsOn} onChange={e => { setHintsOn(e.target.checked); setHintsEnabled(e.target.checked); toast.success(e.target.checked ? 'Hover hints enabled' : 'Hover hints disabled'); }}
               style={{ opacity: 0, width: 0, height: 0 }} />
             <span style={{
@@ -200,6 +208,59 @@ export default function SettingsApp() {
           </label>
         </div>
       </div>
+
+      {/* ── EDIT HINTS MODAL ── */}
+      {showEditHints && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
+          onClick={() => setShowEditHints(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', maxWidth: '600px', width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px' }}>✏️ Edit Hover Hints</h3>
+              <button onClick={() => setShowEditHints(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
+            </div>
+            <input placeholder="Search hints..." value={hintSearch} onChange={e => setHintSearch(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', marginBottom: '12px' }} />
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '14px' }}>
+              {Object.entries(editingHints)
+                .filter(([key]) => !hintSearch || key.includes(hintSearch.toLowerCase()))
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([key, val]) => (
+                <div key={key} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: '120px', maxWidth: '140px', fontSize: '12px', fontWeight: '600', color: '#667eea', paddingTop: '8px', textTransform: 'capitalize' }}>
+                    {key}
+                  </div>
+                  <input value={val} onChange={e => setEditingHints(prev => ({ ...prev, [key]: e.target.value }))}
+                    style={{ flex: 1, padding: '6px 10px', border: '1px solid #e0e0e0', borderRadius: '4px', fontSize: '13px' }} />
+                  <button onClick={() => setEditingHints(prev => { const n = { ...prev }; delete n[key]; return n; })}
+                    style={{ padding: '6px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => {
+                const custom = {};
+                Object.entries(editingHints).forEach(([k, v]) => {
+                  if (v !== DEFAULT_HINTS[k]) custom[k] = v;
+                });
+                saveCustomHints(custom);
+                toast.success('Hints saved!');
+                setShowEditHints(false);
+              }} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                Save Hints
+              </button>
+              <button onClick={() => { saveCustomHints({}); setEditingHints({ ...DEFAULT_HINTS }); toast.success('Reset to defaults'); }}
+                style={{ padding: '10px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                Reset
+              </button>
+              <button onClick={() => setShowEditHints(false)}
+                style={{ padding: '10px 16px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── QUICK TOUR MODAL ── */}
       {showTour && (
