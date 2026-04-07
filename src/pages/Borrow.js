@@ -8,7 +8,6 @@ const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
 function getTier(m) {
-  if (m.membership_tier) return m.membership_tier.toLowerCase();
   if (m.plan) return m.plan.toLowerCase();
   if ((m.borrow_limit || 2) >= 5) return 'gold';
   if ((m.borrow_limit || 2) >= 3) return 'silver';
@@ -154,7 +153,7 @@ export default function Borrow() {
         supabase.from('books').select('*').order('title'),
         supabase
           .from('circulation')
-          .select('*, members(name, plan, borrow_limit, membership_tier, phone), books(title, book_image, author)')
+          .select('*, members(name, plan, borrow_limit, phone), books(title, book_image, author)')
           .eq('status', 'checked_out')
           .order('due_date', { ascending: true }),
         supabase
@@ -167,6 +166,7 @@ export default function Borrow() {
       setMembers(membersData || []);
       setBooks(booksData || []);
       setCirculationData(circData || []);
+      console.log('[Borrow] Fetched:', { members: (membersData||[]).length, books: (booksData||[]).length, circulation: (circData||[]).length, returnedToday });
 
       const cd = circData || [];
       setStats({
