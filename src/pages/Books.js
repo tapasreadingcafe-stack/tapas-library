@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import BulkImport from '../BulkImport';
+import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 
