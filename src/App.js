@@ -3,6 +3,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { HintBubble } from './components/HintTooltip';
 import GlobalTooltip from './components/GlobalTooltip';
 import { useTheme } from './components/ThemeProvider';
+import { useDevMode, Editable } from './components/DevMode';
 import NotificationBell from './components/NotificationBell';
 import './App.css';
 
@@ -153,6 +154,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
   const location = useLocation();
   const { dark, toggleTheme } = useTheme();
+  const { devMode, getLabel } = useDevMode();
 
   // Determine which groups should start expanded (based on active route)
   const getInitialOpenGroups = () => {
@@ -221,7 +223,7 @@ function App() {
           <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle sidebar">
             ☰
           </button>
-          <h1 className="app-title">📚 Tapas Reading Cafe</h1>
+          <h1 className="app-title"><Editable id="app_title">📚 Tapas Reading Cafe</Editable></h1>
         </div>
         <div className="navbar-right">
           <NotificationBell />
@@ -249,7 +251,7 @@ function App() {
                   onClick={() => toggleGroup(item.key)}
                 >
                   <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-label">{item.label}</span>
+                  <span className="nav-label"><Editable id={`nav_${item.key}`}>{item.label}</Editable></span>
                   <span className={`nav-chevron ${openGroups[item.key] ? 'open' : ''}`}>›</span>
                 </button>
                 <div className={`nav-group-children ${openGroups[item.key] ? 'expanded' : 'collapsed'}`}>
@@ -260,7 +262,7 @@ function App() {
                         className={`nav-link nav-link-child ${isActive(child.to) ? 'active' : ''}`}
                       >
                         <span className="nav-icon">{child.icon}</span>
-                        <span className="nav-label">{child.label}</span>
+                        <span className="nav-label"><Editable id={`nav_${child.to}`}>{child.label}</Editable></span>
                       </Link>
                     </HintBubble>
                   ))}
@@ -273,7 +275,7 @@ function App() {
                   className={`nav-link ${isActive(item.to) ? 'active' : ''}`}
                 >
                   <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-label">{item.label}</span>
+                  <span className="nav-label"><Editable id={`nav_${item.to}`}>{item.label}</Editable></span>
                 </Link>
               </HintBubble>
             )

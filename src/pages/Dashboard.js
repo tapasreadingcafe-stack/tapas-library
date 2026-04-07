@@ -62,7 +62,7 @@ export default function Dashboard() {
         { data: booksForCats },
         { data: activeMembers },
       ] = await Promise.all([
-        supabase.from('members').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('members').select('id', { count: 'exact', head: true }),
         supabase.from('books').select('id', { count: 'exact', head: true }),
         supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('status', 'checked_out').eq('checkout_date', today),
         supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('status', 'checked_out').lt('due_date', today),
@@ -76,7 +76,17 @@ export default function Dashboard() {
         supabase.from('circulation').select('member_id, members(name)').eq('status', 'checked_out').limit(200),
       ]);
 
-      const totalRevenue = salesData?.reduce((s, sale) => s + (sale.total_amount || 0), 0) || 0;
+      let totalRevenue = salesData?.reduce((s, sale) => s + (sale.total_amount || 0), 0) || 0;
+
+      // Also pull from pos_transactions and cafe_orders
+      try {
+        const { data: posData } = await supabase.from('pos_transactions').select('total_amount').gte('created_at', firstDay + 'T00:00:00');
+        totalRevenue += (posData || []).reduce((s, t) => s + (t.total_amount || 0), 0);
+      } catch {}
+      try {
+        const { data: cafeData } = await supabase.from('cafe_orders').select('total_amount').gte('created_at', firstDay + 'T00:00:00').eq('status', 'completed');
+        totalRevenue += (cafeData || []).reduce((s, t) => s + (t.total_amount || 0), 0);
+      } catch {}
 
       const outstandingFines = (overdueForFines || []).reduce((s, item) => {
         const days = Math.max(0, Math.floor((new Date() - new Date(item.due_date)) / 86400000));

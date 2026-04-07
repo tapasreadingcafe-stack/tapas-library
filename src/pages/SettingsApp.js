@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { isHintsEnabled, setHintsEnabled } from '../components/HintTooltip';
 import { DEFAULT_HINTS, loadCustomHints, saveCustomHints } from '../components/GlobalTooltip';
+import { useDevMode } from '../components/DevMode';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now()
@@ -60,6 +61,7 @@ const TOUR_STEPS = [
 export default function SettingsApp() {
   const toast = useToast();
   const navigate = useNavigate();
+  const devModeCtx = useDevMode();
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -167,6 +169,44 @@ export default function SettingsApp() {
           ))}
         </div>
       )}
+
+      {/* ── DEVELOPER MODE ────────────────────────────────────────────────── */}
+      <h2 style={{ fontSize: '20px', marginTop: '28px', marginBottom: '14px' }}>🛠 Developer</h2>
+      <div style={{ background: 'white', borderRadius: '10px', padding: '24px' }}>
+        <div className="settings-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #f0f0f0', gap: '12px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>🛠 Developer Mode</div>
+            <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>Edit any label, title, or tab name directly by clicking on it. A ✎ icon appears on editable elements.</div>
+          </div>
+          <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: 'pointer', flexShrink: 0 }}>
+            <input type="checkbox" checked={devModeCtx.devMode} onChange={() => { devModeCtx.toggleDevMode(); toast.success(devModeCtx.devMode ? 'Developer mode OFF' : 'Developer mode ON — click any label to edit'); }}
+              style={{ opacity: 0, width: 0, height: 0 }} />
+            <span style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              background: devModeCtx.devMode ? '#667eea' : '#ccc', borderRadius: '26px', transition: 'background 0.3s',
+            }}>
+              <span style={{
+                position: 'absolute', left: devModeCtx.devMode ? '24px' : '2px',
+                top: '2px', width: '22px', height: '22px', background: 'white', borderRadius: '50%', transition: 'left 0.3s',
+              }} />
+            </span>
+          </label>
+        </div>
+        {devModeCtx.devMode && (
+          <div style={{ padding: '14px 0' }}>
+            <p style={{ fontSize: '13px', color: '#667eea', marginBottom: '8px' }}>✎ Dev mode is ON — click on any label in the sidebar or page headers to rename it.</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => { devModeCtx.resetAll(); toast.success('All custom labels reset to defaults'); }}
+                style={{ padding: '6px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px' }}>
+                Reset All Labels
+              </button>
+              <span style={{ fontSize: '12px', color: '#999', alignSelf: 'center' }}>
+                {Object.keys(devModeCtx.customLabels).length} custom label(s)
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── HELP & GUIDANCE ─────────────────────────────────────────────────── */}
       <h2 style={{ fontSize: '20px', marginTop: '28px', marginBottom: '14px' }}>💡 Help & Guidance</h2>
