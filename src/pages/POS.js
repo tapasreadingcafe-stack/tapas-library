@@ -154,7 +154,7 @@ export default function POS() {
 
   // Quick Add Member
   const [showAddMember, setShowAddMember] = useState(false);
-  const [newMemberForm, setNewMemberForm] = useState({ name: '', phone: '', email: '' });
+  const [newMemberForm, setNewMemberForm] = useState({ name: '', phone: '', email: '', date_of_birth: '', plan: '', age: '' });
 
   // Family members
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -697,9 +697,18 @@ export default function POS() {
                           </div>
                           <div style={{ padding: '8px' }}>
                             <div style={{ fontSize: '11px', fontWeight: '700', color: '#333', lineHeight: 1.3, marginBottom: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{book.title}</div>
-                            <div style={{ fontSize: '10px', color: '#999', marginBottom: '6px' }}>{(book.author || '').substring(0, 18)}</div>
+                            <div style={{ fontSize: '10px', color: '#999', marginBottom: '2px' }}>{(book.author || '').substring(0, 18)}</div>
+                            <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                              {book.book_id && <span style={{ fontSize: '9px', fontFamily: 'monospace', color: '#667eea', background: '#f0f3ff', padding: '1px 4px', borderRadius: '3px' }}>{book.book_id}</span>}
+                              <span style={{ fontSize: '9px', color: inStock ? '#1dd1a1' : '#e74c3c', fontWeight: '600' }}>{book.quantity_available || 0}/{book.quantity_total || 0} copies</span>
+                            </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: '13px', fontWeight: '800', color: '#667eea' }}>{fmt(book.sales_price || book.price)}</span>
+                              <div>
+                                {book.mrp > 0 && book.sales_price > 0 && book.sales_price < book.mrp && (
+                                  <span style={{ fontSize: '10px', textDecoration: 'line-through', color: '#999', marginRight: '3px' }}>₹{book.mrp}</span>
+                                )}
+                                <span style={{ fontSize: '13px', fontWeight: '800', color: '#667eea' }}>{fmt(book.sales_price || book.price)}</span>
+                              </div>
                               <button
                                 onClick={() => { addToCart({ ...book, cartType: 'book' }); showToast(`"${book.title.substring(0, 18)}…" added`); }}
                                 disabled={!inStock}
@@ -1298,40 +1307,73 @@ export default function POS() {
         </div>
       )}
 
-      {/* Quick Add Member Popup */}
+      {/* Quick Add Member Popup — Full Form */}
       {showAddMember && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
           onClick={() => setShowAddMember(false)}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '380px', width: '90%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '16px' }}>👤 Quick Add Member</h3>
-            <div style={{ marginBottom: '10px' }}>
-              <input placeholder="Name *" value={newMemberForm.name} onChange={e => setNewMemberForm({ ...newMemberForm, name: e.target.value })}
-                autoFocus style={{ width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '450px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 14px', fontSize: '16px' }}>👤 Add New Member</h3>
+            <p style={{ fontSize: '11px', color: '#999', margin: '0 0 12px' }}>Adding as a member (no plan). Membership is separate — assign plans in Members page.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Name *</label>
+                <input value={newMemberForm.name} onChange={e => setNewMemberForm({ ...newMemberForm, name: e.target.value })}
+                  autoFocus style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Phone *</label>
+                <input value={newMemberForm.phone} onChange={e => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+              </div>
             </div>
-            <div style={{ marginBottom: '10px' }}>
-              <input placeholder="Phone *" value={newMemberForm.phone} onChange={e => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
-                style={{ width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Email</label>
+                <input value={newMemberForm.email} onChange={e => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Date of Birth</label>
+                <input type="date" value={newMemberForm.date_of_birth} onChange={e => {
+                  const dob = e.target.value;
+                  const age = dob ? Math.floor((new Date() - new Date(dob)) / 31557600000) : '';
+                  setNewMemberForm({ ...newMemberForm, date_of_birth: dob, age });
+                }} style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+              </div>
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <input placeholder="Email (optional)" value={newMemberForm.email} onChange={e => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
-                style={{ width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+            {newMemberForm.age && (
+              <p style={{ fontSize: '12px', color: newMemberForm.age < 18 ? '#e74c3c' : '#1dd1a1', margin: '0 0 8px', fontWeight: '600' }}>
+                Age: {newMemberForm.age} years {newMemberForm.age < 18 ? '(Minor)' : '(Adult)'}
+              </p>
+            )}
+            <div style={{ background: '#f8f9ff', border: '1px solid #e0e8ff', borderRadius: '6px', padding: '8px', marginBottom: '12px' }}>
+              <p style={{ fontSize: '11px', color: '#667eea', margin: 0 }}>
+                💡 This creates a member without a plan (Guest). To add a paid membership, go to <strong>Members → Edit → Select Plan</strong> after adding.
+              </p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={async () => {
                 if (!newMemberForm.name || !newMemberForm.phone) { showToast('Name and phone required', 'error'); return; }
                 try {
-                  const { error } = await supabase.from('members').insert([{ name: newMemberForm.name, phone: newMemberForm.phone, email: newMemberForm.email || null, status: 'active' }]);
+                  const payload = {
+                    name: newMemberForm.name, phone: newMemberForm.phone,
+                    email: newMemberForm.email || null,
+                    date_of_birth: newMemberForm.date_of_birth || null,
+                    age: newMemberForm.age || null,
+                    customer_type: newMemberForm.age && newMemberForm.age < 18 ? 'minor' : 'adult',
+                    status: 'active',
+                  };
+                  const { error } = await supabase.from('members').insert([payload]);
                   if (error) throw error;
                   showToast(`Member "${newMemberForm.name}" added!`);
                   setShowAddMember(false);
-                  // Refresh members list
                   const { data } = await supabase.from('members').select('*').order('name');
                   setAllMembers(data || []);
                   setMemberSearch(newMemberForm.name);
                   setMemberDrop(true);
                 } catch (err) { showToast('Error: ' + err.message, 'error'); }
               }} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
-                Add Member
+                Add Member (No Plan)
               </button>
               <button onClick={() => setShowAddMember(false)}
                 style={{ padding: '10px 16px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
