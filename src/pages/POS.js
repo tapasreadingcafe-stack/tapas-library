@@ -293,41 +293,55 @@ export default function POS() {
     const trimmed = code.trim();
     if (!trimmed) return;
 
-    // 1. Try to find by copy code (B-FIC-0001) in book_copies table
-    if (trimmed.startsWith('B-')) {
+    // 1. Try copy code (B-FIC-0001) in book_copies → get book
+    if (trimmed.toUpperCase().startsWith('B-')) {
       try {
-        const { data: copy } = await supabase.from('book_copies').select('book_id').eq('copy_code', trimmed).limit(1);
-        if (copy?.length) {
-          const book = allBooks.find(b => b.id === copy[0].book_id);
-          if (book) {
-            addToCart({ ...book, cartType: 'book' });
-            showToast(`Added: ${book.title}`);
-            return;
-          }
+        const { data: copy } = await supabase.from('book_copies').select('book_id, books(*)').eq('copy_code', trimmed.toUpperCase()).limit(1);
+        if (copy?.length && copy[0].books) {
+          addToCart({ ...copy[0].books, cartType: 'book' });
+          showToast(`Added: ${copy[0].books.title}`);
+          return;
         }
       } catch {}
     }
 
-    // 2. Try book_id match
-    const byBookId = allBooks.find(b => b.book_id?.toLowerCase() === trimmed.toLowerCase());
-    if (byBookId) {
-      addToCart({ ...byBookId, cartType: 'book' });
-      showToast(`Added: ${byBookId.title}`);
+    // 2. Try local matches: book_id, isbn, title
+    const sl = trimmed.toLowerCase();
+    const localMatch = allBooks.find(b =>
+      b.book_id?.toLowerCase() === sl ||
+      b.isbn === trimmed ||
+      b.title?.toLowerCase() === sl
+    );
+    if (localMatch) {
+      addToCart({ ...localMatch, cartType: 'book' });
+      showToast(`Added: ${localMatch.title}`);
       return;
     }
 
-    // 3. Try ISBN match
-    const byIsbn = allBooks.find(b => b.isbn === trimmed);
-    if (byIsbn) {
-      addToCart({ ...byIsbn, cartType: 'book' });
-      showToast(`Added: ${byIsbn.title}`);
-      return;
-    }
+    // 3. Try database search by ISBN (might not be loaded in allBooks)
+    try {
+      const { data: dbBooks } = await supabase.from('books').select('*').eq('isbn', trimmed).limit(1);
+      if (dbBooks?.length) {
+        addToCart({ ...dbBooks[0], cartType: 'book' });
+        showToast(`Added: ${dbBooks[0].title}`);
+        return;
+      }
+    } catch {}
 
-    // 4. Not found — put in search
+    // 4. Try database search by book_id
+    try {
+      const { data: dbBooks } = await supabase.from('books').select('*').eq('book_id', trimmed).limit(1);
+      if (dbBooks?.length) {
+        addToCart({ ...dbBooks[0], cartType: 'book' });
+        showToast(`Added: ${dbBooks[0].title}`);
+        return;
+      }
+    } catch {}
+
+    // 5. Not found — put in search
     setItemSearch(trimmed);
     setActiveCat('Books');
-    showToast('Book not found — showing search results', 'error');
+    showToast(`"${trimmed}" not found in catalog`, 'error');
   };
 
   const addFineToCart = (fine) => {
@@ -704,7 +718,13 @@ export default function POS() {
 
           {/* ── MEMBER SEARCH ── */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
-            <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px', marginBottom: '8px' }}>CUSTOMER (F1)</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px' }}>CUSTOMER (F1)</div>
+              <button onClick={() => window.open('/members', '_blank')} title="Add new member"
+                style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
+                + New
+              </button>
+            </div>
             <div style={{ position: 'relative' }}>
               <input
                 ref={memberSearchRef}
