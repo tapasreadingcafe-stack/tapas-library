@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
+import { getCategoryPrefix, createBookCopies } from '../utils/bookCopies';
 
 const PRESET_CATEGORIES = [
   'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
@@ -22,6 +24,7 @@ const CONDITION_STYLE = {
 };
 
 export default function Books() {
+  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -261,21 +264,34 @@ export default function Books() {
       payload.mrp = parseFloat(payload.mrp) || 0;
       payload.discount_percent = parseFloat(payload.discount_percent) || 0;
 
+      // Auto-generate book_id from category
+      if (!editingId) {
+        payload.book_id = `B-${getCategoryPrefix(payload.category)}`;
+      }
+
       if (editingId) {
         const { error } = await supabase.from('books').update(payload).eq('id', editingId);
         if (error) throw error;
         setEditingId(null);
       } else {
-        const { error } = await supabase.from('books').insert([payload]);
+        const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
         if (error) throw error;
+
+        // Auto-create individual copies with unique IDs
+        const copyCount = parseInt(payload.quantity_total) || 1;
+        try {
+          await createBookCopies(newBook.id, payload.category, copyCount);
+        } catch (copyErr) {
+          console.warn('Could not create copies (table may not exist):', copyErr.message);
+        }
       }
 
       setFormData(emptyForm);
       setImagePreview('');
       setShowAddForm(false);
       fetchBooks();
-      alert(editingId ? 'Book updated!' : 'Book added!');
-      logActivity(editingId ? ACTIONS.BOOK_UPDATED : ACTIONS.BOOK_ADDED, `${editingId ? 'Updated' : 'Added'} book: ${formData.title}`, { book_title: formData.title, author: formData.author });
+      alert(editingId ? 'Book updated!' : `Book added with ${payload.quantity_total} copies!`);
+      logActivity(editingId ? ACTIONS.BOOK_UPDATED : ACTIONS.BOOK_ADDED, `${editingId ? 'Updated' : 'Added'} book: ${formData.title} (${payload.quantity_total} copies)`, { book_title: formData.title, author: formData.author });
     } catch (error) {
       console.error('Error saving book:', error);
       alert('Error saving book: ' + error.message);
@@ -448,10 +464,11 @@ export default function Books() {
                   <input
                     type="text"
                     name="book_id"
-                    value={formData.book_id}
-                    onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    value={formData.book_id || (formData.category ? `B-${getCategoryPrefix(formData.category)}-AUTO` : 'Auto-generated')}
+                    readOnly
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600' }}
                   />
+                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>Auto-generated from category. Copies get unique IDs.</p>
                 </div>
               </div>
 
@@ -705,7 +722,7 @@ export default function Books() {
                           title="Edit book">
                           ✏️
                         </button>
-                        <button onClick={() => window.location.href = `/books/${book.id}/copies`}
+                        <button onClick={() => navigate(`/books/${book.id}/copies`)}
                           style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                           title="Manage copies & print barcodes">
                           📦
