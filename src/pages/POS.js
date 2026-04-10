@@ -156,6 +156,9 @@ export default function POS() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberForm, setNewMemberForm] = useState({ name: '', phone: '', email: '' });
 
+  // Family members
+  const [familyMembers, setFamilyMembers] = useState([]);
+
   // Editable services
   const [SERVICES, setSERVICES]         = useState(loadServices);
   const [editSvcModal, setEditSvcModal] = useState(null);
@@ -773,7 +776,10 @@ export default function POS() {
                     )}
                     {memberMatches.map(m => (
                       <div key={m.id}
-                        onClick={() => { setSelectedMember(m); setMemberSearch(m.name); setMemberDrop(false); fetchMemberFines(m.id); }}
+                        onClick={async () => {
+                          setSelectedMember(m); setMemberSearch(m.name); setMemberDrop(false); fetchMemberFines(m.id);
+                          try { const { data } = await supabase.from('family_members').select('*').eq('parent_member_id', m.id); setFamilyMembers(data || []); } catch { setFamilyMembers([]); }
+                        }}
                         style={{ padding: '10px 14px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f5f5f5' }}
                         onMouseEnter={e => e.currentTarget.style.background = '#f5f0ff'}
                         onMouseLeave={e => e.currentTarget.style.background = 'white'}
@@ -796,9 +802,26 @@ export default function POS() {
                     {(selectedMember.plan || 'Guest').replace('_', ' ')} · {selectedMember.phone}
                   </div>
                 </div>
-                <button onClick={() => { setSelectedMember(null); setMemberSearch(''); setMemberFines([]); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c4b5fd', fontSize: '18px', lineHeight: 1 }}>✕</button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button onClick={() => window.open(`/member/${selectedMember.id}`, '_blank')} title="View full profile"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>👁️</button>
+                  <button onClick={() => { setSelectedMember(null); setMemberSearch(''); setMemberFines([]); setFamilyMembers([]); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c4b5fd', fontSize: '18px', lineHeight: 1 }}>✕</button>
+                </div>
               </div>
+              {/* Family members */}
+              {familyMembers.length > 0 && (
+                <div style={{ marginTop: '6px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '6px 10px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#166534', marginBottom: '4px' }}>👨‍👩‍👧‍👦 FAMILY ({familyMembers.length})</div>
+                  {familyMembers.map(fm => (
+                    <div key={fm.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: '12px' }}>
+                      <span style={{ color: '#166534' }}>{fm.name} <span style={{ color: '#86efac', fontSize: '10px' }}>({fm.relationship})</span></span>
+                      <button onClick={() => window.open(`/member/${selectedMember.id}/child/${fm.id}`, '_blank')} title="View profile"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px' }}>👁️</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             )}
           </div>
 
