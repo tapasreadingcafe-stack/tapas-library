@@ -152,6 +152,10 @@ export default function POS() {
   // Scanner
   const [showPosScanner, setShowPosScanner] = useState(false);
 
+  // Quick Add Member
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMemberForm, setNewMemberForm] = useState({ name: '', phone: '', email: '' });
+
   // Editable services
   const [SERVICES, setSERVICES]         = useState(loadServices);
   const [editSvcModal, setEditSvcModal] = useState(null);
@@ -293,13 +297,23 @@ export default function POS() {
     const trimmed = code.trim();
     if (!trimmed) return;
 
-    // 1. Try copy code (B-FIC-0001) in book_copies → get book
-    if (trimmed.toUpperCase().startsWith('B-')) {
+    // 1. Try copy code (B-FIC-0001 or BCHI0001 without dashes) in book_copies → get book
+    const upper = trimmed.toUpperCase();
+    if (upper.startsWith('B')) {
       try {
-        const { data: copy } = await supabase.from('book_copies').select('book_id, books(*)').eq('copy_code', trimmed.toUpperCase()).limit(1);
+        // Try exact match first
+        let { data: copy } = await supabase.from('book_copies').select('book_id, books(*)').eq('copy_code', upper).limit(1);
+        // Try adding dashes: BCHI0001 → B-CHI-0001
+        if (!copy?.length && !upper.includes('-')) {
+          const withDashes = upper.replace(/^B([A-Z]{3})(\d{4})$/, 'B-$1-$2');
+          if (withDashes !== upper) {
+            const r = await supabase.from('book_copies').select('book_id, books(*)').eq('copy_code', withDashes).limit(1);
+            copy = r.data;
+          }
+        }
         if (copy?.length && copy[0].books) {
           addToCart({ ...copy[0].books, cartType: 'book' });
-          showToast(`Added: ${copy[0].books.title}`);
+          showToast(`Added: ${copy[0].books.title} (${copy[0].copy_code || upper})`);
           return;
         }
       } catch {}
@@ -720,7 +734,7 @@ export default function POS() {
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px' }}>CUSTOMER (F1)</div>
-              <button onClick={() => window.open('/members', '_blank')} title="Add new member"
+              <button onClick={() => { setShowAddMember(true); setNewMemberForm({ name: '', phone: '', email: '' }); }} title="Add new member"
                 style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
                 + New
               </button>
@@ -833,7 +847,19 @@ export default function POS() {
                 {cart.map(item => (
                   <div key={item.cartId} style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '8px 10px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#374151', flex: 1, marginRight: '6px', lineHeight: 1.3 }}>{item.name}</span>
+                      <div style={{ flex: 1, marginRight: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#374151', lineHeight: 1.3 }}>{item.name}</span>
+                        {item.bookId && (
+                          <div style={{ fontSize: '10px', color: '#667eea', fontFamily: 'monospace', marginTop: '2px' }}>
+                            {allBooks.find(b => b.id === item.bookId)?.book_id || ''}
+                          </div>
+                        )}
+                      </div>
+                      {item.bookId && (
+                        <button onClick={() => window.open(`/books/${item.bookId}/copies`, '_blank')}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '0 4px', flexShrink: 0 }}
+                          title="View copies">👁️</button>
+                      )}
                       <button onClick={() => removeFromCart(item.cartId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '14px', lineHeight: 1, padding: 0, flexShrink: 0 }}
                         onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
                         onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}
@@ -1245,6 +1271,48 @@ export default function POS() {
             </div>
             <button onClick={() => setShowPosScanner(false)}
               style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Add Member Popup */}
+      {showAddMember && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setShowAddMember(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '380px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 14px', fontSize: '16px' }}>👤 Quick Add Member</h3>
+            <div style={{ marginBottom: '10px' }}>
+              <input placeholder="Name *" value={newMemberForm.name} onChange={e => setNewMemberForm({ ...newMemberForm, name: e.target.value })}
+                autoFocus style={{ width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <input placeholder="Phone *" value={newMemberForm.phone} onChange={e => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
+                style={{ width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <input placeholder="Email (optional)" value={newMemberForm.email} onChange={e => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                style={{ width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={async () => {
+                if (!newMemberForm.name || !newMemberForm.phone) { showToast('Name and phone required', 'error'); return; }
+                try {
+                  const { error } = await supabase.from('members').insert([{ name: newMemberForm.name, phone: newMemberForm.phone, email: newMemberForm.email || null, status: 'active' }]);
+                  if (error) throw error;
+                  showToast(`Member "${newMemberForm.name}" added!`);
+                  setShowAddMember(false);
+                  // Refresh members list
+                  const { data } = await supabase.from('members').select('*').order('name');
+                  setAllMembers(data || []);
+                  setMemberSearch(newMemberForm.name);
+                  setMemberDrop(true);
+                } catch (err) { showToast('Error: ' + err.message, 'error'); }
+              }} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
+                Add Member
+              </button>
+              <button onClick={() => setShowAddMember(false)}
+                style={{ padding: '10px 16px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

@@ -44,9 +44,11 @@ function encodeCode128B(text) {
 }
 
 function generateBarcodeSVG(text) {
-  const bits = encodeCode128B(text);
-  const barWidth = 1.5;
-  const height = 40;
+  // Remove dashes for cleaner barcode, keep for display
+  const cleanText = text.replace(/-/g, '');
+  const bits = encodeCode128B(cleanText);
+  const barWidth = 2;
+  const height = 50;
   const totalW = bits.length * barWidth;
 
   return (
