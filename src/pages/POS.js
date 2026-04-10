@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
 import { useDevMode } from '../components/DevMode';
+import BarcodeScanner from '../BarcodeScanner';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -147,6 +148,9 @@ export default function POS() {
 
   // Toast
   const [toast, setToast]               = useState(null);
+
+  // Scanner
+  const [showPosScanner, setShowPosScanner] = useState(false);
 
   // Editable services
   const [SERVICES, setSERVICES]         = useState(loadServices);
@@ -517,18 +521,21 @@ export default function POS() {
         {/* ════════════════ LEFT PANEL — CATALOG ════════════════ */}
         <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
 
-          {/* Search */}
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0' }}>
+          {/* Search + Scan */}
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '8px' }}>
             <input
               ref={itemSearchRef}
               type="text"
               placeholder="🔍  Search items, books, author… (F2)"
               value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s' }}
+              style={{ flex: 1, padding: '10px 14px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s' }}
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e  => e.target.style.borderColor = '#e0e0e0'}
             />
+            <button onClick={() => setShowPosScanner(true)}
+              style={{ padding: '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}
+              title="Scan barcode">📷</button>
           </div>
 
           {/* Category tabs */}
@@ -1152,6 +1159,28 @@ export default function POS() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* POS Barcode Scanner */}
+      {showPosScanner && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setShowPosScanner(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '400px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '18px' }}>📷 Scan Book Barcode</h3>
+            <BarcodeScanner
+              onScan={(code) => { setShowPosScanner(false); setItemSearch(code); setActiveCat('Books'); }}
+              onClose={() => setShowPosScanner(false)}
+            />
+            <div style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '600' }}>Or use USB barcode scanner:</p>
+              <input autoFocus placeholder="Barcode scanner types here..."
+                onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { setShowPosScanner(false); setItemSearch(e.target.value.trim()); setActiveCat('Books'); } }}
+                style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '6px', fontSize: '16px', textAlign: 'center', fontFamily: 'monospace' }} />
+            </div>
+            <button onClick={() => setShowPosScanner(false)}
+              style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
           </div>
         </div>
       )}

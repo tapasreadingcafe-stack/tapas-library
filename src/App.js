@@ -50,6 +50,7 @@ const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile')
 const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
 const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
 const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
+const DeviceManager         = React.lazy(() => import('./pages/DeviceManager'));
 const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
@@ -142,6 +143,7 @@ const NAV_CONFIG = [
       { to: '/settings/app',     icon: '🔧', label: 'App Config' },
       { to: '/settings/profile', icon: '👤', label: 'Profile' },
       { to: '/settings/activity', icon: '📋', label: 'Activity Log' },
+      { to: '/settings/devices', icon: '🔌', label: 'Devices' },
       { to: '/catalog',          icon: '🌐', label: 'Public Catalog' },
       { to: '/kiosk',            icon: '🖥️', label: 'Kiosk Mode' },
     ],
@@ -344,6 +346,7 @@ function App() {
             <Route path="/settings/app"                       element={<SettingsApp />} />
             <Route path="/settings/profile"                   element={<SettingsProfile />} />
             <Route path="/settings/activity"                  element={<ActivityLog />} />
+            <Route path="/settings/devices"                  element={<DeviceManager />} />
 
             {/* Public & Kiosk */}
             <Route path="/catalog"                            element={<PublicCatalog />} />
