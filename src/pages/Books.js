@@ -406,6 +406,28 @@ export default function Books() {
             }}
             style={{ padding: '8px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
+            📥 Export CSV
+          </button>
+          <button
+            onClick={() => {
+              if (books.length === 0) return alert('No books to export');
+              const rows = books.map(b => ({
+                Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category,
+                'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total,
+                Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp,
+                'Selling Price': b.sales_price, 'Discount %': b.discount_percent,
+              }));
+              const headers = Object.keys(rows[0]);
+              let tsv = headers.join('\t') + '\n';
+              rows.forEach(r => { tsv += headers.map(h => r[h] ?? '').join('\t') + '\n'; });
+              const blob = new Blob([tsv], { type: 'application/vnd.ms-excel' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `books_catalog_${new Date().toISOString().split('T')[0]}.xls`;
+              a.click(); URL.revokeObjectURL(url);
+            }}
+            style={{ padding: '8px 16px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
             📥 Export Excel
           </button>
         </div>
