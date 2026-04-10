@@ -1,0 +1,430 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabase';
+
+const TABLES = [
+  { name: 'books',               label: 'Books Catalog',        icon: '📚', required: true },
+  { name: 'book_copies',         label: 'Book Copies',          icon: '🏷️', required: false },
+  { name: 'members',             label: 'Members',              icon: '👥', required: true },
+  { name: 'family_members',      label: 'Family Members',       icon: '👨‍👩‍👧', required: false },
+  { name: 'circulation',         label: 'Circulation (Borrow)', icon: '🔄', required: true },
+  { name: 'reservations',        label: 'Reservations',         icon: '📋', required: false },
+  { name: 'pos_transactions',    label: 'POS Transactions',     icon: '💰', required: false },
+  { name: 'pos_transaction_items', label: 'POS Line Items',     icon: '🧾', required: false },
+  { name: 'events',              label: 'Events',               icon: '🎉', required: false },
+  { name: 'event_registrations', label: 'Event Registrations',  icon: '📝', required: false },
+  { name: 'vendors',             label: 'Vendors',              icon: '🏪', required: false },
+  { name: 'purchase_orders',     label: 'Purchase Orders',      icon: '📦', required: false },
+  { name: 'cafe_menu_items',     label: 'Cafe Menu',            icon: '☕', required: false },
+  { name: 'cafe_orders',         label: 'Cafe Orders',          icon: '🍰', required: false },
+  { name: 'activity_log',        label: 'Activity Log',         icon: '📋', required: false },
+];
+
+const COLUMN_CHECKS = [
+  { table: 'members',     column: 'profile_photo', label: 'Member profile photos' },
+  { table: 'circulation', column: 'child_id',      label: 'Child borrowing (family)' },
+  { table: 'circulation', column: 'renewal_count',  label: 'Renewal tracking' },
+  { table: 'book_copies', column: 'sold_price',     label: 'Copy sale tracking' },
+];
+
+export default function SettingsHealth() {
+  const [tableStatuses, setTableStatuses] = useState({});
+  const [columnStatuses, setColumnStatuses] = useState({});
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+
+  useEffect(() => { runAllChecks(); }, []);
+
+  const runAllChecks = async () => {
+    setLoading(true);
+    setSyncResult(null);
+    await Promise.all([checkTables(), checkColumns(), fetchStats()]);
+    setLoading(false);
+  };
+
+  const checkTables = async () => {
+    const results = {};
+    await Promise.all(
+      TABLES.map(async (t) => {
+        try {
+          const { count, error } = await supabase.from(t.name).select('*', { count: 'exact', head: true });
+          if (error) {
+            results[t.name] = { exists: false, count: 0, error: error.message };
+          } else {
+            results[t.name] = { exists: true, count: count || 0 };
+          }
+        } catch (err) {
+          results[t.name] = { exists: false, count: 0, error: err.message };
+        }
+      })
+    );
+    setTableStatuses(results);
+  };
+
+  const checkColumns = async () => {
+    const results = {};
+    await Promise.all(
+      COLUMN_CHECKS.map(async (c) => {
+        try {
+          const { error } = await supabase.from(c.table).select(c.column).limit(0);
+          results[`${c.table}.${c.column}`] = !error;
+        } catch {
+          results[`${c.table}.${c.column}`] = false;
+        }
+      })
+    );
+    setColumnStatuses(results);
+  };
+
+  const fetchStats = async () => {
+    try {
+      const [
+        { count: totalBooks },
+        { count: totalMembers },
+        { count: totalCopies },
+        { count: activeCirculation },
+        { count: totalTransactions },
+      ] = await Promise.all([
+        supabase.from('books').select('*', { count: 'exact', head: true }),
+        supabase.from('members').select('*', { count: 'exact', head: true }),
+        supabase.from('book_copies').select('*', { count: 'exact', head: true }).then(r => r.error ? { count: 0 } : r),
+        supabase.from('circulation').select('*', { count: 'exact', head: true }).then(r => r.error ? { count: 0 } : r),
+        supabase.from('pos_transactions').select('*', { count: 'exact', head: true }).then(r => r.error ? { count: 0 } : r),
+      ]);
+
+      // Get copy status breakdown
+      let copyBreakdown = { available: 0, issued: 0, sold: 0, lost: 0, damaged: 0 };
+      try {
+        const { data: copies } = await supabase.from('book_copies').select('status');
+        if (copies) {
+          copies.forEach(c => {
+            if (copyBreakdown[c.status] !== undefined) copyBreakdown[c.status]++;
+          });
+        }
+      } catch {}
+
+      // Get member status breakdown
+      let memberBreakdown = { active: 0, expired: 0, guest: 0 };
+      try {
+        const { data: members } = await supabase.from('members').select('status, plan');
+        if (members) {
+          members.forEach(m => {
+            if (m.status === 'active' && m.plan) memberBreakdown.active++;
+            else if (m.status === 'expired') memberBreakdown.expired++;
+            else memberBreakdown.guest++;
+          });
+        }
+      } catch {}
+
+      // Get overdue count
+      let overdueCount = 0;
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { count } = await supabase.from('circulation').select('*', { count: 'exact', head: true })
+          .eq('status', 'checked_out').lt('due_date', today);
+        overdueCount = count || 0;
+      } catch {}
+
+      setStats({
+        totalBooks: totalBooks || 0,
+        totalMembers: totalMembers || 0,
+        totalCopies: totalCopies || 0,
+        activeCirculation: activeCirculation || 0,
+        totalTransactions: totalTransactions || 0,
+        copyBreakdown,
+        memberBreakdown,
+        overdueCount,
+      });
+    } catch (err) {
+      console.error('Stats fetch error:', err);
+    }
+  };
+
+  // Sync book_copies count with books.quantity_available
+  const syncCopyQuantities = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      // Get all books
+      const { data: books } = await supabase.from('books').select('id, quantity_available');
+      if (!books) throw new Error('Failed to fetch books');
+
+      let fixed = 0;
+      for (const book of books) {
+        const { count } = await supabase
+          .from('book_copies')
+          .select('*', { count: 'exact', head: true })
+          .eq('book_id', book.id)
+          .eq('status', 'available');
+
+        const availableCount = count || 0;
+        if (availableCount !== book.quantity_available) {
+          await supabase.from('books')
+            .update({ quantity_available: availableCount })
+            .eq('id', book.id);
+          fixed++;
+        }
+      }
+
+      setSyncResult({ success: true, fixed, total: books.length });
+      if (fixed > 0) fetchStats();
+    } catch (err) {
+      setSyncResult({ success: false, error: err.message });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const tablesOk = Object.values(tableStatuses).filter(t => t.exists).length;
+  const tablesFailed = Object.values(tableStatuses).filter(t => !t.exists).length;
+  const totalRows = Object.values(tableStatuses).reduce((s, t) => s + (t.count || 0), 0);
+  const columnsOk = Object.values(columnStatuses).filter(Boolean).length;
+
+  // Rough storage estimate (each row ~ 0.5KB avg for a library app)
+  const estimatedStorageMB = (totalRows * 0.5 / 1024).toFixed(1);
+  const FREE_TIER_LIMIT_MB = 500; // Supabase free tier
+  const storagePercent = Math.min(100, (estimatedStorageMB / FREE_TIER_LIMIT_MB) * 100);
+
+  const healthScore = Math.round(
+    (tablesOk / TABLES.length) * 60 +
+    (columnsOk / COLUMN_CHECKS.length) * 20 +
+    (stats ? 20 : 0)
+  );
+
+  const healthColor = healthScore >= 80 ? '#059669' : healthScore >= 50 ? '#f59e0b' : '#ef4444';
+
+  return (
+    <div style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '26px', margin: '0 0 4px' }}>🩺 System Health</h1>
+          <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>Database checks, storage usage & data sync</p>
+        </div>
+        <button onClick={runAllChecks} disabled={loading}
+          style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+          {loading ? '⏳ Checking...' : '🔄 Re-check'}
+        </button>
+      </div>
+
+      {/* ── HEALTH SCORE ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '20px', marginBottom: '24px' }}>
+        <div style={{ background: 'white', borderRadius: '12px', padding: '24px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div style={{ position: 'relative', width: '100px', height: '100px', margin: '0 auto 12px' }}>
+            <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="#f0f0f0" strokeWidth="8" />
+              <circle cx="50" cy="50" r="42" fill="none" stroke={healthColor} strokeWidth="8"
+                strokeDasharray={`${healthScore * 2.64} ${264 - healthScore * 2.64}`}
+                strokeLinecap="round" />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+              <span style={{ fontSize: '28px', fontWeight: '900', color: healthColor }}>{loading ? '—' : healthScore}</span>
+              <span style={{ fontSize: '10px', color: '#999' }}>/ 100</span>
+            </div>
+          </div>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: healthColor }}>
+            {healthScore >= 80 ? 'Healthy' : healthScore >= 50 ? 'Needs Attention' : 'Issues Found'}
+          </div>
+        </div>
+
+        {/* Quick stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          {[
+            { label: 'Books', value: stats?.totalBooks ?? '—', icon: '📚', color: '#667eea' },
+            { label: 'Members', value: stats?.totalMembers ?? '—', icon: '👥', color: '#059669' },
+            { label: 'Copies Tracked', value: stats?.totalCopies ?? '—', icon: '🏷️', color: '#f59e0b' },
+            { label: 'Books Checked Out', value: stats?.activeCirculation ?? '—', icon: '📖', color: '#8b5cf6' },
+            { label: 'Overdue', value: stats?.overdueCount ?? '—', icon: '⚠️', color: '#ef4444' },
+            { label: 'POS Transactions', value: stats?.totalTransactions ?? '—', icon: '💰', color: '#06b6d4' },
+          ].map(s => (
+            <div key={s.label} style={{ background: 'white', borderRadius: '8px', padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', borderLeft: `4px solid ${s.color}` }}>
+              <div style={{ fontSize: '10px', color: '#999', fontWeight: '600', textTransform: 'uppercase' }}>{s.icon} {s.label}</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: s.color, marginTop: '4px' }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── STORAGE BAR ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, fontSize: '15px' }}>💾 Database Storage (estimated)</h3>
+          <span style={{ fontSize: '13px', color: '#666', fontWeight: '600' }}>
+            {estimatedStorageMB} MB / {FREE_TIER_LIMIT_MB} MB
+          </span>
+        </div>
+        <div style={{ background: '#f0f0f0', borderRadius: '8px', height: '24px', overflow: 'hidden', position: 'relative' }}>
+          <div style={{
+            height: '100%', borderRadius: '8px', transition: 'width 0.5s ease',
+            width: `${Math.max(1, storagePercent)}%`,
+            background: storagePercent > 80 ? '#ef4444' : storagePercent > 50 ? '#f59e0b' : 'linear-gradient(90deg, #667eea, #764ba2)',
+          }} />
+          <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: storagePercent > 15 ? 'white' : '#666' }}>
+            {storagePercent.toFixed(1)}% used
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '12px', color: '#888' }}>
+          <span>📊 {totalRows.toLocaleString()} total rows</span>
+          <span>📦 ~{estimatedStorageMB} MB estimated</span>
+          <span style={{ color: storagePercent > 80 ? '#ef4444' : '#059669', fontWeight: '600' }}>
+            {storagePercent > 80 ? '⚠️ Running low' : '✅ Plenty of space'}
+          </span>
+        </div>
+      </div>
+
+      {/* ── ROWS PER TABLE BREAKDOWN ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: '15px' }}>📊 Data Breakdown</h3>
+        <div style={{ display: 'grid', gap: '6px' }}>
+          {TABLES.filter(t => tableStatuses[t.name]?.exists).map(t => {
+            const count = tableStatuses[t.name]?.count || 0;
+            const maxCount = Math.max(...Object.values(tableStatuses).map(s => s.count || 0), 1);
+            const barW = Math.max(2, (count / maxCount) * 100);
+            return (
+              <div key={t.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ width: '22px', textAlign: 'center', fontSize: '14px' }}>{t.icon}</span>
+                <span style={{ width: '160px', fontSize: '12px', fontWeight: '600', color: '#374151' }}>{t.label}</span>
+                <div style={{ flex: 1, background: '#f3f4f6', borderRadius: '4px', height: '18px', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ width: `${barW}%`, height: '100%', background: 'linear-gradient(90deg, #667eea, #764ba2)', borderRadius: '4px', transition: 'width 0.3s' }} />
+                </div>
+                <span style={{ width: '60px', textAlign: 'right', fontSize: '12px', fontWeight: '700', color: '#667eea' }}>{count.toLocaleString()}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Copy status breakdown */}
+        {stats?.totalCopies > 0 && (
+          <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#999', marginBottom: '8px' }}>COPY STATUS BREAKDOWN</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {Object.entries(stats.copyBreakdown).filter(([,v]) => v > 0).map(([status, count]) => (
+                <span key={status} style={{
+                  padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600',
+                  background: status === 'available' ? '#ecfdf5' : status === 'issued' ? '#eff6ff' : status === 'sold' ? '#fef2f2' : '#f9fafb',
+                  color: status === 'available' ? '#059669' : status === 'issued' ? '#2563eb' : status === 'sold' ? '#dc2626' : '#6b7280',
+                }}>
+                  {status}: {count}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── TABLE HEALTH CHECKS ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: '15px' }}>
+          🔍 Table Checks
+          <span style={{ fontSize: '12px', fontWeight: '400', color: '#999', marginLeft: '8px' }}>
+            {tablesOk} OK · {tablesFailed} missing
+          </span>
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px' }}>
+          {TABLES.map(t => {
+            const status = tableStatuses[t.name];
+            const ok = status?.exists;
+            return (
+              <div key={t.name} style={{
+                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                borderRadius: '8px', border: `1px solid ${ok ? '#d1fae5' : '#fecaca'}`,
+                background: ok ? '#f0fdf4' : '#fef2f2',
+              }}>
+                <span style={{ fontSize: '18px' }}>{t.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{t.label}</div>
+                  <div style={{ fontSize: '10px', color: ok ? '#059669' : '#dc2626' }}>
+                    {ok ? `${(status.count || 0).toLocaleString()} rows` : status?.error || 'Table not found'}
+                  </div>
+                </div>
+                <span style={{ fontSize: '16px' }}>{ok ? '✅' : t.required ? '❌' : '⚪'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── FEATURE / COLUMN CHECKS ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: '15px' }}>
+          🧩 Feature Checks
+          <span style={{ fontSize: '12px', fontWeight: '400', color: '#999', marginLeft: '8px' }}>
+            {columnsOk}/{COLUMN_CHECKS.length} enabled
+          </span>
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
+          {COLUMN_CHECKS.map(c => {
+            const ok = columnStatuses[`${c.table}.${c.column}`];
+            return (
+              <div key={`${c.table}.${c.column}`} style={{
+                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                borderRadius: '8px', border: `1px solid ${ok ? '#d1fae5' : '#fef3c7'}`,
+                background: ok ? '#f0fdf4' : '#fffbeb',
+              }}>
+                <span style={{ fontSize: '14px' }}>{ok ? '✅' : '⚠️'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{c.label}</div>
+                  <div style={{ fontSize: '10px', color: '#999', fontFamily: 'monospace' }}>{c.table}.{c.column}</div>
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: '600', color: ok ? '#059669' : '#d97706' }}>
+                  {ok ? 'Active' : 'Not setup'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── SYNC TOOL ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: '15px' }}>🔧 Maintenance Tools</h3>
+        <p style={{ fontSize: '12px', color: '#999', margin: '0 0 14px' }}>
+          Sync book quantities with actual copy counts in the database
+        </p>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={syncCopyQuantities} disabled={syncing}
+            style={{
+              padding: '10px 20px', background: syncing ? '#d1d5db' : '#f59e0b', color: 'white',
+              border: 'none', borderRadius: '8px', cursor: syncing ? 'wait' : 'pointer',
+              fontWeight: '700', fontSize: '13px',
+            }}>
+            {syncing ? '⏳ Syncing...' : '🔄 Sync Copy Quantities'}
+          </button>
+          {syncResult && (
+            <span style={{
+              fontSize: '13px', fontWeight: '600',
+              color: syncResult.success ? '#059669' : '#ef4444',
+            }}>
+              {syncResult.success
+                ? `✅ Done! Fixed ${syncResult.fixed} of ${syncResult.total} books.`
+                : `❌ Error: ${syncResult.error}`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── CONNECTION INFO ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>🔗 Connection Info</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
+          <div style={{ padding: '8px 12px', background: '#f9fafb', borderRadius: '6px' }}>
+            <span style={{ color: '#999' }}>Provider: </span>
+            <span style={{ fontWeight: '600' }}>Supabase</span>
+          </div>
+          <div style={{ padding: '8px 12px', background: '#f9fafb', borderRadius: '6px' }}>
+            <span style={{ color: '#999' }}>Status: </span>
+            <span style={{ fontWeight: '600', color: '#059669' }}>✅ Connected</span>
+          </div>
+          <div style={{ padding: '8px 12px', background: '#f9fafb', borderRadius: '6px' }}>
+            <span style={{ color: '#999' }}>Deploy: </span>
+            <span style={{ fontWeight: '600' }}>Vercel</span>
+          </div>
+          <div style={{ padding: '8px 12px', background: '#f9fafb', borderRadius: '6px' }}>
+            <span style={{ color: '#999' }}>Stack: </span>
+            <span style={{ fontWeight: '600' }}>React 18 + Supabase</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -47,6 +47,7 @@ const AccountsTransactions  = React.lazy(() => import('./pages/AccountsTransacti
 const AccountsExpenses      = React.lazy(() => import('./pages/AccountsExpenses'));
 const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
 const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
+const SettingsHealth        = React.lazy(() => import('./pages/SettingsHealth'));
 const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
 const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
 const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
@@ -140,6 +141,7 @@ const NAV_CONFIG = [
   {
     icon: '⚙️', label: 'Settings', key: 'settings',
     children: [
+      { to: '/settings/health',  icon: '🩺', label: 'System Health' },
       { to: '/settings/app',     icon: '🔧', label: 'App Config' },
       { to: '/settings/profile', icon: '👤', label: 'Profile' },
       { to: '/settings/activity', icon: '📋', label: 'Activity Log' },
@@ -343,6 +345,7 @@ function App() {
             <Route path="/vendors/orders"                     element={<PurchaseOrders />} />
 
             {/* Settings */}
+            <Route path="/settings/health"                    element={<SettingsHealth />} />
             <Route path="/settings/app"                       element={<SettingsApp />} />
             <Route path="/settings/profile"                   element={<SettingsProfile />} />
             <Route path="/settings/activity"                  element={<ActivityLog />} />
