@@ -97,6 +97,15 @@ export default function Borrow() {
   const [showScanner, setShowScanner] = useState(false);
   const [scannerMode, setScannerMode] = useState('book');
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // Toast
   const toast = useToast();
   const showToast = (msg, type = 'success') => {
@@ -491,7 +500,8 @@ export default function Borrow() {
 
   const inputStyle = {
     padding: '9px 12px', border: '2px solid #e0e0e0', borderRadius: '6px',
-    fontSize: '14px', outline: 'none', width: '100%', boxSizing: 'border-box',
+    fontSize: isMobile ? '16px' : '14px', outline: 'none', width: '100%', boxSizing: 'border-box',
+    minHeight: '44px',
   };
 
   const btnPrimary = {
@@ -500,10 +510,10 @@ export default function Borrow() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ padding: isMobile ? '12px' : '20px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>📚 Borrow Management</h1>
           <p style={{ color: '#aaa', fontSize: '12px' }}>Ctrl+B = New Checkout &nbsp;·&nbsp; Ctrl+R = Active Borrows</p>
@@ -514,7 +524,7 @@ export default function Borrow() {
       </div>
 
       {/* Stats bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total Out', value: stats.totalOut, icon: '📖', color: '#667eea' },
           { label: 'Overdue', value: stats.overdue, icon: '⚠️', color: '#e74c3c' },
@@ -522,13 +532,13 @@ export default function Borrow() {
           { label: 'Returned Today', value: stats.returnedToday, icon: '✓', color: '#27ae60' },
         ].map(s => (
           <div key={s.label} style={{
-            background: 'white', borderRadius: '8px', padding: '14px 18px',
-            borderLeft: `4px solid ${s.color}`, display: 'flex', alignItems: 'center', gap: '12px',
+            background: 'white', borderRadius: '8px', padding: isMobile ? '10px 12px' : '14px 18px',
+            borderLeft: `4px solid ${s.color}`, display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px',
           }}>
-            <span style={{ fontSize: '22px' }}>{s.icon}</span>
+            <span style={{ fontSize: isMobile ? '18px' : '22px' }}>{s.icon}</span>
             <div>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: s.color, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>{s.label.toUpperCase()}</div>
+              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', color: s.color, lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: isMobile ? '10px' : '11px', color: '#999', marginTop: '3px' }}>{s.label.toUpperCase()}</div>
             </div>
           </div>
         ))}
@@ -548,7 +558,7 @@ export default function Borrow() {
 
       {/* ─── CHECKOUT TAB ─── */}
       {activeTab === 'checkout' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
 
           {/* Member panel */}
           <div style={{ background: 'white', borderRadius: '8px', padding: '20px' }}>
@@ -564,7 +574,7 @@ export default function Borrow() {
 
             {/* Search results */}
             {memberResults.length > 0 && !selectedMember && (
-              <div style={{ border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+              <div style={{ border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', ...(isMobile ? { maxHeight: '200px', overflowY: 'auto' } : {}) }}>
                 {memberResults.map(m => {
                   const borrows = getMemberBorrows(m.id);
                   const fines = getMemberFines(m.id);
@@ -656,7 +666,7 @@ export default function Borrow() {
 
             {/* Book search results */}
             {bookResults.length > 0 && !selectedBook && (
-              <div style={{ border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+              <div style={{ border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', ...(isMobile ? { maxHeight: '200px', overflowY: 'auto' } : {}) }}>
                 {bookResults.map(b => (
                   <div key={b.id} onClick={() => b.quantity_available > 0 && selectBook(b)} style={{
                     padding: '10px 14px', cursor: b.quantity_available > 0 ? 'pointer' : 'default',
@@ -721,8 +731,8 @@ export default function Borrow() {
                           key={copy.id}
                           onClick={() => setSelectedCopy(copy)}
                           style={{
-                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
-                            fontSize: '12px', fontWeight: '700', fontFamily: 'monospace',
+                            padding: isMobile ? '10px 16px' : '6px 12px', borderRadius: '6px', cursor: 'pointer',
+                            fontSize: isMobile ? '14px' : '12px', fontWeight: '700', fontFamily: 'monospace',
                             border: `2px solid ${selectedCopy?.id === copy.id ? '#667eea' : '#d1d5db'}`,
                             background: selectedCopy?.id === copy.id ? '#667eea' : 'white',
                             color: selectedCopy?.id === copy.id ? 'white' : '#374151',
@@ -752,13 +762,13 @@ export default function Borrow() {
 
           {/* Borrowing for child — full width, shown when member has children */}
           {selectedMember && childrenOfMember.length > 0 && (
-            <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', border: '2px solid #e8f4fd' }}>
+            <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '12px' : '16px 20px', display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '10px' : '16px', border: '2px solid #e8f4fd', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '14px', fontWeight: '700', color: '#555', whiteSpace: 'nowrap' }}>📋 Borrowing for:</span>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setSelectedChild(null)}
                   style={{
-                    padding: '7px 16px', border: '2px solid', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                    padding: isMobile ? '10px 18px' : '7px 16px', border: '2px solid', borderRadius: '20px', cursor: 'pointer', fontSize: isMobile ? '14px' : '13px', fontWeight: '600',
                     borderColor: !selectedChild ? '#667eea' : '#ddd',
                     background: !selectedChild ? '#667eea' : 'white',
                     color: !selectedChild ? 'white' : '#555',
@@ -775,7 +785,7 @@ export default function Borrow() {
                       key={child.id}
                       onClick={() => setSelectedChild(child)}
                       style={{
-                        padding: '7px 16px', border: `2px solid ${active ? color : '#ddd'}`, borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                        padding: isMobile ? '10px 18px' : '7px 16px', border: `2px solid ${active ? color : '#ddd'}`, borderRadius: '20px', cursor: 'pointer', fontSize: isMobile ? '14px' : '13px', fontWeight: '600',
                         background: active ? color : 'white',
                         color: active ? 'white' : '#555',
                       }}
@@ -799,19 +809,19 @@ export default function Borrow() {
           )}
 
           {/* Due date + checkout — full width */}
-          <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div>
+          <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '14px' : '18px 20px', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '12px' : '20px', flexDirection: isMobile ? 'column' : 'row' }}>
+            <div style={{ width: isMobile ? '100%' : 'auto' }}>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '6px', letterSpacing: '0.5px' }}>DUE DATE</label>
               <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                style={{ padding: '9px 14px', border: '2px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+                style={{ padding: '9px 14px', border: '2px solid #e0e0e0', borderRadius: '6px', fontSize: isMobile ? '16px' : '14px', minHeight: '44px', width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }} />
             </div>
             {selectedMember && (
               <div style={{ fontSize: '12px', color: '#667eea', background: '#f0f3ff', padding: '6px 12px', borderRadius: '6px' }}>
                 Auto-set to <strong>{getLoanDays(selectedMember)} days</strong> ({getTier(selectedMember)} tier)
               </div>
             )}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {selectedMember && selectedBook && (
+            <div style={{ marginLeft: isMobile ? '0' : 'auto', display: 'flex', alignItems: 'center', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
+              {selectedMember && selectedBook && !isMobile && (
                 <div style={{ fontSize: '13px', color: '#555' }}>
                   <strong>{selectedMember.name}</strong> ← <strong>{selectedBook.title}</strong>
                 </div>
@@ -824,6 +834,7 @@ export default function Borrow() {
                   background: (!selectedMember || !selectedBook || !dueDate) ? '#ccc' : '#667eea',
                   color: 'white', border: 'none', borderRadius: '6px',
                   cursor: (!selectedMember || !selectedBook || !dueDate) ? 'not-allowed' : 'pointer',
+                  width: isMobile ? '100%' : 'auto',
                 }}>
                 ✓ Checkout Book
               </button>
@@ -841,7 +852,7 @@ export default function Borrow() {
               placeholder="🔍 Search member or book..."
               value={activeSearch}
               onChange={e => setActiveSearch(e.target.value)}
-              style={{ padding: '7px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', width: '220px' }}
+              style={{ padding: '7px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '16px' : '13px', width: isMobile ? '100%' : '220px', minHeight: '44px', boxSizing: 'border-box' }}
             />
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[
@@ -869,6 +880,45 @@ export default function Borrow() {
             ) : filteredCirculation.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>No borrows found.</div>
             ) : (
+              isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
+                  {filteredCirculation.map(item => {
+                    const badge = getStatusBadge(item.due_date);
+                    const fine = daysOverdue(item.due_date) * FINE_PER_DAY;
+                    return (
+                      <div key={item.id} style={{ background: getRowBg(item.due_date), borderRadius: '10px', padding: '12px', border: '1px solid #f0f0f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ fontWeight: '700', fontSize: '14px' }}>{item.members?.name}</span>
+                          <span style={{ background: badge.bg, color: badge.color, padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                            {badge.label}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>{item.books?.title}</div>
+                        <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: '#999' }}>
+                          <span>Due: {new Date(item.due_date).toLocaleDateString('en-IN')}</span>
+                          <span>Renewals: {item.renewal_count || 0}/3</span>
+                          {fine > 0 && <span style={{ color: '#e74c3c', fontWeight: '700' }}>Fine: ₹{fine}</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                          <button
+                            onClick={() => openRenewal(item)}
+                            disabled={(item.renewal_count || 0) >= 3}
+                            style={{
+                              padding: '8px 14px', border: 'none', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: (item.renewal_count || 0) >= 3 ? 'not-allowed' : 'pointer',
+                              background: (item.renewal_count || 0) >= 3 ? '#f5f5f5' : '#e8f0ff',
+                              color: (item.renewal_count || 0) >= 3 ? '#ccc' : '#667eea',
+                            }}>
+                            ♻️ Renew
+                          </button>
+                          <button onClick={() => openReturn(item)} style={{ padding: '8px 14px', background: '#e8faf0', color: '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                            ✓ Return
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #e8e8e8' }}>
@@ -931,6 +981,7 @@ export default function Borrow() {
                   })}
                 </tbody>
               </table>
+              )
             )}
           </div>
         </div>
@@ -958,7 +1009,7 @@ export default function Borrow() {
       {receiptModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
           onClick={() => setReceiptModal(null)}>
-          <div style={{ background: 'white', borderRadius: '10px', padding: '32px', maxWidth: '380px', width: '90%', fontFamily: 'monospace' }}
+          <div style={{ background: 'white', borderRadius: '10px', padding: isMobile ? '20px' : '32px', maxWidth: '380px', width: isMobile ? '95%' : '90%', fontFamily: 'monospace' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ textAlign: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '2px dashed #ddd' }}>
               <div style={{ fontSize: '28px', marginBottom: '6px' }}>📚</div>
@@ -1014,7 +1065,7 @@ export default function Borrow() {
       {returnModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
           onClick={() => setReturnModal(null)}>
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '480px', width: '90%' }}
+          <div style={{ background: 'white', borderRadius: '10px', padding: isMobile ? '20px' : '28px', maxWidth: '480px', width: isMobile ? '95%' : '90%' }}
             onClick={e => e.stopPropagation()}>
             <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>✓ Return Book</h2>
             <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '14px', marginBottom: '16px', fontSize: '13px', lineHeight: '1.9' }}>
@@ -1072,7 +1123,7 @@ export default function Borrow() {
       {renewalModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
           onClick={() => setRenewalModal(null)}>
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '90%' }}
+          <div style={{ background: 'white', borderRadius: '10px', padding: isMobile ? '20px' : '28px', maxWidth: '420px', width: isMobile ? '95%' : '90%' }}
             onClick={e => e.stopPropagation()}>
             <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>♻️ Renew Book</h2>
             <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '14px', marginBottom: '16px', fontSize: '13px', lineHeight: '1.9' }}>

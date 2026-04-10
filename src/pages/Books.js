@@ -46,6 +46,14 @@ export default function Books() {
   const [printAfterAdd, setPrintAfterAdd] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const emptyForm = {
     book_id: '',
     title: '',
@@ -378,8 +386,8 @@ export default function Books() {
   });
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div style={{ padding: isMobile ? '12px' : '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h1>📚 Books</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -389,13 +397,13 @@ export default function Books() {
               setImagePreview('');
               setFormData(emptyForm);
             }}
-            style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
           >
             ➕ Add Book
           </button>
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowImportExport(!showImportExport)}
-              style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}>
+              style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}>
               📁 Import / Export ▾
             </button>
             {showImportExport && (
@@ -439,18 +447,18 @@ export default function Books() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <input
           type="text"
           placeholder="Search by title, author, ISBN, or Book ID..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+          style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit', minWidth: isMobile ? '100%' : '200px' }}
         />
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
-          style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+          style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit', flex: isMobile ? '1 1 45%' : 'none' }}
         >
           <option value="all">All Categories</option>
           {categories.map(cat => (
@@ -461,7 +469,7 @@ export default function Books() {
           <select
             value={filterCondition}
             onChange={e => setFilterCondition(e.target.value)}
-            style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+            style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit', flex: isMobile ? '1 1 45%' : 'none' }}
           >
             <option value="all">All Conditions</option>
             {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -471,7 +479,7 @@ export default function Books() {
 
       {showAddForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '700px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: 'white', padding: isMobile ? '16px' : '30px', borderRadius: '8px', maxWidth: '700px', width: isMobile ? '95%' : '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingId ? 'Edit Book' : 'Add New Book'}</h2>
             <form onSubmit={handleAddBook}>
               {/* IMAGE PREVIEW SECTION */}
@@ -498,7 +506,7 @@ export default function Books() {
                   value={formData.book_image}
                   onChange={handleInputChange}
                   placeholder="https://covers.openlibrary.org/b/id/7741150-M.jpg"
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                 />
                 <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>Get free images from: https://openlibrary.org</p>
               </div>
@@ -524,11 +532,11 @@ export default function Books() {
                   value={formData.title}
                   onChange={handleInputChange}
                   required
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Author</label>
                   <input
@@ -536,7 +544,7 @@ export default function Books() {
                     name="author"
                     value={formData.author}
                     onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
                 </div>
                 <div>
@@ -546,30 +554,30 @@ export default function Books() {
                     name="book_id"
                     value={formData.book_id || (formData.category ? `B-${getCategoryPrefix(formData.category)}-XXXX` : 'Select category first')}
                     readOnly
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600' }}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
                   <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>Auto-generated. Each copy gets: B-{getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...</p>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>ISBN</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <input
                       type="text"
                       name="isbn"
                       value={formData.isbn}
                       onChange={handleInputChange}
                       placeholder="e.g. 9780134685991"
-                      style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minWidth: isMobile ? '0' : '120px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                     />
                     <button type="button" onClick={() => lookupISBN()} disabled={isbnLooking}
-                      style={{ padding: '10px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                      style={{ padding: '10px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', whiteSpace: 'nowrap', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto' }}>
                       {isbnLooking ? '...' : '🔍'}
                     </button>
                     <button type="button" onClick={() => setShowIsbnScanner(true)}
-                      style={{ padding: '10px 12px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap' }}
+                      style={{ padding: '10px 12px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto' }}
                       title="Scan barcode">
                       📷
                     </button>
@@ -585,7 +593,7 @@ export default function Books() {
                     onChange={handleInputChange}
                     list="category-options"
                     placeholder="Select or type a category..."
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
                   <datalist id="category-options">
                     {PRESET_CATEGORIES.map(c => <option key={c} value={c} />)}
@@ -600,7 +608,7 @@ export default function Books() {
                     name="condition"
                     value={formData.condition || 'Good'}
                     onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   >
                     {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -610,7 +618,7 @@ export default function Books() {
               {/* PRICING SECTION */}
               <div style={{ background: '#f8f9ff', padding: '14px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e0e8ff' }}>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', fontSize: '14px', color: '#667eea' }}>💰 Pricing</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Buying Price (₹)</label>
                     <input
@@ -620,7 +628,7 @@ export default function Books() {
                       onChange={handleInputChange}
                       min="0"
                       placeholder="-"
-                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                     />
                     <p style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>Your cost. Leave blank if N/A</p>
                   </div>
@@ -638,11 +646,11 @@ export default function Books() {
                       }}
                       min="0"
                       placeholder="Maximum Retail Price"
-                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                     />
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Discount (%)</label>
                     <input
@@ -657,7 +665,7 @@ export default function Books() {
                       }}
                       min="0" max="100" step="0.5"
                       placeholder="0"
-                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                     />
                   </div>
                   <div>
@@ -674,7 +682,7 @@ export default function Books() {
                       }}
                       min="0"
                       placeholder="Auto from MRP - Discount"
-                      style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '4px', fontWeight: '700', color: '#667eea' }}
+                      style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '4px', fontWeight: '700', color: '#667eea', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                     />
                     {formData.mrp && formData.sales_price && parseFloat(formData.sales_price) < parseFloat(formData.mrp) && (
                       <p style={{ fontSize: '11px', color: '#27ae60', marginTop: '2px', fontWeight: '600' }}>
@@ -685,7 +693,7 @@ export default function Books() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Total Copies</label>
                   <input
@@ -694,7 +702,7 @@ export default function Books() {
                     value={formData.quantity_total}
                     onChange={handleInputChange}
                     min="1"
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
                 </div>
               </div>
@@ -707,22 +715,22 @@ export default function Books() {
                   value={formData.quantity_available}
                   onChange={handleInputChange}
                   min="0"
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                 />
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button type="submit" style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+                <button type="submit" style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
                   {editingId ? 'Update Book' : 'Add Book'}
                 </button>
                 {!editingId && (
                   <button type="submit" onClick={() => setPrintAfterAdd(true)}
-                    style={{ padding: '10px 20px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+                    style={{ padding: '10px 20px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
                     Add + 🖨️ Print Barcode
                   </button>
                 )}
                 <button type="button" onClick={() => setShowAddForm(false)}
-                  style={{ padding: '10px 20px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+                  style={{ padding: '10px 20px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
                   Cancel
                 </button>
               </div>
@@ -743,85 +751,151 @@ export default function Books() {
 
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
         {loading ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  {[40, 20, 15, 10, 10, 5].map((w, j) => (
-                    <td key={j} style={{ padding: '14px 12px' }}>
-                      <div style={{ height: '14px', width: `${w}%`, minWidth: '40px', background: '#f0f0f0', borderRadius: '4px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
-                    </td>
-                  ))}
-                </tr>
+          isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ background: 'white', borderRadius: '10px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid #f0f0f0' }}>
+                  <div style={{ width: '50px', height: '70px', background: '#f0f0f0', borderRadius: '6px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ height: '14px', width: '70%', background: '#f0f0f0', borderRadius: '4px', marginBottom: '8px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                    <div style={{ height: '12px', width: '50%', background: '#f0f0f0', borderRadius: '4px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    {[40, 20, 15, 10, 10, 5].map((w, j) => (
+                      <td key={j} style={{ padding: '14px 12px' }}>
+                        <div style={{ height: '14px', width: `${w}%`, minWidth: '40px', background: '#f0f0f0', borderRadius: '4px', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
         ) : filteredBooks.length === 0 ? (
           <p style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No books found</p>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: '#f5f5f5', borderBottom: '2px solid #e0e0e0' }}>
-              <tr>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Title</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Author</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Category</th>
-                {hasCondition && <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Condition</th>}
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Available</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Price</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBooks.map((book) => {
-                const cStyle = hasCondition && book.condition ? CONDITION_STYLE[book.condition] || {} : {};
-                return (
-                  <tr key={book.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '12px' }}>{book.title}</td>
-                    <td style={{ padding: '12px' }}>{book.author}</td>
-                    <td style={{ padding: '12px' }}>
-                      {book.category ? (
-                        <span style={{ background: '#e8f4fd', color: '#2980b9', padding: '2px 8px', borderRadius: '10px', fontSize: '12px' }}>{book.category}</span>
-                      ) : '—'}
-                    </td>
-                    {hasCondition && (
-                      <td style={{ padding: '12px' }}>
-                        {book.condition ? (
-                          <span style={{ background: cStyle.bg, color: cStyle.text, padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600' }}>
-                            {book.condition}
-                          </span>
-                        ) : '—'}
-                      </td>
+        ) : isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
+            {filteredBooks.map((book) => {
+              const cStyle = hasCondition && book.condition ? CONDITION_STYLE[book.condition] || {} : {};
+              return (
+                <div key={book.id} style={{ background: 'white', borderRadius: '10px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid #f0f0f0' }}>
+                  <div style={{ width: '50px', height: '70px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {book.book_image ? (
+                      <img src={book.book_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
+                    ) : (
+                      <span style={{ fontSize: '20px' }}>📚</span>
                     )}
-                    <td style={{ padding: '12px' }}>
-                      <span style={{ padding: '4px 8px', borderRadius: '4px', background: book.quantity_available > 0 ? '#d4edda' : '#f8d7da', color: book.quantity_available > 0 ? '#155724' : '#721c24' }}>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: '700', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</div>
+                    <div style={{ fontSize: '12px', color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.author}</div>
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {book.category && (
+                        <span style={{ background: '#e8f4fd', color: '#2980b9', padding: '2px 6px', borderRadius: '10px', fontSize: '11px' }}>{book.category}</span>
+                      )}
+                      {hasCondition && book.condition && (
+                        <span style={{ background: cStyle.bg, color: cStyle.text, padding: '2px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>{book.condition}</span>
+                      )}
+                      <span style={{ fontSize: '12px', fontWeight: '600' }}>₹{book.sales_price || book.price}</span>
+                      <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '11px', background: book.quantity_available > 0 ? '#d4edda' : '#f8d7da', color: book.quantity_available > 0 ? '#155724' : '#721c24' }}>
                         {book.quantity_available}/{book.quantity_total}
                       </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>₹{book.price?.toLocaleString('en-IN')}</td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        <button onClick={() => handleEditBook(book)}
-                          style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                          title="Edit book">
-                          ✏️
-                        </button>
-                        <button onClick={() => navigate(`/books/${book.id}/copies`)}
-                          style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                          title="Manage copies & print barcodes">
-                          📦
-                        </button>
-                        <button onClick={() => handleDeleteBook(book.id)}
-                          style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                          title="Delete book">
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                    <button onClick={() => handleEditBook(book)}
+                      style={{ width: '36px', height: '36px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Edit book">
+                      ✏️
+                    </button>
+                    <button onClick={() => navigate(`/books/${book.id}/copies`)}
+                      style={{ width: '36px', height: '36px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Manage copies">
+                      📦
+                    </button>
+                    <button onClick={() => handleDeleteBook(book.id)}
+                      style={{ width: '36px', height: '36px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Delete book">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ background: '#f5f5f5', borderBottom: '2px solid #e0e0e0' }}>
+                <tr>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Title</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Author</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Category</th>
+                  {hasCondition && <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Condition</th>}
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Available</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Price</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBooks.map((book) => {
+                  const cStyle = hasCondition && book.condition ? CONDITION_STYLE[book.condition] || {} : {};
+                  return (
+                    <tr key={book.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '12px' }}>{book.title}</td>
+                      <td style={{ padding: '12px' }}>{book.author}</td>
+                      <td style={{ padding: '12px' }}>
+                        {book.category ? (
+                          <span style={{ background: '#e8f4fd', color: '#2980b9', padding: '2px 8px', borderRadius: '10px', fontSize: '12px' }}>{book.category}</span>
+                        ) : '—'}
+                      </td>
+                      {hasCondition && (
+                        <td style={{ padding: '12px' }}>
+                          {book.condition ? (
+                            <span style={{ background: cStyle.bg, color: cStyle.text, padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600' }}>
+                              {book.condition}
+                            </span>
+                          ) : '—'}
+                        </td>
+                      )}
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ padding: '4px 8px', borderRadius: '4px', background: book.quantity_available > 0 ? '#d4edda' : '#f8d7da', color: book.quantity_available > 0 ? '#155724' : '#721c24' }}>
+                          {book.quantity_available}/{book.quantity_total}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>₹{book.price?.toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <button onClick={() => handleEditBook(book)}
+                            style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                            title="Edit book">
+                            ✏️
+                          </button>
+                          <button onClick={() => navigate(`/books/${book.id}/copies`)}
+                            style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                            title="Manage copies & print barcodes">
+                            📦
+                          </button>
+                          <button onClick={() => handleDeleteBook(book.id)}
+                            style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                            title="Delete book">
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
