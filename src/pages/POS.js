@@ -163,6 +163,10 @@ export default function POS() {
   const [copyPickerCopies, setCopyPickerCopies] = useState([]);
   const [copyPickerLoading, setCopyPickerLoading] = useState(false);
 
+  // Custom amount input (replaces window.prompt)
+  const [customAmtModal, setCustomAmtModal] = useState(null); // { svc }
+  const [customAmtVal, setCustomAmtVal] = useState('');
+
   // Editable services
   const [SERVICES, setSERVICES]         = useState(loadServices);
   const [editSvcModal, setEditSvcModal] = useState(null);
@@ -171,12 +175,13 @@ export default function POS() {
 
   // Mobile view toggle
   const [mobileView, setMobileView] = useState('catalog'); // 'catalog' or 'cart'
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth <= 768);
+    check(); // initial check after mount
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   // Refs for keyboard shortcuts
@@ -595,9 +600,15 @@ export default function POS() {
   // ── Print ─────────────────────────────────────────────────────────────────────
   const handlePrint = useReactToPrint({ content: () => receiptRef.current });
 
-  // ── Keyboard shortcuts (defined after handleCheckout) ─────────────────────────
+  // ── Keyboard shortcuts (using refs to avoid stale closures) ───────────────────
   const checkoutRef = useRef(handleCheckout);
+  const confirmRef = useRef(confirm);
+  const resetCartRef = useRef(resetCart);
+  const cartRef = useRef(cart);
   checkoutRef.current = handleCheckout;
+  confirmRef.current = confirm;
+  resetCartRef.current = resetCart;
+  cartRef.current = cart;
 
   useEffect(() => {
     const handler = async (e) => {
@@ -605,12 +616,12 @@ export default function POS() {
       if (e.key === 'F2')  { e.preventDefault(); itemSearchRef.current?.focus(); }
       if (e.key === 'F12') { e.preventDefault(); checkoutRef.current(); }
       if (e.key === 'Escape' && !showReceipt) {
-        if (cart.length > 0 && await confirm({ title: 'Clear Cart', message: 'Clear cart and start over?', variant: 'warning' })) resetCart();
+        if (cartRef.current.length > 0 && await confirmRef.current({ title: 'Clear Cart', message: 'Clear cart and start over?', variant: 'warning' })) resetCartRef.current();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cart.length, showReceipt]); // eslint-disable-line
+  }, [showReceipt]);
 
   // ── Filtered catalog ──────────────────────────────────────────────────────────
   const sl = itemSearch.toLowerCase();
@@ -718,30 +729,31 @@ export default function POS() {
         <div style={{ background: 'white', borderRadius: isMobile ? '8px' : '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', overflow: 'hidden', display: isMobile && mobileView !== 'catalog' ? 'none' : 'block' }}>
 
           {/* Search + Scan */}
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '8px' }}>
+          <div style={{ padding: isMobile ? '10px 12px' : '14px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '8px' }}>
             <input
               ref={itemSearchRef}
               type="text"
-              placeholder="🔍  Search items, books, author… (F2)"
+              placeholder={isMobile ? "🔍 Search books…" : "🔍  Search items, books, author… (F2)"}
               value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
-              style={{ flex: 1, padding: '10px 14px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s' }}
+              style={{ flex: 1, padding: isMobile ? '12px' : '10px 14px', border: '2px solid #e0e0e0', borderRadius: '10px', fontSize: isMobile ? '16px' : '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s', WebkitAppearance: 'none' }}
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e  => e.target.style.borderColor = '#e0e0e0'}
             />
             <button onClick={() => setShowPosScanner(true)}
-              style={{ padding: '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}
+              style={{ padding: isMobile ? '12px 16px' : '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', flexShrink: 0, minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Scan barcode">📷</button>
           </div>
 
           {/* Category tabs */}
-          <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px', overflowX: 'auto' }}>
+          <div style={{ padding: isMobile ? '8px 10px' : '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
             {CATS.map(cat => (
               <button key={cat} onClick={() => setActiveCat(cat)} style={{
-                padding: '5px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
-                fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                padding: isMobile ? '8px 14px' : '5px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                fontWeight: '700', fontSize: isMobile ? '13px' : '12px', whiteSpace: 'nowrap', transition: 'all 0.15s',
                 background: activeCat === cat ? '#667eea' : '#f0f2f5',
                 color:      activeCat === cat ? 'white'   : '#666',
+                flexShrink: 0,
               }}>
                 {cat}
               </button>
@@ -763,15 +775,12 @@ export default function POS() {
                       onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
                       onClick={() => {
                         if (svc.custom) {
-                          const raw = window.prompt(`Enter amount for "${svc.name}" (₹):`);
-                          if (raw === null) return;
-                          const amt = parseFloat(raw);
-                          if (isNaN(amt) || amt <= 0) { showToast('Invalid amount', 'error'); return; }
-                          addToCart({ ...svc, price: amt, cartType: 'service' });
+                          setCustomAmtModal(svc);
+                          setCustomAmtVal('');
                         } else {
                           addToCart({ ...svc, cartType: 'service' });
+                          showToast(`${svc.name} added to cart`);
                         }
-                        showToast(`${svc.name} added to cart`);
                       }} />
                   ))}
                 </div>
@@ -833,7 +842,7 @@ export default function POS() {
                               <button
                                 onClick={() => handleAddBookToCart(book)}
                                 disabled={!inStock}
-                                style={{ padding: '3px 8px', background: inStock ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '4px', cursor: inStock ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '700' }}
+                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: inStock ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: inStock ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
                               >+</button>
                             </div>
                           </div>
@@ -1500,6 +1509,48 @@ export default function POS() {
         </div>
       )}
 
+      {/* ── CUSTOM AMOUNT MODAL ── */}
+      {customAmtModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
+          onClick={() => setCustomAmtModal(null)}>
+          <div style={{ background: 'white', borderRadius: '14px', padding: '24px', maxWidth: '340px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>{customAmtModal.emoji} {customAmtModal.name}</h3>
+            <p style={{ margin: '0 0 14px', fontSize: '13px', color: '#999' }}>Enter custom amount</p>
+            <div style={{ position: 'relative', marginBottom: '14px' }}>
+              <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '18px', color: '#999' }}>₹</span>
+              <input
+                type="number" autoFocus value={customAmtVal}
+                onChange={e => setCustomAmtVal(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && customAmtVal) {
+                    const amt = parseFloat(customAmtVal);
+                    if (!isNaN(amt) && amt > 0) {
+                      addToCart({ ...customAmtModal, price: amt, cartType: 'service' });
+                      showToast(`${customAmtModal.name} added — ${fmt(amt)}`);
+                      setCustomAmtModal(null);
+                    }
+                  }
+                }}
+                placeholder="0"
+                style={{ width: '100%', padding: '14px 14px 14px 32px', border: '2px solid #667eea', borderRadius: '10px', fontSize: '24px', fontWeight: '700', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setCustomAmtModal(null)}
+                style={{ flex: 1, padding: '12px', background: '#f3f4f6', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Cancel</button>
+              <button onClick={() => {
+                const amt = parseFloat(customAmtVal);
+                if (isNaN(amt) || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
+                addToCart({ ...customAmtModal, price: amt, cartType: 'service' });
+                showToast(`${customAmtModal.name} added — ${fmt(amt)}`);
+                setCustomAmtModal(null);
+              }}
+                style={{ flex: 1, padding: '12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>Add to Cart</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MOBILE FLOATING CART BUTTON ── */}
       {isMobile && mobileView === 'catalog' && cart.length > 0 && (
         <button onClick={() => setMobileView('cart')} style={{
@@ -1521,22 +1572,27 @@ export default function POS() {
 
       {/* POS Barcode Scanner */}
       {showPosScanner && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 9999 }}
           onClick={() => setShowPosScanner(false)}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '400px', width: '90%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '18px' }}>📷 Scan Book Barcode</h3>
+          <div style={{ background: 'white', borderRadius: isMobile ? '20px 20px 0 0' : '14px', padding: '20px', maxWidth: '420px', width: isMobile ? '100%' : '90%', maxHeight: isMobile ? '85vh' : 'auto', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px' }}>📷 Scan Barcode</h3>
+              <button onClick={() => setShowPosScanner(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
             <BarcodeScanner
               onScan={(code) => handlePosScan(code)}
               onClose={() => setShowPosScanner(false)}
             />
             <div style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '600' }}>Or use USB barcode scanner:</p>
-              <input autoFocus placeholder="Barcode scanner types here..."
+              <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '600' }}>
+                {isMobile ? 'Or type barcode manually:' : 'Or use USB barcode scanner:'}
+              </p>
+              <input autoFocus placeholder="Type barcode number…"
                 onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { handlePosScan(e.target.value.trim()); } }}
-                style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '6px', fontSize: '16px', textAlign: 'center', fontFamily: 'monospace' }} />
+                style={{ width: '100%', padding: '14px', border: '2px solid #667eea', borderRadius: '10px', fontSize: '18px', textAlign: 'center', fontFamily: 'monospace', boxSizing: 'border-box', WebkitAppearance: 'none' }} />
             </div>
             <button onClick={() => setShowPosScanner(false)}
-              style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
+              style={{ width: '100%', marginTop: '10px', padding: '14px', background: '#f3f4f6', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '15px' }}>Cancel</button>
           </div>
         </div>
       )}
