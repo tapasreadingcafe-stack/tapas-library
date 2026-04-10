@@ -169,6 +169,16 @@ export default function POS() {
   const [editSvcForm, setEditSvcForm]   = useState({ emoji: '', name: '', price: '', cat: '' });
   const [showAddSvc, setShowAddSvc]     = useState(false);
 
+  // Mobile view toggle
+  const [mobileView, setMobileView] = useState('catalog'); // 'catalog' or 'cart'
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Refs for keyboard shortcuts
   const memberSearchRef = useRef();
   const itemSearchRef   = useRef();
@@ -631,29 +641,59 @@ export default function POS() {
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh' }}>
 
-
       {/* ── DAILY SUMMARY BAR ── */}
       <div style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '0', flexWrap: 'wrap',
+        padding: isMobile ? '8px 12px' : '12px 20px', display: 'flex', alignItems: 'center', gap: '0', flexWrap: 'wrap',
       }}>
-        <span style={{ fontSize: '14px', fontWeight: '800', color: 'white', marginRight: '20px', flexShrink: 0 }}>📊 Today</span>
+        <span style={{ fontSize: isMobile ? '12px' : '14px', fontWeight: '800', color: 'white', marginRight: isMobile ? '8px' : '20px', flexShrink: 0 }}>📊 Today</span>
         {[
           { label: 'Revenue',       value: fmt(todayStats.total),  accent: '#ffd700' },
-          { label: 'Transactions',  value: todayStats.count,       accent: 'white' },
-          { label: 'Cash',          value: fmt(todayStats.cash),   accent: '#7bed9f' },
-          { label: 'Card',          value: fmt(todayStats.card),   accent: '#74b9ff' },
-          { label: 'UPI',           value: fmt(todayStats.upi),    accent: '#fd79a8' },
+          { label: 'Txns',          value: todayStats.count,       accent: 'white' },
+          ...(isMobile ? [] : [
+            { label: 'Cash',          value: fmt(todayStats.cash),   accent: '#7bed9f' },
+            { label: 'Card',          value: fmt(todayStats.card),   accent: '#74b9ff' },
+            { label: 'UPI',           value: fmt(todayStats.upi),    accent: '#fd79a8' },
+          ]),
         ].map(s => (
-          <div key={s.label} style={{ textAlign: 'center', padding: '0 14px', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
-            <div style={{ fontSize: '15px', fontWeight: '800', color: s.accent }}>{s.value}</div>
+          <div key={s.label} style={{ textAlign: 'center', padding: isMobile ? '0 8px' : '0 14px', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '800', color: s.accent }}>{s.value}</div>
             <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.5px' }}>{s.label.toUpperCase()}</div>
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', fontSize: '10px', color: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>
-          F1=Member · F2=Search · F12=Checkout · Esc=Clear
-        </div>
+        {!isMobile && (
+          <div style={{ marginLeft: 'auto', fontSize: '10px', color: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>
+            F1=Member · F2=Search · F12=Checkout · Esc=Clear
+          </div>
+        )}
       </div>
+
+      {/* ── MOBILE TAB SWITCHER ── */}
+      {isMobile && (
+        <div style={{ display: 'flex', background: 'white', borderBottom: '2px solid #f0f0f0' }}>
+          <button onClick={() => setMobileView('catalog')} style={{
+            flex: 1, padding: '12px', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+            background: mobileView === 'catalog' ? '#667eea' : 'white',
+            color: mobileView === 'catalog' ? 'white' : '#666',
+          }}>📚 Catalog</button>
+          <button onClick={() => setMobileView('cart')} style={{
+            flex: 1, padding: '12px', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+            background: mobileView === 'cart' ? '#667eea' : 'white',
+            color: mobileView === 'cart' ? 'white' : '#666',
+            position: 'relative',
+          }}>
+            🛒 Cart
+            {cart.length > 0 && (
+              <span style={{
+                position: 'absolute', top: '6px', right: '20%',
+                background: '#ef4444', color: 'white', borderRadius: '50%',
+                width: '20px', height: '20px', fontSize: '11px', fontWeight: '800',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{cart.length}</span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* ── SETUP NOTICE ── */}
       {hasPosTable === false && (
@@ -671,11 +711,11 @@ export default function POS() {
         </div>
       )}
 
-      {/* ── MAIN 2-COLUMN LAYOUT ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', padding: '16px', alignItems: 'start' }}>
+      {/* ── MAIN LAYOUT ── */}
+      <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 400px', gap: '16px', padding: isMobile ? '8px' : '16px', alignItems: 'start' }}>
 
         {/* ════════════════ LEFT PANEL — CATALOG ════════════════ */}
-        <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+        <div style={{ background: 'white', borderRadius: isMobile ? '8px' : '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', overflow: 'hidden', display: isMobile && mobileView !== 'catalog' ? 'none' : 'block' }}>
 
           {/* Search + Scan */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '8px' }}>
@@ -717,7 +757,7 @@ export default function POS() {
                 {activeCat === 'All' && (
                   <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px', marginBottom: '10px' }}>SERVICES & CHARGES</div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(148px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
                   {visibleServices.map(svc => (
                     <ServiceCard key={svc.id} svc={svc} fmt={fmt}
                       onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
@@ -757,8 +797,8 @@ export default function POS() {
                     {sl ? 'No books match your search' : 'No books in catalog'}
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-                    {visibleBooks.slice(0, 60).map(book => {
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(130px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
+                    {visibleBooks.slice(0, isMobile ? 30 : 60).map(book => {
                       const inStock = book.quantity_available > 0;
                       return (
                         <div key={book.id} style={{ background: 'white', border: '1px solid #ebebeb', borderRadius: '8px', overflow: 'hidden', cursor: inStock ? 'pointer' : 'default', opacity: inStock ? 1 : 0.5, transition: 'box-shadow 0.15s' }}
@@ -816,11 +856,13 @@ export default function POS() {
 
         {/* ════════════════ RIGHT PANEL — CART ════════════════ */}
         <div style={{
-          position: 'sticky', top: '16px',
-          background: 'white', borderRadius: '12px',
+          position: isMobile ? 'relative' : 'sticky', top: isMobile ? 0 : '16px',
+          background: 'white', borderRadius: isMobile ? '8px' : '12px',
           boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
-          maxHeight: 'calc(100vh - 100px)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          maxHeight: isMobile ? 'none' : 'calc(100vh - 100px)',
+          display: isMobile && mobileView !== 'cart' ? 'none' : 'flex',
+          flexDirection: 'column', overflow: 'hidden',
+          marginTop: isMobile ? '8px' : 0,
         }}>
 
           {/* ── MEMBER SEARCH ── */}
@@ -1456,6 +1498,25 @@ export default function POS() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── MOBILE FLOATING CART BUTTON ── */}
+      {isMobile && mobileView === 'catalog' && cart.length > 0 && (
+        <button onClick={() => setMobileView('cart')} style={{
+          position: 'fixed', bottom: '20px', right: '20px', zIndex: 8000,
+          width: '60px', height: '60px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #059669, #047857)',
+          color: 'white', border: 'none', cursor: 'pointer',
+          boxShadow: '0 4px 20px rgba(5,150,105,0.4)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          fontSize: '18px',
+        }}>
+          🛒
+          <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', borderRadius: '50%', width: '22px', height: '22px', fontSize: '12px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {cart.length}
+          </span>
+          <span style={{ fontSize: '9px', fontWeight: '700', marginTop: '1px' }}>{fmt(cart.reduce((s, i) => s + i.price * i.qty, 0))}</span>
+        </button>
       )}
 
       {/* POS Barcode Scanner */}
