@@ -159,6 +159,11 @@ export default function POS() {
   // Family members
   const [familyMembers, setFamilyMembers] = useState([]);
 
+  // Copy picker modal
+  const [copyPickerBook, setCopyPickerBook] = useState(null);
+  const [copyPickerCopies, setCopyPickerCopies] = useState([]);
+  const [copyPickerLoading, setCopyPickerLoading] = useState(false);
+
   // Editable services
   const [SERVICES, setSERVICES]         = useState(loadServices);
   const [editSvcModal, setEditSvcModal] = useState(null);
@@ -389,6 +394,36 @@ export default function POS() {
     setItemSearch(trimmed);
     setActiveCat('Books');
     showToast(`"${trimmed}" not found in catalog`, 'error');
+  };
+
+  // Handle clicking + on a book card — check for copies first
+  const handleAddBookToCart = async (book) => {
+    // Check if this book has tracked copies in book_copies
+    try {
+      const { data: copies } = await supabase
+        .from('book_copies')
+        .select('id, copy_code, status, condition')
+        .eq('book_id', book.id)
+        .eq('status', 'available')
+        .order('copy_code');
+
+      if (copies && copies.length > 0) {
+        // If only 1 available copy, add it directly
+        if (copies.length === 1) {
+          addToCart({ ...book, copyCode: copies[0].copy_code, copyId: copies[0].id });
+          showToast(`Added: ${book.title} (${copies[0].copy_code})`);
+        } else {
+          // Show copy picker modal
+          setCopyPickerBook(book);
+          setCopyPickerCopies(copies);
+        }
+        return;
+      }
+    } catch {} // book_copies table might not exist
+
+    // No copies tracked — add generically
+    addToCart({ ...book, cartType: 'book' });
+    showToast(`"${book.title.substring(0, 18)}…" added`);
   };
 
   const addFineToCart = (fine) => {
@@ -749,7 +784,7 @@ export default function POS() {
                                 <span style={{ fontSize: '13px', fontWeight: '800', color: '#667eea' }}>{fmt(book.sales_price || book.price)}</span>
                               </div>
                               <button
-                                onClick={() => { addToCart({ ...book, cartType: 'book' }); showToast(`"${book.title.substring(0, 18)}…" added`); }}
+                                onClick={() => handleAddBookToCart(book)}
                                 disabled={!inStock}
                                 style={{ padding: '3px 8px', background: inStock ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '4px', cursor: inStock ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '700' }}
                               >+</button>
@@ -1332,6 +1367,59 @@ export default function POS() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── COPY PICKER MODAL ── */}
+      {copyPickerBook && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
+          onClick={() => setCopyPickerBook(null)}>
+          <div style={{ background: 'white', borderRadius: '14px', padding: '22px', maxWidth: '480px', width: '100%', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>📋 Select Copy to Sell</h3>
+            <div style={{ fontSize: '13px', color: '#666', marginBottom: '14px' }}>
+              <strong>{copyPickerBook.title}</strong> — {copyPickerCopies.length} available cop{copyPickerCopies.length === 1 ? 'y' : 'ies'}
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {copyPickerCopies.map(copy => {
+                const alreadyInCart = cart.some(c => c.copyCode === copy.copy_code);
+                return (
+                  <button
+                    key={copy.id}
+                    disabled={alreadyInCart}
+                    onClick={() => {
+                      addToCart({ ...copyPickerBook, copyCode: copy.copy_code, copyId: copy.id });
+                      showToast(`Added: ${copyPickerBook.title} (${copy.copy_code})`);
+                      setCopyPickerBook(null);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 16px', border: '2px solid #e0e8ff', borderRadius: '8px',
+                      cursor: alreadyInCart ? 'not-allowed' : 'pointer',
+                      background: alreadyInCart ? '#f3f4f6' : 'white',
+                      opacity: alreadyInCart ? 0.5 : 1,
+                      transition: 'all 0.15s', textAlign: 'left',
+                    }}
+                    onMouseEnter={e => { if (!alreadyInCart) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.background = '#f5f7ff'; } }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e8ff'; e.currentTarget.style.background = alreadyInCart ? '#f3f4f6' : 'white'; }}
+                  >
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontWeight: '800', fontSize: '15px', color: '#059669' }}>{copy.copy_code}</div>
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>Condition: {copy.condition}</div>
+                    </div>
+                    {alreadyInCart ? (
+                      <span style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>Already in cart</span>
+                    ) : (
+                      <span style={{ fontSize: '20px' }}>＋</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setCopyPickerBook(null)}
+              style={{ marginTop: '12px', width: '100%', padding: '10px', background: '#e5e7eb', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+              Cancel
+            </button>
           </div>
         </div>
       )}
