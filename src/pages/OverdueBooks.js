@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { formatDate, formatCurrency } from '../utils/membershipUtils';
+import { useConfirm } from '../components/ConfirmModal';
 
 export default function OverdueBooks() {
+  const confirm = useConfirm();
   const [overdueBooks, setOverdueBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -93,7 +95,7 @@ export default function OverdueBooks() {
   };
 
   const handleReturnOverdueBook = async (item) => {
-    if (!window.confirm('Mark this overdue book as returned?')) return;
+    if (!await confirm({ title: 'Mark Returned', message: 'Mark this overdue book as returned?', variant: 'warning' })) return;
 
     try {
       const { error } = await supabase

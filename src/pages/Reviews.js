@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useConfirm } from '../components/ConfirmModal';
 
 const SETUP_SQL = `CREATE TABLE reviews (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -36,6 +37,7 @@ function StarRating({ value, onChange, readOnly = false, size = 20 }) {
 }
 
 export default function Reviews() {
+  const confirm = useConfirm();
   const [tableExists, setTableExists] = useState(null); // null = loading
   const [reviews, setReviews] = useState([]);
   const [books, setBooks] = useState([]);
@@ -120,7 +122,7 @@ export default function Reviews() {
   };
 
   const deleteReview = async (id) => {
-    if (!window.confirm('Delete this review?')) return;
+    if (!await confirm({ title: 'Delete Review', message: 'Delete this review?', variant: 'danger' })) return;
     await supabase.from('reviews').delete().eq('id', id);
     fetchAll();
   };

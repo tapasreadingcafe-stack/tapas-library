@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '' };
 
@@ -8,6 +11,9 @@ function initials(name) {
 }
 
 export default function StaffManagement() {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [staffList, setStaffList]       = useState([]);
   const [loading, setLoading]           = useState(true);
   const [tableExists, setTableExists]   = useState(null);
@@ -15,7 +21,6 @@ export default function StaffManagement() {
   const [editingStaff, setEditingStaff] = useState(null);
   const [form, setForm]                 = useState(EMPTY_FORM);
   const [saving, setSaving]             = useState(false);
-  const [toast, setToast]               = useState(null);
   const [showPwModal, setShowPwModal]   = useState(null); // staff record to reset pw for
   const [changePwModal, setChangePwModal] = useState(false);
   const [newPw, setNewPw]               = useState('');
@@ -23,8 +28,8 @@ export default function StaffManagement() {
   const [showNewPw, setShowNewPw]       = useState(false);
 
   const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    if (type === 'error') toast.error(msg);
+    else toast.success(msg);
   };
 
   useEffect(() => {
@@ -120,7 +125,7 @@ export default function StaffManagement() {
 
   const toggleActive = async (member) => {
     const action = member.is_active ? 'deactivate' : 'activate';
-    if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${member.name}?`)) return;
+    if (!await confirm({ title: `${action.charAt(0).toUpperCase() + action.slice(1)} Staff`, message: `${action.charAt(0).toUpperCase() + action.slice(1)} ${member.name}?`, variant: 'warning' })) return;
     try {
       const { error } = await supabase.from('staff').update({ is_active: !member.is_active }).eq('id', member.id);
       if (error) throw error;
@@ -198,18 +203,6 @@ ON CONFLICT (email) DO NOTHING;`;
 
   return (
     <div style={{ padding: '20px' }}>
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '70px', right: '20px', zIndex: 9999,
-          background: toast.type === 'error' ? '#e74c3c' : '#27ae60',
-          color: 'white', padding: '12px 20px', borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)', fontSize: '14px', fontWeight: '500', maxWidth: '340px',
-        }}>
-          {toast.msg}
-        </div>
-      )}
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>👥 Staff Management</h1>
@@ -300,6 +293,9 @@ ON CONFLICT (email) DO NOTHING;`;
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => navigate(`/staff/${member.id}`)} style={{ padding: '5px 10px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                        👁️ View
+                      </button>
                       <button onClick={() => openEdit(member)} style={{ padding: '5px 10px', background: '#e8f0ff', color: '#667eea', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
                         ✏️ Edit
                       </button>

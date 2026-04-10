@@ -6,6 +6,8 @@ import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
 import { exportToCSV } from '../utils/exportCSV';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 const PRESET_CATEGORIES = [
   'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
@@ -26,6 +28,8 @@ const CONDITION_STYLE = {
 
 export default function Books() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,7 +180,7 @@ export default function Books() {
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Error: ' + error.message);
+      toast.error('Error: ' + error.message);
     } finally {
       setUploadingImage(false);
     }
@@ -186,7 +190,7 @@ export default function Books() {
 
   const lookupISBN = async (isbnOverride) => {
     const isbn = (isbnOverride || formData.isbn || '').trim().replace(/[-\s]/g, '');
-    if (!isbn) { alert('Enter an ISBN first'); return; }
+    if (!isbn) { toast.warning('Enter an ISBN first'); return; }
     setIsbnLooking(true);
     try {
       // Try Open Library first (better ISBN coverage)
@@ -233,13 +237,13 @@ export default function Books() {
       }
 
       if (found) {
-        alert('Book details auto-filled!');
+        toast.success('Book details auto-filled!');
       } else {
-        alert('No book found for this ISBN. Try entering details manually.');
+        toast.warning('No book found for this ISBN. Try entering details manually.');
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to lookup ISBN. Check your internet connection.');
+      toast.error('Failed to lookup ISBN. Check your internet connection.');
     }
     setIsbnLooking(false);
   };
@@ -277,7 +281,7 @@ export default function Books() {
         setImagePreview('');
         setShowAddForm(false);
         fetchBooks();
-        alert('Book updated!');
+        toast.success('Book updated!');
         logActivity(ACTIONS.BOOK_UPDATED, `Updated book: ${formData.title}`, { book_title: formData.title });
       } else {
         // Check if same book (by ISBN or title+author) already exists
@@ -303,7 +307,7 @@ export default function Books() {
           setImagePreview('');
           setShowAddForm(false);
           fetchBooks();
-          alert(`${copyCount} copies added to existing "${payload.title}" (Total: ${newTotal})`);
+          toast.success(`${copyCount} copies added to existing "${payload.title}" (Total: ${newTotal})`);
           logActivity(ACTIONS.BOOK_ADDED, `Added ${copyCount} copies to: ${payload.title} (total: ${newTotal})`, { book_title: payload.title });
           if (printAfterAdd) navigate(`/books/${existingBook.id}/copies`);
         } else {
@@ -325,7 +329,7 @@ export default function Books() {
           setImagePreview('');
           setShowAddForm(false);
           fetchBooks();
-          alert(`Book added with ${copyCount} copies!`);
+          toast.success(`Book added with ${copyCount} copies!`);
           logActivity(ACTIONS.BOOK_ADDED, `Added book: ${payload.title} (${copyCount} copies)`, { book_title: payload.title });
           if (printAfterAdd) navigate(`/books/${newBook.id}/copies`);
         }
@@ -333,7 +337,7 @@ export default function Books() {
       }
     } catch (error) {
       console.error('Error saving book:', error);
-      alert('Error saving book: ' + error.message);
+      toast.error('Error saving book: ' + error.message);
     }
   };
 
@@ -345,8 +349,8 @@ export default function Books() {
   };
 
   const handleDeleteBook = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this book?')) return;
-    
+    if (!await confirm({ title: 'Delete Book', message: 'Are you sure you want to delete this book?', variant: 'danger' })) return;
+
     try {
       const { error } = await supabase
         .from('books')
@@ -354,10 +358,10 @@ export default function Books() {
         .eq('id', id);
       if (error) throw error;
       fetchBooks();
-      alert('Book deleted!');
+      toast.success('Book deleted!');
     } catch (error) {
       console.error('Error deleting book:', error);
-      alert('Error deleting book');
+      toast.error('Error deleting book');
     }
   };
 
@@ -410,14 +414,14 @@ export default function Books() {
                   <div style={{ padding: '8px 12px', fontSize: '11px', color: '#999', fontWeight: '600', borderBottom: '1px solid #f0f0f0' }}>EXPORT</div>
                   <button onClick={() => {
                     setShowImportExport(false);
-                    if (books.length === 0) return alert('No books');
+                    if (books.length === 0) return toast.warning('No books to export');
                     exportToCSV(books.map(b => ({ Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category, 'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total, Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp, 'Selling Price': b.sales_price, 'Discount %': b.discount_percent })), 'books_catalog');
                   }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>📥</span> Export as CSV
                   </button>
                   <button onClick={() => {
                     setShowImportExport(false);
-                    if (books.length === 0) return alert('No books');
+                    if (books.length === 0) return toast.warning('No books to export');
                     const rows = books.map(b => ({ Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category, 'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total, Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp, 'Selling Price': b.sales_price, 'Discount %': b.discount_percent }));
                     const headers = Object.keys(rows[0]);
                     let tsv = headers.join('\t') + '\n';

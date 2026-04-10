@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 const CATEGORIES = ['tea', 'coffee', 'juice', 'bakery', 'snacks', 'other'];
 const CAT_ICONS = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🍰', snacks: '🍿', other: '🍽️' };
 
 export default function CafeMenu() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -56,7 +58,7 @@ export default function CafeMenu() {
   };
 
   const deleteItem = async (id) => {
-    if (!window.confirm('Delete this menu item?')) return;
+    if (!await confirm({ title: 'Delete Menu Item', message: 'Delete this menu item?', variant: 'danger' })) return;
     await supabase.from('cafe_menu_items').delete().eq('id', id);
     fetchItems();
   };

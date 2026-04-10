@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor:
@@ -57,6 +58,7 @@ CREATE POLICY "open" ON event_attendance FOR ALL USING (true) WITH CHECK (true);
 
 export default function EventListing() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -128,13 +130,13 @@ export default function EventListing() {
   };
 
   const cancelReg = async (regId) => {
-    if (!window.confirm('Cancel this registration?')) return;
+    if (!await confirm({ title: 'Cancel Registration', message: 'Cancel this registration?', variant: 'warning' })) return;
     await supabase.from('event_registrations').update({ status: 'cancelled' }).eq('id', regId);
     viewEvent(selectedEvent);
   };
 
   const cancelEvent = async (id) => {
-    if (!window.confirm('Cancel this event?')) return;
+    if (!await confirm({ title: 'Cancel Event', message: 'Cancel this event?', variant: 'warning' })) return;
     await supabase.from('events').update({ status: 'cancelled' }).eq('id', id);
     fetchEvents();
     if (selectedEvent?.id === id) setSelectedEvent(null);

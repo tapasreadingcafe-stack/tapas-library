@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useConfirm } from '../components/ConfirmModal';
 
 const SETUP_SQL = `CREATE TABLE wishlists (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -10,6 +11,7 @@ const SETUP_SQL = `CREATE TABLE wishlists (
 );`;
 
 export default function Wishlist() {
+  const confirm = useConfirm();
   const [tableExists, setTableExists] = useState(null);
   const [wishlists, setWishlists] = useState([]);
   const [books, setBooks] = useState([]);
@@ -71,7 +73,7 @@ export default function Wishlist() {
   };
 
   const removeItem = async (id) => {
-    if (!window.confirm('Remove from wishlist?')) return;
+    if (!await confirm({ title: 'Remove from Wishlist', message: 'Remove this item from the wishlist?', variant: 'warning' })) return;
     await supabase.from('wishlists').delete().eq('id', id);
     fetchAll();
   };

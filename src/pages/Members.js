@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import FilterBar from '../components/FilterBar';
 import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 
 import {
@@ -24,6 +25,7 @@ import {
 function Members() {
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -314,7 +316,7 @@ function Members() {
   };
 
   const handleDeleteMember = async (memberId) => {
-    if (!window.confirm('Are you sure you want to delete this member?')) {
+    if (!await confirm({ title: 'Delete Member', message: 'Are you sure you want to delete this member?', variant: 'danger' })) {
       return;
     }
 

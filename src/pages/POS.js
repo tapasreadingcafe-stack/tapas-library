@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
 import { useDevMode } from '../components/DevMode';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 import BarcodeScanner from '../BarcodeScanner';
 
 // ── Default service items ─────────────────────────────────────────────────────
@@ -146,9 +148,6 @@ export default function POS() {
   const [todayTxns, setTodayTxns]       = useState([]);
   const [todayStats, setTodayStats]     = useState({ total: 0, count: 0, cash: 0, card: 0, upi: 0 });
 
-  // Toast
-  const [toast, setToast]               = useState(null);
-
   // Scanner
   const [showPosScanner, setShowPosScanner] = useState(false);
 
@@ -175,13 +174,16 @@ export default function POS() {
   const itemSearchRef   = useRef();
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const fmt = useCallback((n) =>
     `₹${(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, []);
 
   const showToast = useCallback((msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  }, []);
+    if (type === 'error') toast.error(msg);
+    else toast.success(msg);
+  }, [toast]);
 
   // ── On mount ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -206,7 +208,7 @@ export default function POS() {
     try {
       const { data } = await supabase
         .from('books')
-        .select('id, book_id, title, author, category, price, sales_price, quantity_available, book_image')
+        .select('id, book_id, title, author, category, price, sales_price, quantity_available, quantity_total, book_image')
         .order('title').limit(300);
       setAllBooks(data || []);
     } catch (e) { console.error(e); }
@@ -588,12 +590,12 @@ export default function POS() {
   checkoutRef.current = handleCheckout;
 
   useEffect(() => {
-    const handler = (e) => {
+    const handler = async (e) => {
       if (e.key === 'F1')  { e.preventDefault(); memberSearchRef.current?.focus(); }
       if (e.key === 'F2')  { e.preventDefault(); itemSearchRef.current?.focus(); }
       if (e.key === 'F12') { e.preventDefault(); checkoutRef.current(); }
       if (e.key === 'Escape' && !showReceipt) {
-        if (cart.length > 0 && window.confirm('Clear cart?')) resetCart();
+        if (cart.length > 0 && await confirm({ title: 'Clear Cart', message: 'Clear cart and start over?', variant: 'warning' })) resetCart();
       }
     };
     window.addEventListener('keydown', handler);
@@ -629,17 +631,6 @@ export default function POS() {
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh' }}>
 
-      {/* ── TOAST ── */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '70px', right: '20px', zIndex: 9999,
-          background: toast.type === 'error' ? '#e74c3c' : '#27ae60',
-          color: 'white', padding: '12px 20px', borderRadius: '8px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)', fontSize: '14px', fontWeight: '600',
-        }}>
-          {toast.msg}
-        </div>
-      )}
 
       {/* ── DAILY SUMMARY BAR ── */}
       <div style={{
@@ -790,7 +781,7 @@ export default function POS() {
                             <div style={{ fontSize: '10px', color: '#999', marginBottom: '2px' }}>{(book.author || '').substring(0, 18)}</div>
                             <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', flexWrap: 'wrap' }}>
                               {book.book_id && <span style={{ fontSize: '9px', fontFamily: 'monospace', color: '#667eea', background: '#f0f3ff', padding: '1px 4px', borderRadius: '3px' }}>{book.book_id}</span>}
-                              <span style={{ fontSize: '9px', color: inStock ? '#1dd1a1' : '#e74c3c', fontWeight: '600' }}>{book.quantity_available || 0}/{book.quantity_total || 0} copies</span>
+                              <span style={{ fontSize: '9px', color: inStock ? '#1dd1a1' : '#e74c3c', fontWeight: '600' }}>{book.quantity_available || 0} {(book.quantity_available || 0) === 1 ? 'copy' : 'copies'}</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div>
@@ -1154,7 +1145,7 @@ export default function POS() {
             </button>
 
             {cart.length > 0 && (
-              <button onClick={() => { if (window.confirm('Clear cart and start over?')) resetCart(); }}
+              <button onClick={async () => { if (await confirm({ title: 'Clear Cart', message: 'Clear cart and start over?', variant: 'warning' })) resetCart(); }}
                 style={{ width: '100%', marginTop: '5px', padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '11px' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
                 onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}
@@ -1369,8 +1360,8 @@ export default function POS() {
                 {showAddSvc ? 'Add Service' : 'Save Changes'}
               </button>
               {editSvcModal && !showAddSvc && (
-                <button onClick={() => {
-                  if (!window.confirm(`Delete "${editSvcModal.name}"?`)) return;
+                <button onClick={async () => {
+                  if (!await confirm({ title: 'Delete Service', message: `Delete "${editSvcModal.name}"?`, variant: 'danger' })) return;
                   const updated = SERVICES.filter(s => s.id !== editSvcModal.id);
                   setSERVICES(updated);
                   saveServices(updated);

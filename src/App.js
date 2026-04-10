@@ -49,6 +49,7 @@ const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
 const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
 const SettingsHealth        = React.lazy(() => import('./pages/SettingsHealth'));
 const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
+const StaffDetail           = React.lazy(() => import('./pages/StaffDetail'));
 const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
 const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
 const DeviceManager         = React.lazy(() => import('./pages/DeviceManager'));
@@ -339,6 +340,7 @@ function App() {
 
             {/* Staff */}
             <Route path="/staff"                              element={<StaffManagement />} />
+            <Route path="/staff/:staffId"                     element={<StaffDetail />} />
 
             {/* Vendors */}
             <Route path="/vendors"                            element={<VendorList />} />

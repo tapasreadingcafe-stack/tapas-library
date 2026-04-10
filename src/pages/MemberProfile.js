@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { calculateAge, isMinor, generateCustomerID, formatCurrency, formatDate, calculateStatusColor, PLAN_DEFAULTS } from '../utils/membershipUtils';
+import { useConfirm } from '../components/ConfirmModal';
 
 const TIERS = {
   basic:  { name: 'Basic',  icon: '🥉', borrow_limit: 2,  loan_days: 7,  color: '#95a5a6', bg: '#f4f4f4' },
@@ -41,6 +42,7 @@ const EMPTY_CHILD_FORM = { name: '', date_of_birth: '', relationship: 'Son', ava
 export default function MemberProfile() {
   const { memberId } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const [member, setMember] = useState(null);
   const [membershipHistory, setMembershipHistory] = useState([]);
@@ -163,7 +165,7 @@ export default function MemberProfile() {
   };
 
   const handleTierUpgrade = async (tierKey) => {
-    if (!window.confirm(`Upgrade membership to ${TIERS[tierKey].name} tier?`)) return;
+    if (!await confirm({ title: 'Upgrade Membership', message: `Upgrade membership to ${TIERS[tierKey].name} tier?`, variant: 'warning' })) return;
     setUpgradingTier(true);
     try {
       const tier = TIERS[tierKey];
@@ -284,7 +286,7 @@ export default function MemberProfile() {
   };
 
   const removeChild = async (child) => {
-    if (!window.confirm(`Remove ${child.name} from this family account?`)) return;
+    if (!await confirm({ title: 'Remove Child', message: `Remove ${child.name} from this family account?`, variant: 'danger' })) return;
     try {
       const { error } = await supabase.from('family_members').delete().eq('id', child.id);
       if (error) throw error;

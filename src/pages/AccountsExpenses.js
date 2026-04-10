@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS cafe_expenses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -15,6 +16,7 @@ const EXP_CATEGORIES = ['ingredients', 'equipment', 'utilities', 'rent', 'salary
 
 export default function AccountsExpenses() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -51,7 +53,7 @@ export default function AccountsExpenses() {
   };
 
   const deleteExpense = async (id) => {
-    if (!window.confirm('Delete this expense?')) return;
+    if (!await confirm({ title: 'Delete Expense', message: 'Delete this expense?', variant: 'danger' })) return;
     try {
       const { error } = await supabase.from('cafe_expenses').delete().eq('id', id);
       if (error) throw error;

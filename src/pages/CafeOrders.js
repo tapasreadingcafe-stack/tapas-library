@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 export default function CafeOrders() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -40,7 +42,7 @@ export default function CafeOrders() {
   };
 
   const cancelOrder = async (id) => {
-    if (!window.confirm('Cancel this order?')) return;
+    if (!await confirm({ title: 'Cancel Order', message: 'Cancel this order?', variant: 'warning' })) return;
     await supabase.from('cafe_orders').update({ status: 'cancelled' }).eq('id', id);
     fetchOrders();
     if (selectedOrder?.id === id) setSelectedOrder(null);

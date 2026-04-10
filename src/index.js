@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
+import { ConfirmProvider } from './components/ConfirmModal';
 import { ThemeProvider } from './components/ThemeProvider';
 import { DevModeProvider } from './components/DevMode';
 import App from './App';
@@ -13,7 +14,9 @@ root.render(
       <ThemeProvider>
         <DevModeProvider>
           <ToastProvider>
-            <App />
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
           </ToastProvider>
         </DevModeProvider>
       </ThemeProvider>

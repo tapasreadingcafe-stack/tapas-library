@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
+import { useToast } from '../components/Toast';
 
 const FINE_PER_DAY = 10;
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
@@ -97,13 +98,10 @@ export default function Borrow() {
   const [scannerMode, setScannerMode] = useState('book');
 
   // Toast
-  const [toast, setToast] = useState(null);
-  const toastTimer = useRef(null);
-
+  const toast = useToast();
   const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
+    if (type === 'error') toast.error(msg);
+    else toast.success(msg);
   };
 
   // Keyboard shortcuts: Ctrl+B = checkout, Ctrl+R = active
@@ -503,18 +501,6 @@ export default function Borrow() {
 
   return (
     <div style={{ padding: '20px' }}>
-      {/* Toast notification */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '70px', right: '20px', zIndex: 9999,
-          background: toast.type === 'error' ? '#e74c3c' : '#27ae60',
-          color: 'white', padding: '12px 20px', borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)', fontSize: '14px', fontWeight: '500',
-          maxWidth: '340px',
-        }}>
-          {toast.msg}
-        </div>
-      )}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
