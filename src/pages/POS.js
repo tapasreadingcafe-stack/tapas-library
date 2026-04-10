@@ -287,6 +287,49 @@ export default function POS() {
     });
   }, []);
 
+  // Handle barcode scan — find book by copy code, book_id, or ISBN and auto-add to cart
+  const handlePosScan = async (code) => {
+    setShowPosScanner(false);
+    const trimmed = code.trim();
+    if (!trimmed) return;
+
+    // 1. Try to find by copy code (B-FIC-0001) in book_copies table
+    if (trimmed.startsWith('B-')) {
+      try {
+        const { data: copy } = await supabase.from('book_copies').select('book_id').eq('copy_code', trimmed).limit(1);
+        if (copy?.length) {
+          const book = allBooks.find(b => b.id === copy[0].book_id);
+          if (book) {
+            addToCart({ ...book, cartType: 'book' });
+            showToast(`Added: ${book.title}`);
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Try book_id match
+    const byBookId = allBooks.find(b => b.book_id?.toLowerCase() === trimmed.toLowerCase());
+    if (byBookId) {
+      addToCart({ ...byBookId, cartType: 'book' });
+      showToast(`Added: ${byBookId.title}`);
+      return;
+    }
+
+    // 3. Try ISBN match
+    const byIsbn = allBooks.find(b => b.isbn === trimmed);
+    if (byIsbn) {
+      addToCart({ ...byIsbn, cartType: 'book' });
+      showToast(`Added: ${byIsbn.title}`);
+      return;
+    }
+
+    // 4. Not found — put in search
+    setItemSearch(trimmed);
+    setActiveCat('Books');
+    showToast('Book not found — showing search results', 'error');
+  };
+
   const addFineToCart = (fine) => {
     const cartId = `fine_${fine.id}`;
     if (cart.find(c => c.cartId === cartId)) { showToast('Fine already in cart', 'error'); return; }
@@ -1171,13 +1214,13 @@ export default function POS() {
           <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '400px', width: '90%' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 12px', fontSize: '18px' }}>📷 Scan Book Barcode</h3>
             <BarcodeScanner
-              onScan={(code) => { setShowPosScanner(false); setItemSearch(code); setActiveCat('Books'); }}
+              onScan={(code) => handlePosScan(code)}
               onClose={() => setShowPosScanner(false)}
             />
             <div style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
               <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '600' }}>Or use USB barcode scanner:</p>
               <input autoFocus placeholder="Barcode scanner types here..."
-                onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { setShowPosScanner(false); setItemSearch(e.target.value.trim()); setActiveCat('Books'); } }}
+                onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { handlePosScan(e.target.value.trim()); } }}
                 style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '6px', fontSize: '16px', textAlign: 'center', fontFamily: 'monospace' }} />
             </div>
             <button onClick={() => setShowPosScanner(false)}
