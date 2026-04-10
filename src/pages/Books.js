@@ -4,7 +4,8 @@ import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
-import { getCategoryPrefix, createBookCopies } from '../utils/bookCopies';
+import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
+import { exportToCSV } from '../utils/exportCSV';
 
 const PRESET_CATEGORIES = [
   'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
@@ -38,6 +39,7 @@ export default function Books() {
   const [hasCondition, setHasCondition] = useState(false);
   const [filterCondition, setFilterCondition] = useState('all');
   const [isbnLooking, setIsbnLooking] = useState(false);
+  const [printAfterAdd, setPrintAfterAdd] = useState(false);
 
   const emptyForm = {
     book_id: '',
@@ -264,34 +266,70 @@ export default function Books() {
       payload.mrp = parseFloat(payload.mrp) || 0;
       payload.discount_percent = parseFloat(payload.discount_percent) || 0;
 
-      // Auto-generate book_id from category
-      if (!editingId) {
-        payload.book_id = `B-${getCategoryPrefix(payload.category)}`;
-      }
+      const copyCount = parseInt(payload.quantity_total) || 1;
 
       if (editingId) {
         const { error } = await supabase.from('books').update(payload).eq('id', editingId);
         if (error) throw error;
         setEditingId(null);
+        setFormData(emptyForm);
+        setImagePreview('');
+        setShowAddForm(false);
+        fetchBooks();
+        alert('Book updated!');
+        logActivity(ACTIONS.BOOK_UPDATED, `Updated book: ${formData.title}`, { book_title: formData.title });
       } else {
-        const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
-        if (error) throw error;
-
-        // Auto-create individual copies with unique IDs
-        const copyCount = parseInt(payload.quantity_total) || 1;
-        try {
-          await createBookCopies(newBook.id, payload.category, copyCount);
-        } catch (copyErr) {
-          console.warn('Could not create copies (table may not exist):', copyErr.message);
+        // Check if same book (by ISBN or title+author) already exists
+        let existingBook = null;
+        if (payload.isbn) {
+          const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category').eq('isbn', payload.isbn).limit(1);
+          if (data?.length) existingBook = data[0];
         }
-      }
+        if (!existingBook && payload.title) {
+          const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category').eq('title', payload.title).eq('author', payload.author || '').limit(1);
+          if (data?.length) existingBook = data[0];
+        }
 
-      setFormData(emptyForm);
-      setImagePreview('');
-      setShowAddForm(false);
-      fetchBooks();
-      alert(editingId ? 'Book updated!' : `Book added with ${payload.quantity_total} copies!`);
-      logActivity(editingId ? ACTIONS.BOOK_UPDATED : ACTIONS.BOOK_ADDED, `${editingId ? 'Updated' : 'Added'} book: ${formData.title} (${payload.quantity_total} copies)`, { book_title: formData.title, author: formData.author });
+        if (existingBook) {
+          // Add copies to existing book
+          const newTotal = (existingBook.quantity_total || 0) + copyCount;
+          const newAvail = (existingBook.quantity_available || 0) + copyCount;
+          await supabase.from('books').update({ quantity_total: newTotal, quantity_available: newAvail }).eq('id', existingBook.id);
+          try {
+            await createBookCopies(existingBook.id, existingBook.category || payload.category, copyCount);
+          } catch (e) { console.warn('Copies:', e.message); }
+          setFormData(emptyForm);
+          setImagePreview('');
+          setShowAddForm(false);
+          fetchBooks();
+          alert(`${copyCount} copies added to existing "${payload.title}" (Total: ${newTotal})`);
+          logActivity(ACTIONS.BOOK_ADDED, `Added ${copyCount} copies to: ${payload.title} (total: ${newTotal})`, { book_title: payload.title });
+          if (printAfterAdd) navigate(`/books/${existingBook.id}/copies`);
+        } else {
+          // Generate book_id with next number
+          const prefix = getCategoryPrefix(payload.category);
+          const nextCopies = await generateCopyIds(null, payload.category, 0);
+          // Get last number from existing copies for this prefix
+          const { data: lastCopy } = await supabase.from('book_copies').select('copy_code').like('copy_code', `B-${prefix}-%`).order('copy_code', { ascending: false }).limit(1);
+          let nextNum = 1;
+          if (lastCopy?.length) { const m = lastCopy[0].copy_code.match(/-(\d+)$/); if (m) nextNum = parseInt(m[1]) + 1; }
+          payload.book_id = `B-${prefix}-${String(nextNum).padStart(4, '0')}`;
+
+          const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
+          if (error) throw error;
+          try {
+            await createBookCopies(newBook.id, payload.category, copyCount);
+          } catch (e) { console.warn('Copies:', e.message); }
+          setFormData(emptyForm);
+          setImagePreview('');
+          setShowAddForm(false);
+          fetchBooks();
+          alert(`Book added with ${copyCount} copies!`);
+          logActivity(ACTIONS.BOOK_ADDED, `Added book: ${payload.title} (${copyCount} copies)`, { book_title: payload.title });
+          if (printAfterAdd) navigate(`/books/${newBook.id}/copies`);
+        }
+        setPrintAfterAdd(false);
+      }
     } catch (error) {
       console.error('Error saving book:', error);
       alert('Error saving book: ' + error.message);
@@ -355,6 +393,20 @@ export default function Books() {
             style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
             📤 Import CSV
+          </button>
+          <button
+            onClick={() => {
+              if (books.length === 0) return alert('No books to export');
+              exportToCSV(books.map(b => ({
+                Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category,
+                'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total,
+                Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp,
+                'Selling Price': b.sales_price, 'Discount %': b.discount_percent,
+              })), 'books_catalog');
+            }}
+            style={{ padding: '8px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            📥 Export Excel
           </button>
         </div>
       </div>
@@ -464,11 +516,11 @@ export default function Books() {
                   <input
                     type="text"
                     name="book_id"
-                    value={formData.book_id || (formData.category ? `B-${getCategoryPrefix(formData.category)}-AUTO` : 'Auto-generated')}
+                    value={formData.book_id || (formData.category ? `B-${getCategoryPrefix(formData.category)}-XXXX` : 'Select category first')}
                     readOnly
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600' }}
                   />
-                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>Auto-generated from category. Copies get unique IDs.</p>
+                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>Auto-generated. Each copy gets: B-{getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...</p>
                 </div>
               </div>
 
@@ -631,15 +683,18 @@ export default function Books() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="submit" style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button type="submit" style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
                   {editingId ? 'Update Book' : 'Add Book'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  style={{ padding: '8px 16px', background: '#e0e0e0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
+                {!editingId && (
+                  <button type="submit" onClick={() => setPrintAfterAdd(true)}
+                    style={{ padding: '10px 20px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+                    Add + 🖨️ Print Barcode
+                  </button>
+                )}
+                <button type="button" onClick={() => setShowAddForm(false)}
+                  style={{ padding: '10px 20px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
                   Cancel
                 </button>
               </div>
