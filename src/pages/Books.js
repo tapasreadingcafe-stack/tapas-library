@@ -701,11 +701,18 @@ export default function Books() {
                     <td style={{ padding: '12px' }}>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => handleEditBook(book)}
-                          style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                          style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                          title="Edit book">
                           ✏️
                         </button>
+                        <button onClick={() => window.location.href = `/books/${book.id}/copies`}
+                          style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                          title="Manage copies & print barcodes">
+                          📦
+                        </button>
                         <button onClick={() => handleDeleteBook(book.id)}
-                          style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                          style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                          title="Delete book">
                           🗑️
                         </button>
                       </div>

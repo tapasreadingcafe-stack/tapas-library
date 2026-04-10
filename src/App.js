@@ -49,6 +49,7 @@ const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
 const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
 const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
 const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
+const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
 const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
@@ -292,6 +293,7 @@ function App() {
 
             {/* Library */}
             <Route path="/books"                              element={<Books />} />
+            <Route path="/books/:bookId/copies"                 element={<BookCopies />} />
             <Route path="/Borrow"                             element={<Borrow />} />
             <Route path="/overdue"                            element={<OverdueBooks />} />
             <Route path="/availability"                       element={<BookAvailability />} />
