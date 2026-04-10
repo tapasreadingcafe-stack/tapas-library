@@ -40,6 +40,7 @@ export default function Books() {
   const [filterCondition, setFilterCondition] = useState('all');
   const [isbnLooking, setIsbnLooking] = useState(false);
   const [printAfterAdd, setPrintAfterAdd] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
 
   const emptyForm = {
     book_id: '',
@@ -388,48 +389,49 @@ export default function Books() {
           >
             ➕ Add Book
           </button>
-          <button
-            onClick={() => setShowImport(true)}
-            style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            📤 Import CSV
-          </button>
-          <button
-            onClick={() => {
-              if (books.length === 0) return alert('No books to export');
-              exportToCSV(books.map(b => ({
-                Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category,
-                'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total,
-                Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp,
-                'Selling Price': b.sales_price, 'Discount %': b.discount_percent,
-              })), 'books_catalog');
-            }}
-            style={{ padding: '8px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            📥 Export CSV
-          </button>
-          <button
-            onClick={() => {
-              if (books.length === 0) return alert('No books to export');
-              const rows = books.map(b => ({
-                Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category,
-                'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total,
-                Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp,
-                'Selling Price': b.sales_price, 'Discount %': b.discount_percent,
-              }));
-              const headers = Object.keys(rows[0]);
-              let tsv = headers.join('\t') + '\n';
-              rows.forEach(r => { tsv += headers.map(h => r[h] ?? '').join('\t') + '\n'; });
-              const blob = new Blob([tsv], { type: 'application/vnd.ms-excel' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url; a.download = `books_catalog_${new Date().toISOString().split('T')[0]}.xls`;
-              a.click(); URL.revokeObjectURL(url);
-            }}
-            style={{ padding: '8px 16px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            📥 Export Excel
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowImportExport(!showImportExport)}
+              style={{ padding: '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}>
+              📁 Import / Export ▾
+            </button>
+            {showImportExport && (
+              <>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }} onClick={() => setShowImportExport(false)} />
+                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', background: 'white', borderRadius: '8px', boxShadow: '0 6px 20px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0', zIndex: 100, minWidth: '200px', overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 12px', fontSize: '11px', color: '#999', fontWeight: '600', borderBottom: '1px solid #f0f0f0' }}>IMPORT</div>
+                  <button onClick={() => { setShowImportExport(false); setShowImport(true); }}
+                    style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📤</span> Import from CSV
+                  </button>
+                  <button onClick={() => { setShowImportExport(false); setShowImport(true); }}
+                    style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📊</span> Import from Excel (.xls/.xlsx)
+                  </button>
+                  <div style={{ padding: '8px 12px', fontSize: '11px', color: '#999', fontWeight: '600', borderBottom: '1px solid #f0f0f0' }}>EXPORT</div>
+                  <button onClick={() => {
+                    setShowImportExport(false);
+                    if (books.length === 0) return alert('No books');
+                    exportToCSV(books.map(b => ({ Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category, 'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total, Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp, 'Selling Price': b.sales_price, 'Discount %': b.discount_percent })), 'books_catalog');
+                  }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📥</span> Export as CSV
+                  </button>
+                  <button onClick={() => {
+                    setShowImportExport(false);
+                    if (books.length === 0) return alert('No books');
+                    const rows = books.map(b => ({ Title: b.title, Author: b.author, ISBN: b.isbn, Category: b.category, 'Book ID': b.book_id, Condition: b.condition, 'Total Copies': b.quantity_total, Available: b.quantity_available, 'Buying Price': b.price, MRP: b.mrp, 'Selling Price': b.sales_price, 'Discount %': b.discount_percent }));
+                    const headers = Object.keys(rows[0]);
+                    let tsv = headers.join('\t') + '\n';
+                    rows.forEach(r => { tsv += headers.map(h => r[h] ?? '').join('\t') + '\n'; });
+                    const blob = new Blob([tsv], { type: 'application/vnd.ms-excel' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `books_catalog_${new Date().toISOString().split('T')[0]}.xls`; a.click(); URL.revokeObjectURL(url);
+                  }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📊</span> Export as Excel (.xls)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
