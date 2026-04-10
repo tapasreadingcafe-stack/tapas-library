@@ -45,6 +45,10 @@ const PurchaseOrders        = React.lazy(() => import('./pages/PurchaseOrders'))
 const AccountsOverview      = React.lazy(() => import('./pages/AccountsOverview'));
 const AccountsTransactions  = React.lazy(() => import('./pages/AccountsTransactions'));
 const AccountsExpenses      = React.lazy(() => import('./pages/AccountsExpenses'));
+const AccountsPnL           = React.lazy(() => import('./pages/AccountsPnL'));
+const AccountsInvoices      = React.lazy(() => import('./pages/AccountsInvoices'));
+const AccountsMemberPayments = React.lazy(() => import('./pages/AccountsMemberPayments'));
+const AccountsVendorPayments = React.lazy(() => import('./pages/AccountsVendorPayments'));
 const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
 const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
 const SettingsHealth        = React.lazy(() => import('./pages/SettingsHealth'));
@@ -126,9 +130,13 @@ const NAV_CONFIG = [
   {
     icon: '💳', label: 'Accounts', key: 'accounts',
     children: [
-      { to: '/accounts/overview',     icon: '📊', label: 'Overview' },
-      { to: '/accounts/transactions', icon: '💸', label: 'Transactions' },
-      { to: '/accounts/expenses',     icon: '🧾', label: 'Expenses' },
+      { to: '/accounts/overview',         icon: '📊', label: 'Overview' },
+      { to: '/accounts/pnl',              icon: '📑', label: 'P&L Statement' },
+      { to: '/accounts/transactions',     icon: '💸', label: 'Transactions' },
+      { to: '/accounts/invoices',         icon: '🧾', label: 'Invoices' },
+      { to: '/accounts/expenses',         icon: '📤', label: 'Expenses' },
+      { to: '/accounts/member-payments',  icon: '💳', label: 'Member Payments' },
+      { to: '/accounts/vendor-payments',  icon: '🏪', label: 'Vendor Payments' },
     ],
   },
   { to: '/staff', icon: '👤', label: 'Staff' },
@@ -335,8 +343,12 @@ function App() {
 
             {/* Accounts */}
             <Route path="/accounts/overview"                  element={<AccountsOverview />} />
+            <Route path="/accounts/pnl"                       element={<AccountsPnL />} />
             <Route path="/accounts/transactions"              element={<AccountsTransactions />} />
+            <Route path="/accounts/invoices"                  element={<AccountsInvoices />} />
             <Route path="/accounts/expenses"                  element={<AccountsExpenses />} />
+            <Route path="/accounts/member-payments"           element={<AccountsMemberPayments />} />
+            <Route path="/accounts/vendor-payments"           element={<AccountsVendorPayments />} />
 
             {/* Staff */}
             <Route path="/staff"                              element={<StaffManagement />} />
