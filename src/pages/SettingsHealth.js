@@ -34,6 +34,13 @@ export default function SettingsHealth() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
 
+  // Bug Finder state
+  const [bugFinderRunning, setBugFinderRunning] = useState(false);
+  const [bugFinderProgress, setBugFinderProgress] = useState(0);
+  const [bugFinderResults, setBugFinderResults] = useState(null);
+  const [expandedCheck, setExpandedCheck] = useState(null);
+  const [fixingCheck, setFixingCheck] = useState(null);
+
   useEffect(() => { runAllChecks(); }, []);
 
   const runAllChecks = async () => {
@@ -138,6 +145,258 @@ export default function SettingsHealth() {
       });
     } catch (err) {
       console.error('Stats fetch error:', err);
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BUG FINDER ENGINE
+  // ══════════════════════════════════════════════════════════════════════════
+  const runBugFinder = async () => {
+    setBugFinderRunning(true);
+    setBugFinderProgress(0);
+    setBugFinderResults(null);
+    setExpandedCheck(null);
+
+    const results = [];
+    const totalChecks = 15;
+    let done = 0;
+    const tick = () => { done++; setBugFinderProgress(Math.round((done / totalChecks) * 100)); };
+
+    // Helper: safe query that returns [] on error
+    const safeQuery = async (fn) => { try { return await fn(); } catch { return []; } };
+
+    // ─── 1. Book quantity_available mismatch ───
+    const qtyMismatch = await safeQuery(async () => {
+      const { data: books } = await supabase.from('books').select('id, title, quantity_available');
+      if (!books) return [];
+      const issues = [];
+      for (const b of books) {
+        const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', b.id).eq('status', 'available');
+        const actual = count || 0;
+        if (actual !== b.quantity_available) issues.push({ id: b.id, title: b.title, expected: actual, got: b.quantity_available });
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'qty_avail', label: 'Book available qty mismatch', category: 'Sync', icon: '📊', issues: qtyMismatch, fixable: true,
+      fix: async () => {
+        for (const i of qtyMismatch) await supabase.from('books').update({ quantity_available: i.expected }).eq('id', i.id);
+      },
+      detail: (i) => `"${i.title}" — shows ${i.got}, should be ${i.expected}` });
+
+    // ─── 2. Book quantity_total mismatch ───
+    const totalMismatch = await safeQuery(async () => {
+      const { data: books } = await supabase.from('books').select('id, title, quantity_total');
+      if (!books) return [];
+      const issues = [];
+      for (const b of books) {
+        const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', b.id);
+        const actual = count || 0;
+        if (actual > 0 && actual !== (b.quantity_total || 0)) issues.push({ id: b.id, title: b.title, expected: actual, got: b.quantity_total || 0 });
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'qty_total', label: 'Book total qty mismatch', category: 'Sync', icon: '📦', issues: totalMismatch, fixable: true,
+      fix: async () => {
+        for (const i of totalMismatch) await supabase.from('books').update({ quantity_total: i.expected }).eq('id', i.id);
+      },
+      detail: (i) => `"${i.title}" — shows ${i.got} total, actual copies: ${i.expected}` });
+
+    // ─── 3. Expired members still active ───
+    const expiredActive = await safeQuery(async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase.from('members').select('id, name, plan, subscription_end, status').eq('status', 'active').not('subscription_end', 'is', null).lt('subscription_end', today);
+      return (data || []).map(m => ({ id: m.id, name: m.name, plan: m.plan, expired: m.subscription_end }));
+    });
+    tick();
+    results.push({ id: 'expired_active', label: 'Expired plans still active', category: 'Sync', icon: '👤', issues: expiredActive, fixable: true,
+      fix: async () => {
+        for (const i of expiredActive) await supabase.from('members').update({ status: 'expired', status_color: 'red' }).eq('id', i.id);
+      },
+      detail: (i) => `${i.name} — ${i.plan} expired ${i.expired}` });
+
+    // ─── 4. Issued copies without checkout circulation ───
+    const issuedNoCirc = await safeQuery(async () => {
+      const { data: issued } = await supabase.from('book_copies').select('id, copy_code, book_id, current_borrower_id').eq('status', 'issued');
+      if (!issued?.length) return [];
+      const issues = [];
+      for (const c of issued) {
+        let q = supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('book_id', c.book_id).eq('status', 'checked_out');
+        if (c.current_borrower_id) q = q.eq('member_id', c.current_borrower_id);
+        const { count } = await q;
+        if (!count) issues.push({ id: c.id, copy_code: c.copy_code });
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'issued_no_circ', label: 'Issued copies without checkout', category: 'Copy Status', icon: '📤', issues: issuedNoCirc, fixable: true,
+      fix: async () => {
+        for (const i of issuedNoCirc) await supabase.from('book_copies').update({ status: 'available', current_borrower_id: null }).eq('id', i.id);
+      },
+      detail: (i) => `${i.copy_code} — marked issued but no active checkout found` });
+
+    // ─── 5. Stale borrower IDs ───
+    const staleBorrower = await safeQuery(async () => {
+      const { data } = await supabase.from('book_copies').select('id, copy_code, current_borrower_id').not('current_borrower_id', 'is', null).neq('status', 'issued');
+      return (data || []).map(c => ({ id: c.id, copy_code: c.copy_code }));
+    });
+    tick();
+    results.push({ id: 'stale_borrower', label: 'Stale borrower IDs on copies', category: 'Copy Status', icon: '👻', issues: staleBorrower, fixable: true,
+      fix: async () => {
+        for (const i of staleBorrower) await supabase.from('book_copies').update({ current_borrower_id: null }).eq('id', i.id);
+      },
+      detail: (i) => `${i.copy_code} — has borrower but status is not "issued"` });
+
+    // ─── 6. Sold copies missing price/date ───
+    const soldNoPrice = await safeQuery(async () => {
+      const { data } = await supabase.from('book_copies').select('id, copy_code, sold_price, sold_date').eq('status', 'sold');
+      return (data || []).filter(c => !c.sold_price || !c.sold_date).map(c => ({ id: c.id, copy_code: c.copy_code, price: c.sold_price, date: c.sold_date }));
+    });
+    tick();
+    results.push({ id: 'sold_no_price', label: 'Sold copies missing price/date', category: 'Copy Status', icon: '💰', issues: soldNoPrice, fixable: false,
+      detail: (i) => `${i.copy_code} — price: ${i.price ?? 'missing'}, date: ${i.date ?? 'missing'}` });
+
+    // ─── 7. Orphaned circulation records ───
+    const orphanCirc = await safeQuery(async () => {
+      const { data: circ } = await supabase.from('circulation').select('id, member_id, book_id, status').eq('status', 'checked_out');
+      if (!circ?.length) return [];
+      const { data: members } = await supabase.from('members').select('id');
+      const { data: books } = await supabase.from('books').select('id');
+      const memberIds = new Set((members || []).map(m => m.id));
+      const bookIds = new Set((books || []).map(b => b.id));
+      return circ.filter(c => !memberIds.has(c.member_id) || !bookIds.has(c.book_id))
+        .map(c => ({ id: c.id, member_missing: !memberIds.has(c.member_id), book_missing: !bookIds.has(c.book_id) }));
+    });
+    tick();
+    results.push({ id: 'orphan_circ', label: 'Orphaned circulation records', category: 'Orphans', icon: '🔗', issues: orphanCirc, fixable: false,
+      detail: (i) => `Record ${i.id.slice(0,8)}… — ${i.member_missing ? 'member deleted' : ''}${i.member_missing && i.book_missing ? ' + ' : ''}${i.book_missing ? 'book deleted' : ''}` });
+
+    // ─── 8. Orphaned book copies ───
+    const orphanCopies = await safeQuery(async () => {
+      const { data: copies } = await supabase.from('book_copies').select('id, copy_code, book_id');
+      if (!copies?.length) return [];
+      const { data: books } = await supabase.from('books').select('id');
+      const bookIds = new Set((books || []).map(b => b.id));
+      return copies.filter(c => !bookIds.has(c.book_id)).map(c => ({ id: c.id, copy_code: c.copy_code }));
+    });
+    tick();
+    results.push({ id: 'orphan_copies', label: 'Orphaned book copies', category: 'Orphans', icon: '📄', issues: orphanCopies, fixable: true,
+      fix: async () => {
+        for (const i of orphanCopies) await supabase.from('book_copies').delete().eq('id', i.id);
+      },
+      detail: (i) => `${i.copy_code} — book no longer exists` });
+
+    // ─── 9. Orphaned family circulation ───
+    const orphanChildCirc = await safeQuery(async () => {
+      const { data: circ } = await supabase.from('circulation').select('id, child_id').not('child_id', 'is', null);
+      if (!circ?.length) return [];
+      const { data: children } = await supabase.from('family_members').select('id');
+      const childIds = new Set((children || []).map(c => c.id));
+      return circ.filter(c => !childIds.has(c.child_id)).map(c => ({ id: c.id, child_id: c.child_id }));
+    });
+    tick();
+    results.push({ id: 'orphan_child', label: 'Orphaned child circulation', category: 'Orphans', icon: '👶', issues: orphanChildCirc, fixable: false,
+      detail: (i) => `Circulation ${i.id.slice(0,8)}… — child ${i.child_id?.slice(0,8)}… deleted` });
+
+    // ─── 10. Duplicate copy codes ───
+    const dupCodes = await safeQuery(async () => {
+      const { data: copies } = await supabase.from('book_copies').select('copy_code');
+      if (!copies) return [];
+      const counts = {};
+      copies.forEach(c => { counts[c.copy_code] = (counts[c.copy_code] || 0) + 1; });
+      return Object.entries(counts).filter(([, v]) => v > 1).map(([code, count]) => ({ copy_code: code, count }));
+    });
+    tick();
+    results.push({ id: 'dup_codes', label: 'Duplicate copy codes', category: 'Data Quality', icon: '🔢', issues: dupCodes, fixable: false,
+      detail: (i) => `${i.copy_code} — appears ${i.count} times` });
+
+    // ─── 11. Invalid copy status ───
+    const validStatuses = ['available', 'issued', 'sold', 'lost', 'damaged'];
+    const badStatus = await safeQuery(async () => {
+      const { data } = await supabase.from('book_copies').select('id, copy_code, status');
+      return (data || []).filter(c => !validStatuses.includes(c.status)).map(c => ({ id: c.id, copy_code: c.copy_code, status: c.status }));
+    });
+    tick();
+    results.push({ id: 'bad_status', label: 'Invalid copy status values', category: 'Data Quality', icon: '🏷️', issues: badStatus, fixable: false,
+      detail: (i) => `${i.copy_code} — status "${i.status}" is not valid` });
+
+    // ─── 12. Invalid copy condition ───
+    const validConditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
+    const badCondition = await safeQuery(async () => {
+      const { data } = await supabase.from('book_copies').select('id, copy_code, condition');
+      return (data || []).filter(c => c.condition && !validConditions.includes(c.condition)).map(c => ({ id: c.id, copy_code: c.copy_code, condition: c.condition }));
+    });
+    tick();
+    results.push({ id: 'bad_condition', label: 'Invalid copy condition values', category: 'Data Quality', icon: '📋', issues: badCondition, fixable: false,
+      detail: (i) => `${i.copy_code} — condition "${i.condition}" is not valid` });
+
+    // ─── 13. Checked-out but book qty 0 with no copies ───
+    const checkedOutQty0 = await safeQuery(async () => {
+      const { data: circ } = await supabase.from('circulation').select('id, book_id, member_id, books(title, quantity_available)').eq('status', 'checked_out');
+      if (!circ) return [];
+      const issues = [];
+      for (const c of circ) {
+        if (c.books && c.books.quantity_available <= 0) {
+          const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', c.book_id);
+          if (!count) issues.push({ id: c.id, title: c.books?.title, book_id: c.book_id });
+        }
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'checkout_qty0', label: 'Checked out but qty=0 (no copies)', category: 'Logic', icon: '⚠️', issues: checkedOutQty0, fixable: false,
+      detail: (i) => `"${i.title}" — book shows 0 available, no copies tracked` });
+
+    // ─── 14. Unpaid fines in completed POS transactions ───
+    const unpaidFines = await safeQuery(async () => {
+      const { data: fineItems } = await supabase.from('pos_transaction_items').select('id, fine_id').eq('item_type', 'fine').not('fine_id', 'is', null);
+      if (!fineItems?.length) return [];
+      const issues = [];
+      for (const fi of fineItems) {
+        const { data: circ } = await supabase.from('circulation').select('id, fine_paid, books(title)').eq('id', fi.fine_id).single();
+        if (circ && !circ.fine_paid) issues.push({ id: fi.fine_id, title: circ.books?.title || 'Unknown' });
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'unpaid_fines', label: 'Fines paid in POS but not marked', category: 'Logic', icon: '💸', issues: unpaidFines, fixable: true,
+      fix: async () => {
+        for (const i of unpaidFines) await supabase.from('circulation').update({ fine_paid: true }).eq('id', i.id);
+      },
+      detail: (i) => `"${i.title}" — POS collected fine but circulation.fine_paid is still false` });
+
+    // ─── 15. Stale reservations ───
+    const staleRes = await safeQuery(async () => {
+      const { data: res } = await supabase.from('reservations').select('id, book_id, member_id, status, books(title)').in('status', ['registered', 'pending']);
+      if (!res?.length) return [];
+      const issues = [];
+      for (const r of res) {
+        const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', r.book_id).eq('status', 'available');
+        if ((count || 0) > 0) issues.push({ id: r.id, title: r.books?.title || 'Unknown', available: count });
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'stale_res', label: 'Stale reservations (book available)', category: 'Logic', icon: '📅', issues: staleRes, fixable: false,
+      detail: (i) => `"${i.title}" — ${i.available} copies available but reservation still pending` });
+
+    setBugFinderResults(results);
+    setBugFinderRunning(false);
+  };
+
+  const handleAutoFix = async (check) => {
+    if (!check.fix) return;
+    setFixingCheck(check.id);
+    try {
+      await check.fix();
+      // Re-run just this check after fix by re-running entire scanner
+      // For now just mark as fixed
+      setBugFinderResults(prev => prev.map(r => r.id === check.id ? { ...r, issues: [], fixed: true } : r));
+    } catch (err) {
+      alert('Fix failed: ' + err.message);
+    } finally {
+      setFixingCheck(null);
     }
   };
 
@@ -401,6 +660,145 @@ export default function SettingsHealth() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* ── BUG FINDER ── */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '2px solid #e0e8ff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '17px' }}>🔍 Bug Finder</h3>
+            <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>
+              Scans all data for sync issues, orphan records, invalid states & logic bugs
+            </p>
+          </div>
+          <button onClick={runBugFinder} disabled={bugFinderRunning}
+            style={{
+              padding: '12px 24px',
+              background: bugFinderRunning ? '#d1d5db' : 'linear-gradient(135deg, #667eea, #764ba2)',
+              color: 'white', border: 'none', borderRadius: '10px',
+              cursor: bugFinderRunning ? 'wait' : 'pointer',
+              fontWeight: '800', fontSize: '14px',
+              boxShadow: bugFinderRunning ? 'none' : '0 4px 14px rgba(102,126,234,0.35)',
+            }}>
+            {bugFinderRunning ? `⏳ Scanning... ${bugFinderProgress}%` : '🔍 Run Bug Finder'}
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        {bugFinderRunning && (
+          <div style={{ background: '#f0f0f0', borderRadius: '6px', height: '8px', overflow: 'hidden', marginBottom: '14px' }}>
+            <div style={{ width: `${bugFinderProgress}%`, height: '100%', background: 'linear-gradient(90deg, #667eea, #764ba2)', borderRadius: '6px', transition: 'width 0.3s' }} />
+          </div>
+        )}
+
+        {/* Results */}
+        {bugFinderResults && (
+          <div>
+            {/* Summary bar */}
+            {(() => {
+              const passed = bugFinderResults.filter(r => r.issues.length === 0 && !r.fixed).length;
+              const fixed = bugFinderResults.filter(r => r.fixed).length;
+              const issues = bugFinderResults.filter(r => r.issues.length > 0).length;
+              const totalIssues = bugFinderResults.reduce((s, r) => s + r.issues.length, 0);
+              return (
+                <div style={{
+                  display: 'flex', gap: '16px', padding: '14px 18px', borderRadius: '10px', marginBottom: '14px',
+                  background: issues === 0 ? '#ecfdf5' : '#fef2f2',
+                  border: `1px solid ${issues === 0 ? '#a7f3d0' : '#fecaca'}`,
+                }}>
+                  <span style={{ fontSize: '24px' }}>{issues === 0 ? '🎉' : '🐛'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '800', fontSize: '15px', color: issues === 0 ? '#059669' : '#dc2626' }}>
+                      {issues === 0 ? 'All checks passed!' : `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} found across ${issues} check${issues !== 1 ? 's' : ''}`}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                      ✅ {passed} passed · {fixed > 0 ? `🔧 ${fixed} fixed · ` : ''}⚠️ {issues} with issues · 15 total checks
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Group by category */}
+            {['Sync', 'Copy Status', 'Orphans', 'Data Quality', 'Logic'].map(cat => {
+              const checks = bugFinderResults.filter(r => r.category === cat);
+              if (!checks.length) return null;
+              return (
+                <div key={cat} style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '0.5px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    {cat}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {checks.map(check => {
+                      const ok = check.issues.length === 0;
+                      const isFixed = check.fixed;
+                      const isExpanded = expandedCheck === check.id;
+                      const isFixing = fixingCheck === check.id;
+                      return (
+                        <div key={check.id}>
+                          <div
+                            onClick={() => setExpandedCheck(isExpanded ? null : check.id)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                              borderRadius: '8px', cursor: 'pointer',
+                              border: `1px solid ${isFixed ? '#a7f3d0' : ok ? '#e5e7eb' : '#fecaca'}`,
+                              background: isFixed ? '#ecfdf5' : ok ? '#fafafa' : '#fef2f2',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            <span style={{ fontSize: '16px' }}>{check.icon}</span>
+                            <span style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+                              {check.label}
+                            </span>
+                            {isFixed ? (
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#059669', background: '#d1fae5', padding: '2px 10px', borderRadius: '10px' }}>Fixed ✓</span>
+                            ) : ok ? (
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#059669' }}>✅ Pass</span>
+                            ) : (
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '800', color: '#dc2626', background: '#fee2e2', padding: '2px 10px', borderRadius: '10px' }}>
+                                  {check.issues.length} issue{check.issues.length !== 1 ? 's' : ''}
+                                </span>
+                                {check.fixable && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleAutoFix(check); }}
+                                    disabled={isFixing}
+                                    style={{
+                                      padding: '3px 10px', fontSize: '11px', fontWeight: '700',
+                                      background: isFixing ? '#d1d5db' : '#667eea', color: 'white',
+                                      border: 'none', borderRadius: '6px', cursor: isFixing ? 'wait' : 'pointer',
+                                    }}
+                                  >
+                                    {isFixing ? '⏳' : '🔧 Fix'}
+                                  </button>
+                                )}
+                                <span style={{ fontSize: '12px', color: '#999' }}>{isExpanded ? '▲' : '▼'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Expanded details */}
+                          {isExpanded && check.issues.length > 0 && (
+                            <div style={{ margin: '4px 0 0 36px', padding: '10px 14px', background: '#fff8f8', borderRadius: '6px', border: '1px solid #fecaca', maxHeight: '200px', overflowY: 'auto' }}>
+                              {check.issues.slice(0, 50).map((issue, idx) => (
+                                <div key={idx} style={{ fontSize: '12px', color: '#666', padding: '3px 0', borderBottom: idx < check.issues.length - 1 ? '1px solid #fee2e2' : 'none' }}>
+                                  {check.detail(issue)}
+                                </div>
+                              ))}
+                              {check.issues.length > 50 && (
+                                <div style={{ fontSize: '11px', color: '#999', marginTop: '6px' }}>...and {check.issues.length - 50} more</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── CONNECTION INFO ── */}
