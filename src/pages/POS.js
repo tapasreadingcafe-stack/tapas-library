@@ -449,7 +449,8 @@ export default function POS() {
         !sl ||
         b.title?.toLowerCase().includes(sl) ||
         b.author?.toLowerCase().includes(sl) ||
-        b.book_id?.toLowerCase().includes(sl)
+        b.book_id?.toLowerCase().includes(sl) ||
+        b.isbn?.includes(sl)
       )
     : [];
 
