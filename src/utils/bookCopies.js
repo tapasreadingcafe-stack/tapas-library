@@ -25,11 +25,13 @@ export function getCategoryPrefix(category) {
 export async function generateCopyIds(bookId, category, count) {
   const prefix = getCategoryPrefix(category);
 
+  const fullPrefix = `B-${prefix}`;
+
   // Get the highest existing number for this prefix
   const { data: existing } = await supabase
     .from('book_copies')
     .select('copy_code')
-    .like('copy_code', `${prefix}-%`)
+    .like('copy_code', `${fullPrefix}-%`)
     .order('copy_code', { ascending: false })
     .limit(1);
 
@@ -44,7 +46,7 @@ export async function generateCopyIds(bookId, category, count) {
     const num = String(lastNum + i).padStart(4, '0');
     copies.push({
       book_id: bookId,
-      copy_code: `${prefix}-${num}`,
+      copy_code: `${fullPrefix}-${num}`,
       status: 'available',
       condition: 'New',
     });

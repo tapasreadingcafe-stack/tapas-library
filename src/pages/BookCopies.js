@@ -274,20 +274,17 @@ export default function BookCopies() {
                   <div className="book-title" style={{ fontSize: '9px', color: '#666', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {book.title}
                   </div>
-                  <div className="book-author" style={{ fontSize: '8px', color: '#999' }}>
-                    {book.author}
-                  </div>
                   {showPriceOnLabel && (book.mrp > 0 || book.sales_price > 0) && (
                     <div className="price-line" style={{ marginTop: '4px', fontSize: '10px' }}>
                       {book.sales_price > 0 && book.mrp > 0 && book.sales_price < book.mrp ? (
                         <>
-                          <span className="mrp-strike" style={{ textDecoration: 'line-through', color: '#999', marginRight: '4px' }}>₹{book.mrp}</span>
-                          <span className="sell-price" style={{ fontWeight: '700', color: '#333' }}>₹{book.sales_price}</span>
+                          <span className="sell-price" style={{ fontWeight: '700', color: '#333' }}>Price: ₹{book.sales_price}</span>
+                          <span className="mrp-strike" style={{ textDecoration: 'line-through', color: '#999', marginLeft: '6px' }}>₹{book.mrp}</span>
                         </>
                       ) : book.mrp > 0 ? (
                         <span style={{ fontWeight: '600' }}>MRP: ₹{book.mrp}</span>
                       ) : book.sales_price > 0 ? (
-                        <span style={{ fontWeight: '600' }}>₹{book.sales_price}</span>
+                        <span style={{ fontWeight: '600' }}>Price: ₹{book.sales_price}</span>
                       ) : null}
                     </div>
                   )}
