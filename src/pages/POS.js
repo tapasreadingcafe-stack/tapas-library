@@ -398,24 +398,32 @@ export default function POS() {
 
   // Handle clicking + on a book card — check for copies first
   const handleAddBookToCart = async (book) => {
-    // Check if this book has tracked copies in book_copies
+    // Check if this book has ANY tracked copies in book_copies (all statuses)
     try {
-      const { data: copies } = await supabase
+      const { data: allCopies } = await supabase
         .from('book_copies')
         .select('id, copy_code, status, condition')
         .eq('book_id', book.id)
-        .eq('status', 'available')
         .order('copy_code');
 
-      if (copies && copies.length > 0) {
-        // If only 1 available copy, add it directly
-        if (copies.length === 1) {
-          addToCart({ ...book, copyCode: copies[0].copy_code, copyId: copies[0].id });
-          showToast(`Added: ${book.title} (${copies[0].copy_code})`);
-        } else {
-          // Show copy picker modal
+      if (allCopies && allCopies.length > 0) {
+        const availableCopies = allCopies.filter(c => c.status === 'available');
+
+        if (availableCopies.length === 0) {
+          // All copies are issued/sold/etc — show picker so user sees why
           setCopyPickerBook(book);
-          setCopyPickerCopies(copies);
+          setCopyPickerCopies(allCopies);
+          return;
+        }
+
+        // If only 1 available copy, add it directly
+        if (availableCopies.length === 1) {
+          addToCart({ ...book, copyCode: availableCopies[0].copy_code, copyId: availableCopies[0].id });
+          showToast(`Added: ${book.title} (${availableCopies[0].copy_code})`);
+        } else {
+          // Show copy picker modal with all copies (available ones selectable)
+          setCopyPickerBook(book);
+          setCopyPickerCopies(allCopies);
         }
         return;
       }
@@ -1378,43 +1386,54 @@ export default function POS() {
           <div style={{ background: 'white', borderRadius: '14px', padding: '22px', maxWidth: '480px', width: '100%', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>📋 Select Copy to Sell</h3>
             <div style={{ fontSize: '13px', color: '#666', marginBottom: '14px' }}>
-              <strong>{copyPickerBook.title}</strong> — {copyPickerCopies.length} available cop{copyPickerCopies.length === 1 ? 'y' : 'ies'}
+              <strong>{copyPickerBook.title}</strong> — {copyPickerCopies.filter(c => c.status === 'available').length} available of {copyPickerCopies.length} total
             </div>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {copyPickerCopies.map(copy => {
                 const alreadyInCart = cart.some(c => c.copyCode === copy.copy_code);
+                const isAvailable = copy.status === 'available';
+                const canAdd = isAvailable && !alreadyInCart;
+                const statusLabel = copy.status === 'issued' ? '📤 Issued' : copy.status === 'sold' ? '💰 Sold' : copy.status === 'lost' ? '❌ Lost' : copy.status === 'damaged' ? '⚠️ Damaged' : null;
                 return (
                   <button
                     key={copy.id}
-                    disabled={alreadyInCart}
+                    disabled={!canAdd}
                     onClick={() => {
+                      if (!canAdd) return;
                       addToCart({ ...copyPickerBook, copyCode: copy.copy_code, copyId: copy.id });
                       showToast(`Added: ${copyPickerBook.title} (${copy.copy_code})`);
                       setCopyPickerBook(null);
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '12px 16px', border: '2px solid #e0e8ff', borderRadius: '8px',
-                      cursor: alreadyInCart ? 'not-allowed' : 'pointer',
-                      background: alreadyInCart ? '#f3f4f6' : 'white',
-                      opacity: alreadyInCart ? 0.5 : 1,
+                      padding: '12px 16px', border: `2px solid ${canAdd ? '#e0e8ff' : '#f0f0f0'}`, borderRadius: '8px',
+                      cursor: canAdd ? 'pointer' : 'not-allowed',
+                      background: !isAvailable ? '#f9fafb' : alreadyInCart ? '#f3f4f6' : 'white',
+                      opacity: canAdd ? 1 : 0.5,
                       transition: 'all 0.15s', textAlign: 'left',
                     }}
-                    onMouseEnter={e => { if (!alreadyInCart) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.background = '#f5f7ff'; } }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e8ff'; e.currentTarget.style.background = alreadyInCart ? '#f3f4f6' : 'white'; }}
+                    onMouseEnter={e => { if (canAdd) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.background = '#f5f7ff'; } }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = canAdd ? '#e0e8ff' : '#f0f0f0'; e.currentTarget.style.background = !isAvailable ? '#f9fafb' : alreadyInCart ? '#f3f4f6' : 'white'; }}
                   >
                     <div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: '800', fontSize: '15px', color: '#059669' }}>{copy.copy_code}</div>
+                      <div style={{ fontFamily: 'monospace', fontWeight: '800', fontSize: '15px', color: isAvailable ? '#059669' : '#9ca3af' }}>{copy.copy_code}</div>
                       <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>Condition: {copy.condition}</div>
                     </div>
-                    {alreadyInCart ? (
-                      <span style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>Already in cart</span>
+                    {!isAvailable ? (
+                      <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>{statusLabel}</span>
+                    ) : alreadyInCart ? (
+                      <span style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>In cart ✓</span>
                     ) : (
                       <span style={{ fontSize: '20px' }}>＋</span>
                     )}
                   </button>
                 );
               })}
+              {copyPickerCopies.every(c => c.status !== 'available') && (
+                <div style={{ textAlign: 'center', padding: '12px', color: '#ef4444', fontSize: '13px', fontWeight: '600', background: '#fef2f2', borderRadius: '8px' }}>
+                  No available copies — all are issued, sold, or unavailable
+                </div>
+              )}
             </div>
             <button onClick={() => setCopyPickerBook(null)}
               style={{ marginTop: '12px', width: '100%', padding: '10px', background: '#e5e7eb', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
