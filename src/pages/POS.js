@@ -279,6 +279,25 @@ export default function POS() {
 
   // ── Cart operations ───────────────────────────────────────────────────────────
   const addToCart = useCallback((item) => {
+    // If item has a copyCode, each copy gets its own cart row (no merging)
+    if (item.copyCode) {
+      const cartId = `copy_${item.copyCode}`;
+      setCart(prev => {
+        if (prev.find(c => c.cartId === cartId)) return prev; // already in cart
+        return [...prev, {
+          cartId,
+          name:     item.title || item.name,
+          type:     'book',
+          price:    item.sales_price || item.price || 0,
+          qty:      1,
+          bookId:   item.id,
+          copyCode: item.copyCode,
+          copyId:   item.copyId,  // book_copies.id for marking sold
+        }];
+      });
+      return;
+    }
+    // Services / generic books (no copy tracking) — merge by id
     const cartId = item.id;
     setCart(prev => {
       const existing = prev.find(c => c.cartId === cartId);
@@ -305,18 +324,29 @@ export default function POS() {
     if (upper.startsWith('B')) {
       try {
         // Try exact match first
-        let { data: copy } = await supabase.from('book_copies').select('book_id, books(*)').eq('copy_code', upper).limit(1);
-        // Try adding dashes: BCHI0001 → B-CHI-0001
+        let { data: copy } = await supabase.from('book_copies').select('id, copy_code, status, book_id, books(*)').eq('copy_code', upper).limit(1);
+        // Try adding dashes: BCHI0001 → B-CHI-0001, BFIC0001 → B-FIC-0001
         if (!copy?.length && !upper.includes('-')) {
-          const withDashes = upper.replace(/^B([A-Z]{3})(\d{4})$/, 'B-$1-$2');
-          if (withDashes !== upper) {
-            const r = await supabase.from('book_copies').select('book_id, books(*)').eq('copy_code', withDashes).limit(1);
+          // Try splitting: B + letters + digits → B-XXX-0000
+          const m = upper.match(/^B([A-Z]{2,4})(\d{3,4})$/);
+          if (m) {
+            const withDashes = `B-${m[1]}-${m[2].padStart(4, '0')}`;
+            const r = await supabase.from('book_copies').select('id, copy_code, status, book_id, books(*)').eq('copy_code', withDashes).limit(1);
             copy = r.data;
           }
         }
         if (copy?.length && copy[0].books) {
-          addToCart({ ...copy[0].books, cartType: 'book' });
-          showToast(`Added: ${copy[0].books.title} (${copy[0].copy_code || upper})`);
+          const c = copy[0];
+          if (c.status === 'sold') {
+            showToast(`Copy ${c.copy_code} is already sold!`, 'error');
+            return;
+          }
+          if (c.status === 'issued') {
+            showToast(`Copy ${c.copy_code} is currently issued to a member`, 'error');
+            return;
+          }
+          addToCart({ ...c.books, copyCode: c.copy_code, copyId: c.id });
+          showToast(`Added: ${c.books.title} (${c.copy_code})`);
           return;
         }
       } catch {}
@@ -425,16 +455,19 @@ export default function POS() {
         txnId = txn.id;
 
         await supabase.from('pos_transaction_items').insert(
-          cart.map(item => ({
-            transaction_id: txnId,
-            item_type:  item.type,
-            item_name:  item.name,
-            book_id:    item.bookId  || null,
-            fine_id:    item.fineId  || null,
-            unit_price: item.price,
-            quantity:   item.qty,
-            total_price: item.price * item.qty,
-          }))
+          cart.map(item => {
+            const row = {
+              transaction_id: txnId,
+              item_type:  item.type,
+              item_name:  item.copyCode ? `${item.name} [${item.copyCode}]` : item.name,
+              book_id:    item.bookId  || null,
+              fine_id:    item.fineId  || null,
+              unit_price: item.price,
+              quantity:   item.qty,
+              total_price: item.price * item.qty,
+            };
+            return row;
+          })
         );
       } else {
         // Fallback: save to legacy sales table
@@ -458,13 +491,19 @@ export default function POS() {
         await supabase.from('circulation').update({ fine_paid: true }).eq('id', fi.fineId);
       }
 
-      // Decrement book stock for book sales
+      // Decrement book stock and mark copies as sold
       for (const bi of cart.filter(c => c.bookId)) {
         const book = allBooks.find(b => b.id === bi.bookId);
         if (book && book.quantity_available > 0) {
           await supabase.from('books')
             .update({ quantity_available: Math.max(0, book.quantity_available - bi.qty) })
             .eq('id', bi.bookId);
+        }
+        // Mark individual copy as sold in book_copies
+        if (bi.copyId) {
+          await supabase.from('book_copies')
+            .update({ status: 'sold', sold_price: bi.price, sold_date: new Date().toISOString().split('T')[0] })
+            .eq('id', bi.copyId);
         }
       }
 
@@ -803,7 +842,7 @@ export default function POS() {
             </div>
 
             {/* Member badge */}
-            {selectedMember && (
+            {selectedMember && (<>
               <div style={{ marginTop: '8px', background: '#f5f0ff', border: '1px solid #c4b5fd', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontWeight: '700', fontSize: '13px', color: '#5b21b6' }}>{selectedMember.name}</div>
@@ -831,7 +870,7 @@ export default function POS() {
                   ))}
                 </div>
               )}
-            )}
+            </>)}
           </div>
 
           {/* ── OUTSTANDING FINES ── */}
@@ -881,11 +920,16 @@ export default function POS() {
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '5px' }}>
                       <div style={{ flex: 1, marginRight: '6px' }}>
                         <span style={{ fontSize: '12px', fontWeight: '600', color: '#374151', lineHeight: 1.3 }}>{item.name}</span>
-                        {item.bookId && (
+                        {item.copyCode ? (
+                          <div style={{ fontSize: '10px', fontFamily: 'monospace', marginTop: '2px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <span style={{ color: '#059669', background: '#ecfdf5', padding: '1px 5px', borderRadius: '3px', fontWeight: '700' }}>{item.copyCode}</span>
+                            <span style={{ color: '#9ca3af' }}>{allBooks.find(b => b.id === item.bookId)?.book_id || ''}</span>
+                          </div>
+                        ) : item.bookId ? (
                           <div style={{ fontSize: '10px', color: '#667eea', fontFamily: 'monospace', marginTop: '2px' }}>
                             {allBooks.find(b => b.id === item.bookId)?.book_id || ''}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                       {item.bookId && (
                         <button onClick={() => window.open(`/books/${item.bookId}/copies`, '_blank')}
@@ -899,9 +943,15 @@ export default function POS() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <button onClick={() => updateQty(item.cartId, -1)} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>−</button>
-                        <span style={{ fontSize: '13px', fontWeight: '800', minWidth: '18px', textAlign: 'center', color: '#374151' }}>{item.qty}</span>
-                        <button onClick={() => updateQty(item.cartId, 1)} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
+                        {item.copyCode ? (
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>×1</span>
+                        ) : (
+                          <>
+                            <button onClick={() => updateQty(item.cartId, -1)} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>−</button>
+                            <span style={{ fontSize: '13px', fontWeight: '800', minWidth: '18px', textAlign: 'center', color: '#374151' }}>{item.qty}</span>
+                            <button onClick={() => updateQty(item.cartId, 1)} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
+                          </>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -1147,6 +1197,7 @@ export default function POS() {
                     <div style={{ flex: 1, marginRight: '8px' }}>
                       {item.name.substring(0, 30)}
                       {item.qty > 1 && <span style={{ color: '#888' }}> ×{item.qty}</span>}
+                      {item.copyCode && <div style={{ fontSize: '10px', color: '#888', fontFamily: 'monospace' }}>{item.copyCode}</div>}
                     </div>
                     <span style={{ fontWeight: '700' }}>{fmt(item.price * item.qty)}</span>
                   </div>

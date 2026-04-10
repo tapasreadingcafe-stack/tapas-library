@@ -58,10 +58,26 @@ export default function BarcodeScanner({ onScan, onClose }) {
 
       let code = null;
 
-      // Try native BarcodeDetector first (handles 1D barcodes like ISBN EAN-13)
+      // Try native BarcodeDetector first (handles 1D barcodes like ISBN EAN-13, CODE_128)
       if (detector) {
         try {
-          const barcodes = await detector.detect(canvas);
+          let barcodes = await detector.detect(canvas);
+          // If no result, try with enhanced contrast (helps with printed labels)
+          if (!barcodes.length) {
+            try {
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const d = imgData.data;
+              for (let p = 0; p < d.length; p += 4) {
+                const avg = (d[p] + d[p+1] + d[p+2]) / 3;
+                d[p] = d[p+1] = d[p+2] = avg > 140 ? 255 : 0;
+              }
+              const enhCanvas = document.createElement('canvas');
+              enhCanvas.width = canvas.width;
+              enhCanvas.height = canvas.height;
+              enhCanvas.getContext('2d').putImageData(imgData, 0, 0);
+              barcodes = await detector.detect(enhCanvas);
+            } catch {}
+          }
           if (barcodes.length > 0) {
             code = barcodes[0].rawValue;
           }

@@ -62,7 +62,7 @@ function Members() {
       setLoading(true);
       const { data, error } = await supabase
         .from('members')
-        .select('id, sequential_id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, created_at')
+        .select('id, sequential_id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, profile_photo, created_at')
         .order('created_at', { ascending: false })
         .limit(200);
 
@@ -127,7 +127,8 @@ function Members() {
       duration_days: 30,
       borrow_limit: 3,
       discount_percent: 0,
-      price: 100
+      price: 100,
+      profile_photo: ''
     });
     setShowModal(true);
   };
@@ -145,7 +146,8 @@ function Members() {
       duration_days: member.plan_duration_days || 30,
       borrow_limit: member.borrow_limit || 3,
       discount_percent: member.discount_percent || 0,
-      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'basic']?.price || 100
+      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'basic']?.price || 100,
+      profile_photo: member.profile_photo || ''
     });
     setShowModal(true);
   };
@@ -233,7 +235,8 @@ function Members() {
           email: formData.email,
           date_of_birth: formData.date_of_birth,
           age: formData.age,
-          customer_type: formData.age < 18 ? 'minor' : 'adult'
+          customer_type: formData.age < 18 ? 'minor' : 'adult',
+          ...(formData.profile_photo !== undefined && { profile_photo: formData.profile_photo || null }),
         };
 
         if (formData.plan) {
@@ -273,7 +276,8 @@ function Members() {
           email: formData.email,
           date_of_birth: formData.date_of_birth,
           age: formData.age,
-          customer_type: formData.age < 18 ? 'minor' : 'adult'
+          customer_type: formData.age < 18 ? 'minor' : 'adult',
+          ...(formData.profile_photo && { profile_photo: formData.profile_photo }),
         };
 
         if (formData.plan) {
@@ -431,7 +435,16 @@ function Members() {
               filteredMembers.map(member => (
                 <tr key={member.id} className={`member-row ${member.plan ? 'member-row-gold' : 'guest-row'}`}>
                   <td className="customer-id">{getGeneratedCustomerID(member)}</td>
-                  <td className="font-bold">{member.name}</td>
+                  <td className="font-bold" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {member.profile_photo ? (
+                      <img src={member.profile_photo} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; }} />
+                    ) : (
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#667eea', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
+                        {(member.name || '?')[0].toUpperCase()}
+                      </div>
+                    )}
+                    {member.name}
+                  </td>
                   <td className="text-center">
                     {member.age ? (
                       <span className={member.age < 18 ? 'minor-badge' : 'adult-badge'}>
@@ -494,6 +507,45 @@ function Members() {
                       </small>
                     </div>
                   )}
+
+                  {/* Profile Photo Upload */}
+                  <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {formData.profile_photo ? (
+                        <img src={formData.profile_photo} alt="" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #667eea' }} />
+                      ) : (
+                        <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#e0e8ff', color: '#667eea', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '20px' }}>
+                          {(formData.name || '?')[0]?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px', display: 'block' }}>Profile Photo</label>
+                      <input type="file" accept="image/*" style={{ fontSize: '12px' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 2 * 1024 * 1024) { alert('Image must be under 2MB'); return; }
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const img = new Image();
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              const size = 200;
+                              canvas.width = size; canvas.height = size;
+                              const ctx = canvas.getContext('2d');
+                              const scale = Math.max(size / img.width, size / img.height);
+                              const w = img.width * scale, h = img.height * scale;
+                              ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+                              setFormData(prev => ({ ...prev, profile_photo: canvas.toDataURL('image/jpeg', 0.8) }));
+                            };
+                            img.src = ev.target.result;
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </div>
+                  </div>
 
                   <div className="form-group">
                     <label>Name *</label>

@@ -48,6 +48,8 @@ export default function MemberProfile() {
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [upgradingTier, setUpgradingTier] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = React.useRef();
 
   // Family state
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -185,6 +187,49 @@ export default function MemberProfile() {
     }
   };
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image file'); return; }
+    if (file.size > 2 * 1024 * 1024) { alert('Image must be under 2MB'); return; }
+    setUploadingPhoto(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        // Resize to 200x200 for storage efficiency
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          const size = 200;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          const { error } = await supabase
+            .from('members')
+            .update({ profile_photo: dataUrl })
+            .eq('id', memberId);
+          if (error) {
+            // Column might not exist yet — try adding it
+            alert('To enable photos, add a profile_photo TEXT column to members table, or the update was blocked by RLS.');
+          } else {
+            setMember(prev => ({ ...prev, profile_photo: dataUrl }));
+          }
+          setUploadingPhoto(false);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+      setUploadingPhoto(false);
+    }
+  };
+
   const openAddChild = () => {
     setEditingChild(null);
     setChildForm(EMPTY_CHILD_FORM);
@@ -306,7 +351,41 @@ export default function MemberProfile() {
       {/* Member Header Card */}
       <div style={{ background: 'white', padding: '25px', borderRadius: '8px', marginBottom: '25px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: `5px solid ${headerBorderColor}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
+          <div style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
+            {/* Profile Photo */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              {member.profile_photo ? (
+                <img src={member.profile_photo} alt={member.name}
+                  style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${headerBorderColor}` }}
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <div style={{
+                  width: '80px', height: '80px', borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${headerBorderColor}, #667eea)`,
+                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: '800', fontSize: '28px',
+                }}>
+                  {(member.name || '?')[0].toUpperCase()}
+                </div>
+              )}
+              <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                style={{
+                  position: 'absolute', bottom: '-2px', right: '-2px',
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  background: '#667eea', color: 'white', border: '2px solid white',
+                  cursor: 'pointer', fontSize: '12px', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+                title="Upload photo"
+              >
+                {uploadingPhoto ? '...' : '📷'}
+              </button>
+            </div>
+            <div>
             <h1 style={{ margin: '0 0 10px 0', color: '#333' }}>{member.name}</h1>
             <p style={{ margin: '5px 0', color: '#666', fontSize: '16px' }}><strong>Customer ID:</strong> {customerId}</p>
             <p style={{ margin: '5px 0', color: '#666', fontSize: '16px' }}><strong>Age:</strong> {age} years old {isMinor(member.date_of_birth) ? '(Minor)' : '(Adult)'}</p>
@@ -331,6 +410,7 @@ export default function MemberProfile() {
                 )}
               </div>
             )}
+          </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>

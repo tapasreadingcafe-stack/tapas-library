@@ -74,6 +74,12 @@ export default function Borrow() {
   const [selectedChild, setSelectedChild] = useState(null); // null = borrowing for parent
   const [hasChildIdCol, setHasChildIdCol] = useState(false);
 
+  // Copy selection state
+  const [availableCopies, setAvailableCopies] = useState([]);
+  const [selectedCopy, setSelectedCopy] = useState(null);
+  const [copiesLoading, setCopiesLoading] = useState(false);
+  const [hasCopiesTable, setHasCopiesTable] = useState(false);
+
   // Active borrows filters
   const [filter, setFilter] = useState('all');
   const [activeSearch, setActiveSearch] = useState('');
@@ -113,6 +119,7 @@ export default function Borrow() {
   useEffect(() => {
     fetchData();
     probeChildIdColumn();
+    probeBookCopiesTable();
   }, []);
 
   // Pre-select parent + child if navigated from ChildProfile
@@ -137,6 +144,31 @@ export default function Borrow() {
   const probeChildIdColumn = async () => {
     const { error } = await supabase.from('circulation').select('child_id').limit(0);
     setHasChildIdCol(!error);
+  };
+
+  const probeBookCopiesTable = async () => {
+    const { error } = await supabase.from('book_copies').select('id').limit(0);
+    setHasCopiesTable(!error);
+  };
+
+  const fetchCopiesForBook = async (bookId) => {
+    if (!hasCopiesTable) return;
+    setCopiesLoading(true);
+    try {
+      const { data } = await supabase
+        .from('book_copies')
+        .select('id, copy_code, status, condition')
+        .eq('book_id', bookId)
+        .eq('status', 'available')
+        .order('copy_code');
+      setAvailableCopies(data || []);
+      // Auto-select if only one copy
+      if (data?.length === 1) setSelectedCopy(data[0]);
+    } catch {
+      setAvailableCopies([]);
+    } finally {
+      setCopiesLoading(false);
+    }
   };
 
   const fetchData = async () => {
@@ -237,6 +269,9 @@ export default function Borrow() {
     setSelectedBook(b);
     setBookSearch(b.title);
     setBookResults([]);
+    setSelectedCopy(null);
+    setAvailableCopies([]);
+    fetchCopiesForBook(b.id);
   };
 
   const getMemberBorrows = (memberId) =>
@@ -250,6 +285,11 @@ export default function Borrow() {
   const handleCheckout = async () => {
     if (!selectedMember || !selectedBook || !dueDate) {
       showToast('Please select a member, book, and due date', 'error');
+      return;
+    }
+    // If copies exist for this book, require a copy selection
+    if (hasCopiesTable && availableCopies.length > 0 && !selectedCopy) {
+      showToast('Please select which copy to check out', 'error');
       return;
     }
     const currentBorrows = getMemberBorrows(selectedMember.id);
@@ -288,10 +328,20 @@ export default function Borrow() {
         .update({ quantity_available: selectedBook.quantity_available - 1 })
         .eq('id', selectedBook.id);
 
-      setReceiptModal({ member: selectedMember, book: selectedBook, dueDate, child: selectedChild });
+      // Mark the specific copy as issued
+      if (selectedCopy) {
+        await supabase
+          .from('book_copies')
+          .update({ status: 'issued', current_borrower_id: selectedMember.id })
+          .eq('id', selectedCopy.id);
+      }
+
+      setReceiptModal({ member: selectedMember, book: selectedBook, dueDate, child: selectedChild, copy: selectedCopy });
       setSelectedMember(null);
       setSelectedBook(null);
       setSelectedChild(null);
+      setSelectedCopy(null);
+      setAvailableCopies([]);
       setChildrenOfMember([]);
       setMemberSearch('');
       setBookSearch('');
@@ -329,6 +379,24 @@ export default function Borrow() {
           .from('books')
           .update({ quantity_available: book.quantity_available + 1 })
           .eq('id', returnModal.book_id);
+      }
+
+      // Mark copy as available again (find the copy issued to this member)
+      if (hasCopiesTable) {
+        try {
+          const { data: issuedCopies } = await supabase
+            .from('book_copies')
+            .select('id')
+            .eq('book_id', returnModal.book_id)
+            .eq('status', 'issued')
+            .eq('current_borrower_id', returnModal.member_id)
+            .limit(1);
+          if (issuedCopies?.length) {
+            await supabase.from('book_copies')
+              .update({ status: 'available', current_borrower_id: null, condition: returnCondition })
+              .eq('id', issuedCopies[0].id);
+          }
+        } catch {} // book_copies table might not have all columns
       }
 
       // Notify next reservation
@@ -646,8 +714,52 @@ export default function Borrow() {
                     {selectedBook.quantity_available} available
                   </span>
                 </div>
-                <button onClick={() => { setSelectedBook(null); setBookSearch(''); }}
+                <button onClick={() => { setSelectedBook(null); setBookSearch(''); setSelectedCopy(null); setAvailableCopies([]); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '20px', padding: '0 4px' }}>×</button>
+              </div>
+            )}
+
+            {/* Copy selection — when book has tracked copies */}
+            {selectedBook && hasCopiesTable && (
+              <div style={{ marginTop: '10px' }}>
+                {copiesLoading ? (
+                  <div style={{ fontSize: '12px', color: '#999', padding: '8px' }}>Loading copies...</div>
+                ) : availableCopies.length > 0 ? (
+                  <div style={{ border: '1px solid #e0e8ff', borderRadius: '8px', padding: '10px', background: '#f8faff' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#667eea', marginBottom: '8px' }}>
+                      📋 SELECT COPY ({availableCopies.length} available)
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {availableCopies.map(copy => (
+                        <button
+                          key={copy.id}
+                          onClick={() => setSelectedCopy(copy)}
+                          style={{
+                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
+                            fontSize: '12px', fontWeight: '700', fontFamily: 'monospace',
+                            border: `2px solid ${selectedCopy?.id === copy.id ? '#667eea' : '#d1d5db'}`,
+                            background: selectedCopy?.id === copy.id ? '#667eea' : 'white',
+                            color: selectedCopy?.id === copy.id ? 'white' : '#374151',
+                          }}
+                        >
+                          {copy.copy_code}
+                          <span style={{ fontSize: '10px', fontWeight: '400', marginLeft: '4px', opacity: 0.7 }}>
+                            ({copy.condition})
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedCopy && (
+                      <div style={{ marginTop: '6px', fontSize: '11px', color: '#059669', fontWeight: '600' }}>
+                        Selected: {selectedCopy.copy_code} ({selectedCopy.condition})
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: '#999', padding: '6px 0' }}>
+                    No tracked copies — will check out without copy tracking
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -882,6 +994,12 @@ export default function Borrow() {
                 <span style={{ color: '#888' }}>Book:</span>
                 <span style={{ fontWeight: '700', maxWidth: '200px', textAlign: 'right' }}>{receiptModal.book.title}</span>
               </div>
+              {receiptModal.copy && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#888' }}>Copy:</span>
+                  <span style={{ fontWeight: '700', fontFamily: 'monospace', color: '#059669' }}>{receiptModal.copy.copy_code}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#888' }}>Checkout:</span>
                 <span>{new Date().toLocaleDateString('en-IN')}</span>
