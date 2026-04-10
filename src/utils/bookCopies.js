@@ -2,15 +2,65 @@ import { supabase } from './supabase';
 
 // Category → 3-letter prefix mapping
 const CAT_PREFIX = {
-  'fiction': 'FIC', 'non-fiction': 'NFI', 'science': 'SCI', 'history': 'HIS',
-  'biography': 'BIO', 'mystery': 'MYS', 'fantasy': 'FAN', 'romance': 'ROM',
-  'thriller': 'THR', 'self-help': 'SLF', 'business': 'BIZ', 'technology': 'TEC',
-  'children': 'CHI', 'young adult': 'YAD', 'poetry': 'POE', 'drama': 'DRA',
-  'philosophy': 'PHI', 'religion': 'REL', 'travel': 'TRV', 'cooking': 'COK',
-  'art': 'ART', 'sports': 'SPO', 'politics': 'POL', 'economics': 'ECO',
-  'health': 'HLT', 'classic': 'CLS', 'adventure': 'ADV', 'horror': 'HOR',
-  'comic': 'COM', 'manga': 'MNG', 'gothic': 'GOT', 'dystopian': 'DYS',
-  'education': 'EDU',
+  // Main genres
+  'fiction': 'FIC', 'non-fiction': 'NFI', 'classic': 'CLS', 'literature': 'LIT',
+  'mystery': 'MYS', 'thriller': 'THR', 'fantasy': 'FAN', 'romance': 'ROM',
+  'horror': 'HOR', 'adventure': 'ADV', 'action': 'ACT', 'drama': 'DRA',
+  'comedy': 'CMD', 'satire': 'SAT', 'gothic': 'GOT', 'dystopian': 'DYS',
+  'crime': 'CRM', 'detective': 'DET', 'spy': 'SPY', 'war': 'WAR',
+  'western': 'WST', 'mythology': 'MTH', 'fairy tale': 'FTL', 'fable': 'FAB',
+  'folklore': 'FLK', 'legend': 'LGD',
+
+  // Non-fiction & knowledge
+  'science': 'SCI', 'history': 'HIS', 'biography': 'BIO', 'autobiography': 'AUB',
+  'memoir': 'MEM', 'philosophy': 'PHI', 'psychology': 'PSY', 'sociology': 'SOC',
+  'politics': 'POL', 'economics': 'ECO', 'business': 'BIZ', 'finance': 'FIN',
+  'marketing': 'MKT', 'management': 'MGT', 'entrepreneurship': 'ENT',
+  'self-help': 'SLF', 'motivation': 'MOT', 'spirituality': 'SPR',
+  'religion': 'REL', 'health': 'HLT', 'fitness': 'FIT', 'yoga': 'YOG',
+  'meditation': 'MED', 'nutrition': 'NUT', 'wellness': 'WEL',
+
+  // Science & technology
+  'technology': 'TEC', 'computer': 'CMP', 'programming': 'PRG', 'engineering': 'ENG',
+  'mathematics': 'MAT', 'physics': 'PHY', 'chemistry': 'CHM', 'biology': 'BLG',
+  'astronomy': 'AST', 'environment': 'ENV', 'geography': 'GEO', 'medicine': 'MDC',
+  'artificial intelligence': 'AIL', 'data science': 'DTS', 'robotics': 'ROB',
+
+  // Arts & lifestyle
+  'art': 'ART', 'music': 'MUS', 'photography': 'PHO', 'design': 'DES',
+  'architecture': 'ARC', 'fashion': 'FSH', 'cooking': 'COK', 'food': 'FOD',
+  'travel': 'TRV', 'sports': 'SPO', 'cricket': 'CRK', 'gardening': 'GRD',
+  'craft': 'CRF', 'diy': 'DIY', 'film': 'FLM', 'theater': 'THT',
+
+  // Age groups
+  'children': 'CHI', 'kids': 'KID', 'young adult': 'YAD', 'teen': 'TEE',
+  'baby': 'BBY', 'toddler': 'TDL', 'picture book': 'PIC',
+
+  // Education & exam
+  'education': 'EDU', 'academic': 'ACD', 'textbook': 'TXB', 'reference': 'REF',
+  'dictionary': 'DIC', 'encyclopedia': 'ENC', 'study guide': 'STG',
+  'exam prep': 'EXP', 'competitive': 'CET', 'upsc': 'UPS', 'ssc': 'SSC',
+  'gate': 'GAT', 'neet': 'NET', 'jee': 'JEE', 'cat': 'CAT',
+  'banking': 'BNK', 'railway': 'RLY',
+
+  // Literature formats
+  'poetry': 'POE', 'essay': 'ESY', 'short story': 'SHS', 'anthology': 'ANT',
+  'journal': 'JRN', 'magazine': 'MAG', 'newspaper': 'NWS', 'comic': 'COM',
+  'manga': 'MNG', 'graphic novel': 'GRN', 'novel': 'NOV', 'novella': 'NVL',
+
+  // Indian languages
+  'hindi': 'HIN', 'marathi': 'MAR', 'gujarati': 'GUJ', 'tamil': 'TAM',
+  'telugu': 'TEL', 'kannada': 'KAN', 'malayalam': 'MAL', 'bengali': 'BEN',
+  'punjabi': 'PUN', 'urdu': 'URD', 'sanskrit': 'SAN', 'odia': 'ODI',
+  'assamese': 'ASM', 'konkani': 'KON',
+
+  // Special
+  'law': 'LAW', 'journalism': 'JRM', 'mass communication': 'MCM',
+  'social work': 'SWK', 'agriculture': 'AGR', 'veterinary': 'VET',
+  'general knowledge': 'GNK', 'current affairs': 'CUR', 'quiz': 'QUZ',
+  'puzzle': 'PZL', 'activity': 'ATV', 'coloring': 'CLR', 'sticker': 'STK',
+  'stationery': 'STN', 'map': 'MAP', 'atlas': 'ATL', 'globe': 'GLB',
+  'other': 'OTH', 'uncategorized': 'UNC', 'general': 'GEN', 'misc': 'MSC',
 };
 
 export function getCategoryPrefix(category) {
