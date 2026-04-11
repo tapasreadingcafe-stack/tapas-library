@@ -125,7 +125,6 @@ function GridBookCard({ book }) {
 
 export default function Home() {
   const content = useSiteContent();
-  const brand = content.brand;
   const home = content.home;
   const newsletter = content.newsletter;
   const images = content.images || {};

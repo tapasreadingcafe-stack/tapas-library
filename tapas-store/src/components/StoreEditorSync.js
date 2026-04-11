@@ -44,7 +44,6 @@ function isInIframe() {
 // Hover + selection state as module-level closures — one instance only.
 let hoverEl = null;
 let selectedEl = null;
-let selectedPath = null;
 
 function cleanOutline(el) {
   if (!el) return;
@@ -82,17 +81,15 @@ function setHover(el) {
   if (el && el !== selectedEl) applyOutline(el, HOVER_COLOR, 1.5, 'solid');
 }
 
-function setSelected(el, path) {
+function setSelected(el, _path) {
   if (selectedEl && selectedEl !== el) cleanOutline(selectedEl);
   selectedEl = el;
-  selectedPath = path;
   if (el) applyOutline(el, SELECTED_COLOR, 2, 'solid');
 }
 
 function clearSelection() {
   if (selectedEl) cleanOutline(selectedEl);
   selectedEl = null;
-  selectedPath = null;
 }
 
 export default function StoreEditorSync() {
