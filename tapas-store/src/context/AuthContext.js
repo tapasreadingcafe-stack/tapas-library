@@ -74,7 +74,8 @@ export function AuthProvider({ children }) {
         .insert({
           auth_user_id: user.id,
           email: user.email,
-          name: user.email ? user.email.split('@')[0] : 'Guest',
+          name: user.user_metadata?.name || (user.email ? user.email.split('@')[0] : 'Guest'),
+          phone: user.phone || '',  // NOT NULL column — fill empty string for online signups
           customer_type: 'online',
           status: 'active',
         })
