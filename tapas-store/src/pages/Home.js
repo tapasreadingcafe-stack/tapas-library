@@ -41,13 +41,13 @@ function BookCard({ book }) {
         onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 15px rgba(0,0,0,0.08)'; }}
       >
         <div style={{ height:'180px', background:'linear-gradient(135deg, #F5DEB3, #D4A853)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-          {book.cover_image ? (
-            <img src={book.cover_image} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          {(book.book_image || book.cover_image) ? (
+            <img src={book.book_image || book.cover_image} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
           ) : (
             <div style={{ textAlign:'center', padding:'20px' }}>
               <div style={{ fontSize:'48px', marginBottom:'8px' }}>📖</div>
               <div style={{ fontSize:'11px', color:'#8B6914', fontWeight:'600', textTransform:'uppercase', letterSpacing:'1px' }}>
-                {book.genre || 'Book'}
+                {book.genre || book.category || 'Book'}
               </div>
             </div>
           )}
@@ -56,7 +56,7 @@ function BookCard({ book }) {
             background: book.quantity_available > 0 ? '#48BB78' : '#FC8181',
             color:'white', fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px'
           }}>
-            {book.quantity_available > 0 ? '✅ Available' : '❌ Borrowed'}
+            {book.quantity_available > 0 ? '✅ In Stock' : '❌ Sold Out'}
           </div>
         </div>
         <div style={{ padding:'16px' }}>
@@ -65,10 +65,10 @@ function BookCard({ book }) {
           </h3>
           <p style={{ color:'#8B6914', fontSize:'13px', marginBottom:'10px' }}>{book.author}</p>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            {book.price ? (
-              <span style={{ color:'#D4A853', fontWeight:'700', fontSize:'16px' }}>₹{book.price}</span>
+            {Number(book.sales_price || 0) > 0 ? (
+              <span style={{ color:'#D4A853', fontWeight:'700', fontSize:'16px' }}>₹{book.sales_price}</span>
             ) : (
-              <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'13px' }}>Free to Borrow</span>
+              <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'13px' }}>Borrow Only</span>
             )}
             <span style={{ color:'#D4A853', fontSize:'13px' }}>★ {book.rating || '4.5'}</span>
           </div>
@@ -91,19 +91,13 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const [booksRes, membersRes, newRes] = await Promise.all([
-        supabase.from('books').select('*').gt('quantity_available', 0).limit(8).order('title'),
-        supabase.from('members').select('id', { count:'exact', head:true }),
-        supabase.from('books').select('*').limit(8).order('created_at', { ascending:false }),
+      const [booksRes, newRes] = await Promise.all([
+        supabase.from('books').select('*').eq('store_visible', true).gt('quantity_available', 0).limit(8).order('title'),
+        supabase.from('books').select('*').eq('store_visible', true).limit(8).order('created_at', { ascending:false }),
       ]);
 
       setFeaturedBooks(booksRes.data || []);
       setNewArrivals(newRes.data || []);
-      setStats({ // eslint-disable-line
-        books: booksRes.data?.length || 0,
-        members: membersRes.count || 0,
-        genres: CATEGORIES.length,
-      });
     } catch (err) {
       console.error(err);
     } finally {
