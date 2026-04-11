@@ -795,6 +795,14 @@ export default function SiteContent() {
   const autosaveTimerRef = useRef(null);
   const applyContentTimerRef = useRef(null);
 
+  // Undo / redo history. The stack holds past draftContent snapshots.
+  // Captures are debounced (550ms) so one sentence of typing is one
+  // undo entry, not one entry per keystroke.
+  const [history, setHistory] = useState([]);
+  const [historyIdx, setHistoryIdx] = useState(-1);
+  const historyTimerRef = useRef(null);
+  const skipNextCaptureRef = useRef(false);
+
   // Initial load: fetch both draft and live in parallel.
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -825,6 +833,59 @@ export default function SiteContent() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Seed the history with the loaded content exactly once.
+  useEffect(() => {
+    if (loading) return;
+    if (history.length === 0) {
+      setHistory([draftContent]);
+      setHistoryIdx(0);
+    }
+  }, [loading]); // eslint-disable-line
+
+  // Debounced history capture. Runs on every draftContent change unless
+  // the change came from undo/redo itself.
+  useEffect(() => {
+    if (loading || history.length === 0) return;
+    if (skipNextCaptureRef.current) {
+      skipNextCaptureRef.current = false;
+      return;
+    }
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    historyTimerRef.current = setTimeout(() => {
+      setHistory(prev => {
+        const last = prev[historyIdx];
+        try { if (last && JSON.stringify(last) === JSON.stringify(draftContent)) return prev; } catch {}
+        const trimmed = prev.slice(0, historyIdx + 1);
+        const next = [...trimmed, draftContent];
+        // Cap history at 50 entries so we don't bloat memory.
+        return next.length > 50 ? next.slice(-50) : next;
+      });
+      setHistoryIdx(i => Math.min(i + 1, 49));
+    }, 550);
+    return () => { if (historyTimerRef.current) clearTimeout(historyTimerRef.current); };
+  }, [draftContent]); // eslint-disable-line
+
+  const canUndo = historyIdx > 0;
+  const canRedo = historyIdx < history.length - 1;
+
+  const undo = useCallback(() => {
+    if (historyIdx <= 0) return;
+    const prev = history[historyIdx - 1];
+    if (!prev) return;
+    skipNextCaptureRef.current = true;
+    setDraftContent(prev);
+    setHistoryIdx(historyIdx - 1);
+  }, [history, historyIdx]);
+
+  const redo = useCallback(() => {
+    if (historyIdx >= history.length - 1) return;
+    const next = history[historyIdx + 1];
+    if (!next) return;
+    skipNextCaptureRef.current = true;
+    setDraftContent(next);
+    setHistoryIdx(historyIdx + 1);
+  }, [history, historyIdx]);
 
   const updateField = (storageKey, fieldKey, value) => {
     setDraftContent(prev => ({
@@ -976,6 +1037,42 @@ export default function SiteContent() {
     });
   };
 
+  // Global keyboard shortcuts.
+  useEffect(() => {
+    const onKey = (e) => {
+      const isCmd = e.metaKey || e.ctrlKey;
+      // Ignore while typing in inputs inside the dashboard — let native
+      // text undo work. Exception: Cmd+Shift+Z / Cmd+Y always redoes
+      // content history.
+      const tag = (e.target?.tagName || '').toLowerCase();
+      const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+
+      if (isCmd && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        // Cmd+Z: undo content history. Skip while typing so native undo
+        // still works inside text fields.
+        if (typing) return;
+        e.preventDefault();
+        undo();
+        return;
+      }
+      if (isCmd && ((e.key === 'z' || e.key === 'Z') && e.shiftKey) || (isCmd && (e.key === 'y' || e.key === 'Y'))) {
+        if (typing) return;
+        e.preventDefault();
+        redo();
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (selectedElement) {
+          setSelectedElement(null);
+          try { iframeRef.current?.contentWindow?.postMessage({ type: 'tapas:clear-selection' }, '*'); } catch {}
+        }
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo, selectedElement]);
+
   // Receive messages from the iframe (click-to-edit)
   useEffect(() => {
     const onMessage = (event) => {
@@ -1085,9 +1182,44 @@ export default function SiteContent() {
           )}
         </div>
 
+        {/* Undo / redo */}
+        <div style={{ display: 'flex', gap: '2px', background: S.bg, padding: '2px', borderRadius: '6px' }}>
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (⌘Z)"
+            style={{
+              width: '28px', height: '24px',
+              background: canUndo ? 'white' : 'transparent',
+              border: 'none', borderRadius: '4px',
+              cursor: canUndo ? 'pointer' : 'not-allowed',
+              color: canUndo ? S.text : S.textFaint,
+              fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.15s',
+              boxShadow: canUndo ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+            }}
+          >↶</button>
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (⌘⇧Z)"
+            style={{
+              width: '28px', height: '24px',
+              background: canRedo ? 'white' : 'transparent',
+              border: 'none', borderRadius: '4px',
+              cursor: canRedo ? 'pointer' : 'not-allowed',
+              color: canRedo ? S.text : S.textFaint,
+              fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.15s',
+              boxShadow: canRedo ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+            }}
+          >↷</button>
+        </div>
+
         <button
           onClick={revertDraft}
           disabled={!dirty || pushing}
+          title="Revert draft to the live version"
           style={{
             padding: '7px 14px',
             background: 'white',
@@ -1097,13 +1229,17 @@ export default function SiteContent() {
             cursor: !dirty || pushing ? 'not-allowed' : 'pointer',
             fontSize: '12px',
             fontWeight: '600',
+            transition: 'all 0.15s',
           }}
+          onMouseEnter={e => { if (dirty && !pushing) { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.borderColor = S.danger + '55'; } }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = S.border; }}
         >
           Discard changes
         </button>
         <button
           onClick={pushToLive}
           disabled={!dirty || pushing || saving}
+          title={dirty ? 'Publish draft to live site' : 'Nothing to publish'}
           style={{
             padding: '8px 18px',
             background: dirty ? S.accent : S.borderStrong,
@@ -1113,8 +1249,11 @@ export default function SiteContent() {
             cursor: (!dirty || pushing || saving) ? 'not-allowed' : 'pointer',
             fontSize: '12px',
             fontWeight: '700',
-            boxShadow: dirty ? '0 2px 8px rgba(79,70,229,0.35)' : 'none',
+            boxShadow: dirty ? '0 2px 8px rgba(13,153,255,0.35)' : 'none',
+            transition: 'all 0.15s',
           }}
+          onMouseEnter={e => { if (dirty && !pushing) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(13,153,255,0.45)'; } }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = dirty ? '0 2px 8px rgba(13,153,255,0.35)' : 'none'; }}
         >
           {pushing ? '⏳ Publishing…' : '🚀 Push to live'}
         </button>
@@ -1143,31 +1282,38 @@ export default function SiteContent() {
             <div style={{ fontSize: '10px', fontWeight: '700', color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
               Pages
             </div>
-            {PAGES.map(p => (
-              <button
-                key={p.path}
-                onClick={() => setIframePath(p.path)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 10px',
-                  marginBottom: '2px',
-                  background: iframePath === p.path ? S.accentLight : 'transparent',
-                  color: iframePath === p.path ? S.accent : S.text,
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: iframePath === p.path ? '600' : '500',
-                  textAlign: 'left',
-                }}
-              >
-                <span>{p.icon}</span>
-                <span>{p.label}</span>
-              </button>
-            ))}
+            {PAGES.map(p => {
+              const active = iframePath === p.path;
+              return (
+                <button
+                  key={p.path}
+                  onClick={() => setIframePath(p.path)}
+                  title={`Open ${p.label} in the preview`}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 10px',
+                    marginBottom: '2px',
+                    background: active ? S.accentLight : 'transparent',
+                    color: active ? S.accent : S.text,
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: active ? '600' : '500',
+                    textAlign: 'left',
+                    transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = S.bg; }}
+                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span>{p.icon}</span>
+                  <span>{p.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div style={{ borderTop: `1px solid ${S.border}`, marginTop: '6px' }}>
@@ -1192,6 +1338,7 @@ export default function SiteContent() {
                       <button
                         key={section.key}
                         onClick={() => jumpToSection(section.key)}
+                        title={section.subtitle || section.title}
                         style={{
                           width: '100%',
                           display: 'flex',
@@ -1207,7 +1354,10 @@ export default function SiteContent() {
                           fontWeight: active ? '600' : '400',
                           textAlign: 'left',
                           marginBottom: '1px',
+                          transition: 'background 0.12s',
                         }}
+                        onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = S.bg; }}
+                        onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                       >
                         <span style={{ opacity: 0.8 }}>{section.icon}</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{section.title}</span>
@@ -1387,6 +1537,23 @@ export default function SiteContent() {
               <div style={{ color: S.textDim, textAlign: 'center', padding: '40px', fontSize: '11px' }}>Loading…</div>
             ) : (
               <>
+                {/* Canvas-editing hint */}
+                <div style={{
+                  margin: '0 12px 12px',
+                  padding: '10px 12px',
+                  background: S.accentLight,
+                  border: `1px solid ${S.accent}22`,
+                  borderRadius: '4px',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'flex-start',
+                }}>
+                  <span style={{ fontSize: '12px', color: S.accent, flexShrink: 0 }}>✎</span>
+                  <div style={{ fontSize: '10.5px', color: S.text, lineHeight: '1.45' }}>
+                    <strong>Tip:</strong> click any text on the preview to edit its CSS styles directly.
+                  </div>
+                </div>
+
                 {currentSection.subtitle && (
                   <div style={{
                     padding: '0 16px 12px',
