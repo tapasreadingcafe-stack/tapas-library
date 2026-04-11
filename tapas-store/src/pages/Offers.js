@@ -51,30 +51,48 @@ export default function Offers() {
   const plans = content.plans || {};
   const visibility = content.visibility || {};
   const styles = content.styles || {};
+  const sectionStyles = content.section_styles || {};
   const PLANS = buildPlans(plans);
+
+  const bgOverlay = 'linear-gradient(135deg, rgba(44,24,16,0.85) 0%, rgba(74,44,23,0.75) 100%)';
+  const heroBg = sectionStyles.offers_hero_bg_image
+    ? `${bgOverlay}, url("${sectionStyles.offers_hero_bg_image}") center/cover`
+    : (sectionStyles.offers_hero_bg_color || 'transparent');
+
   return (
     <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* Editorial hero */}
       <section id="section-offers-hero" data-editable-section="offers" style={{
-        maxWidth:'780px', margin:'0 auto',
-        padding:'80px 20px 40px', textAlign:'center',
+        maxWidth: sectionStyles.offers_hero_bg_image || sectionStyles.offers_hero_bg_color ? '100%' : '780px',
+        margin:'0 auto',
+        padding:`${sectionStyles.offers_hero_padding_top ?? 80}px 20px ${sectionStyles.offers_hero_padding_bottom ?? 40}px`,
+        textAlign:'center',
+        background: heroBg,
+        color: (sectionStyles.offers_hero_bg_image || sectionStyles.offers_hero_bg_color) ? brand.sand_color : undefined,
       }}>
+      <div style={{ maxWidth:'780px', margin:'0 auto' }}>
         <div data-editable="offers.hero_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
           {offers.hero_eyebrow}
         </div>
         <h1 style={{
           fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
-          fontSize: `clamp(32px, 6vw, ${styles.offers_hero_headline_size || 64}px)`,
-          fontWeight:'800', color:brand.primary_color, lineHeight:'1.05', marginBottom:'20px',
+          fontSize: `clamp(32px, 6vw, ${styles.offers_hero_headline_size || 'var(--tapas-h-xxl-size, 64px)'})`,
+          fontWeight:'var(--tapas-h-weight, 800)',
+          color: (sectionStyles.offers_hero_bg_image || sectionStyles.offers_hero_bg_color) ? brand.sand_color : brand.primary_color,
+          lineHeight:'1.05', marginBottom:'20px',
           textAlign: styles.offers_hero_headline_align || 'center',
         }}>
           <span data-editable="offers.hero_headline_line1">{offers.hero_headline_line1}</span><br />
           <span data-editable="offers.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{offers.hero_headline_line2}</span>
         </h1>
-        <p data-editable="offers.hero_description" style={{ color:'#8B6914', fontSize:'17px', lineHeight:'1.75', maxWidth:'580px', margin:'0 auto' }}>
+        <p data-editable="offers.hero_description" style={{
+          color: (sectionStyles.offers_hero_bg_image || sectionStyles.offers_hero_bg_color) ? 'rgba(245,222,179,0.85)' : '#8B6914',
+          fontSize:'17px', lineHeight:'1.75', maxWidth:'580px', margin:'0 auto'
+        }}>
           {offers.hero_description}
         </p>
+      </div>
       </section>
 
       {/* Plans */}
@@ -126,13 +144,18 @@ export default function Offers() {
                   ))}
                 </ul>
                 <Link to="/login?mode=signup" style={{
-                  display:'block', textAlign:'center', padding:'14px',
+                  display:'block', textAlign:'center',
+                  padding:'var(--tapas-btn-padding, 14px)',
                   background: isPopular
-                    ? 'linear-gradient(135deg, #D4A853, #C49040)'
-                    : (isGold ? 'linear-gradient(135deg, #D4A853, #C49040)' : '#2C1810'),
-                  color: isPopular ? '#2C1810' : (isGold ? '#2C1810' : '#F5DEB3'),
-                  borderRadius:'50px', textDecoration:'none', fontWeight:'700', fontSize:'13px',
-                  letterSpacing:'1px', textTransform:'uppercase',
+                    ? `linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`
+                    : (isGold ? `linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})` : brand.primary_color),
+                  color: isPopular ? brand.primary_color : (isGold ? brand.primary_color : brand.sand_color),
+                  borderRadius:'var(--tapas-btn-radius, 50px)',
+                  textDecoration:'none',
+                  fontWeight:'var(--tapas-btn-font-weight, 700)',
+                  fontSize:'var(--tapas-btn-font-size, 13px)',
+                  letterSpacing:'var(--tapas-btn-letter-spacing, 1px)',
+                  textTransform:'var(--tapas-btn-text-transform, uppercase)',
                 }}>
                   Choose {plan.tier} →
                 </Link>
@@ -155,7 +178,13 @@ export default function Offers() {
             <div data-editable="offers.why_join_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
               {offers.why_join_eyebrow}
             </div>
-            <h2 data-editable="offers.why_join_heading" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'38px', fontWeight:'800', color:brand.primary_color, lineHeight:'1.1' }}>
+            <h2 data-editable="offers.why_join_heading" style={{
+              fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+              fontSize:'var(--tapas-h-xl-size, 38px)',
+              fontWeight:'var(--tapas-h-weight, 800)',
+              color:'var(--tapas-h-color, #2C1810)',
+              lineHeight:'1.1'
+            }}>
               {offers.why_join_heading}
             </h2>
           </div>
@@ -182,7 +211,13 @@ export default function Offers() {
       {visibility.offers_cta !== false && (
       <section id="section-offers-cta" style={{ padding:'80px 20px', textAlign:'center' }}>
         <div style={{ maxWidth:'580px', margin:'0 auto' }}>
-          <h2 data-editable="offers.cta_headline" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'36px', fontWeight:'800', color:brand.primary_color, marginBottom:'16px', lineHeight:'1.15' }}>
+          <h2 data-editable="offers.cta_headline" style={{
+            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontSize:'var(--tapas-h-l-size, 36px)',
+            fontWeight:'var(--tapas-h-weight, 800)',
+            color:'var(--tapas-h-color, #2C1810)',
+            marginBottom:'16px', lineHeight:'1.15'
+          }}>
             {offers.cta_headline}
           </h2>
           <p data-editable="offers.cta_body" style={{ color:'#8B6914', fontSize:'15px', marginBottom:'32px', lineHeight:'1.6' }}>
@@ -190,10 +225,14 @@ export default function Offers() {
           </p>
           <Link to="/login?mode=signup" style={{
             display:'inline-block',
-            padding:'16px 40px', borderRadius:'50px',
+            padding:'var(--tapas-btn-padding, 16px 40px)',
+            borderRadius:'var(--tapas-btn-radius, 50px)',
             background:`linear-gradient(135deg, ${brand.primary_color}, ${brand.primary_color_light})`,
             color:brand.sand_color, textDecoration:'none',
-            fontWeight:'700', fontSize:'14px', letterSpacing:'1px', textTransform:'uppercase',
+            fontWeight:'var(--tapas-btn-font-weight, 700)',
+            fontSize:'var(--tapas-btn-font-size, 14px)',
+            letterSpacing:'var(--tapas-btn-letter-spacing, 1px)',
+            textTransform:'var(--tapas-btn-text-transform, uppercase)',
             boxShadow:'0 8px 25px rgba(44,24,16,0.25)',
           }}>
             Create your account →

@@ -151,6 +151,49 @@ export const DEFAULT_CONTENT = {
   layout: {
     home_section_order: 'hero,genres,staff_picks,new_arrivals,cafe_story,newsletter',
   },
+  typography: {
+    heading_xxl_size:   72,   // clamp-max for the biggest page titles (hero h1)
+    heading_xl_size:    42,   // section titles like "Handpicked by our librarians"
+    heading_l_size:     32,   // sub-section titles
+    heading_color:      '',   // optional override; blank = use brand.primary_color
+    heading_weight:     '800',
+    body_size:          16,
+    body_color:         '',
+    eyebrow_size:       11,
+    eyebrow_tracking:   '2.5px',
+  },
+  buttons: {
+    radius:         50,
+    padding_x:      32,
+    padding_y:      14,
+    font_size:      15,
+    font_weight:    '700',
+    text_transform: 'none',
+    letter_spacing: '0.5px',
+  },
+  section_styles: {
+    // Per-section overrides. All nullable — empty means "use defaults".
+    home_hero_padding_top:      80,
+    home_hero_padding_bottom:   100,
+    home_hero_bg_color:         '',
+    home_hero_bg_image:         '',
+    home_staff_picks_padding_top:    80,
+    home_staff_picks_padding_bottom: 80,
+    home_staff_picks_bg_color:       '#FFF8ED',
+    home_staff_picks_bg_image:       '',
+    home_cafe_story_padding_top:    100,
+    home_cafe_story_padding_bottom: 100,
+    home_cafe_story_bg_color:       '',
+    home_cafe_story_bg_image:       '',
+    about_hero_padding_top:    100,
+    about_hero_padding_bottom: 120,
+    about_hero_bg_color:       '',
+    about_hero_bg_image:       '',
+    offers_hero_padding_top:    80,
+    offers_hero_padding_bottom: 40,
+    offers_hero_bg_color:       '',
+    offers_hero_bg_image:       '',
+  },
 };
 
 // =====================================================================

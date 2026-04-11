@@ -62,20 +62,44 @@ function deepMerge(base, override) {
   return out;
 }
 
-// Apply brand tokens to :root as CSS custom properties.
+// Apply brand + typography + button tokens to :root as CSS custom props.
 function applyTheme(content) {
-  const b = content?.brand;
-  if (!b) return;
   const root = document.documentElement;
-  root.style.setProperty('--tapas-primary',        b.primary_color);
-  root.style.setProperty('--tapas-primary-dark',   b.primary_color_dark);
-  root.style.setProperty('--tapas-primary-light',  b.primary_color_light);
-  root.style.setProperty('--tapas-accent',         b.accent_color);
-  root.style.setProperty('--tapas-accent-dark',    b.accent_color_dark);
-  root.style.setProperty('--tapas-cream',          b.cream_color);
-  root.style.setProperty('--tapas-sand',           b.sand_color);
-  root.style.setProperty('--tapas-heading-font',   `"${b.heading_font}", serif`);
-  root.style.setProperty('--tapas-body-font',      `"${b.body_font}", sans-serif`);
+  const b = content?.brand;
+  if (b) {
+    root.style.setProperty('--tapas-primary',        b.primary_color);
+    root.style.setProperty('--tapas-primary-dark',   b.primary_color_dark);
+    root.style.setProperty('--tapas-primary-light',  b.primary_color_light);
+    root.style.setProperty('--tapas-accent',         b.accent_color);
+    root.style.setProperty('--tapas-accent-dark',    b.accent_color_dark);
+    root.style.setProperty('--tapas-cream',          b.cream_color);
+    root.style.setProperty('--tapas-sand',           b.sand_color);
+    root.style.setProperty('--tapas-heading-font',   `"${b.heading_font}", serif`);
+    root.style.setProperty('--tapas-body-font',      `"${b.body_font}", sans-serif`);
+  }
+
+  const t = content?.typography;
+  if (t) {
+    root.style.setProperty('--tapas-h-xxl-size',   `${t.heading_xxl_size || 72}px`);
+    root.style.setProperty('--tapas-h-xl-size',    `${t.heading_xl_size || 42}px`);
+    root.style.setProperty('--tapas-h-l-size',     `${t.heading_l_size || 32}px`);
+    root.style.setProperty('--tapas-h-color',      t.heading_color || (b?.primary_color || '#2C1810'));
+    root.style.setProperty('--tapas-h-weight',     t.heading_weight || '800');
+    root.style.setProperty('--tapas-body-size',    `${t.body_size || 16}px`);
+    root.style.setProperty('--tapas-body-color',   t.body_color || '#5C3A1E');
+    root.style.setProperty('--tapas-eyebrow-size', `${t.eyebrow_size || 11}px`);
+    root.style.setProperty('--tapas-eyebrow-tracking', t.eyebrow_tracking || '2.5px');
+  }
+
+  const btn = content?.buttons;
+  if (btn) {
+    root.style.setProperty('--tapas-btn-radius',         `${btn.radius ?? 50}px`);
+    root.style.setProperty('--tapas-btn-padding',        `${btn.padding_y ?? 14}px ${btn.padding_x ?? 32}px`);
+    root.style.setProperty('--tapas-btn-font-size',      `${btn.font_size ?? 15}px`);
+    root.style.setProperty('--tapas-btn-font-weight',    btn.font_weight || '700');
+    root.style.setProperty('--tapas-btn-text-transform', btn.text_transform || 'none');
+    root.style.setProperty('--tapas-btn-letter-spacing', btn.letter_spacing || '0.5px');
+  }
 }
 
 // Load any Google Fonts the user has picked that aren't already loaded.

@@ -15,6 +15,15 @@ export default function About() {
   const contact = content.contact;
   const visibility = content.visibility || {};
   const styles = content.styles || {};
+  const sectionStyles = content.section_styles || {};
+
+  const bgOverlay = 'linear-gradient(135deg, rgba(44,24,16,0.85) 0%, rgba(74,44,23,0.75) 100%)';
+  const resolveBg = (imgUrl, solidColor, fallbackImgUrl, defaultBg) => {
+    if (imgUrl) return `${bgOverlay}, url("${imgUrl}") center/cover`;
+    if (solidColor) return solidColor;
+    if (fallbackImgUrl) return `${bgOverlay}, url("${fallbackImgUrl}") center/cover`;
+    return defaultBg;
+  };
 
   const HOURS = [
     { day:'Monday',    time: contact.hours_weekdays },
@@ -42,10 +51,16 @@ export default function About() {
 
       {/* Editorial hero */}
       <section id="section-about-hero" data-editable-section="about" style={{
-        background: about.hero_bg_image_url
-          ? `linear-gradient(135deg, ${brand.primary_color}dd 0%, ${brand.primary_color_light}dd 100%), url("${about.hero_bg_image_url}") center/cover`
-          : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`,
-        color:brand.sand_color, padding:'100px 20px 120px', position:'relative', overflow:'hidden'
+        background: resolveBg(
+          sectionStyles.about_hero_bg_image,
+          sectionStyles.about_hero_bg_color,
+          about.hero_bg_image_url,
+          `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`
+        ),
+        color: brand.sand_color, position: 'relative', overflow: 'hidden',
+        paddingTop:    `${sectionStyles.about_hero_padding_top ?? 100}px`,
+        paddingBottom: `${sectionStyles.about_hero_padding_bottom ?? 120}px`,
+        paddingLeft: '20px', paddingRight: '20px',
       }}>
         <div style={{ position:'absolute', right:'-100px', top:'-60px', width:'380px', height:'380px', borderRadius:'50%', background:'rgba(212,168,83,0.06)', border:'1px solid rgba(212,168,83,0.12)' }} />
         <div style={{ maxWidth:'780px', margin:'0 auto', position:'relative', zIndex:1, textAlign:'center' }}>
@@ -54,8 +69,8 @@ export default function About() {
           </div>
           <h1 style={{
             fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
-            fontSize: `clamp(32px, 6vw, ${styles.about_hero_headline_size || 64}px)`,
-            fontWeight:'800', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px',
+            fontSize: `clamp(32px, 6vw, ${styles.about_hero_headline_size || 'var(--tapas-h-xxl-size, 64px)'})`,
+            fontWeight:'var(--tapas-h-weight, 800)', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px',
             textAlign: styles.about_hero_headline_align || 'center',
           }}>
             <span data-editable="about.hero_headline_line1">{about.hero_headline_line1}</span><br />
@@ -90,7 +105,13 @@ export default function About() {
           <div data-editable="about.values_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
             {about.values_eyebrow}
           </div>
-          <h2 data-editable="about.values_heading" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'40px', fontWeight:'800', color:brand.primary_color, lineHeight:'1.1' }}>
+          <h2 data-editable="about.values_heading" style={{
+            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontSize:'var(--tapas-h-xl-size, 40px)',
+            fontWeight:'var(--tapas-h-weight, 800)',
+            color:'var(--tapas-h-color, #2C1810)',
+            lineHeight:'1.1'
+          }}>
             {about.values_heading}
           </h2>
         </div>
@@ -168,10 +189,14 @@ export default function About() {
               ))}
               <Link to="/login?mode=signup" style={{
                 display:'inline-block', marginTop:'8px',
-                padding:'12px 24px', borderRadius:'50px',
-                background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-                textDecoration:'none', fontWeight:'700', fontSize:'13px',
-                letterSpacing:'0.5px', textTransform:'uppercase',
+                padding:'var(--tapas-btn-padding, 12px 24px)',
+                borderRadius:'var(--tapas-btn-radius, 50px)',
+                background:`linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`, color:brand.primary_color,
+                textDecoration:'none',
+                fontWeight:'var(--tapas-btn-font-weight, 700)',
+                fontSize:'var(--tapas-btn-font-size, 13px)',
+                letterSpacing:'var(--tapas-btn-letter-spacing, 0.5px)',
+                textTransform:'var(--tapas-btn-text-transform, uppercase)',
               }}>
                 Become a member →
               </Link>
@@ -237,9 +262,16 @@ export default function About() {
             style={{ padding:'14px 18px', border:'1px solid rgba(212,168,83,0.4)', borderRadius:'8px', fontSize:'15px', outline:'none', resize:'vertical', fontFamily:'Lato, sans-serif', background:'white' }}
           />
           <button type="submit" style={{
-            padding:'16px', background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3',
-            border:'none', borderRadius:'50px', fontWeight:'700', fontSize:'14px', cursor:'pointer',
-            fontFamily:'Lato, sans-serif', letterSpacing:'1px', textTransform:'uppercase',
+            padding:'var(--tapas-btn-padding, 16px 32px)',
+            background:`linear-gradient(135deg, ${brand.primary_color}, ${brand.primary_color_light})`, color:brand.sand_color,
+            border:'none',
+            borderRadius:'var(--tapas-btn-radius, 50px)',
+            fontWeight:'var(--tapas-btn-font-weight, 700)',
+            fontSize:'var(--tapas-btn-font-size, 14px)',
+            cursor:'pointer',
+            fontFamily:'var(--tapas-body-font, Lato), sans-serif',
+            letterSpacing:'var(--tapas-btn-letter-spacing, 1px)',
+            textTransform:'var(--tapas-btn-text-transform, uppercase)',
             boxShadow:'0 6px 20px rgba(44,24,16,0.25)',
           }}>
             Send message

@@ -142,6 +142,17 @@ export default function Home() {
   const visibility = content.visibility || {};
   const styles = content.styles || {};
   const layout = content.layout || {};
+  const sectionStyles = content.section_styles || {};
+
+  // Helpers: resolve background for a section (image wins over solid,
+  // falls back to a default gradient), and padding shorthand.
+  const bgOverlay = 'linear-gradient(135deg, rgba(44,24,16,0.85) 0%, rgba(74,44,23,0.75) 100%)';
+  const resolveBg = (imgUrl, solidColor, fallbackImgUrl, defaultBg) => {
+    if (imgUrl) return `${bgOverlay}, url("${imgUrl}") center/cover`;
+    if (solidColor) return solidColor;
+    if (fallbackImgUrl) return `${bgOverlay}, url("${fallbackImgUrl}") center/cover`;
+    return defaultBg;
+  };
 
   // Section order from dashboard. Unknown ids fall to the end.
   const orderArr = (layout.home_section_order || 'hero,genres,staff_picks,new_arrivals,cafe_story,newsletter')
@@ -233,17 +244,22 @@ export default function Home() {
       {visibility.home_hero !== false && (
       <section id="section-home-hero" data-editable-section="home" style={{
         order: getOrder('hero'),
-        background: images.home_hero_bg_url
-          ? `linear-gradient(135deg, ${brand.primary_color}ee 0%, ${brand.primary_color_light}dd 40%, rgba(107,61,38,0.85) 100%), url("${images.home_hero_bg_url}") center/cover`
-          : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`,
-        color:brand.sand_color, position:'relative', overflow:'hidden',
+        background: resolveBg(
+          sectionStyles.home_hero_bg_image,
+          sectionStyles.home_hero_bg_color,
+          images.home_hero_bg_url,
+          `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`
+        ),
+        color: brand.sand_color, position: 'relative', overflow: 'hidden',
+        paddingTop:    `${sectionStyles.home_hero_padding_top ?? 80}px`,
+        paddingBottom: `${sectionStyles.home_hero_padding_bottom ?? 100}px`,
       }}>
         <div style={{ position:'absolute', inset:0, pointerEvents:'none',
           backgroundImage:'radial-gradient(circle at 15% 50%, rgba(212,168,83,0.10) 0%, transparent 55%), radial-gradient(circle at 85% 20%, rgba(245,222,179,0.06) 0%, transparent 50%)' }} />
         <div style={{ position:'absolute', right:'-120px', top:'-120px', width:'420px', height:'420px', borderRadius:'50%', background:'rgba(212,168,83,0.06)', border:'1px solid rgba(212,168,83,0.12)' }} />
 
         <div style={{
-          maxWidth:'1200px', margin:'0 auto', padding:'80px 20px 100px',
+          maxWidth:'1200px', margin:'0 auto', padding:'0 20px',
           position:'relative', zIndex:1,
           display:'grid', gridTemplateColumns:'1.3fr 1fr', gap:'60px', alignItems:'center',
         }} className="hero-grid">
@@ -253,8 +269,8 @@ export default function Home() {
             </div>
             <h1 style={{
               fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
-              fontSize: `clamp(32px, 6vw, ${styles.home_hero_headline_size || 72}px)`,
-              fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:brand.sand_color,
+              fontSize: `clamp(32px, 6vw, ${styles.home_hero_headline_size || 'var(--tapas-h-xxl-size, 72px)'})`,
+              fontWeight:'var(--tapas-h-weight, 800)', lineHeight:'1.05', marginBottom:'24px', color:brand.sand_color,
               textAlign: styles.home_hero_headline_align || 'left',
             }}>
               <span data-editable="home.hero_headline_line1">{home.hero_headline_line1}</span><br />
@@ -271,7 +287,15 @@ export default function Home() {
                 placeholder={home.search_placeholder}
                 style={{ flex:1, padding:'18px 26px', border:'none', fontSize:'15px', outline:'none', background:'#FFF8ED', color:brand.primary_color, fontFamily:'var(--tapas-body-font, Lato), sans-serif' }}
               />
-              <button type="submit" style={{ padding:'18px 30px', background:`linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`, border:'none', color:brand.primary_color, fontWeight:'700', cursor:'pointer', fontSize:'15px', letterSpacing:'0.5px' }}>
+              <button type="submit" style={{
+                padding:'var(--tapas-btn-padding, 18px 30px)',
+                background:`linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`,
+                border:'none', color:brand.primary_color,
+                fontWeight:'var(--tapas-btn-font-weight, 700)', cursor:'pointer',
+                fontSize:'var(--tapas-btn-font-size, 15px)',
+                letterSpacing:'var(--tapas-btn-letter-spacing, 0.5px)',
+                textTransform:'var(--tapas-btn-text-transform, none)',
+              }}>
                 Search
               </button>
             </form>
@@ -364,13 +388,26 @@ export default function Home() {
       {/* 3. STAFF PICKS — curated rail                                     */}
       {/* ================================================================ */}
       {visibility.home_staff_picks !== false && (
-      <section id="section-home-staff-picks" data-editable-section="home" style={{ order: getOrder('staff_picks'), background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      <section id="section-home-staff-picks" data-editable-section="home" style={{
+        order: getOrder('staff_picks'),
+        background: resolveBg(sectionStyles.home_staff_picks_bg_image, sectionStyles.home_staff_picks_bg_color, null, '#FFF8ED'),
+        paddingTop:    `${sectionStyles.home_staff_picks_padding_top ?? 80}px`,
+        paddingBottom: `${sectionStyles.home_staff_picks_padding_bottom ?? 80}px`,
+        paddingLeft: '20px', paddingRight: '20px',
+        borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)',
+      }}>
         <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
             <div data-editable="home.staff_picks_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
               {home.staff_picks_eyebrow}
             </div>
-            <h2 data-editable="home.staff_picks_title" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'42px', fontWeight:'800', color:brand.primary_color, marginBottom:'12px', lineHeight:'1.1' }}>
+            <h2 data-editable="home.staff_picks_title" style={{
+              fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+              fontSize:'var(--tapas-h-xl-size, 42px)',
+              fontWeight:'var(--tapas-h-weight, 800)',
+              color:'var(--tapas-h-color, #2C1810)',
+              marginBottom:'12px', lineHeight:'1.1'
+            }}>
               {home.staff_picks_title}
             </h2>
             <p data-editable="home.staff_picks_subtitle" style={{ color:'#8B6914', fontSize:'16px', maxWidth:'560px', margin:'0 auto', lineHeight:'1.6' }}>
@@ -435,14 +472,25 @@ export default function Home() {
       {visibility.home_cafe_story !== false && (
       <section id="section-home-cafe-story" data-editable-section="home" style={{
         order: getOrder('cafe_story'),
-        background: images.cafe_story_bg_url
-          ? `linear-gradient(135deg, ${brand.primary_color}ee 0%, ${brand.primary_color_light}dd 100%), url("${images.cafe_story_bg_url}") center/cover`
-          : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`,
-        color:brand.sand_color, padding:'100px 20px'
+        background: resolveBg(
+          sectionStyles.home_cafe_story_bg_image,
+          sectionStyles.home_cafe_story_bg_color,
+          images.cafe_story_bg_url,
+          `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`
+        ),
+        color: brand.sand_color,
+        paddingTop:    `${sectionStyles.home_cafe_story_padding_top ?? 100}px`,
+        paddingBottom: `${sectionStyles.home_cafe_story_padding_bottom ?? 100}px`,
+        paddingLeft: '20px', paddingRight: '20px',
       }}>
         <div style={{ maxWidth:'980px', margin:'0 auto', textAlign:'center' }}>
           <div style={{ fontSize:'48px', marginBottom:'16px' }}>☕</div>
-          <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(32px, 4.5vw, 48px)', fontWeight:'800', color:brand.sand_color, marginBottom:'24px', lineHeight:'1.15' }}>
+          <h2 style={{
+            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontSize: `clamp(32px, 4.5vw, var(--tapas-h-xl-size, 48px))`,
+            fontWeight:'var(--tapas-h-weight, 800)',
+            color:brand.sand_color, marginBottom:'24px', lineHeight:'1.15'
+          }}>
             <span data-editable="home.cafe_story_headline_line1">{home.cafe_story_headline_line1}</span><br />
             <span data-editable="home.cafe_story_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.cafe_story_headline_line2}</span>
           </h2>
@@ -451,16 +499,27 @@ export default function Home() {
           </p>
           <div style={{ display:'flex', gap:'16px', justifyContent:'center', flexWrap:'wrap' }}>
             <Link to="/about" style={{
-              background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-              textDecoration:'none', padding:'14px 32px', borderRadius:'50px',
-              fontWeight:'700', fontSize:'15px', boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
+              background:`linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`, color:brand.primary_color,
+              textDecoration:'none',
+              padding:'var(--tapas-btn-padding, 14px 32px)',
+              borderRadius:'var(--tapas-btn-radius, 50px)',
+              fontSize:'var(--tapas-btn-font-size, 15px)',
+              fontWeight:'var(--tapas-btn-font-weight, 700)',
+              letterSpacing:'var(--tapas-btn-letter-spacing, 0.5px)',
+              textTransform:'var(--tapas-btn-text-transform, none)',
+              boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
             }}>
               Our story →
             </Link>
             <Link to="/login?mode=signup" style={{
-              border:'2px solid rgba(245,222,179,0.5)', color:'#F5DEB3',
-              textDecoration:'none', padding:'14px 32px', borderRadius:'50px',
-              fontWeight:'600', fontSize:'15px'
+              border:`2px solid ${brand.sand_color}88`, color:brand.sand_color,
+              textDecoration:'none',
+              padding:'var(--tapas-btn-padding, 14px 32px)',
+              borderRadius:'var(--tapas-btn-radius, 50px)',
+              fontSize:'var(--tapas-btn-font-size, 15px)',
+              fontWeight:'var(--tapas-btn-font-weight, 700)',
+              letterSpacing:'var(--tapas-btn-letter-spacing, 0.5px)',
+              textTransform:'var(--tapas-btn-text-transform, none)',
             }}>
               Become a member
             </Link>
@@ -481,7 +540,13 @@ export default function Home() {
           boxShadow:'0 10px 40px rgba(44,24,16,0.08)'
         }}>
           <div data-editable="newsletter.eyebrow" style={{ fontSize:'40px', marginBottom:'12px' }}>{newsletter.eyebrow}</div>
-          <h2 data-editable="newsletter.headline" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'32px', fontWeight:'700', color:brand.primary_color, marginBottom:'10px' }}>
+          <h2 data-editable="newsletter.headline" style={{
+            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontSize:'var(--tapas-h-l-size, 32px)',
+            fontWeight:'var(--tapas-h-weight, 800)',
+            color:'var(--tapas-h-color, #2C1810)',
+            marginBottom:'10px'
+          }}>
             {newsletter.headline}
           </h2>
           <p data-editable="newsletter.description" style={{ color:'#8B6914', fontSize:'15px', marginBottom:'28px', maxWidth:'480px', margin:'0 auto 28px', lineHeight:'1.6' }}>
@@ -502,10 +567,17 @@ export default function Home() {
                 style={{ flex:'1 1 240px', padding:'14px 20px', borderRadius:'50px', border:'2px solid #F5DEB3', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', minWidth:0 }}
               />
               <button type="submit" style={{
-                padding:'14px 28px', borderRadius:'50px', border:'none',
-                background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3',
-                fontWeight:'700', fontSize:'14px', cursor:'pointer',
-                fontFamily:'Lato, sans-serif', letterSpacing:'0.5px'
+                padding:'var(--tapas-btn-padding, 14px 28px)',
+                borderRadius:'var(--tapas-btn-radius, 50px)',
+                border:'none',
+                background:`linear-gradient(135deg, ${brand.primary_color}, ${brand.primary_color_light})`,
+                color:brand.sand_color,
+                fontWeight:'var(--tapas-btn-font-weight, 700)',
+                fontSize:'var(--tapas-btn-font-size, 14px)',
+                letterSpacing:'var(--tapas-btn-letter-spacing, 0.5px)',
+                textTransform:'var(--tapas-btn-text-transform, none)',
+                cursor:'pointer',
+                fontFamily:'var(--tapas-body-font, Lato), sans-serif',
               }}>
                 Subscribe
               </button>
