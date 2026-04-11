@@ -149,13 +149,21 @@ function Navbar() {
               </button>
             </div>
           ) : (
-            <Link to="/login" style={{
-              background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-              textDecoration:'none', padding:'8px 18px', borderRadius:'20px',
-              fontWeight:'700', fontSize:'14px', boxShadow:'0 2px 8px rgba(212,168,83,0.4)'
-            }}>
-              Login
-            </Link>
+            <>
+              <Link to="/login" style={{
+                color:'#F5DEB3', textDecoration:'none', padding:'8px 14px', borderRadius:'20px',
+                fontWeight:'600', fontSize:'14px', border:'1px solid rgba(245,222,179,0.3)'
+              }}>
+                Login
+              </Link>
+              <Link to="/login?mode=signup" style={{
+                background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
+                textDecoration:'none', padding:'8px 18px', borderRadius:'20px',
+                fontWeight:'700', fontSize:'14px', boxShadow:'0 2px 8px rgba(212,168,83,0.4)'
+              }}>
+                Sign Up
+              </Link>
+            </>
           )}
 
           <button onClick={() => setMenuOpen(!menuOpen)} style={{

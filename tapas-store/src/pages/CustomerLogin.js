@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../App';
 
 export default function CustomerLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { member } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,7 +14,8 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
-  const [mode, setMode] = useState('login'); // 'login' | 'otp' | 'signup'
+  const initialMode = searchParams.get('mode') === 'signup' ? 'signup' : 'login';
+  const [mode, setMode] = useState(initialMode); // 'login' | 'otp' | 'signup'
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
 
