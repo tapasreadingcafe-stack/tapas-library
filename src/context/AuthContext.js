@@ -31,36 +31,52 @@ export function AuthProvider({ children }) {
   }, [logout]);
 
   // ─── load staff profile from DB ──────────────────────────────────────
+  // Security: only users with an active row in the `staff` table are
+  // allowed into the dashboard. Since we share Supabase Auth with the
+  // customer store (www.tapasreadingcafe.com), any logged-in session
+  // without a matching staff record must be rejected — otherwise a
+  // customer with a valid JWT could walk straight into the dashboard.
   const loadStaffProfile = useCallback(async (authUser) => {
     setUser(authUser);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('staff')
         .select('*')
         .eq('email', authUser.email)
-        .single();
+        .maybeSingle();
 
-      if (data) {
-        if (!data.is_active) {
-          // Account deactivated — sign out
-          await supabase.auth.signOut();
-          setUser(null);
-          setStaff({ _deactivated: true });
-          return;
-        }
-        setStaff(data);
-        // Track last login (fire-and-forget)
-        supabase.from('staff')
-          .update({ last_login: new Date().toISOString() })
-          .eq('id', data.id)
-          .then(() => {});
-      } else {
-        // No staff row yet — treat as basic staff so app doesn't crash
-        setStaff({ email: authUser.email, role: 'staff', name: authUser.email, is_active: true, _no_record: true });
+      if (error) throw error;
+
+      if (!data) {
+        // No staff row — this is a customer or an unauthorised user.
+        // Sign them out so they can't access the dashboard.
+        console.warn('[Auth] No staff row for', authUser.email, '— signing out.');
+        await supabase.auth.signOut();
+        setUser(null);
+        setStaff({ _not_staff: true });
+        return;
       }
+
+      if (!data.is_active) {
+        // Account deactivated — sign out
+        await supabase.auth.signOut();
+        setUser(null);
+        setStaff({ _deactivated: true });
+        return;
+      }
+
+      setStaff(data);
+      // Track last login (fire-and-forget)
+      supabase.from('staff')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', data.id)
+        .then(() => {});
     } catch (err) {
-      console.error('Failed to load staff profile:', err);
-      setStaff({ email: authUser.email, role: 'staff', name: authUser.email, is_active: true });
+      // Fail closed on any error: sign out instead of granting access.
+      console.error('Failed to load staff profile, signing out:', err);
+      try { await supabase.auth.signOut(); } catch (_) {}
+      setUser(null);
+      setStaff({ _error: err.message || String(err) });
     }
   }, []);
 

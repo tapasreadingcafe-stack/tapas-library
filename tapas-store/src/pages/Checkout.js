@@ -41,7 +41,48 @@ export default function Checkout() {
   if (authLoading || !member) return null;
   if (items.length === 0) return null;
 
-  const handlePay = async () => {
+  // Build items payload shared by both flows.
+  const buildPayloadItems = () => items.map(i => {
+    if (i.type === 'book') {
+      return { type: 'book', book_id: i.book_id, quantity: i.quantity };
+    }
+    return {
+      type: 'membership',
+      membership_plan: i.membership_plan,
+      membership_days: i.membership_days,
+      quantity: 1,
+    };
+  });
+
+  // Pay-on-pickup flow — default until Razorpay goes live.
+  const handlePlacePickupOrder = async () => {
+    setError('');
+    setProcessing(true);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke(
+        'place-pickup-order',
+        { body: { items: buildPayloadItems() } }
+      );
+      if (fnErr || !data?.ok) {
+        const errMsg = fnErr?.message || data?.error || 'Failed to place order';
+        if (data?.error === 'insufficient_stock') {
+          throw new Error('Sorry, one of the books in your cart just went out of stock. Please remove it and try again.');
+        }
+        throw new Error(errMsg);
+      }
+      clear();
+      navigate(`/order/${data.customer_order_id}`);
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setProcessing(false);
+    }
+  };
+
+  // Razorpay flow — activated once RAZORPAY_KEY_ID env var is present.
+  // Kept in code so flipping payment mode is a one-line change later.
+  const razorpayEnabled = !!process.env.REACT_APP_RAZORPAY_KEY_ID;
+
+  const handleRazorpayPay = async () => {
     setError('');
     setProcessing(true);
     try {
@@ -49,30 +90,15 @@ export default function Checkout() {
         throw new Error('Payment system not loaded. Please refresh and try again.');
       }
 
-      // Build items payload.
-      const payloadItems = items.map(i => {
-        if (i.type === 'book') {
-          return { type: 'book', book_id: i.book_id, quantity: i.quantity };
-        }
-        return {
-          type: 'membership',
-          membership_plan: i.membership_plan,
-          membership_days: i.membership_days,
-          quantity: 1,
-        };
-      });
-
-      // Call create-razorpay-order edge function.
       const { data: createData, error: createErr } = await supabase.functions.invoke(
         'create-razorpay-order',
-        { body: { items: payloadItems } }
+        { body: { items: buildPayloadItems() } }
       );
 
       if (createErr || !createData?.razorpay_order_id) {
         throw new Error(createErr?.message || createData?.error || 'Failed to create order');
       }
 
-      // Open Razorpay checkout modal.
       const rzp = new window.Razorpay({
         key: createData.key_id,
         amount: createData.amount,
@@ -88,32 +114,20 @@ export default function Checkout() {
         theme: { color: '#2C1810' },
         handler: async (response) => {
           try {
-            const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
-              'verify-razorpay-payment',
-              {
-                body: {
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                },
-              }
-            );
-            if (verifyErr || !verifyData?.ok) {
-              // Payment captured but verify failed — user keeps the order_id,
-              // webhook will reconcile. Still redirect to success.
-              console.error('[Checkout] verify failed, webhook will reconcile', verifyErr);
-            }
-            clear();
-            navigate(`/order/${createData.customer_order_id}`);
+            await supabase.functions.invoke('verify-razorpay-payment', {
+              body: {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              },
+            });
           } catch (err) {
             console.error('[Checkout] verify handler error', err);
-            clear();
-            navigate(`/order/${createData.customer_order_id}`);
           }
+          clear();
+          navigate(`/order/${createData.customer_order_id}`);
         },
-        modal: {
-          ondismiss: () => setProcessing(false),
-        },
+        modal: { ondismiss: () => setProcessing(false) },
       });
       rzp.open();
     } catch (err) {
@@ -223,7 +237,7 @@ export default function Checkout() {
             )}
 
             <button
-              onClick={handlePay}
+              onClick={handlePlacePickupOrder}
               disabled={processing}
               style={{
                 width:'100%', marginTop:'20px', padding:'14px',
@@ -233,11 +247,35 @@ export default function Checkout() {
                 fontFamily:'Lato, sans-serif',
                 boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
               }}>
-              {processing ? '⏳ Processing...' : '💳 Pay with Razorpay'}
+              {processing ? '⏳ Reserving...' : '🔖 Reserve & Pay on Pickup'}
             </button>
             <p style={{ marginTop:'12px', textAlign:'center', color:'#8B6914', fontSize:'12px' }}>
-              🔒 Secure payment via Razorpay
+              We'll hold your books at Tapas Reading Cafe.<br/>
+              Pay cash or UPI when you collect them.
             </p>
+
+            {razorpayEnabled ? (
+              <button
+                onClick={handleRazorpayPay}
+                disabled={processing}
+                style={{
+                  width:'100%', marginTop:'12px', padding:'12px',
+                  background:'white', color:'#2C1810',
+                  border:'2px solid #D4A853', borderRadius:'12px', fontWeight:'700', fontSize:'14px',
+                  cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.7 : 1,
+                  fontFamily:'Lato, sans-serif'
+                }}>
+                💳 Or pay online with Razorpay
+              </button>
+            ) : (
+              <div style={{
+                marginTop:'12px', padding:'12px', borderRadius:'12px',
+                background:'#FFF8ED', border:'1px dashed #D4A853',
+                textAlign:'center', color:'#8B6914', fontSize:'12px'
+              }}>
+                💳 Online payment (Razorpay) coming soon
+              </div>
+            )}
           </div>
         </div>
       </div>

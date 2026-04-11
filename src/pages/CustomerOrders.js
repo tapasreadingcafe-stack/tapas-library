@@ -15,12 +15,17 @@ import { supabase } from '../utils/supabase';
 // =====================================================================
 
 const STATUS_META = {
-  pending:          { bg: '#fff3cd', text: '#856404', label: '⏳ Pending payment' },
+  pending:          { bg: '#fff3cd', text: '#856404', label: '⏳ Awaiting payment' },
   paid:             { bg: '#cce5ff', text: '#004085', label: '💰 Paid' },
   ready_for_pickup: { bg: '#d4edda', text: '#155724', label: '✅ Ready for pickup' },
   fulfilled:        { bg: '#e2d9f3', text: '#5e35b1', label: '📦 Fulfilled' },
   cancelled:        { bg: '#f8d7da', text: '#721c24', label: '❌ Cancelled' },
   refunded:         { bg: '#e2e3e5', text: '#383d41', label: '↩️ Refunded' },
+};
+
+const PAYMENT_METHOD_LABEL = {
+  cash_on_pickup: '💵 Pay on pickup',
+  razorpay: '💳 Razorpay',
 };
 
 const FILTERS = [
@@ -87,14 +92,20 @@ export default function CustomerOrders() {
         }
       }
 
+      // When marking paid on a cash-on-pickup order, also flip payment_status.
+      const patch = { status: nextStatus };
+      if (nextStatus === 'paid' && order.payment_method === 'cash_on_pickup') {
+        patch.payment_status = 'paid';
+      }
+
       const { error } = await supabase
         .from('customer_orders')
-        .update({ status: nextStatus })
+        .update(patch)
         .eq('id', order.id);
       if (error) throw error;
 
       // Optimistic update — reflect the change in-place.
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: nextStatus } : o));
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...patch } : o));
     } catch (err) {
       alert('Failed to update order: ' + err.message);
     } finally {
@@ -175,6 +186,9 @@ export default function CustomerOrders() {
               {visibleOrders.map(o => {
                 const meta = STATUS_META[o.status] || { bg: '#eee', text: '#333', label: o.status };
                 const itemCount = (o.customer_order_items || []).reduce((s, it) => s + it.quantity, 0);
+                const isCashOnPickup = o.payment_method === 'cash_on_pickup';
+                // Cash-on-pickup orders sit at 'pending' until staff marks paid.
+                const canMarkPaid     = isCashOnPickup && o.status === 'pending';
                 const canMarkReady    = o.status === 'paid';
                 const canMarkFulfilled = o.status === 'ready_for_pickup';
                 const canCancel        = ['pending', 'paid', 'ready_for_pickup'].includes(o.status);
@@ -193,8 +207,11 @@ export default function CustomerOrders() {
                       </td>
                       <td style={{ padding: '14px 12px', color: '#5a6c7d' }}>{itemCount} item{itemCount === 1 ? '' : 's'}</td>
                       <td style={{ padding: '14px 12px', textAlign: 'right', fontWeight: '700', color: '#2c3e50' }}>₹{Number(o.total).toFixed(2)}</td>
-                      <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px' }}>
-                        {o.fulfillment_type === 'pickup' ? '🏪 Pickup' : '🚚 Delivery'}
+                      <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <div>{o.fulfillment_type === 'pickup' ? '🏪 Pickup' : '🚚 Delivery'}</div>
+                        <div style={{ color: '#8B6914', fontSize: '11px' }}>
+                          {PAYMENT_METHOD_LABEL[o.payment_method] || o.payment_method}
+                        </div>
                       </td>
                       <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                         <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: meta.bg, color: meta.text }}>
@@ -206,6 +223,16 @@ export default function CustomerOrders() {
                       </td>
                       <td style={{ padding: '14px 12px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                          {canMarkPaid && (
+                            <button
+                              onClick={() => updateStatus(o, 'paid')}
+                              disabled={actioning === o.id}
+                              style={{ padding: '6px 10px', background: '#cce5ff', color: '#004085', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}
+                              title="Cash/UPI received — mark as paid"
+                            >
+                              💰 Paid
+                            </button>
+                          )}
                           {canMarkReady && (
                             <button
                               onClick={() => updateStatus(o, 'ready_for_pickup')}
