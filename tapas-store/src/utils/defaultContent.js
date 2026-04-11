@@ -123,6 +123,7 @@ export const DEFAULT_CONTENT = {
     header_subtitle_suffix: 'titles curated by the Tapas team. Browse by genre or search for something specific.',
   },
   footer: {
+    template: 'classic',
     tagline: "Your neighbourhood library and book store. Discover, borrow, and buy books you'll love.",
     copyright_text: 'All rights reserved.',
     quick_links_heading: 'Quick Links',
@@ -130,6 +131,7 @@ export const DEFAULT_CONTENT = {
     contact_heading: 'Contact',
   },
   header: {
+    template: 'classic',
     logo_emoji: '📚',
     nav_home: 'Home',
     nav_books: 'Books',

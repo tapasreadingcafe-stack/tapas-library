@@ -59,7 +59,7 @@ export function HintBubble({ path, children }) {
 
   const handleEnter = () => {
     if (!enabled || !hint) return;
-    timerRef.current = setTimeout(() => setShow(true), 2000);
+    timerRef.current = setTimeout(() => setShow(true), 800);
   };
   const handleLeave = () => {
     clearTimeout(timerRef.current);
@@ -137,13 +137,13 @@ export function GlobalHintTooltip() {
       setTooltip(null);
       currentElRef.current = el;
 
-      // Show after 2 seconds
+      // Show after 0.8 seconds
       timerRef.current = setTimeout(() => {
         const rect = el.getBoundingClientRect();
         const x = rect.left + rect.width / 2;
         const y = rect.top - 8;
         setTooltip({ text: hint, x, y, below: y < 60 });
-      }, 2000);
+      }, 800);
     };
 
     const handleMouseOut = (e) => {

@@ -113,6 +113,7 @@ export const DEFAULT_CONTENT = {
     header_subtitle_suffix: 'titles curated by the Tapas team. Browse by genre or search for something specific.',
   },
   footer: {
+    template: 'classic',
     tagline: "Your neighbourhood library and book store. Discover, borrow, and buy books you'll love.",
     copyright_text: 'All rights reserved.',
     quick_links_heading: 'Quick Links',
@@ -120,6 +121,7 @@ export const DEFAULT_CONTENT = {
     contact_heading: 'Contact',
   },
   header: {
+    template: 'classic',
     logo_emoji: '📚',
     nav_home: 'Home',
     nav_books: 'Books',
@@ -408,9 +410,21 @@ export const CONTENT_SCHEMA = [
   {
     key: 'header',
     title: 'Header / Navbar',
-    subtitle: 'Logo emoji, nav link labels, and CTA buttons in the top bar.',
+    subtitle: 'Template, logo emoji, nav link labels, and CTA buttons in the top bar.',
     icon: '🧭',
     fields: [
+      { key: 'template', label: 'Layout template', type: 'select', hint: 'Pick one of 10 navbar layouts.', options: [
+        { value:'classic',        label: '1. Classic (logo · nav · CTAs)' },
+        { value:'centered',       label: '2. Centered (2 rows, logo center)' },
+        { value:'split',          label: '3. Split (nav left · logo center)' },
+        { value:'minimal',        label: '4. Minimal (logo + single CTA)' },
+        { value:'search_forward', label: '5. Search-forward (big search bar)' },
+        { value:'double_decker',  label: '6. Double-decker (info strip + nav)' },
+        { value:'transparent',    label: '7. Transparent (overlays hero)' },
+        { value:'pill_nav',       label: '8. Pill nav (rounded container)' },
+        { value:'accent_bar',     label: '9. Accent bar (thick top border)' },
+        { value:'announcement',   label: '10. Announcement (marquee + nav)' },
+      ] },
       { key: 'logo_emoji',     label: 'Logo emoji',   type: 'text', hint: 'Shown next to the brand name in the navbar.' },
       { key: 'nav_home',       label: 'Home link',    type: 'text' },
       { key: 'nav_books',      label: 'Books link',   type: 'text' },
@@ -424,9 +438,21 @@ export const CONTENT_SCHEMA = [
   {
     key: 'footer',
     title: 'Footer',
-    subtitle: 'Tagline, copyright, and section headings at the bottom of every page.',
+    subtitle: 'Template, tagline, copyright, and section headings at the bottom of every page.',
     icon: '🦶',
     fields: [
+      { key: 'template', label: 'Layout template', type: 'select', hint: 'Pick one of 10 footer layouts.', options: [
+        { value:'classic',          label: '1. Classic (4 columns)' },
+        { value:'minimal',          label: '2. Minimal (single row)' },
+        { value:'big_visit',        label: '3. Big visit (address focus)' },
+        { value:'newsletter_first', label: '4. Newsletter first (subscribe strip)' },
+        { value:'centered',         label: '5. Centered column' },
+        { value:'two_column',       label: '6. Two-column (brand + links)' },
+        { value:'dark_gold',        label: '7. Dark + gold accents' },
+        { value:'three_column',     label: '8. Three-column compact' },
+        { value:'social_first',     label: '9. Social / contact pills top' },
+        { value:'map_embed',        label: '10. Map embed (Google Maps)' },
+      ] },
       { key: 'tagline',             label: 'Tagline',              type: 'textarea', hint: 'Short description next to the logo.' },
       { key: 'quick_links_heading', label: 'Quick Links heading',  type: 'text' },
       { key: 'hours_heading',       label: 'Opening Hours heading', type: 'text' },

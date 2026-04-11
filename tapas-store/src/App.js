@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { SiteContentProvider, useSiteContent } from './context/SiteContent';
 import StoreEditorSync from './components/StoreEditorSync';
+import HeaderTemplate from './components/HeaderTemplates';
+import FooterTemplate from './components/FooterTemplates';
 import './App.css';
 
 const Home            = React.lazy(() => import('./pages/Home'));
@@ -256,7 +258,7 @@ function AppShell() {
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Lato:wght@300;400;600;700&display=swap" />
       <StoreEditorSync />
       <div style={{ minHeight:'100vh', background:'#FDF8F0' }}>
-        <Navbar />
+        <HeaderTemplate />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/"              element={<Home />} />
@@ -273,7 +275,7 @@ function AppShell() {
             <Route path="/order/:id"     element={<OrderSuccess />} />
           </Routes>
         </Suspense>
-        <Footer />
+        <FooterTemplate />
       </div>
     </>
   );
