@@ -127,8 +127,14 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await loadMember(session.user);
-        setLoading(false);
+        // Flip loading ON while we resolve the member row so downstream
+        // pages don't race-redirect to /login before loadMember finishes.
+        setLoading(true);
+        try {
+          await loadMember(session.user);
+        } finally {
+          setLoading(false);
+        }
       } else if (event === 'SIGNED_OUT') {
         setAuthUser(null);
         setMember(null);

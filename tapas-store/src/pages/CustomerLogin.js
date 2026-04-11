@@ -30,7 +30,10 @@ export default function CustomerLogin() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      navigate('/member');
+      // Don't navigate here — the useEffect watching `member` will redirect
+      // to /profile once AuthContext finishes loading the members row.
+      // Navigating directly races against onAuthStateChange and can land
+      // on /profile before the member is loaded, which bounces back here.
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -60,7 +63,10 @@ export default function CustomerLogin() {
     try {
       const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'email' });
       if (error) throw error;
-      navigate('/member');
+      // Don't navigate here — the useEffect watching `member` will redirect
+      // to /profile once AuthContext finishes loading the members row.
+      // Navigating directly races against onAuthStateChange and can land
+      // on /profile before the member is loaded, which bounces back here.
     } catch (err) {
       setError(err.message || 'Invalid OTP. Please try again.');
     } finally {
