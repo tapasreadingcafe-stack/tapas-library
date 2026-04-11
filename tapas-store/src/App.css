@@ -1,0 +1,13 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Lato', sans-serif;
+  background: #FDF8F0;
+  color: #2C1810;
+}
+
+a { color: inherit; }
+
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: block !important; }
+}

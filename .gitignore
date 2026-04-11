@@ -3,3 +3,9 @@ node_modules/
 .env.local
 .env.*.local
 .vercel
+
+# tapas-store (customer e-commerce app)
+tapas-store/build/
+tapas-store/.env
+tapas-store/.env.local
+tapas-store/.env.*.local
