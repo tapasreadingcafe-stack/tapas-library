@@ -61,6 +61,7 @@ const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
 const CustomerOrders        = React.lazy(() => import('./pages/CustomerOrders'));
+const SiteContent           = React.lazy(() => import('./pages/SiteContent'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -133,7 +134,8 @@ const NAV_CONFIG = [
   {
     icon: '🛒', label: 'Online Store', key: 'store',
     children: [
-      { to: '/store/orders', icon: '📦', label: 'Online Orders' },
+      { to: '/store/orders',  icon: '📦', label: 'Online Orders' },
+      { to: '/store/content', icon: '🎨', label: 'Edit Website' },
     ],
   },
   {
@@ -376,6 +378,7 @@ function App() {
 
             {/* Online Store */}
             <Route path="/store/orders"                       element={<CustomerOrders />} />
+            <Route path="/store/content"                      element={<SiteContent />} />
 
             {/* Public & Kiosk */}
             <Route path="/catalog"                            element={<PublicCatalog />} />

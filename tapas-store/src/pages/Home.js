@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { useSiteContent } from '../context/SiteContent';
 
 // =====================================================================
 // Home — editorial bookstore homepage inspired by powells.com.
@@ -133,6 +134,11 @@ function GridBookCard({ book }) {
 }
 
 export default function Home() {
+  const content = useSiteContent();
+  const brand = content.brand;
+  const home = content.home;
+  const newsletter = content.newsletter;
+
   const [featured, setFeatured] = useState(null);     // big hero book
   const [staffPicks, setStaffPicks] = useState([]);    // 4 curated
   const [newArrivals, setNewArrivals] = useState([]);  // 8 latest
@@ -207,14 +213,14 @@ export default function Home() {
   };
 
   return (
-    <div style={{ fontFamily:'Lato, sans-serif', background:'#FDF8F0' }}>
+    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* ================================================================ */}
       {/* 1. EDITORIAL HERO — headline + search + featured book on the right */}
       {/* ================================================================ */}
       <section style={{
-        background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 40%, #6B3D26 100%)',
-        color:'#F5DEB3', position:'relative', overflow:'hidden',
+        background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`,
+        color:brand.sand_color, position:'relative', overflow:'hidden',
       }}>
         <div style={{ position:'absolute', inset:0, pointerEvents:'none',
           backgroundImage:'radial-gradient(circle at 15% 50%, rgba(212,168,83,0.10) 0%, transparent 55%), radial-gradient(circle at 85% 20%, rgba(245,222,179,0.06) 0%, transparent 50%)' }} />
@@ -226,27 +232,25 @@ export default function Home() {
           display:'grid', gridTemplateColumns:'1.3fr 1fr', gap:'60px', alignItems:'center',
         }} className="hero-grid">
           <div>
-            <div style={{ display:'inline-block', background:'rgba(212,168,83,0.15)', border:'1px solid rgba(212,168,83,0.35)', borderRadius:'20px', padding:'6px 16px', fontSize:'12px', color:'#D4A853', letterSpacing:'2px', marginBottom:'28px', textTransform:'uppercase', fontWeight:'700' }}>
-              📚 Nagpur's Reading Cafe
+            <div style={{ display:'inline-block', background:'rgba(212,168,83,0.15)', border:'1px solid rgba(212,168,83,0.35)', borderRadius:'20px', padding:'6px 16px', fontSize:'12px', color:brand.accent_color, letterSpacing:'2px', marginBottom:'28px', textTransform:'uppercase', fontWeight:'700' }}>
+              📚 {home.hero_eyebrow}
             </div>
-            <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(40px, 6vw, 72px)', fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:'#F5DEB3' }}>
-              Stories worth<br />
-              <span style={{ color:'#D4A853', fontStyle:'italic' }}>your shelf.</span>
+            <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 72px)', fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:brand.sand_color }}>
+              {home.hero_headline_line1}<br />
+              <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.hero_headline_line2}</span>
             </h1>
             <p style={{ fontSize:'18px', lineHeight:'1.7', color:'rgba(245,222,179,0.85)', marginBottom:'36px', maxWidth:'540px' }}>
-              A curated collection of books to borrow or own — handpicked by
-              the Tapas Reading Cafe team. Fiction, memoirs, kids' favourites,
-              and everything in between.
+              {home.hero_description}
             </p>
 
             <form onSubmit={handleSearch} style={{ display:'flex', gap:'0', marginBottom:'28px', maxWidth:'520px', borderRadius:'50px', overflow:'hidden', boxShadow:'0 10px 30px rgba(0,0,0,0.35)' }}>
               <input
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search title, author, or genre…"
-                style={{ flex:1, padding:'18px 26px', border:'none', fontSize:'15px', outline:'none', background:'#FFF8ED', color:'#2C1810', fontFamily:'Lato, sans-serif' }}
+                placeholder={home.search_placeholder}
+                style={{ flex:1, padding:'18px 26px', border:'none', fontSize:'15px', outline:'none', background:'#FFF8ED', color:brand.primary_color, fontFamily:'var(--tapas-body-font, Lato), sans-serif' }}
               />
-              <button type="submit" style={{ padding:'18px 30px', background:'linear-gradient(135deg, #D4A853, #C49040)', border:'none', color:'#2C1810', fontWeight:'700', cursor:'pointer', fontSize:'15px', letterSpacing:'0.5px' }}>
+              <button type="submit" style={{ padding:'18px 30px', background:`linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`, border:'none', color:brand.primary_color, fontWeight:'700', cursor:'pointer', fontSize:'15px', letterSpacing:'0.5px' }}>
                 Search
               </button>
             </form>
@@ -338,15 +342,14 @@ export default function Home() {
       <section style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
-            <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
-              ★ ★ ★
+            <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+              {home.staff_picks_eyebrow}
             </div>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'42px', fontWeight:'800', color:'#2C1810', marginBottom:'12px', lineHeight:'1.1' }}>
-              Handpicked by our librarians
+            <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'42px', fontWeight:'800', color:brand.primary_color, marginBottom:'12px', lineHeight:'1.1' }}>
+              {home.staff_picks_title}
             </h2>
             <p style={{ color:'#8B6914', fontSize:'16px', maxWidth:'560px', margin:'0 auto', lineHeight:'1.6' }}>
-              Every week our team picks a handful of books we can't stop
-              talking about. Here's what's on our desks right now.
+              {home.staff_picks_subtitle}
             </p>
           </div>
 
@@ -401,18 +404,15 @@ export default function Home() {
       {/* ================================================================ */}
       {/* 5. CAFE STORY — editorial block about the reading cafe            */}
       {/* ================================================================ */}
-      <section style={{ background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)', color:'#F5DEB3', padding:'100px 20px' }}>
+      <section style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px' }}>
         <div style={{ maxWidth:'980px', margin:'0 auto', textAlign:'center' }}>
           <div style={{ fontSize:'48px', marginBottom:'16px' }}>☕</div>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(32px, 4.5vw, 48px)', fontWeight:'800', color:'#F5DEB3', marginBottom:'24px', lineHeight:'1.15' }}>
-            More than a bookstore.<br />
-            <span style={{ color:'#D4A853', fontStyle:'italic' }}>A reading home.</span>
+          <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(32px, 4.5vw, 48px)', fontWeight:'800', color:brand.sand_color, marginBottom:'24px', lineHeight:'1.15' }}>
+            {home.cafe_story_headline_line1}<br />
+            <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.cafe_story_headline_line2}</span>
           </h2>
           <p style={{ color:'rgba(245,222,179,0.82)', fontSize:'17px', lineHeight:'1.8', maxWidth:'680px', margin:'0 auto 36px' }}>
-            Tapas Reading Cafe is part library, part bookshop, part
-            neighbourhood café. Members borrow from a curated collection,
-            visitors stop in for filter coffee and a book-of-the-week, and
-            everyone is welcome to stay a while. Come find your next read.
+            {home.cafe_story_body}
           </p>
           <div style={{ display:'flex', gap:'16px', justifyContent:'center', flexWrap:'wrap' }}>
             <Link to="/about" style={{
@@ -443,13 +443,12 @@ export default function Home() {
           border:'1px solid rgba(212,168,83,0.3)',
           boxShadow:'0 10px 40px rgba(44,24,16,0.08)'
         }}>
-          <div style={{ fontSize:'40px', marginBottom:'12px' }}>📬</div>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'32px', fontWeight:'700', color:'#2C1810', marginBottom:'10px' }}>
-            Our weekly reading list
+          <div style={{ fontSize:'40px', marginBottom:'12px' }}>{newsletter.eyebrow}</div>
+          <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'32px', fontWeight:'700', color:brand.primary_color, marginBottom:'10px' }}>
+            {newsletter.headline}
           </h2>
           <p style={{ color:'#8B6914', fontSize:'15px', marginBottom:'28px', maxWidth:'480px', margin:'0 auto 28px', lineHeight:'1.6' }}>
-            One email every Sunday — staff picks, new arrivals, and what's
-            happening at the cafe. No spam, easy unsubscribe.
+            {newsletter.description}
           </p>
 
           {subscribed ? (

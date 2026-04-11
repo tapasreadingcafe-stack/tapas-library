@@ -2,6 +2,7 @@ import React, { useState, Suspense } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
+import { SiteContentProvider, useSiteContent } from './context/SiteContent';
 import './App.css';
 
 const Home            = React.lazy(() => import('./pages/Home'));
@@ -47,6 +48,7 @@ function Navbar() {
   const navigate = useNavigate();
   const { member, wishlistCount, logout } = useAuth();
   const { itemCount } = useCart();
+  const content = useSiteContent();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,16 +79,16 @@ function Navbar() {
   return (
     <nav style={{
       position:'sticky', top:0, zIndex:1000,
-      background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)',
+      background:`linear-gradient(135deg, ${content.brand.primary_color} 0%, ${content.brand.primary_color_light} 100%)`,
       boxShadow:'0 2px 20px rgba(0,0,0,0.35)',
-      fontFamily:'Lato, sans-serif'
+      fontFamily:'var(--tapas-body-font, Lato), sans-serif'
     }}>
       <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'64px' }}>
         <Link to="/" style={{ textDecoration:'none', display:'flex', alignItems:'center', gap:'10px' }}>
           <span style={{ fontSize:'28px' }}>📚</span>
           <div>
-            <div style={{ color:'#F5DEB3', fontFamily:'"Playfair Display", serif', fontSize:'18px', fontWeight:'700', lineHeight:'1.1' }}>Tapas Library</div>
-            <div style={{ color:'#D4A853', fontSize:'11px', letterSpacing:'2px' }}>& BOOK STORE</div>
+            <div style={{ color:content.brand.sand_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'18px', fontWeight:'700', lineHeight:'1.1' }}>{content.brand.name}</div>
+            <div style={{ color:content.brand.accent_color, fontSize:'11px', letterSpacing:'2px' }}>{content.brand.tagline}</div>
           </div>
         </Link>
 
@@ -191,16 +193,17 @@ function Navbar() {
 }
 
 function Footer() {
+  const content = useSiteContent();
   return (
-    <footer style={{ background:'#1A0F0A', color:'#F5DEB3', fontFamily:'Lato, sans-serif', marginTop:'60px' }}>
+    <footer style={{ background:content.brand.primary_color_dark, color:content.brand.sand_color, fontFamily:'var(--tapas-body-font, Lato), sans-serif', marginTop:'60px' }}>
       <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'50px 20px 30px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'40px', marginBottom:'40px' }}>
           <div>
             <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px' }}>
               <span style={{ fontSize:'32px' }}>📚</span>
               <div>
-                <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', fontWeight:'700' }}>Tapas Library</div>
-                <div style={{ color:'#D4A853', fontSize:'12px', letterSpacing:'2px' }}>& BOOK STORE</div>
+                <div style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'20px', fontWeight:'700' }}>{content.brand.name}</div>
+                <div style={{ color:content.brand.accent_color, fontSize:'12px', letterSpacing:'2px' }}>{content.brand.tagline}</div>
               </div>
             </div>
             <p style={{ color:'#A0856A', fontSize:'14px', lineHeight:'1.6' }}>
@@ -218,18 +221,18 @@ function Footer() {
           </div>
 
           <div>
-            <h4 style={{ color:'#D4A853', fontFamily:'"Playfair Display", serif', fontSize:'16px', marginBottom:'16px' }}>Opening Hours</h4>
-            {[['Mon – Fri','9:00 AM – 8:00 PM'],['Saturday','9:00 AM – 6:00 PM'],['Sunday','10:00 AM – 4:00 PM']].map(([day, time]) => (
+            <h4 style={{ color:content.brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', marginBottom:'16px' }}>Opening Hours</h4>
+            {[['Mon – Fri', content.contact.hours_weekdays],['Saturday', content.contact.hours_saturday],['Sunday', content.contact.hours_sunday]].map(([day, time]) => (
               <div key={day} style={{ marginBottom:'10px' }}>
-                <div style={{ color:'#F5DEB3', fontSize:'13px', fontWeight:'600' }}>{day}</div>
+                <div style={{ color:content.brand.sand_color, fontSize:'13px', fontWeight:'600' }}>{day}</div>
                 <div style={{ color:'#A0856A', fontSize:'13px' }}>{time}</div>
               </div>
             ))}
           </div>
 
           <div>
-            <h4 style={{ color:'#D4A853', fontFamily:'"Playfair Display", serif', fontSize:'16px', marginBottom:'16px' }}>Contact</h4>
-            {[['📍','123 Library Lane, Booktown'],['📞','+91 98765 43210'],['✉️','hello@tapaslibrary.in']].map(([icon, text]) => (
+            <h4 style={{ color:content.brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', marginBottom:'16px' }}>Contact</h4>
+            {[['📍', content.contact.address],['📞', content.contact.phone],['✉️', content.contact.email]].map(([icon, text]) => (
               <div key={text} style={{ display:'flex', gap:'10px', marginBottom:'12px', alignItems:'flex-start' }}>
                 <span>{icon}</span>
                 <span style={{ color:'#A0856A', fontSize:'13px' }}>{text}</span>
@@ -238,7 +241,7 @@ function Footer() {
           </div>
         </div>
         <div style={{ borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:'20px', textAlign:'center', color:'#A0856A', fontSize:'13px' }}>
-          © 2024 Tapas Library & Book Store. All rights reserved. Made with ❤️ for book lovers.
+          © {new Date().getFullYear()} {content.brand.name} {content.brand.tagline}. All rights reserved.
         </div>
       </div>
     </footer>
@@ -275,10 +278,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <AppShell />
-      </CartProvider>
-    </AuthProvider>
+    <SiteContentProvider>
+      <AuthProvider>
+        <CartProvider>
+          <AppShell />
+        </CartProvider>
+      </AuthProvider>
+    </SiteContentProvider>
   );
 }

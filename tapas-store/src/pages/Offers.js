@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useSiteContent } from '../context/SiteContent';
 
 // =====================================================================
 // Offers / Memberships — editorial treatment, Powell's-style.
@@ -59,25 +60,26 @@ const PLANS = [
 ];
 
 export default function Offers() {
+  const content = useSiteContent();
+  const brand = content.brand;
+  const offers = content.offers;
   return (
-    <div style={{ fontFamily:'Lato, sans-serif', background:'#FDF8F0' }}>
+    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* Editorial hero */}
       <section style={{
         maxWidth:'780px', margin:'0 auto',
         padding:'80px 20px 40px', textAlign:'center',
       }}>
-        <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
-          Membership
+        <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
+          {offers.hero_eyebrow}
         </div>
-        <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:'#2C1810', lineHeight:'1.05', marginBottom:'20px' }}>
-          Read more,<br />
-          <span style={{ color:'#D4A853', fontStyle:'italic' }}>pay less.</span>
+        <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:brand.primary_color, lineHeight:'1.05', marginBottom:'20px' }}>
+          {offers.hero_headline_line1}<br />
+          <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{offers.hero_headline_line2}</span>
         </h1>
         <p style={{ color:'#8B6914', fontSize:'17px', lineHeight:'1.75', maxWidth:'580px', margin:'0 auto' }}>
-          Becoming a Tapas member is the simplest way to read more books for
-          less money. Borrow freely, reserve new arrivals, and get a discount
-          on anything you want to take home.
+          {offers.hero_description}
         </p>
       </section>
 

@@ -1,21 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useSiteContent } from '../context/SiteContent';
 
 // =====================================================================
 // About — editorial story + visit info + contact.
-// Dropped the fabricated "meet the team" and fake stats from the old
-// version — replace with real content when ready.
+// Text and contact info come from the SiteContent context so staff can
+// edit them in the dashboard.
 // =====================================================================
-
-const HOURS = [
-  { day:'Monday',    time:'9:00 AM – 8:00 PM' },
-  { day:'Tuesday',   time:'9:00 AM – 8:00 PM' },
-  { day:'Wednesday', time:'9:00 AM – 8:00 PM' },
-  { day:'Thursday',  time:'9:00 AM – 8:00 PM' },
-  { day:'Friday',    time:'9:00 AM – 8:00 PM' },
-  { day:'Saturday',  time:'9:00 AM – 6:00 PM' },
-  { day:'Sunday',    time:'10:00 AM – 4:00 PM' },
-];
 
 const VALUES = [
   { title:'Curated, not endless',   body:'We don\'t stock everything — we stock books our team has actually read and wants to recommend. That means less noise, better discoveries.' },
@@ -25,6 +16,21 @@ const VALUES = [
 ];
 
 export default function About() {
+  const content = useSiteContent();
+  const brand = content.brand;
+  const about = content.about;
+  const contact = content.contact;
+
+  const HOURS = [
+    { day:'Monday',    time: contact.hours_weekdays },
+    { day:'Tuesday',   time: contact.hours_weekdays },
+    { day:'Wednesday', time: contact.hours_weekdays },
+    { day:'Thursday',  time: contact.hours_weekdays },
+    { day:'Friday',    time: contact.hours_weekdays },
+    { day:'Saturday',  time: contact.hours_saturday },
+    { day:'Sunday',    time: contact.hours_sunday },
+  ];
+
   const [formData, setFormData] = useState({ name:'', email:'', phone:'', message:'' });
   const [sent, setSent] = useState(false);
 
@@ -37,47 +43,38 @@ export default function About() {
   };
 
   return (
-    <div style={{ fontFamily:'Lato, sans-serif', background:'#FDF8F0' }}>
+    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* Editorial hero */}
-      <section style={{ background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)', color:'#F5DEB3', padding:'100px 20px 120px', position:'relative', overflow:'hidden' }}>
+      <section style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px 120px', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', right:'-100px', top:'-60px', width:'380px', height:'380px', borderRadius:'50%', background:'rgba(212,168,83,0.06)', border:'1px solid rgba(212,168,83,0.12)' }} />
         <div style={{ maxWidth:'780px', margin:'0 auto', position:'relative', zIndex:1, textAlign:'center' }}>
-          <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
-            Our story
+          <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
+            {about.hero_eyebrow}
           </div>
-          <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:'#F5DEB3', lineHeight:'1.1', marginBottom:'24px' }}>
-            A room full of books<br />
-            <span style={{ color:'#D4A853', fontStyle:'italic' }}>and a pot of coffee.</span>
+          <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px' }}>
+            {about.hero_headline_line1}<br />
+            <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{about.hero_headline_line2}</span>
           </h1>
           <p style={{ color:'rgba(245,222,179,0.82)', fontSize:'18px', lineHeight:'1.8', maxWidth:'600px', margin:'0 auto' }}>
-            Tapas Reading Cafe started the way most good things do — a few
-            shelves, a kettle, and people who wanted somewhere quiet to read.
+            {about.hero_subtitle}
           </p>
         </div>
       </section>
 
       {/* Story body */}
       <section style={{ maxWidth:'720px', margin:'-60px auto 0', background:'white', borderRadius:'8px', padding:'56px 48px', boxShadow:'0 20px 60px rgba(44,24,16,0.1)', position:'relative', zIndex:2 }}>
-        <p style={{ color:'#5C3A1E', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'"Playfair Display", serif', fontStyle:'italic' }}>
-          "We wanted a reading room that didn't feel like a library rulebook."
+        <p style={{ color:'#5C3A1E', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontStyle:'italic' }}>
+          "{about.story_pull_quote}"
         </p>
-        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px' }}>
-          Before Tapas, the nearest bookstore in our part of the neighbourhood
-          was a forty-minute bus ride away, and the library closed too early for
-          anyone who worked. So we opened a small space with a couple hundred
-          books, a single espresso machine, and a long table for anyone who
-          wanted to linger.
+        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
+          {about.story_body_1}
         </p>
-        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px' }}>
-          The collection grew the way friendships do — one recommendation at
-          a time. A member brought in a Booker winner they'd loved; we ordered
-          two more. A regular asked for picture books for their daughter;
-          we started a kids' shelf. Ten years later, most of what you'll find
-          on our shelves arrived because someone, somewhere, asked for it.
+        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
+          {about.story_body_2}
         </p>
-        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85' }}>
-          We're still that room with a kettle. Just a lot more books.
+        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', whiteSpace:'pre-line' }}>
+          {about.story_body_3}
         </p>
       </section>
 
@@ -146,9 +143,9 @@ export default function About() {
                 📍 Find us
               </h3>
               {[
-                { label:'Address', value:'Tapas Reading Cafe, Nagpur, Maharashtra' },
-                { label:'Phone',   value:'+91 98765 43210' },
-                { label:'Email',   value:'tapasreadingcafe@gmail.com' },
+                { label:'Address', value: contact.address },
+                { label:'Phone',   value: contact.phone },
+                { label:'Email',   value: contact.email },
               ].map(c => (
                 <div key={c.label} style={{ marginBottom:'18px' }}>
                   <div style={{ fontSize:'10px', fontWeight:'800', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1.5px', marginBottom:'4px' }}>
