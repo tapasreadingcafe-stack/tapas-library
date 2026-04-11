@@ -20,7 +20,23 @@ import { DEFAULT_CONTENT } from '../utils/defaultContent';
 // Google Fonts when they differ from the defaults.
 // =====================================================================
 
-const CACHE_KEY = 'tapas_store_content_v1';
+// Draft-preview mode: when the store is loaded with `?preview=draft`, it
+// reads the `store_content_draft` row from app_settings instead of the live
+// `store_content`. This lets the dashboard editor iframe show unpushed
+// changes without affecting real visitors. Cache keys are namespaced so
+// draft and live never overwrite each other in localStorage.
+function isDraftPreview() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('preview') === 'draft';
+  } catch {
+    return false;
+  }
+}
+
+const IS_DRAFT = isDraftPreview();
+const CONTENT_ROW_KEY = IS_DRAFT ? 'store_content_draft' : 'store_content';
+const CACHE_KEY = IS_DRAFT ? 'tapas_store_content_draft_v1' : 'tapas_store_content_v1';
 
 function loadFromCache() {
   try {
@@ -145,7 +161,7 @@ export function SiteContentProvider({ children }) {
         const { data } = await supabase
           .from('app_settings')
           .select('value')
-          .eq('key', 'store_content')
+          .eq('key', CONTENT_ROW_KEY)
           .maybeSingle();
         if (!mounted) return;
         if (data?.value) {
