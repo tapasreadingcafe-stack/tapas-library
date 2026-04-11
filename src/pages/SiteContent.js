@@ -81,70 +81,126 @@ function deepMerge(base, override) {
 
 // ---- Styling tokens (Figma-like neutrals) -----------------------------
 
+// Figma-ish neutral palette.
 const S = {
-  bg:       '#F5F6F8',
+  canvas:   '#E5E5E5',          // canvas gray (outside the white panels)
+  bg:       '#F5F5F5',
   panel:    '#FFFFFF',
-  border:   '#E4E7EB',
-  borderStrong: '#CBD2D9',
-  text:     '#1F2933',
-  textDim:  '#7B8794',
-  textFaint:'#A8B1BB',
-  accent:   '#4F46E5',
-  accentLight:'#EEF2FF',
-  success:  '#10B981',
+  panelAlt: '#FAFAFA',
+  border:   '#E5E5E5',
+  borderStrong: '#D1D5DB',
+  divider:  '#ECECEC',
+  text:     '#2C2C2C',
+  textDim:  '#8A8A8A',
+  textFaint:'#B3B3B3',
+  accent:   '#0D99FF',            // Figma blue
+  accentLight:'#E5F1FC',
+  success:  '#14AE5C',
   warning:  '#F59E0B',
-  danger:   '#EF4444',
+  danger:   '#F24822',
+  sectionHeader: '#F5F5F5',
 };
 
-// ---- Field renderers --------------------------------------------------
+// ---- Field renderers: Figma-style icon + label + input rows -----------
+// Every field is a compact row. Figma's inspector is dense — 28px tall
+// inputs, 10–11px labels, tight gaps. We lean into that.
 
 const inputBaseStyle = {
   width: '100%',
-  padding: '6px 10px',
-  border: `1px solid ${S.border}`,
-  borderRadius: '6px',
-  fontSize: '12px',
+  padding: '0 8px',
+  border: `1px solid transparent`,
+  borderRadius: '2px',
+  fontSize: '11px',
   fontFamily: 'inherit',
   outline: 'none',
-  background: '#FFF',
+  background: S.panelAlt,
   color: S.text,
   boxSizing: 'border-box',
-  height: '32px',
-};
-const labelStyle = {
-  display: 'block',
-  fontSize: '11px',
-  fontWeight: '500',
-  color: S.textDim,
-  marginBottom: '4px',
+  height: '28px',
 };
 const hintStyle = {
-  fontSize: '11px',
+  fontSize: '10px',
   color: S.textFaint,
-  marginTop: '4px',
+  marginTop: '3px',
+  paddingLeft: '24px',
+  lineHeight: '1.35',
 };
 
-function Row({ label, children, inline }) {
-  if (inline) {
+// Icon glyphs per field type. Using unicode so we don't ship SVG paths.
+// Positioned monospace-ish in a 20px column on the left of every row.
+const TYPE_ICON = {
+  text:         'T',
+  textarea:     '¶',
+  color:        '●',
+  font:         'A',
+  image:        '⛰',
+  toggle:       '◱',
+  number:       '#',
+  select:       '▾',
+  sectionOrder: '☰',
+};
+
+function FieldIcon({ type, color }) {
+  const glyph = TYPE_ICON[type] || '·';
+  return (
+    <span style={{
+      width: '20px',
+      flexShrink: 0,
+      color: color || S.textDim,
+      fontSize: '11px',
+      fontWeight: '500',
+      textAlign: 'center',
+      fontFamily: 'ui-monospace, "SF Mono", monospace',
+    }}>{glyph}</span>
+  );
+}
+
+// Compact row — Figma inspector uses a 20px icon column, a muted label,
+// and a flex input on the right. Label truncates if it doesn't fit.
+function Row({ label, iconType, iconColor, children, stacked }) {
+  if (stacked) {
     return (
-      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px' }}>
-        <label style={{ ...labelStyle, marginBottom: 0, flexShrink: 0, width: '110px' }}>{label}</label>
-        <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+      <div style={{ padding: '0 16px 10px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
+          <FieldIcon type={iconType} color={iconColor} />
+          <span style={{ fontSize:'10px', color: S.textDim, fontWeight:'500', textTransform:'capitalize' }}>
+            {label}
+          </span>
+        </div>
+        <div style={{ paddingLeft: '28px' }}>{children}</div>
       </div>
     );
   }
   return (
-    <div style={{ marginBottom: '12px' }}>
-      <label style={labelStyle}>{label}</label>
-      {children}
+    <div style={{ padding: '0 16px', marginBottom: '6px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+        <FieldIcon type={iconType} color={iconColor} />
+        <span style={{
+          fontSize:'11px',
+          color: S.textDim,
+          fontWeight:'400',
+          flexShrink: 0,
+          width: '88px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }} title={label}>
+          {label}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+      </div>
     </div>
   );
 }
 
 function TextField({ field, value, onChange, inputRef }) {
   return (
-    <Row label={field.label} inline>
-      <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)} style={inputBaseStyle} />
+    <Row label={field.label} iconType="text">
+      <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+        style={inputBaseStyle}
+        onFocus={e => { e.target.style.border = `1px solid ${S.accent}`; e.target.style.background = '#FFF'; }}
+        onBlur={e  => { e.target.style.border = `1px solid transparent`; e.target.style.background = S.panelAlt; }}
+      />
       {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
@@ -152,9 +208,12 @@ function TextField({ field, value, onChange, inputRef }) {
 
 function TextArea({ field, value, onChange, inputRef }) {
   return (
-    <Row label={field.label}>
+    <Row label={field.label} iconType="textarea" stacked>
       <textarea ref={inputRef} value={value || ''} onChange={e => onChange(e.target.value)} rows={3}
-        style={{ ...inputBaseStyle, height: 'auto', resize: 'vertical', lineHeight: '1.5', padding: '8px 10px' }} />
+        style={{ ...inputBaseStyle, height: 'auto', resize: 'vertical', lineHeight: '1.45', padding: '6px 8px' }}
+        onFocus={e => { e.target.style.border = `1px solid ${S.accent}`; e.target.style.background = '#FFF'; }}
+        onBlur={e  => { e.target.style.border = `1px solid transparent`; e.target.style.background = S.panelAlt; }}
+      />
       {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
@@ -162,24 +221,26 @@ function TextArea({ field, value, onChange, inputRef }) {
 
 function ColorField({ field, value, onChange, inputRef }) {
   return (
-    <Row label={field.label} inline>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        <div style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0 }}>
+    <Row label={field.label} iconType="color" iconColor={value || S.textDim}>
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: S.panelAlt, borderRadius: '2px', height: '28px', padding: '0 6px' }}>
+        <div style={{ position: 'relative', width: '16px', height: '16px', flexShrink: 0 }}>
           <div style={{
-            width: '100%', height: '100%', borderRadius: '6px',
+            width: '100%', height: '100%', borderRadius: '2px',
             background: value || 'transparent',
-            border: `1px solid ${S.border}`,
+            border: `1px solid ${S.borderStrong}`,
             backgroundImage: value ? 'none' : 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
-            backgroundSize: '8px 8px',
-            backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0',
+            backgroundSize: '6px 6px',
+            backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
           }} />
           <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)}
             style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
         </div>
-        <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
-          placeholder="Transparent" style={{ ...inputBaseStyle, fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase' }} />
+        <input ref={inputRef} type="text" value={(value || '').replace('#', '').toUpperCase()}
+          onChange={e => onChange('#' + e.target.value.replace('#', ''))}
+          placeholder="—"
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '11px', fontFamily: 'ui-monospace, monospace', color: S.text, letterSpacing: '0.3px', minWidth: 0 }} />
+        <span style={{ fontSize: '10px', color: S.textFaint, flexShrink: 0 }}>100%</span>
       </div>
-      {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
 }
@@ -187,14 +248,16 @@ function ColorField({ field, value, onChange, inputRef }) {
 function FontField({ field, value, onChange, inputRef }) {
   const COMMON = ['Playfair Display','Lato','Inter','Roboto','Open Sans','Merriweather','Lora','Raleway','Cormorant Garamond','EB Garamond','Crimson Pro','Libre Baskerville','Montserrat','Poppins'];
   return (
-    <Row label={field.label} inline>
+    <Row label={field.label} iconType="font">
       <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
         list={`font-options-${field.key}`} placeholder="Playfair Display"
-        style={{ ...inputBaseStyle, fontFamily: value ? `"${value}", serif` : 'inherit' }} />
+        style={{ ...inputBaseStyle, fontFamily: value ? `"${value}", serif` : 'inherit' }}
+        onFocus={e => { e.target.style.border = `1px solid ${S.accent}`; e.target.style.background = '#FFF'; }}
+        onBlur={e  => { e.target.style.border = `1px solid transparent`; e.target.style.background = S.panelAlt; }}
+      />
       <datalist id={`font-options-${field.key}`}>
         {COMMON.map(f => <option key={f} value={f} />)}
       </datalist>
-      {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
 }
@@ -219,31 +282,30 @@ function ImageField({ field, value, onChange, inputRef }) {
     } finally { setUploading(false); }
   };
   return (
-    <Row label={field.label}>
+    <Row label={field.label} iconType="image" stacked>
       {value && (
-        <div style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', border: `1px solid ${S.border}` }}>
-          <img src={value} alt={field.label} style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', display: 'block' }} />
+        <div style={{ marginBottom: '6px', borderRadius: '2px', overflow: 'hidden', border: `1px solid ${S.border}` }}>
+          <img src={value} alt={field.label} style={{ width: '100%', maxHeight: '120px', objectFit: 'cover', display: 'block' }} />
         </div>
       )}
-      <div style={{ display: 'flex', gap: '6px' }}>
+      <div style={{ display: 'flex', gap: '4px' }}>
         <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
-          placeholder="https://… or upload"
-          style={{ ...inputBaseStyle, flex: 1, fontSize: '11px', fontFamily: 'ui-monospace, monospace' }} />
+          placeholder="URL or upload"
+          style={{ ...inputBaseStyle, flex: 1, fontFamily: 'ui-monospace, monospace' }} />
         <label style={{
-          padding: '0 10px', height: '32px', display: 'inline-flex', alignItems: 'center',
-          background: S.accent, color: 'white', border: 'none', borderRadius: '6px',
+          padding: '0 10px', height: '28px', display: 'inline-flex', alignItems: 'center',
+          background: S.accent, color: 'white', border: 'none', borderRadius: '2px',
           cursor: 'pointer', fontSize: '11px', fontWeight: '600', opacity: uploading ? 0.7 : 1,
         }}>
-          {uploading ? '⏳' : '📤'}
+          {uploading ? '⏳' : '↑'}
           <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} style={{ display: 'none' }} />
         </label>
         {value && (
           <button type="button" onClick={() => onChange('')} title="Remove"
-            style={{ padding: '0 10px', height: '32px', background: 'white', border: `1px solid ${S.border}`, borderRadius: '6px', cursor: 'pointer', color: S.danger, fontSize: '12px' }}>🗑</button>
+            style={{ padding: '0 10px', height: '28px', background: S.panelAlt, border: 'none', borderRadius: '2px', cursor: 'pointer', color: S.textDim, fontSize: '11px' }}>✕</button>
         )}
       </div>
       {uploadError && <div style={{ ...hintStyle, color: S.danger }}>⚠️ {uploadError}</div>}
-      {!uploadError && field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
 }
@@ -251,24 +313,20 @@ function ImageField({ field, value, onChange, inputRef }) {
 function ToggleField({ field, value, onChange }) {
   const on = value !== false;
   return (
-    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: S.bg, borderRadius: '6px' }}>
+    <Row label={field.label} iconType="toggle">
       <button type="button" onClick={() => onChange(!on)} aria-pressed={on}
         style={{
-          width: '32px', height: '18px', borderRadius: '9px',
-          background: on ? S.success : S.borderStrong, border: 'none', cursor: 'pointer',
-          position: 'relative', flexShrink: 0, transition: 'background 0.15s',
+          width: '28px', height: '16px', borderRadius: '8px',
+          background: on ? S.accent : S.borderStrong, border: 'none', cursor: 'pointer',
+          position: 'relative', transition: 'background 0.15s',
         }}>
         <span style={{
-          position: 'absolute', top: '2px', left: on ? '16px' : '2px',
-          width: '14px', height: '14px', background: 'white', borderRadius: '50%',
-          transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+          position: 'absolute', top: '2px', left: on ? '14px' : '2px',
+          width: '12px', height: '12px', background: 'white', borderRadius: '50%',
+          transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
         }} />
       </button>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '12px', color: S.text, fontWeight: '500' }}>{field.label}</div>
-        {field.hint && <div style={{ ...hintStyle, marginTop: 0 }}>{field.hint}</div>}
-      </div>
-    </div>
+    </Row>
   );
 }
 
@@ -277,32 +335,31 @@ function NumberField({ field, value, onChange, inputRef }) {
   const min = field.min ?? 0;
   const max = field.max ?? 200;
   return (
-    <Row label={field.label} inline>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+    <Row label={field.label} iconType="number">
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: S.panelAlt, borderRadius: '2px', height: '28px', padding: '0 6px' }}>
         <input type="range" min={min} max={max} value={v}
           onChange={e => onChange(Number(e.target.value))}
-          style={{ flex: 1, accentColor: S.accent }} />
-        <div style={{ position: 'relative', width: '64px', flexShrink: 0 }}>
-          <input ref={inputRef} type="number" min={min} max={max} value={v}
-            onChange={e => onChange(Number(e.target.value))}
-            style={{ ...inputBaseStyle, textAlign: 'right', paddingRight: '22px' }} />
-          <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', color: S.textFaint, pointerEvents: 'none' }}>px</span>
-        </div>
+          style={{ flex: 1, accentColor: S.accent, height: '16px', minWidth: 0 }} />
+        <input ref={inputRef} type="number" min={min} max={max} value={v}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{
+            width: '44px', background: 'transparent', border: 'none', outline: 'none',
+            fontSize: '11px', color: S.text, textAlign: 'right',
+            fontFamily: 'ui-monospace, monospace',
+          }} />
       </div>
-      {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
 }
 
 function SelectField({ field, value, onChange, inputRef }) {
   return (
-    <Row label={field.label} inline>
+    <Row label={field.label} iconType="select">
       <select ref={inputRef} value={value || (field.options?.[0]?.value ?? '')}
         onChange={e => onChange(e.target.value)}
         style={{ ...inputBaseStyle, cursor: 'pointer' }}>
         {(field.options || []).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
-      {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
 }
@@ -319,25 +376,23 @@ function SectionOrderField({ field, value, onChange }) {
     onChange(next.join(','));
   };
   return (
-    <Row label={field.label}>
-      <div style={{ background: S.bg, borderRadius: '6px', padding: '4px', border: `1px solid ${S.border}` }}>
+    <Row label={field.label} iconType="sectionOrder" stacked>
+      <div style={{ background: S.panelAlt, borderRadius: '2px', padding: '4px' }}>
         {ordered.map((id, idx) => (
           <div key={id} style={{
             display: 'flex', alignItems: 'center', gap: '6px',
-            background: 'white', padding: '8px 10px', borderRadius: '4px',
+            background: S.panel, padding: '6px 8px', borderRadius: '2px',
             marginBottom: idx === ordered.length - 1 ? 0 : '2px',
-            border: `1px solid ${S.border}`,
           }}>
-            <span style={{ color: S.textFaint, fontSize: '12px' }}>⋮⋮</span>
-            <span style={{ flex: 1, fontSize: '12px', color: S.text, fontWeight: '500' }}>{labelFor(id)}</span>
+            <span style={{ color: S.textFaint, fontSize: '10px' }}>☰</span>
+            <span style={{ flex: 1, fontSize: '11px', color: S.text, fontWeight: '500' }}>{labelFor(id)}</span>
             <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0}
-              style={{ width: '22px', height: '22px', padding: 0, background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px', cursor: idx === 0 ? 'not-allowed' : 'pointer', color: idx === 0 ? S.textFaint : S.textDim, fontSize: '11px' }}>↑</button>
+              style={{ width: '20px', height: '20px', padding: 0, background: 'transparent', border: 'none', cursor: idx === 0 ? 'not-allowed' : 'pointer', color: idx === 0 ? S.textFaint : S.textDim, fontSize: '11px' }}>↑</button>
             <button type="button" onClick={() => move(idx, 1)} disabled={idx === ordered.length - 1}
-              style={{ width: '22px', height: '22px', padding: 0, background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px', cursor: idx === ordered.length - 1 ? 'not-allowed' : 'pointer', color: idx === ordered.length - 1 ? S.textFaint : S.textDim, fontSize: '11px' }}>↓</button>
+              style={{ width: '20px', height: '20px', padding: 0, background: 'transparent', border: 'none', cursor: idx === ordered.length - 1 ? 'not-allowed' : 'pointer', color: idx === ordered.length - 1 ? S.textFaint : S.textDim, fontSize: '11px' }}>↓</button>
           </div>
         ))}
       </div>
-      {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </Row>
   );
 }
@@ -562,6 +617,8 @@ export default function SiteContent() {
   }, []);
 
   const vp = VIEWPORTS.find(v => v.key === viewport) || VIEWPORTS[0];
+  const currentSection = CONTENT_SCHEMA.find(s => s.key === activeSection) || CONTENT_SCHEMA[0];
+  const currentStorage = storageKeyForSection(currentSection);
 
   return (
     <div style={{
@@ -807,127 +864,118 @@ export default function SiteContent() {
           </div>
         </main>
 
-        {/* RIGHT: property inspector — Figma-style collapsible sections */}
+        {/* RIGHT: property inspector — Figma-style, one active section */}
         <aside style={{
-          width: '340px',
+          width: '320px',
           flexShrink: 0,
           background: S.panel,
           borderLeft: `1px solid ${S.border}`,
           display: 'flex',
           flexDirection: 'column',
         }}>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          {/* Design / Prototype tab bar */}
+          <div style={{
+            display: 'flex',
+            borderBottom: `1px solid ${S.border}`,
+            background: S.panel,
+            flexShrink: 0,
+          }}>
+            <div style={{
+              flex: 1,
+              padding: '10px 0',
+              textAlign: 'center',
+              fontSize: '11px',
+              fontWeight: '600',
+              color: S.text,
+              borderBottom: `2px solid ${S.accent}`,
+              marginBottom: '-1px',
+            }}>
+              Design
+            </div>
+            <div style={{
+              flex: 1,
+              padding: '10px 0',
+              textAlign: 'center',
+              fontSize: '11px',
+              fontWeight: '500',
+              color: S.textFaint,
+            }}>
+              Prototype
+            </div>
+          </div>
+
+          {/* Section header — "Frame" style */}
+          {!loading && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderBottom: `1px solid ${S.border}`,
+              flexShrink: 0,
+            }}>
+              <span style={{ fontSize: '12px' }}>{currentSection.icon}</span>
+              <span style={{ flex: 1, fontSize: '11px', fontWeight: '600', color: S.text }}>
+                {currentSection.title}
+                <span style={{ marginLeft: '4px', color: S.textFaint, fontSize: '9px' }}>▾</span>
+              </span>
+              <button
+                title="Reset section"
+                onClick={() => {
+                  if (!window.confirm(`Reset ${currentSection.title}?`)) return;
+                  const defaults = DEFAULT_CONTENT[currentStorage] || {};
+                  const keysToReset = currentSection.fields.map(f => f.key);
+                  setDraftContent(prev => ({
+                    ...prev,
+                    [currentStorage]: keysToReset.reduce(
+                      (acc, k) => ({ ...acc, [k]: defaults[k] }),
+                      { ...(prev[currentStorage] || {}) }
+                    ),
+                  }));
+                }}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: S.textFaint, cursor: 'pointer',
+                  fontSize: '12px', padding: '4px 6px', borderRadius: '2px',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = S.bg; }}
+                onMouseLeave={e => { e.currentTarget.style.color = S.textFaint; e.currentTarget.style.background = 'transparent'; }}
+              >↺</button>
+            </div>
+          )}
+
+          {/* Fields */}
+          <div style={{ flex: 1, overflowY: 'auto', paddingTop: '12px', paddingBottom: '40px' }}>
             {loading ? (
-              <div style={{ color: S.textDim, textAlign: 'center', padding: '40px' }}>Loading…</div>
+              <div style={{ color: S.textDim, textAlign: 'center', padding: '40px', fontSize: '11px' }}>Loading…</div>
             ) : (
-              CONTENT_SCHEMA.map(section => {
-                const storage = storageKeyForSection(section);
-                const isExpanded = expanded.has(section.key);
-                const isActive = activeSection === section.key;
-
-                return (
-                  <div
-                    key={section.key}
-                    ref={(el) => { sectionRefs.current[section.key] = el; }}
-                    style={{
-                      borderBottom: `1px solid ${S.border}`,
-                      background: isActive ? S.accentLight + '55' : 'transparent',
-                    }}
-                  >
-                    {/* Section header */}
-                    <button
-                      onClick={() => toggleExpand(section.key)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 16px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <span style={{
-                        fontSize: '9px',
-                        color: S.textDim,
-                        width: '12px',
-                        display: 'inline-block',
-                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.15s',
-                      }}>▶</span>
-                      <span style={{ fontSize: '12px' }}>{section.icon}</span>
-                      <span style={{
-                        flex: 1,
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: S.text,
-                        textTransform: 'none',
-                        letterSpacing: '0',
-                      }}>
-                        {section.title}
-                      </span>
-                      <span
-                        title="Reset to defaults"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!window.confirm(`Reset ${section.title}?`)) return;
-                          const defaults = DEFAULT_CONTENT[storage] || {};
-                          const keysToReset = section.fields.map(f => f.key);
-                          setDraftContent(prev => ({
-                            ...prev,
-                            [storage]: keysToReset.reduce(
-                              (acc, k) => ({ ...acc, [k]: defaults[k] }),
-                              { ...(prev[storage] || {}) }
-                            ),
-                          }));
-                        }}
-                        style={{
-                          color: S.textFaint,
-                          fontSize: '12px',
-                          padding: '2px 6px',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = S.bg; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = S.textFaint; e.currentTarget.style.background = 'transparent'; }}
-                      >↺</span>
-                    </button>
-
-                    {/* Section body */}
-                    {isExpanded && (
-                      <div style={{ padding: '4px 16px 14px' }}>
-                        {section.subtitle && (
-                          <p style={{
-                            margin: '0 0 12px',
-                            color: S.textDim,
-                            fontSize: '10.5px',
-                            lineHeight: '1.4',
-                            fontStyle: 'italic',
-                          }}>
-                            {section.subtitle}
-                          </p>
-                        )}
-                        {section.fields.map(field => {
-                          const Renderer = FIELD_RENDERERS[field.type] || TextField;
-                          const value = draftContent[storage]?.[field.key];
-                          const refKey = `${section.key}.${field.key}`;
-                          return (
-                            <Renderer
-                              key={field.key}
-                              field={field}
-                              value={value}
-                              inputRef={(el) => { fieldRefs.current[refKey] = el; }}
-                              onChange={(v) => updateField(storage, field.key, v)}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
+              <>
+                {currentSection.subtitle && (
+                  <div style={{
+                    padding: '0 16px 12px',
+                    color: S.textFaint,
+                    fontSize: '10.5px',
+                    lineHeight: '1.45',
+                    fontStyle: 'italic',
+                  }}>
+                    {currentSection.subtitle}
                   </div>
-                );
-              })
+                )}
+                {currentSection.fields.map(field => {
+                  const Renderer = FIELD_RENDERERS[field.type] || TextField;
+                  const value = draftContent[currentStorage]?.[field.key];
+                  const refKey = `${currentSection.key}.${field.key}`;
+                  return (
+                    <Renderer
+                      key={field.key}
+                      field={field}
+                      value={value}
+                      inputRef={(el) => { fieldRefs.current[refKey] = el; }}
+                      onChange={(v) => updateField(currentStorage, field.key, v)}
+                    />
+                  );
+                })}
+              </>
             )}
           </div>
         </aside>
