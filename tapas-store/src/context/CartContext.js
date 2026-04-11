@@ -51,7 +51,7 @@ export function CartProvider({ children }) {
         book_id: book.id,
         title: book.title,
         author: book.author,
-        cover_image: book.cover_image || null,
+        cover_image: book.book_image || book.cover_image || null,
         unit_price: Number(book.sales_price || 0),
         quantity: qty,
       }];
