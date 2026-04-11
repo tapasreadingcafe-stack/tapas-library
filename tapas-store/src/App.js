@@ -70,11 +70,12 @@ function Navbar() {
     }
   };
 
+  const header = content.header || {};
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/books', label: 'Books' },
-    { to: '/offers', label: 'Offers' },
-    { to: '/about', label: 'About' },
+    { to: '/', label: header.nav_home || 'Home' },
+    { to: '/books', label: header.nav_books || 'Books' },
+    { to: '/offers', label: header.nav_offers || 'Offers' },
+    { to: '/about', label: header.nav_about || 'About' },
   ];
 
   return (
@@ -86,7 +87,7 @@ function Navbar() {
     }}>
       <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'64px' }}>
         <Link to="/" style={{ textDecoration:'none', display:'flex', alignItems:'center', gap:'10px' }}>
-          <span style={{ fontSize:'28px' }}>📚</span>
+          <span style={{ fontSize:'28px' }}>{header.logo_emoji || '📚'}</span>
           <div>
             <div style={{ color:content.brand.sand_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'18px', fontWeight:'700', lineHeight:'1.1' }}>{content.brand.name}</div>
             <div style={{ color:content.brand.accent_color, fontSize:'11px', letterSpacing:'2px' }}>{content.brand.tagline}</div>
@@ -114,7 +115,7 @@ function Navbar() {
                 autoFocus
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search books..."
+                placeholder={header.search_placeholder || 'Search books...'}
                 style={{ padding:'6px 12px', borderRadius:'20px', border:'none', background:'rgba(255,255,255,0.15)', color:'white', outline:'none', width:'200px', fontSize:'14px' }}
               />
               <button type="submit" style={{ background:'none', border:'none', color:'#D4A853', cursor:'pointer', fontSize:'18px' }}>🔍</button>
@@ -154,17 +155,17 @@ function Navbar() {
           ) : (
             <>
               <Link to="/login" style={{
-                color:'#F5DEB3', textDecoration:'none', padding:'8px 14px', borderRadius:'20px',
-                fontWeight:'600', fontSize:'14px', border:'1px solid rgba(245,222,179,0.3)'
+                color:content.brand.sand_color, textDecoration:'none', padding:'8px 14px', borderRadius:'20px',
+                fontWeight:'600', fontSize:'14px', border:`1px solid ${content.brand.sand_color}55`
               }}>
-                Login
+                {header.login_label || 'Login'}
               </Link>
               <Link to="/login?mode=signup" style={{
-                background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
+                background:`linear-gradient(135deg, ${content.brand.accent_color}, ${content.brand.accent_color_dark})`, color:content.brand.primary_color,
                 textDecoration:'none', padding:'8px 18px', borderRadius:'20px',
                 fontWeight:'700', fontSize:'14px', boxShadow:'0 2px 8px rgba(212,168,83,0.4)'
               }}>
-                Sign Up
+                {header.signup_label || 'Sign Up'}
               </Link>
             </>
           )}
@@ -232,7 +233,7 @@ function Footer() {
           </div>
 
           <div>
-            <h4 style={{ color:content.brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', marginBottom:'16px' }}>Contact</h4>
+            <h4 style={{ color:content.brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', marginBottom:'16px' }}>{content.footer?.contact_heading || 'Contact'}</h4>
             {[['📍', content.contact.address],['📞', content.contact.phone],['✉️', content.contact.email]].map(([icon, text]) => (
               <div key={text} style={{ display:'flex', gap:'10px', marginBottom:'12px', alignItems:'flex-start' }}>
                 <span>{icon}</span>

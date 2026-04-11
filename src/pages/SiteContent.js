@@ -43,7 +43,7 @@ const VIEWPORTS = [
 // the left panel can render them grouped like Figma's layers panel.
 const SECTION_GROUPS = [
   { key: 'design', label: 'Design',    icon: '🎨', sectionKeys: ['brand', 'typography', 'buttons', 'images'] },
-  { key: 'pages',  label: 'Pages',     icon: '📄', sectionKeys: ['home', 'catalog', 'about', 'about_values', 'offers', 'offers_why_join', 'offers_cta', 'newsletter', 'footer', 'contact'] },
+  { key: 'pages',  label: 'Pages',     icon: '📄', sectionKeys: ['header', 'home', 'catalog', 'about', 'about_values', 'offers', 'offers_why_join', 'offers_cta', 'newsletter', 'footer', 'contact'] },
   { key: 'plans',  label: 'Membership', icon: '💳', sectionKeys: ['plans_basic', 'plans_silver', 'plans_gold'] },
   { key: 'layout', label: 'Layout',    icon: '📐', sectionKeys: [
     'visibility', 'styles', 'layout',
@@ -361,13 +361,18 @@ export default function SiteContent() {
   const [pushedAt, setPushedAt] = useState(null);
   const [error,   setError]     = useState('');
   const [activeSection, setActiveSection] = useState('brand');
+  // Expanded sections in the right panel — Set of schema keys.
+  const [expanded, setExpanded] = useState(new Set(['brand']));
   const [viewport, setViewport]   = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [iframePath, setIframePath] = useState('/');
+  const [iframeReady, setIframeReady] = useState(false);
   const iframeRef = useRef(null);
   const fieldRefs = useRef({});
+  const sectionRefs = useRef({});
   const pendingScrollRef = useRef(null);
   const autosaveTimerRef = useRef(null);
+  const applyContentTimerRef = useRef(null);
 
   // Initial load: fetch both draft and live in parallel.
   const load = useCallback(async () => {
@@ -433,6 +438,24 @@ export default function SiteContent() {
     return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
   }, [draftContent, dirty, loading, saveDraft]);
 
+  // Live preview bridge: on every draftContent change, push the whole
+  // blob to the iframe via postMessage so the preview updates without
+  // waiting for autosave or reload. Debounced tightly (120ms) so typing
+  // feels instant. Only runs after the iframe signals ready.
+  useEffect(() => {
+    if (loading || !iframeReady) return;
+    if (applyContentTimerRef.current) clearTimeout(applyContentTimerRef.current);
+    applyContentTimerRef.current = setTimeout(() => {
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'tapas:apply-content', content: draftContent },
+          '*'
+        );
+      } catch {}
+    }, 120);
+    return () => { if (applyContentTimerRef.current) clearTimeout(applyContentTimerRef.current); };
+  }, [draftContent, loading, iframeReady]);
+
   // Push — copies draft → live.
   const pushToLive = async () => {
     setPushing(true); setError('');
@@ -463,8 +486,30 @@ export default function SiteContent() {
 
   const jumpToSection = (sectionKey) => {
     setActiveSection(sectionKey);
+    // Expand the picked section in the right panel, keep any previously
+    // expanded sections as-is (Figma-like behaviour).
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.add(sectionKey);
+      return next;
+    });
     const path = SECTION_DEFAULT_PATH[sectionKey] || '/';
     if (iframePath !== path) setIframePath(path);
+    // Scroll the section card into view in the right panel after the
+    // render cycle completes.
+    setTimeout(() => {
+      const el = sectionRefs.current[sectionKey];
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
+
+  const toggleExpand = (sectionKey) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionKey)) next.delete(sectionKey);
+      else next.add(sectionKey);
+      return next;
+    });
   };
 
   // Receive messages from the iframe (click-to-edit)
@@ -473,16 +518,32 @@ export default function SiteContent() {
       const msg = event.data;
       if (!msg || typeof msg !== 'object') return;
 
-      if (msg.type === 'tapas:ready' && pendingScrollRef.current) {
-        iframeRef.current?.contentWindow?.postMessage(
-          { type: 'tapas:highlight', sectionId: pendingScrollRef.current }, '*'
-        );
-        pendingScrollRef.current = null;
+      if (msg.type === 'tapas:ready') {
+        setIframeReady(true);
+        // On ready, immediately send the current draft so the iframe
+        // shows unpublished changes even if the DB row is stale.
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'tapas:apply-content', content: draftContent },
+            '*'
+          );
+        } catch {}
+        if (pendingScrollRef.current) {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'tapas:highlight', sectionId: pendingScrollRef.current }, '*'
+          );
+          pendingScrollRef.current = null;
+        }
       }
       if (msg.type === 'tapas:edit-field' && typeof msg.fieldPath === 'string') {
         const sectionKey = sectionForFieldPath(msg.fieldPath);
         if (!sectionKey) return;
         setActiveSection(sectionKey);
+        setExpanded(prev => {
+          const next = new Set(prev);
+          next.add(sectionKey);
+          return next;
+        });
         const fieldKey = msg.fieldPath.split('.')[1];
         setTimeout(() => {
           const el = fieldRefs.current[`${sectionKey}.${fieldKey}`];
@@ -501,8 +562,6 @@ export default function SiteContent() {
   }, []);
 
   const vp = VIEWPORTS.find(v => v.key === viewport) || VIEWPORTS[0];
-  const currentSection = CONTENT_SCHEMA.find(s => s.key === activeSection) || CONTENT_SCHEMA[0];
-  const currentStorage = storageKeyForSection(currentSection);
 
   return (
     <div style={{
@@ -748,7 +807,7 @@ export default function SiteContent() {
           </div>
         </main>
 
-        {/* RIGHT: property inspector */}
+        {/* RIGHT: property inspector — Figma-style collapsible sections */}
         <aside style={{
           width: '340px',
           flexShrink: 0,
@@ -757,69 +816,118 @@ export default function SiteContent() {
           display: 'flex',
           flexDirection: 'column',
         }}>
-          <div style={{
-            padding: '14px 16px 10px',
-            borderBottom: `1px solid ${S.border}`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <span style={{ fontSize: '14px' }}>{currentSection.icon}</span>
-              <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: S.text }}>
-                {currentSection.title}
-              </h2>
-            </div>
-            <p style={{ margin: 0, color: S.textDim, fontSize: '11px', lineHeight: '1.4' }}>
-              {currentSection.subtitle}
-            </p>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px' }}>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
               <div style={{ color: S.textDim, textAlign: 'center', padding: '40px' }}>Loading…</div>
             ) : (
-              <>
-                {currentSection.fields.map(field => {
-                  const Renderer = FIELD_RENDERERS[field.type] || TextField;
-                  const value = draftContent[currentStorage]?.[field.key];
-                  const refKey = `${currentSection.key}.${field.key}`;
-                  return (
-                    <Renderer
-                      key={field.key}
-                      field={field}
-                      value={value}
-                      inputRef={(el) => { fieldRefs.current[refKey] = el; }}
-                      onChange={(v) => updateField(currentStorage, field.key, v)}
-                    />
-                  );
-                })}
+              CONTENT_SCHEMA.map(section => {
+                const storage = storageKeyForSection(section);
+                const isExpanded = expanded.has(section.key);
+                const isActive = activeSection === section.key;
 
-                <button
-                  onClick={() => {
-                    if (!window.confirm(`Reset ${currentSection.title} to defaults?`)) return;
-                    const defaults = DEFAULT_CONTENT[currentStorage] || {};
-                    const keysToReset = currentSection.fields.map(f => f.key);
-                    setDraftContent(prev => ({
-                      ...prev,
-                      [currentStorage]: keysToReset.reduce(
-                        (acc, k) => ({ ...acc, [k]: defaults[k] }),
-                        { ...(prev[currentStorage] || {}) }
-                      ),
-                    }));
-                  }}
-                  style={{
-                    marginTop: '10px',
-                    padding: '6px 12px',
-                    background: 'transparent',
-                    border: `1px solid ${S.border}`,
-                    borderRadius: '4px',
-                    color: S.textDim,
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                  }}
-                >
-                  ↺ Reset section
-                </button>
-              </>
+                return (
+                  <div
+                    key={section.key}
+                    ref={(el) => { sectionRefs.current[section.key] = el; }}
+                    style={{
+                      borderBottom: `1px solid ${S.border}`,
+                      background: isActive ? S.accentLight + '55' : 'transparent',
+                    }}
+                  >
+                    {/* Section header */}
+                    <button
+                      onClick={() => toggleExpand(section.key)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 16px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '9px',
+                        color: S.textDim,
+                        width: '12px',
+                        display: 'inline-block',
+                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.15s',
+                      }}>▶</span>
+                      <span style={{ fontSize: '12px' }}>{section.icon}</span>
+                      <span style={{
+                        flex: 1,
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: S.text,
+                        textTransform: 'none',
+                        letterSpacing: '0',
+                      }}>
+                        {section.title}
+                      </span>
+                      <span
+                        title="Reset to defaults"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!window.confirm(`Reset ${section.title}?`)) return;
+                          const defaults = DEFAULT_CONTENT[storage] || {};
+                          const keysToReset = section.fields.map(f => f.key);
+                          setDraftContent(prev => ({
+                            ...prev,
+                            [storage]: keysToReset.reduce(
+                              (acc, k) => ({ ...acc, [k]: defaults[k] }),
+                              { ...(prev[storage] || {}) }
+                            ),
+                          }));
+                        }}
+                        style={{
+                          color: S.textFaint,
+                          fontSize: '12px',
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = S.bg; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = S.textFaint; e.currentTarget.style.background = 'transparent'; }}
+                      >↺</span>
+                    </button>
+
+                    {/* Section body */}
+                    {isExpanded && (
+                      <div style={{ padding: '4px 16px 14px' }}>
+                        {section.subtitle && (
+                          <p style={{
+                            margin: '0 0 12px',
+                            color: S.textDim,
+                            fontSize: '10.5px',
+                            lineHeight: '1.4',
+                            fontStyle: 'italic',
+                          }}>
+                            {section.subtitle}
+                          </p>
+                        )}
+                        {section.fields.map(field => {
+                          const Renderer = FIELD_RENDERERS[field.type] || TextField;
+                          const value = draftContent[storage]?.[field.key];
+                          const refKey = `${section.key}.${field.key}`;
+                          return (
+                            <Renderer
+                              key={field.key}
+                              field={field}
+                              value={value}
+                              inputRef={(el) => { fieldRefs.current[refKey] = el; }}
+                              onChange={(v) => updateField(storage, field.key, v)}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </aside>

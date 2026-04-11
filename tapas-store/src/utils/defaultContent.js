@@ -125,6 +125,19 @@ export const DEFAULT_CONTENT = {
   footer: {
     tagline: "Your neighbourhood library and book store. Discover, borrow, and buy books you'll love.",
     copyright_text: 'All rights reserved.',
+    quick_links_heading: 'Quick Links',
+    hours_heading: 'Opening Hours',
+    contact_heading: 'Contact',
+  },
+  header: {
+    logo_emoji: '📚',
+    nav_home: 'Home',
+    nav_books: 'Books',
+    nav_offers: 'Offers',
+    nav_about: 'About',
+    login_label: 'Login',
+    signup_label: 'Sign Up',
+    search_placeholder: 'Search books...',
   },
   visibility: {
     home_hero: true,

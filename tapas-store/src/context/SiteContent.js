@@ -152,6 +152,30 @@ export function SiteContentProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Live preview bridge: when running inside the dashboard editor iframe,
+  // listen for postMessage updates so changes appear instantly without a
+  // DB roundtrip. Dashboard sends the entire content blob on every edit.
+  useEffect(() => {
+    if (!IS_DRAFT) return;
+    const handler = (event) => {
+      const msg = event.data;
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.type !== 'tapas:apply-content') return;
+      if (!msg.content || typeof msg.content !== 'object') return;
+      try {
+        const merged = deepMerge(DEFAULT_CONTENT, msg.content);
+        setContent(merged);
+        applyTheme(merged);
+        if (merged.brand?.heading_font) loadGoogleFont(merged.brand.heading_font);
+        if (merged.brand?.body_font)    loadGoogleFont(merged.brand.body_font);
+      } catch (err) {
+        console.warn('[SiteContent] apply-content failed', err);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   // Background fetch: pull latest from Supabase, update only if different.
   useEffect(() => {
     let mounted = true;
