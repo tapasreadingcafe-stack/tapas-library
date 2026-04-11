@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../App';
+import { useCart } from '../context/CartContext';
 
 function StarRating({ rating, interactive, onRate }) {
   const [hover, setHover] = useState(0);
@@ -24,7 +25,9 @@ export default function BookDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { member } = useApp();
+  const { addBook } = useCart();
   const [book, setBook] = useState(null);
+  const [addedToCart, setAddedToCart] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [similar, setSimilar] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +90,13 @@ export default function BookDetail() {
     }
   };
 
+  const handleAddToCart = () => {
+    if (!book) return;
+    addBook(book, 1);
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2500);
+  };
+
   const handleWishlist = async () => {
     if (!member) { navigate('/login'); return; }
     setWishlisting(true);
@@ -117,6 +127,8 @@ export default function BookDetail() {
   if (!book) return null;
 
   const available = book.quantity_available > 0;
+  const forSale = Number(book.sales_price || 0) > 0 && book.store_visible !== false;
+  const borrowable = book.is_borrowable !== false;
   const avgRating = reviews.length ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1) : null;
 
   return (
@@ -163,18 +175,35 @@ export default function BookDetail() {
 
           {/* Action Buttons */}
           <div style={{ marginTop:'16px', display:'flex', flexDirection:'column', gap:'10px' }}>
-            <button
-              onClick={handleReserve}
-              disabled={reserving}
-              style={{
-                padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
-                background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-                fontWeight:'700', fontSize:'16px', fontFamily:'Lato, sans-serif',
-                boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
-              }}
-            >
-              {reserving ? '⏳ Reserving...' : '🔖 Reserve This Book'}
-            </button>
+            {forSale && available && (
+              <button
+                onClick={handleAddToCart}
+                style={{
+                  padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
+                  background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
+                  fontWeight:'700', fontSize:'16px', fontFamily:'Lato, sans-serif',
+                  boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
+                }}
+              >
+                {addedToCart ? '✅ Added to Cart' : '🛒 Add to Cart'}
+              </button>
+            )}
+            {borrowable && (
+              <button
+                onClick={handleReserve}
+                disabled={reserving}
+                style={{
+                  padding:'14px', borderRadius:'12px', border: forSale ? '2px solid #D4A853' : 'none',
+                  cursor:'pointer',
+                  background: forSale ? 'white' : 'linear-gradient(135deg, #D4A853, #C49040)',
+                  color:'#2C1810',
+                  fontWeight:'700', fontSize:'16px', fontFamily:'Lato, sans-serif',
+                  boxShadow: forSale ? 'none' : '0 4px 15px rgba(212,168,83,0.4)'
+                }}
+              >
+                {reserving ? '⏳ Reserving...' : '🔖 Reserve This Book'}
+              </button>
+            )}
             <button
               onClick={handleWishlist}
               disabled={wishlisting}
@@ -218,9 +247,12 @@ export default function BookDetail() {
             </div>
           )}
 
-          {book.price && (
+          {forSale && (
             <div style={{ marginBottom:'24px' }}>
-              <span style={{ fontSize:'32px', fontWeight:'800', color:'#D4A853', fontFamily:'"Playfair Display", serif' }}>₹{book.price}</span>
+              <span style={{ fontSize:'32px', fontWeight:'800', color:'#D4A853', fontFamily:'"Playfair Display", serif' }}>₹{book.sales_price}</span>
+              {book.mrp && Number(book.mrp) > Number(book.sales_price) && (
+                <span style={{ color:'#8B6914', fontSize:'16px', marginLeft:'12px', textDecoration:'line-through' }}>₹{book.mrp}</span>
+              )}
               <span style={{ color:'#8B6914', fontSize:'14px', marginLeft:'8px' }}>purchase price</span>
             </div>
           )}

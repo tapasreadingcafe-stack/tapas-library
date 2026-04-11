@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { useCart } from '../context/CartContext';
 
 const GENRES = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Children', 'Business', 'Travel', 'Arts', 'Biography', 'Mystery', 'Romance', 'Fantasy', 'Self-Help'];
 const SORT_OPTIONS = [
@@ -11,7 +12,16 @@ const SORT_OPTIONS = [
 ];
 
 function BookCard({ book }) {
+  const { addBook } = useCart();
   const available = book.quantity_available > 0;
+  const forSale = Number(book.sales_price || 0) > 0;
+
+  const handleAddToCart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addBook(book, 1);
+  };
+
   return (
     <Link to={`/books/${book.id}`} style={{ textDecoration:'none', color:'inherit' }}>
       <div style={{
@@ -58,19 +68,30 @@ function BookCard({ book }) {
           )}
 
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'auto' }}>
-            {book.price ? (
-              <span style={{ color:'#D4A853', fontWeight:'800', fontSize:'17px' }}>₹{book.price}</span>
+            {forSale ? (
+              <span style={{ color:'#D4A853', fontWeight:'800', fontSize:'17px' }}>₹{book.sales_price}</span>
             ) : (
-              <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'13px' }}>Free Borrow</span>
+              <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'13px' }}>Borrow Only</span>
             )}
             <span style={{ color:'#D4A853', fontSize:'13px', fontWeight:'600' }}>
               ★ {book.rating || '4.5'}
             </span>
           </div>
 
-          <div style={{ marginTop:'12px', padding:'8px 16px', background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3', borderRadius:'20px', textAlign:'center', fontSize:'13px', fontWeight:'600' }}>
-            View Details →
-          </div>
+          {forSale && available ? (
+            <button onClick={handleAddToCart} style={{
+              marginTop:'12px', padding:'10px 16px',
+              background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
+              border:'none', borderRadius:'20px', textAlign:'center', fontSize:'13px', fontWeight:'700',
+              cursor:'pointer', fontFamily:'Lato, sans-serif'
+            }}>
+              🛒 Add to Cart
+            </button>
+          ) : (
+            <div style={{ marginTop:'12px', padding:'8px 16px', background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3', borderRadius:'20px', textAlign:'center', fontSize:'13px', fontWeight:'600' }}>
+              View Details →
+            </div>
+          )}
         </div>
       </div>
     </Link>
@@ -94,7 +115,7 @@ export default function Catalog() {
   const fetchBooks = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from('books').select('*', { count:'exact' });
+      let query = supabase.from('books').select('*', { count:'exact' }).eq('store_visible', true);
 
       if (search) query = query.or(`title.ilike.%${search}%,author.ilike.%${search}%,genre.ilike.%${search}%`);
       if (genre && genre !== 'All') query = query.ilike('genre', `%${genre}%`);

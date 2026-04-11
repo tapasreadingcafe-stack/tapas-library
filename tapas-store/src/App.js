@@ -1,6 +1,7 @@
-import React, { useState, Suspense, createContext, useContext, useEffect } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from './utils/supabase';
+import React, { useState, Suspense } from 'react';
+import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { CartProvider, useCart } from './context/CartContext';
 import './App.css';
 
 const Home            = React.lazy(() => import('./pages/Home'));
@@ -9,10 +10,27 @@ const BookDetail      = React.lazy(() => import('./pages/BookDetail'));
 const Offers          = React.lazy(() => import('./pages/Offers'));
 const About           = React.lazy(() => import('./pages/About'));
 const CustomerLogin   = React.lazy(() => import('./pages/CustomerLogin'));
-const MemberDashboard = React.lazy(() => import('./pages/MemberDashboard'));
+const Profile         = React.lazy(() => import('./pages/Profile'));
+const Cart            = React.lazy(() => import('./pages/Cart'));
+const Checkout        = React.lazy(() => import('./pages/Checkout'));
+const OrderSuccess    = React.lazy(() => import('./pages/OrderSuccess'));
 
-export const AppContext = createContext({});
-export function useApp() { return useContext(AppContext); }
+// ---------------------------------------------------------------------
+// Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
+// retired MemberDashboard) import `useApp` from this file. Instead of
+// touching every page, expose a thin shim that pulls the same fields
+// from AuthContext.
+// ---------------------------------------------------------------------
+export function useApp() {
+  const auth = useAuth();
+  return {
+    member: auth.member,
+    wishlistCount: auth.wishlistCount,
+    setMember: auth.setMember,
+    setWishlistCount: auth.setWishlistCount,
+    refresh: auth.refresh,
+  };
+}
 
 function PageLoader() {
   return (
@@ -24,9 +42,11 @@ function PageLoader() {
   );
 }
 
-function Navbar({ member, setMember, wishlistCount }) {
+function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { member, wishlistCount, logout } = useAuth();
+  const { itemCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,8 +54,7 @@ function Navbar({ member, setMember, wishlistCount }) {
   const isActive = (path) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setMember(null);
+    await logout();
     navigate('/');
   };
 
@@ -102,7 +121,7 @@ function Navbar({ member, setMember, wishlistCount }) {
             <button onClick={() => setSearchOpen(true)} style={{ background:'none', border:'none', color:'#F5DEB3', cursor:'pointer', fontSize:'20px', padding:'4px' }}>🔍</button>
           )}
 
-          <Link to="/member" style={{ position:'relative', textDecoration:'none', color:'#F5DEB3', fontSize:'20px', padding:'4px' }}>
+          <Link to="/profile?tab=wishlist" style={{ position:'relative', textDecoration:'none', color:'#F5DEB3', fontSize:'20px', padding:'4px' }}>
             ❤️
             {wishlistCount > 0 && (
               <span style={{ position:'absolute', top:'-4px', right:'-4px', background:'#D4A853', color:'#2C1810', borderRadius:'50%', width:'16px', height:'16px', fontSize:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold' }}>
@@ -111,10 +130,19 @@ function Navbar({ member, setMember, wishlistCount }) {
             )}
           </Link>
 
+          <Link to="/cart" style={{ position:'relative', textDecoration:'none', color:'#F5DEB3', fontSize:'20px', padding:'4px' }}>
+            🛒
+            {itemCount > 0 && (
+              <span style={{ position:'absolute', top:'-4px', right:'-4px', background:'#D4A853', color:'#2C1810', borderRadius:'50%', minWidth:'16px', height:'16px', padding:'0 4px', fontSize:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold' }}>
+                {itemCount}
+              </span>
+            )}
+          </Link>
+
           {member ? (
             <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-              <Link to="/member" style={{ color:'#D4A853', textDecoration:'none', fontSize:'14px', fontWeight:'600' }}>
-                👤 {member.name?.split(' ')[0]}
+              <Link to="/profile" style={{ color:'#D4A853', textDecoration:'none', fontSize:'14px', fontWeight:'600' }}>
+                👤 {member.name?.split(' ')[0] || 'Profile'}
               </Link>
               <button onClick={handleLogout} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', color:'#F5DEB3', borderRadius:'4px', padding:'6px 12px', cursor:'pointer', fontSize:'13px' }}>
                 Logout
@@ -209,48 +237,40 @@ function Footer() {
   );
 }
 
-export default function App() {
-  const [member, setMember] = useState(null);
-  const [wishlistCount, setWishlistCount] = useState(0);
-
-  const fetchMember = async (email) => {
-    const { data } = await supabase.from('members').select('*').eq('email', email).single();
-    if (data) {
-      setMember(data);
-      const { count } = await supabase.from('wishlists').select('*', { count:'exact', head:true }).eq('member_id', data.id);
-      setWishlistCount(count || 0);
-    }
-  };
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) fetchMember(session.user.email);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) fetchMember(session.user.email);
-      else { setMember(null); setWishlistCount(0); }
-    });
-    return () => subscription.unsubscribe();
-  }, []); // eslint-disable-line
-
+function AppShell() {
   return (
-    <AppContext.Provider value={{ member, setMember, wishlistCount, setWishlistCount, fetchMember }}>
+    <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Lato:wght@300;400;600;700&display=swap" />
       <div style={{ minHeight:'100vh', background:'#FDF8F0' }}>
-        <Navbar member={member} setMember={setMember} wishlistCount={wishlistCount} />
+        <Navbar />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/"         element={<Home />} />
-            <Route path="/books"    element={<Catalog />} />
-            <Route path="/books/:id" element={<BookDetail />} />
-            <Route path="/offers"   element={<Offers />} />
-            <Route path="/about"    element={<About />} />
-            <Route path="/login"    element={<CustomerLogin />} />
-            <Route path="/member"   element={<MemberDashboard />} />
+            <Route path="/"              element={<Home />} />
+            <Route path="/books"         element={<Catalog />} />
+            <Route path="/books/:id"     element={<BookDetail />} />
+            <Route path="/offers"        element={<Offers />} />
+            <Route path="/about"         element={<About />} />
+            <Route path="/login"         element={<CustomerLogin />} />
+            <Route path="/profile"       element={<Profile />} />
+            {/* Backward-compat: /member now redirects to /profile */}
+            <Route path="/member"        element={<Navigate to="/profile" replace />} />
+            <Route path="/cart"          element={<Cart />} />
+            <Route path="/checkout"      element={<Checkout />} />
+            <Route path="/order/:id"     element={<OrderSuccess />} />
           </Routes>
         </Suspense>
         <Footer />
       </div>
-    </AppContext.Provider>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <CartProvider>
+        <AppShell />
+      </CartProvider>
+    </AuthProvider>
   );
 }
