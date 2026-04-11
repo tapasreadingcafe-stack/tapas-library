@@ -71,14 +71,14 @@ export default function Offers() {
         maxWidth:'780px', margin:'0 auto',
         padding:'80px 20px 40px', textAlign:'center',
       }}>
-        <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
+        <div data-editable="offers.hero_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
           {offers.hero_eyebrow}
         </div>
         <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:brand.primary_color, lineHeight:'1.05', marginBottom:'20px' }}>
-          {offers.hero_headline_line1}<br />
-          <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{offers.hero_headline_line2}</span>
+          <span data-editable="offers.hero_headline_line1">{offers.hero_headline_line1}</span><br />
+          <span data-editable="offers.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{offers.hero_headline_line2}</span>
         </h1>
-        <p style={{ color:'#8B6914', fontSize:'17px', lineHeight:'1.75', maxWidth:'580px', margin:'0 auto' }}>
+        <p data-editable="offers.hero_description" style={{ color:'#8B6914', fontSize:'17px', lineHeight:'1.75', maxWidth:'580px', margin:'0 auto' }}>
           {offers.hero_description}
         </p>
       </section>
@@ -146,37 +146,34 @@ export default function Offers() {
           })}
         </div>
 
-        <p style={{ textAlign:'center', color:'#8B6914', fontSize:'13px', marginTop:'40px', fontStyle:'italic' }}>
-          All plans billed monthly. Cancel anytime. Pay cash, UPI, or card at the cafe.
+        <p data-editable="offers.plans_footer" style={{ textAlign:'center', color:'#8B6914', fontSize:'13px', marginTop:'40px', fontStyle:'italic' }}>
+          {offers.plans_footer}
         </p>
       </section>
 
       {/* Why join block */}
-      <section style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      <section id="section-offers-why-join" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'900px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
-            <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
-              Why join
+            <div data-editable="offers.why_join_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+              {offers.why_join_eyebrow}
             </div>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'38px', fontWeight:'800', color:'#2C1810', lineHeight:'1.1' }}>
-              What a membership actually buys you
+            <h2 data-editable="offers.why_join_heading" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'38px', fontWeight:'800', color:brand.primary_color, lineHeight:'1.1' }}>
+              {offers.why_join_heading}
             </h2>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:'32px' }}>
-            {[
-              { n:'01', t:'A curated catalog', b:'Our team handpicks every title. You skip the noise and find your next read faster.' },
-              { n:'02', t:'A space to read', b:'Members can spend as long as they want in the cafe reading area, with filter coffee at member rates.' },
-              { n:'03', t:'Real discounts', b:'Silver and Gold members get 10–20% off anything they buy, not just during sales.' },
-              { n:'04', t:'Priority on new arrivals', b:'Flag books you want and members get reserved copies before walk-ins.' },
-            ].map(item => (
-              <div key={item.n}>
-                <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'28px', fontWeight:'800', color:'#D4A853', lineHeight:1, marginBottom:'10px' }}>
-                  {item.n}
+            {[1, 2, 3, 4].map(i => (
+              <div key={i}>
+                <div style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'28px', fontWeight:'800', color:brand.accent_color, lineHeight:1, marginBottom:'10px' }}>
+                  0{i}
                 </div>
-                <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'18px', color:'#2C1810', marginBottom:'8px', fontWeight:'700' }}>
-                  {item.t}
+                <h3 data-editable={`offers.why_join_${i}_title`} style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'18px', color:brand.primary_color, marginBottom:'8px', fontWeight:'700' }}>
+                  {offers[`why_join_${i}_title`]}
                 </h3>
-                <p style={{ color:'#5C3A1E', lineHeight:'1.7', fontSize:'14px', margin:0 }}>{item.b}</p>
+                <p data-editable={`offers.why_join_${i}_body`} style={{ color:'#5C3A1E', lineHeight:'1.7', fontSize:'14px', margin:0 }}>
+                  {offers[`why_join_${i}_body`]}
+                </p>
               </div>
             ))}
           </div>
@@ -184,19 +181,19 @@ export default function Offers() {
       </section>
 
       {/* Final CTA */}
-      <section style={{ padding:'80px 20px', textAlign:'center' }}>
+      <section id="section-offers-cta" style={{ padding:'80px 20px', textAlign:'center' }}>
         <div style={{ maxWidth:'580px', margin:'0 auto' }}>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'800', color:'#2C1810', marginBottom:'16px', lineHeight:'1.15' }}>
-            Ready to join?
+          <h2 data-editable="offers.cta_headline" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'36px', fontWeight:'800', color:brand.primary_color, marginBottom:'16px', lineHeight:'1.15' }}>
+            {offers.cta_headline}
           </h2>
-          <p style={{ color:'#8B6914', fontSize:'15px', marginBottom:'32px', lineHeight:'1.6' }}>
-            Sign up online, then drop by the cafe whenever you're ready to start borrowing.
+          <p data-editable="offers.cta_body" style={{ color:'#8B6914', fontSize:'15px', marginBottom:'32px', lineHeight:'1.6' }}>
+            {offers.cta_body}
           </p>
           <Link to="/login?mode=signup" style={{
             display:'inline-block',
             padding:'16px 40px', borderRadius:'50px',
-            background:'linear-gradient(135deg, #2C1810, #4A2C17)',
-            color:'#F5DEB3', textDecoration:'none',
+            background:`linear-gradient(135deg, ${brand.primary_color}, ${brand.primary_color_light})`,
+            color:brand.sand_color, textDecoration:'none',
             fontWeight:'700', fontSize:'14px', letterSpacing:'1px', textTransform:'uppercase',
             boxShadow:'0 8px 25px rgba(44,24,16,0.25)',
           }}>

@@ -8,13 +8,6 @@ import { useSiteContent } from '../context/SiteContent';
 // edit them in the dashboard.
 // =====================================================================
 
-const VALUES = [
-  { title:'Curated, not endless',   body:'We don\'t stock everything — we stock books our team has actually read and wants to recommend. That means less noise, better discoveries.' },
-  { title:'Borrow or own',           body:'Every book on our shelves can either come home with you or be borrowed as a member. Reading shouldn\'t depend on your budget.' },
-  { title:'A place to stay a while', body:'The café is part of the bookstore, not an afterthought. Come for a coffee, stay for a book, leave with both.' },
-  { title:'Built on word of mouth',  body:'We opened because our neighbourhood asked for it. The best recommendations still come from members talking to members.' },
-];
-
 export default function About() {
   const content = useSiteContent();
   const brand = content.brand;
@@ -46,17 +39,22 @@ export default function About() {
     <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* Editorial hero */}
-      <section id="section-about-hero" data-editable-section="about" style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px 120px', position:'relative', overflow:'hidden' }}>
+      <section id="section-about-hero" data-editable-section="about" style={{
+        background: about.hero_bg_image_url
+          ? `linear-gradient(135deg, ${brand.primary_color}dd 0%, ${brand.primary_color_light}dd 100%), url("${about.hero_bg_image_url}") center/cover`
+          : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`,
+        color:brand.sand_color, padding:'100px 20px 120px', position:'relative', overflow:'hidden'
+      }}>
         <div style={{ position:'absolute', right:'-100px', top:'-60px', width:'380px', height:'380px', borderRadius:'50%', background:'rgba(212,168,83,0.06)', border:'1px solid rgba(212,168,83,0.12)' }} />
         <div style={{ maxWidth:'780px', margin:'0 auto', position:'relative', zIndex:1, textAlign:'center' }}>
-          <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
+          <div data-editable="about.hero_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
             {about.hero_eyebrow}
           </div>
           <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px' }}>
-            {about.hero_headline_line1}<br />
-            <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{about.hero_headline_line2}</span>
+            <span data-editable="about.hero_headline_line1">{about.hero_headline_line1}</span><br />
+            <span data-editable="about.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{about.hero_headline_line2}</span>
           </h1>
-          <p style={{ color:'rgba(245,222,179,0.82)', fontSize:'18px', lineHeight:'1.8', maxWidth:'600px', margin:'0 auto' }}>
+          <p data-editable="about.hero_subtitle" style={{ color:'rgba(245,222,179,0.82)', fontSize:'18px', lineHeight:'1.8', maxWidth:'600px', margin:'0 auto' }}>
             {about.hero_subtitle}
           </p>
         </div>
@@ -64,44 +62,48 @@ export default function About() {
 
       {/* Story body */}
       <section id="section-about-story" data-editable-section="about" style={{ maxWidth:'720px', margin:'-60px auto 0', background:'white', borderRadius:'8px', padding:'56px 48px', boxShadow:'0 20px 60px rgba(44,24,16,0.1)', position:'relative', zIndex:2 }}>
-        <p style={{ color:'#5C3A1E', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontStyle:'italic' }}>
+        <p data-editable="about.story_pull_quote" style={{ color:'#5C3A1E', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontStyle:'italic' }}>
           "{about.story_pull_quote}"
         </p>
-        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
+        <p data-editable="about.story_body_1" style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
           {about.story_body_1}
         </p>
-        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
+        <p data-editable="about.story_body_2" style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
           {about.story_body_2}
         </p>
-        <p style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', whiteSpace:'pre-line' }}>
+        <p data-editable="about.story_body_3" style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', whiteSpace:'pre-line' }}>
           {about.story_body_3}
         </p>
       </section>
 
       {/* Values */}
-      <section style={{ maxWidth:'1100px', margin:'0 auto', padding:'100px 20px 60px' }}>
+      <section id="section-about-values" style={{ maxWidth:'1100px', margin:'0 auto', padding:'100px 20px 60px' }}>
         <div style={{ textAlign:'center', marginBottom:'56px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
-            What we believe
+          <div data-editable="about.values_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+            {about.values_eyebrow}
           </div>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'40px', fontWeight:'800', color:'#2C1810', lineHeight:'1.1' }}>
-            Four things we care about
+          <h2 data-editable="about.values_heading" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'40px', fontWeight:'800', color:brand.primary_color, lineHeight:'1.1' }}>
+            {about.values_heading}
           </h2>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'32px' }}>
-          {VALUES.map((v, i) => (
-            <div key={v.title} style={{ display:'flex', gap:'20px' }}>
-              <div style={{ flexShrink:0, fontFamily:'"Playfair Display", serif', fontSize:'42px', fontWeight:'800', color:'#D4A853', lineHeight:1 }}>
-                0{i + 1}
+          {[1, 2, 3, 4].map(i => {
+            const title = about[`values_${i}_title`];
+            const body  = about[`values_${i}_body`];
+            return (
+              <div key={i} style={{ display:'flex', gap:'20px' }}>
+                <div style={{ flexShrink:0, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'42px', fontWeight:'800', color:brand.accent_color, lineHeight:1 }}>
+                  0{i}
+                </div>
+                <div>
+                  <h3 data-editable={`about.values_${i}_title`} style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'20px', color:brand.primary_color, marginBottom:'10px', fontWeight:'700' }}>
+                    {title}
+                  </h3>
+                  <p data-editable={`about.values_${i}_body`} style={{ color:'#5C3A1E', lineHeight:'1.75', fontSize:'15px', margin:0 }}>{body}</p>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', color:'#2C1810', marginBottom:'10px', fontWeight:'700' }}>
-                  {v.title}
-                </h3>
-                <p style={{ color:'#5C3A1E', lineHeight:'1.75', fontSize:'15px', margin:0 }}>{v.body}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

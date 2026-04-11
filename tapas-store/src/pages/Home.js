@@ -138,6 +138,7 @@ export default function Home() {
   const brand = content.brand;
   const home = content.home;
   const newsletter = content.newsletter;
+  const images = content.images || {};
 
   const [featured, setFeatured] = useState(null);     // big hero book
   const [staffPicks, setStaffPicks] = useState([]);    // 4 curated
@@ -219,7 +220,9 @@ export default function Home() {
       {/* 1. EDITORIAL HERO — headline + search + featured book on the right */}
       {/* ================================================================ */}
       <section id="section-home-hero" data-editable-section="home" style={{
-        background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`,
+        background: images.home_hero_bg_url
+          ? `linear-gradient(135deg, ${brand.primary_color}ee 0%, ${brand.primary_color_light}dd 40%, rgba(107,61,38,0.85) 100%), url("${images.home_hero_bg_url}") center/cover`
+          : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`,
         color:brand.sand_color, position:'relative', overflow:'hidden',
       }}>
         <div style={{ position:'absolute', inset:0, pointerEvents:'none',
@@ -232,14 +235,14 @@ export default function Home() {
           display:'grid', gridTemplateColumns:'1.3fr 1fr', gap:'60px', alignItems:'center',
         }} className="hero-grid">
           <div>
-            <div style={{ display:'inline-block', background:'rgba(212,168,83,0.15)', border:'1px solid rgba(212,168,83,0.35)', borderRadius:'20px', padding:'6px 16px', fontSize:'12px', color:brand.accent_color, letterSpacing:'2px', marginBottom:'28px', textTransform:'uppercase', fontWeight:'700' }}>
+            <div data-editable="home.hero_eyebrow" style={{ display:'inline-block', background:'rgba(212,168,83,0.15)', border:'1px solid rgba(212,168,83,0.35)', borderRadius:'20px', padding:'6px 16px', fontSize:'12px', color:brand.accent_color, letterSpacing:'2px', marginBottom:'28px', textTransform:'uppercase', fontWeight:'700' }}>
               📚 {home.hero_eyebrow}
             </div>
             <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 72px)', fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:brand.sand_color }}>
-              {home.hero_headline_line1}<br />
-              <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.hero_headline_line2}</span>
+              <span data-editable="home.hero_headline_line1">{home.hero_headline_line1}</span><br />
+              <span data-editable="home.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.hero_headline_line2}</span>
             </h1>
-            <p style={{ fontSize:'18px', lineHeight:'1.7', color:'rgba(245,222,179,0.85)', marginBottom:'36px', maxWidth:'540px' }}>
+            <p data-editable="home.hero_description" style={{ fontSize:'18px', lineHeight:'1.7', color:'rgba(245,222,179,0.85)', marginBottom:'36px', maxWidth:'540px' }}>
               {home.hero_description}
             </p>
 
@@ -342,13 +345,13 @@ export default function Home() {
       <section id="section-home-staff-picks" data-editable-section="home" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
-            <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+            <div data-editable="home.staff_picks_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
               {home.staff_picks_eyebrow}
             </div>
-            <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'42px', fontWeight:'800', color:brand.primary_color, marginBottom:'12px', lineHeight:'1.1' }}>
+            <h2 data-editable="home.staff_picks_title" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'42px', fontWeight:'800', color:brand.primary_color, marginBottom:'12px', lineHeight:'1.1' }}>
               {home.staff_picks_title}
             </h2>
-            <p style={{ color:'#8B6914', fontSize:'16px', maxWidth:'560px', margin:'0 auto', lineHeight:'1.6' }}>
+            <p data-editable="home.staff_picks_subtitle" style={{ color:'#8B6914', fontSize:'16px', maxWidth:'560px', margin:'0 auto', lineHeight:'1.6' }}>
               {home.staff_picks_subtitle}
             </p>
           </div>
@@ -404,14 +407,19 @@ export default function Home() {
       {/* ================================================================ */}
       {/* 5. CAFE STORY — editorial block about the reading cafe            */}
       {/* ================================================================ */}
-      <section id="section-home-cafe-story" data-editable-section="home" style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px' }}>
+      <section id="section-home-cafe-story" data-editable-section="home" style={{
+        background: images.cafe_story_bg_url
+          ? `linear-gradient(135deg, ${brand.primary_color}ee 0%, ${brand.primary_color_light}dd 100%), url("${images.cafe_story_bg_url}") center/cover`
+          : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`,
+        color:brand.sand_color, padding:'100px 20px'
+      }}>
         <div style={{ maxWidth:'980px', margin:'0 auto', textAlign:'center' }}>
           <div style={{ fontSize:'48px', marginBottom:'16px' }}>☕</div>
           <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(32px, 4.5vw, 48px)', fontWeight:'800', color:brand.sand_color, marginBottom:'24px', lineHeight:'1.15' }}>
-            {home.cafe_story_headline_line1}<br />
-            <span style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.cafe_story_headline_line2}</span>
+            <span data-editable="home.cafe_story_headline_line1">{home.cafe_story_headline_line1}</span><br />
+            <span data-editable="home.cafe_story_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.cafe_story_headline_line2}</span>
           </h2>
-          <p style={{ color:'rgba(245,222,179,0.82)', fontSize:'17px', lineHeight:'1.8', maxWidth:'680px', margin:'0 auto 36px' }}>
+          <p data-editable="home.cafe_story_body" style={{ color:'rgba(245,222,179,0.82)', fontSize:'17px', lineHeight:'1.8', maxWidth:'680px', margin:'0 auto 36px' }}>
             {home.cafe_story_body}
           </p>
           <div style={{ display:'flex', gap:'16px', justifyContent:'center', flexWrap:'wrap' }}>
@@ -443,11 +451,11 @@ export default function Home() {
           border:'1px solid rgba(212,168,83,0.3)',
           boxShadow:'0 10px 40px rgba(44,24,16,0.08)'
         }}>
-          <div style={{ fontSize:'40px', marginBottom:'12px' }}>{newsletter.eyebrow}</div>
-          <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'32px', fontWeight:'700', color:brand.primary_color, marginBottom:'10px' }}>
+          <div data-editable="newsletter.eyebrow" style={{ fontSize:'40px', marginBottom:'12px' }}>{newsletter.eyebrow}</div>
+          <h2 data-editable="newsletter.headline" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'32px', fontWeight:'700', color:brand.primary_color, marginBottom:'10px' }}>
             {newsletter.headline}
           </h2>
-          <p style={{ color:'#8B6914', fontSize:'15px', marginBottom:'28px', maxWidth:'480px', margin:'0 auto 28px', lineHeight:'1.6' }}>
+          <p data-editable="newsletter.description" style={{ color:'#8B6914', fontSize:'15px', marginBottom:'28px', maxWidth:'480px', margin:'0 auto 28px', lineHeight:'1.6' }}>
             {newsletter.description}
           </p>
 

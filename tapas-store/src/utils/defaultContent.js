@@ -55,16 +55,44 @@ export const DEFAULT_CONTENT = {
     hero_headline_line1: 'A room full of books',
     hero_headline_line2: 'and a pot of coffee.',
     hero_subtitle: 'Tapas Reading Cafe started the way most good things do — a few shelves, a kettle, and people who wanted somewhere quiet to read.',
+    hero_bg_image_url: '',
     story_pull_quote: "We wanted a reading room that didn't feel like a library rulebook.",
     story_body_1: 'Before Tapas, the nearest bookstore in our part of the neighbourhood was a forty-minute bus ride away, and the library closed too early for anyone who worked. So we opened a small space with a couple hundred books, a single espresso machine, and a long table for anyone who wanted to linger.',
     story_body_2: "The collection grew the way friendships do — one recommendation at a time. A member brought in a Booker winner they'd loved; we ordered two more. A regular asked for picture books for their daughter; we started a kids' shelf. Ten years later, most of what you'll find on our shelves arrived because someone, somewhere, asked for it.",
     story_body_3: "We're still that room with a kettle. Just a lot more books.",
+    values_heading: 'Four things we care about',
+    values_eyebrow: 'What we believe',
+    values_1_title: 'Curated, not endless',
+    values_1_body: "We don't stock everything — we stock books our team has actually read and wants to recommend. That means less noise, better discoveries.",
+    values_2_title: 'Borrow or own',
+    values_2_body: "Every book on our shelves can either come home with you or be borrowed as a member. Reading shouldn't depend on your budget.",
+    values_3_title: 'A place to stay a while',
+    values_3_body: 'The café is part of the bookstore, not an afterthought. Come for a coffee, stay for a book, leave with both.',
+    values_4_title: 'Built on word of mouth',
+    values_4_body: 'We opened because our neighbourhood asked for it. The best recommendations still come from members talking to members.',
   },
   offers: {
     hero_eyebrow: 'Membership',
     hero_headline_line1: 'Read more,',
     hero_headline_line2: 'pay less.',
     hero_description: 'Becoming a Tapas member is the simplest way to read more books for less money. Borrow freely, reserve new arrivals, and get a discount on anything you want to take home.',
+    plans_footer: 'All plans billed monthly. Cancel anytime. Pay cash, UPI, or card at the cafe.',
+    why_join_eyebrow: 'Why join',
+    why_join_heading: 'What a membership actually buys you',
+    why_join_1_title: 'A curated catalog',
+    why_join_1_body: 'Our team handpicks every title. You skip the noise and find your next read faster.',
+    why_join_2_title: 'A space to read',
+    why_join_2_body: 'Members can spend as long as they want in the cafe reading area, with filter coffee at member rates.',
+    why_join_3_title: 'Real discounts',
+    why_join_3_body: 'Silver and Gold members get 10–20% off anything they buy, not just during sales.',
+    why_join_4_title: 'Priority on new arrivals',
+    why_join_4_body: 'Flag books you want and members get reserved copies before walk-ins.',
+    cta_headline: 'Ready to join?',
+    cta_body: "Sign up online, then drop by the cafe whenever you're ready to start borrowing.",
+  },
+  images: {
+    home_hero_bg_url: '',
+    cafe_story_bg_url: '',
   },
   newsletter: {
     eyebrow: '📬',
@@ -79,7 +107,9 @@ export const DEFAULT_CONTENT = {
 // given type. Add new fields to DEFAULT_CONTENT and here at the same time.
 // =====================================================================
 
-export const CONTENT_SCHEMA = [
+// Dashboard schema is now in siteContentSchema.js — tapas-store only needs DEFAULT_CONTENT.
+// Keeping the export here as a no-op for backward compat; edit the schema in the dashboard file.
+export const CONTENT_SCHEMA_UNUSED = [
   {
     key: 'brand',
     title: 'Brand',

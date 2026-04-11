@@ -1,38 +1,30 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../utils/supabase';
-import { DEFAULT_CONTENT, CONTENT_SCHEMA } from '../utils/siteContentSchema';
+import { DEFAULT_CONTENT, CONTENT_SCHEMA, sectionForFieldPath } from '../utils/siteContentSchema';
 
 // =====================================================================
-// SiteContent — split-screen visual editor for the storefront.
+// SiteContent — visual-ish editor for the storefront.
 //
-// Left pane: form editor (sections + fields)
-// Right pane: live iframe of www.tapasreadingcafe.com
+// Left: form sidebar (section tabs + fields).
+// Right: live iframe of www.tapasreadingcafe.com.
 //
-// When you save, the iframe reloads so you can see changes immediately.
-// "Show me" buttons on each section postMessage to the iframe telling
-// it to scroll to the matching section and flash-highlight it.
-//
-// Viewport toggle: Desktop / Tablet / Mobile (changes iframe width).
-// Page toggle: Home / Books / Book detail / About / Offers / Profile.
+// Features:
+//   - Autosave: debounced 900ms after any change
+//   - Click-to-edit: click text on the preview → dashboard jumps to
+//     the matching field (via postMessage from StoreEditorSync)
+//   - Image upload: ImageField uploads to Supabase storage bucket
+//     'site-content' and stores the public URL
+//   - Viewport toggle: Desktop / Tablet / Mobile iframe widths
+//   - Page tabs: switch iframe src between /, /books, /about, /offers
 // =====================================================================
 
 const STORE_URL = 'https://www.tapasreadingcafe.com';
-
-// Maps section keys → a { path, sectionId } so the editor can tell the
-// iframe which URL to load and which in-page anchor to scroll to.
-const SECTION_TARGETS = {
-  brand:      { path: '/',        sectionId: 'section-home-hero' },
-  contact:    { path: '/about',   sectionId: 'section-about-visit' },
-  home:       { path: '/',        sectionId: 'section-home-hero' },
-  about:      { path: '/about',   sectionId: 'section-about-hero' },
-  offers:     { path: '/offers',  sectionId: 'section-offers-hero' },
-  newsletter: { path: '/',        sectionId: 'section-newsletter' },
-};
+const STORAGE_BUCKET = 'site-content';
 
 const VIEWPORTS = [
-  { key: 'desktop', label: '🖥 Desktop', width: '100%',   maxWidth: '1400px' },
-  { key: 'tablet',  label: '📱 Tablet',  width: '820px',  maxWidth: '820px' },
-  { key: 'mobile',  label: '📞 Mobile',  width: '420px',  maxWidth: '420px' },
+  { key: 'desktop', label: '🖥 Desktop', width: '100%',  maxWidth: '1400px' },
+  { key: 'tablet',  label: '📱 Tablet',  width: '820px', maxWidth: '820px' },
+  { key: 'mobile',  label: '📞 Mobile',  width: '420px', maxWidth: '420px' },
 ];
 
 const PAGES = [
@@ -41,6 +33,28 @@ const PAGES = [
   { path: '/about',  label: 'About' },
   { path: '/offers', label: 'Offers' },
 ];
+
+// For each schema section, which iframe path the dashboard should
+// jump to when the user selects that section.
+const SECTION_DEFAULT_PATH = {
+  brand:            '/',
+  contact:          '/about',
+  home:             '/',
+  images:           '/',
+  about:            '/about',
+  about_values:     '/about',
+  offers:           '/offers',
+  offers_why_join:  '/offers',
+  offers_cta:       '/offers',
+  newsletter:       '/',
+};
+
+// Each schema section has a "real" storage key — sections like
+// `about_values` and `offers_why_join` write into `about` / `offers`
+// respectively (see CONTENT_SCHEMA `parent` field).
+function storageKeyForSection(section) {
+  return section.parent || section.key;
+}
 
 function deepMerge(base, override) {
   if (!override || typeof override !== 'object') return base;
@@ -87,45 +101,48 @@ const inputStyle = {
   boxSizing: 'border-box',
 };
 
-function TextField({ field, value, onChange }) {
+function TextField({ field, value, onChange, inputRef }) {
   return (
     <div style={{ marginBottom: '12px' }}>
       <label style={labelStyle}>{field.label}</label>
-      <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} style={inputStyle} />
+      <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)} style={inputStyle} />
       {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </div>
   );
 }
-function TextArea({ field, value, onChange }) {
+
+function TextArea({ field, value, onChange, inputRef }) {
   return (
     <div style={{ marginBottom: '12px' }}>
       <label style={labelStyle}>{field.label}</label>
-      <textarea value={value || ''} onChange={e => onChange(e.target.value)} rows={3}
+      <textarea ref={inputRef} value={value || ''} onChange={e => onChange(e.target.value)} rows={3}
         style={{ ...inputStyle, resize: 'vertical', lineHeight: '1.5' }} />
       {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </div>
   );
 }
-function ColorField({ field, value, onChange }) {
+
+function ColorField({ field, value, onChange, inputRef }) {
   return (
     <div style={{ marginBottom: '12px' }}>
       <label style={labelStyle}>{field.label}</label>
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)}
           style={{ width: '40px', height: '36px', border: '1px solid #dfe4ea', borderRadius: '6px', cursor: 'pointer', padding: '2px' }} />
-        <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+        <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
           placeholder="#2C1810" style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }} />
       </div>
       {field.hint && <div style={hintStyle}>{field.hint}</div>}
     </div>
   );
 }
-function FontField({ field, value, onChange }) {
+
+function FontField({ field, value, onChange, inputRef }) {
   const COMMON = ['Playfair Display','Lato','Inter','Roboto','Open Sans','Merriweather','Lora','Raleway','Cormorant Garamond','EB Garamond','Crimson Pro','Libre Baskerville','Montserrat','Poppins'];
   return (
     <div style={{ marginBottom: '12px' }}>
       <label style={labelStyle}>{field.label}</label>
-      <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+      <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
         list={`font-options-${field.key}`} placeholder="Playfair Display"
         style={{ ...inputStyle, fontFamily: value ? `"${value}", serif` : 'inherit' }} />
       <datalist id={`font-options-${field.key}`}>
@@ -135,7 +152,95 @@ function FontField({ field, value, onChange }) {
     </div>
   );
 }
-const FIELD_RENDERERS = { text: TextField, textarea: TextArea, color: ColorField, font: FontField };
+
+function ImageField({ field, value, onChange, inputRef }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError('');
+    try {
+      const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+      const path = `${field.key}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, file, { upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(path);
+      onChange(publicUrl);
+    } catch (err) {
+      console.error('[ImageField] upload failed', err);
+      setUploadError(
+        err.message?.includes('not found') || err.message?.includes('Bucket')
+          ? `Create a public bucket named "${STORAGE_BUCKET}" in Supabase → Storage first.`
+          : (err.message || 'Upload failed.')
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <label style={labelStyle}>{field.label}</label>
+      {value && (
+        <div style={{ marginBottom: '8px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #dfe4ea', background: '#f5f7fa' }}>
+          <img src={value} alt={field.label} style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', display: 'block' }} />
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder="https://... or upload"
+          style={{ ...inputStyle, flex: 1, fontSize: '12px', fontFamily: 'monospace' }}
+        />
+        <label style={{
+          padding: '10px 14px',
+          background: '#667eea',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontSize: '12px',
+          fontWeight: '700',
+          whiteSpace: 'nowrap',
+          opacity: uploading ? 0.7 : 1,
+        }}>
+          {uploading ? '⏳' : '📤 Upload'}
+          <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} style={{ display: 'none' }} />
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            title="Remove"
+            style={{ padding: '10px 12px', background: 'white', border: '1px solid #dfe4ea', borderRadius: '6px', cursor: 'pointer', color: '#9B2335', fontSize: '14px' }}
+          >
+            🗑
+          </button>
+        )}
+      </div>
+      {uploadError && <div style={{ ...hintStyle, color: '#9B2335', fontStyle: 'normal' }}>⚠️ {uploadError}</div>}
+      {field.hint && !uploadError && <div style={hintStyle}>{field.hint}</div>}
+    </div>
+  );
+}
+
+const FIELD_RENDERERS = {
+  text: TextField,
+  textarea: TextArea,
+  color: ColorField,
+  font: FontField,
+  image: ImageField,
+};
 
 // ---- Main component -----------------------------------------------------
 
@@ -150,7 +255,11 @@ export default function SiteContent() {
   const [viewport, setViewport]   = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [iframePath, setIframePath] = useState('/');
+  const [focusFieldKey, setFocusFieldKey] = useState(null);
   const iframeRef = useRef(null);
+  const fieldRefs = useRef({});
+  const pendingScrollRef = useRef(null);
+  const autosaveTimerRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -173,61 +282,94 @@ export default function SiteContent() {
 
   useEffect(() => { load(); }, [load]);
 
-  const updateField = (sectionKey, fieldKey, value) => {
-    setContent(prev => ({ ...prev, [sectionKey]: { ...prev[sectionKey], [fieldKey]: value } }));
+  const updateField = (storageKey, fieldKey, value) => {
+    setContent(prev => ({
+      ...prev,
+      [storageKey]: { ...(prev[storageKey] || {}), [fieldKey]: value },
+    }));
     setDirty(true);
   };
 
-  const save = async () => {
+  // ---- save -------------------------------------------------------
+  const doSave = useCallback(async (nextContent) => {
     setSaving(true); setError('');
     try {
       const { error } = await supabase.from('app_settings').upsert({
         key: 'store_content',
-        value: content,
+        value: nextContent,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'key' });
       if (error) throw error;
       setSavedAt(new Date());
       setDirty(false);
-      // Reload iframe so changes show up.
       setIframeKey(k => k + 1);
     } catch (err) {
       setError(err.message || 'Failed to save.');
     } finally {
       setSaving(false);
     }
-  };
+  }, []);
 
-  // Send a scroll-to message to the iframe.
-  const jumpToSection = (sectionKey) => {
+  // ---- autosave (debounced) ---------------------------------------
+  useEffect(() => {
+    if (!dirty || loading) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      doSave(content);
+    }, 900);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [content, dirty, loading, doSave]);
+
+  // ---- section jump -----------------------------------------------
+  const jumpToSection = (sectionKey, { sectionScrollId } = {}) => {
     setActiveSection(sectionKey);
-    const target = SECTION_TARGETS[sectionKey];
-    if (!target || !iframeRef.current) return;
-    // If the iframe isn't on the right path, swap src first, then scroll.
-    if (iframePath !== target.path) {
-      setIframePath(target.path);
-      // Scroll will happen after the iframe reloads and posts 'tapas:ready'.
-      pendingScrollRef.current = target.sectionId;
-    } else {
-      iframeRef.current.contentWindow?.postMessage(
-        { type: 'tapas:highlight', sectionId: target.sectionId },
+    const path = SECTION_DEFAULT_PATH[sectionKey] || '/';
+    if (iframePath !== path) {
+      setIframePath(path);
+      pendingScrollRef.current = sectionScrollId || null;
+    } else if (sectionScrollId) {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'tapas:highlight', sectionId: sectionScrollId },
         '*'
       );
     }
   };
 
-  const pendingScrollRef = useRef(null);
-
-  // When the iframe posts 'tapas:ready', flush any pending scroll target.
+  // ---- receive messages from the iframe ---------------------------
   useEffect(() => {
     const onMessage = (event) => {
-      if (!event.data || typeof event.data !== 'object') return;
-      if (event.data.type === 'tapas:ready' && pendingScrollRef.current) {
+      const msg = event.data;
+      if (!msg || typeof msg !== 'object') return;
+
+      // Iframe ready → flush any pending scroll target.
+      if (msg.type === 'tapas:ready' && pendingScrollRef.current) {
         iframeRef.current?.contentWindow?.postMessage(
           { type: 'tapas:highlight', sectionId: pendingScrollRef.current },
           '*'
         );
         pendingScrollRef.current = null;
+      }
+
+      // User clicked a [data-editable] element in the iframe.
+      if (msg.type === 'tapas:edit-field' && typeof msg.fieldPath === 'string') {
+        const sectionKey = sectionForFieldPath(msg.fieldPath);
+        if (!sectionKey) return;
+        setActiveSection(sectionKey);
+        const fieldKey = msg.fieldPath.split('.')[1];
+        setFocusFieldKey(fieldKey);
+        // Give the form a tick to render before focusing.
+        setTimeout(() => {
+          const el = fieldRefs.current[`${sectionKey}.${fieldKey}`];
+          if (el) {
+            el.focus();
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.transition = 'background 0.3s';
+            el.style.background = '#fff3cd';
+            setTimeout(() => { el.style.background = ''; }, 1400);
+          }
+        }, 60);
       }
     };
     window.addEventListener('message', onMessage);
@@ -236,6 +378,7 @@ export default function SiteContent() {
 
   const vp = VIEWPORTS.find(v => v.key === viewport) || VIEWPORTS[0];
   const currentSection = CONTENT_SCHEMA.find(s => s.key === activeSection) || CONTENT_SCHEMA[0];
+  const currentStorage = storageKeyForSection(currentSection);
 
   return (
     <div style={{
@@ -256,29 +399,29 @@ export default function SiteContent() {
         flexDirection: 'column',
       }}>
         {/* Header */}
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f0f0f0' }}>
-          <h1 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: '700', color: '#2c3e50' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f0f0f0' }}>
+          <h1 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: '700', color: '#2c3e50' }}>
             🎨 Edit Website
           </h1>
           <p style={{ margin: 0, color: '#8a98a6', fontSize: '12px' }}>
-            Live preview on the right. Click Save to see changes.
+            Click any text on the preview to edit. Changes save automatically.
           </p>
         </div>
 
         {/* Section tabs */}
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px', flexWrap: 'wrap', background: '#fafbfc' }}>
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '5px', flexWrap: 'wrap', background: '#fafbfc', maxHeight: '140px', overflowY: 'auto' }}>
           {CONTENT_SCHEMA.map(section => (
             <button
               key={section.key}
               onClick={() => jumpToSection(section.key)}
               style={{
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: activeSection === section.key ? '#667eea' : 'white',
                 color: activeSection === section.key ? 'white' : '#5a6c7d',
                 border: `1px solid ${activeSection === section.key ? '#667eea' : '#dfe4ea'}`,
-                borderRadius: '6px',
+                borderRadius: '5px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: '600',
                 whiteSpace: 'nowrap',
               }}
@@ -289,28 +432,31 @@ export default function SiteContent() {
         </div>
 
         {/* Fields for the active section */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
           {loading ? (
             <div style={{ color: '#8a98a6', textAlign: 'center', padding: '40px' }}>Loading…</div>
           ) : (
             <>
-              <div style={{ marginBottom: '18px' }}>
-                <h2 style={{ margin: '0 0 4px', fontSize: '16px', color: '#2c3e50', fontWeight: '700' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <h2 style={{ margin: '0 0 4px', fontSize: '15px', color: '#2c3e50', fontWeight: '700' }}>
                   {currentSection.icon} {currentSection.title}
                 </h2>
-                <p style={{ margin: 0, color: '#8a98a6', fontSize: '12px' }}>
+                <p style={{ margin: 0, color: '#8a98a6', fontSize: '11px', lineHeight: '1.4' }}>
                   {currentSection.subtitle}
                 </p>
               </div>
 
               {currentSection.fields.map(field => {
                 const Renderer = FIELD_RENDERERS[field.type] || TextField;
+                const value = content[currentStorage]?.[field.key];
+                const refKey = `${currentSection.key}.${field.key}`;
                 return (
                   <Renderer
                     key={field.key}
                     field={field}
-                    value={content[currentSection.key]?.[field.key]}
-                    onChange={(v) => updateField(currentSection.key, field.key, v)}
+                    value={value}
+                    inputRef={(el) => { fieldRefs.current[refKey] = el; }}
+                    onChange={(v) => updateField(currentStorage, field.key, v)}
                   />
                 );
               })}
@@ -318,18 +464,24 @@ export default function SiteContent() {
               <button
                 onClick={() => {
                   if (!window.confirm(`Reset all ${currentSection.title} fields to defaults?`)) return;
-                  setContent(prev => ({ ...prev, [currentSection.key]: { ...DEFAULT_CONTENT[currentSection.key] } }));
+                  const defaults = DEFAULT_CONTENT[currentStorage] || {};
+                  // Only reset the fields that belong to this schema section.
+                  const keysToReset = currentSection.fields.map(f => f.key);
+                  setContent(prev => ({
+                    ...prev,
+                    [currentStorage]: keysToReset.reduce((acc, k) => ({ ...acc, [k]: defaults[k] }), { ...(prev[currentStorage] || {}) }),
+                  }));
                   setDirty(true);
                 }}
                 style={{
-                  marginTop: '8px',
+                  marginTop: '6px',
                   padding: '8px 14px',
                   background: 'transparent',
                   border: '1px solid #dfe4ea',
                   borderRadius: '4px',
                   color: '#8a98a6',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: '600',
                 }}
               >
@@ -339,51 +491,31 @@ export default function SiteContent() {
           )}
         </div>
 
-        {/* Footer save bar */}
-        <div style={{ padding: '14px 16px', borderTop: '1px solid #f0f0f0', background: '#fafbfc' }}>
+        {/* Status footer */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', background: '#fafbfc', fontSize: '11px' }}>
           {error && (
-            <div style={{ marginBottom: '10px', padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', color: '#856404', fontSize: '12px' }}>
+            <div style={{ marginBottom: '8px', padding: '8px 10px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', color: '#856404' }}>
               ⚠️ {error}
             </div>
           )}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={save}
-              disabled={saving || !dirty}
-              style={{
-                flex: 1,
-                padding: '11px',
-                background: dirty ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#dfe4ea',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: (saving || !dirty) ? 'not-allowed' : 'pointer',
-                fontWeight: '700',
-                fontSize: '13px',
-              }}
-            >
-              {saving ? '⏳ Saving…' : dirty ? '💾 Save & preview' : '✅ All saved'}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#8a98a6' }}>
+            {saving ? (
+              <span style={{ color: '#667eea', fontWeight: '700' }}>⏳ Saving…</span>
+            ) : dirty ? (
+              <span style={{ color: '#ED8936', fontWeight: '700' }}>● Unsaved — autosave in ~1s</span>
+            ) : savedAt ? (
+              <span style={{ color: '#48BB78', fontWeight: '700' }}>✅ Saved {savedAt.toLocaleTimeString()}</span>
+            ) : (
+              <span>Ready</span>
+            )}
             <button
               onClick={() => setIframeKey(k => k + 1)}
               title="Reload preview"
-              style={{
-                padding: '11px 14px',
-                background: 'white',
-                border: '1px solid #dfe4ea',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
+              style={{ padding: '4px 10px', background: 'white', border: '1px solid #dfe4ea', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
             >
-              ↻
+              ↻ Reload
             </button>
           </div>
-          {savedAt && !dirty && (
-            <div style={{ marginTop: '8px', fontSize: '11px', color: '#48BB78', textAlign: 'center', fontWeight: '600' }}>
-              ✅ Saved {savedAt.toLocaleTimeString()}
-            </div>
-          )}
         </div>
       </aside>
 
@@ -393,7 +525,7 @@ export default function SiteContent() {
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Preview toolbar */}
         <div style={{
-          padding: '12px 16px',
+          padding: '10px 16px',
           background: 'white',
           borderBottom: '1px solid #dfe4ea',
           display: 'flex',
@@ -402,7 +534,6 @@ export default function SiteContent() {
           gap: '12px',
           flexWrap: 'wrap',
         }}>
-          {/* Page tabs */}
           <div style={{ display: 'flex', gap: '4px' }}>
             {PAGES.map(p => (
               <button
@@ -424,7 +555,6 @@ export default function SiteContent() {
             ))}
           </div>
 
-          {/* Viewport + URL */}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '4px', background: '#f5f7fa', padding: '3px', borderRadius: '6px' }}>
               {VIEWPORTS.map(v => (
