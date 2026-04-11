@@ -5,17 +5,8 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
 // =====================================================================
-// /checkout — order summary + Razorpay payment flow.
-//
-// Flow:
-//   1. Assemble cart items as the payload for create-razorpay-order.
-//   2. Invoke edge function → returns razorpay_order_id + key_id.
-//   3. Open Razorpay modal via window.Razorpay (loaded in index.html).
-//   4. On payment success, invoke verify-razorpay-payment.
-//   5. Clear cart and navigate to /order/:id.
-//
-// Fulfillment is locked to 'pickup' for MVP. The selector is rendered
-// with 'delivery' disabled so customers can see it's coming.
+// /checkout — 2025-2026 redesign
+// Modern two-column layout with sticky order summary, rounded cards.
 // =====================================================================
 
 export default function Checkout() {
@@ -24,51 +15,34 @@ export default function Checkout() {
   const { member, loading: authLoading } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
-  const [fulfillment] = useState('pickup'); // locked for MVP
+  const [fulfillment] = useState('pickup');
 
   useEffect(() => {
-    if (!authLoading && !member) {
-      navigate('/login?next=/checkout');
-    }
+    if (!authLoading && !member) navigate('/login?next=/checkout');
   }, [authLoading, member, navigate]);
 
   useEffect(() => {
-    if (items.length === 0) {
-      navigate('/cart');
-    }
+    if (items.length === 0) navigate('/cart');
   }, [items.length, navigate]);
 
   if (authLoading || !member) return null;
   if (items.length === 0) return null;
 
-  // Build items payload shared by both flows.
   const buildPayloadItems = () => items.map(i => {
-    if (i.type === 'book') {
-      return { type: 'book', book_id: i.book_id, quantity: i.quantity };
-    }
-    return {
-      type: 'membership',
-      membership_plan: i.membership_plan,
-      membership_days: i.membership_days,
-      quantity: 1,
-    };
+    if (i.type === 'book') return { type: 'book', book_id: i.book_id, quantity: i.quantity };
+    return { type: 'membership', membership_plan: i.membership_plan, membership_days: i.membership_days, quantity: 1 };
   });
 
-  // Pay-on-pickup flow — default until Razorpay goes live.
   const handlePlacePickupOrder = async () => {
     setError('');
     setProcessing(true);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke(
-        'place-pickup-order',
-        { body: { items: buildPayloadItems() } }
-      );
+      const { data, error: fnErr } = await supabase.functions.invoke('place-pickup-order', { body: { items: buildPayloadItems() } });
       if (fnErr || !data?.ok) {
-        const errMsg = fnErr?.message || data?.error || 'Failed to place order';
         if (data?.error === 'insufficient_stock') {
           throw new Error('Sorry, one of the books in your cart just went out of stock. Please remove it and try again.');
         }
-        throw new Error(errMsg);
+        throw new Error(fnErr?.message || data?.error || 'Failed to place order');
       }
       clear();
       navigate(`/order/${data.customer_order_id}`);
@@ -78,27 +52,17 @@ export default function Checkout() {
     }
   };
 
-  // Razorpay flow — activated once RAZORPAY_KEY_ID env var is present.
-  // Kept in code so flipping payment mode is a one-line change later.
   const razorpayEnabled = !!process.env.REACT_APP_RAZORPAY_KEY_ID;
 
   const handleRazorpayPay = async () => {
     setError('');
     setProcessing(true);
     try {
-      if (!window.Razorpay) {
-        throw new Error('Payment system not loaded. Please refresh and try again.');
-      }
-
-      const { data: createData, error: createErr } = await supabase.functions.invoke(
-        'create-razorpay-order',
-        { body: { items: buildPayloadItems() } }
-      );
-
+      if (!window.Razorpay) throw new Error('Payment system not loaded. Please refresh and try again.');
+      const { data: createData, error: createErr } = await supabase.functions.invoke('create-razorpay-order', { body: { items: buildPayloadItems() } });
       if (createErr || !createData?.razorpay_order_id) {
         throw new Error(createErr?.message || createData?.error || 'Failed to create order');
       }
-
       const rzp = new window.Razorpay({
         key: createData.key_id,
         amount: createData.amount,
@@ -137,43 +101,49 @@ export default function Checkout() {
   };
 
   return (
-    <div style={{ maxWidth:'900px', margin:'0 auto', padding:'40px 20px', fontFamily:'Lato, sans-serif' }}>
-      <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#2C1810', marginBottom:'32px' }}>
-        💳 Checkout
-      </h1>
+    <div className="tps-container-narrow" style={{ padding:'56px 20px 80px', fontFamily:'var(--font-body)', maxWidth:'1080px' }}>
+      <div style={{ marginBottom:'36px' }}>
+        <div className="tps-eyebrow" style={{ marginBottom:'10px' }}>Almost there</div>
+        <h1 className="tps-h1" style={{ marginBottom:'8px' }}>💳 Checkout</h1>
+        <p className="tps-subtle">Review your order and confirm your pickup.</p>
+      </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:'32px' }}>
+      <div className="checkout-grid" style={{ display:'grid', gridTemplateColumns:'1fr 380px', gap:'28px' }}>
 
         {/* Left: fulfillment + customer info */}
         <div>
-          <section style={{ background:'white', borderRadius:'16px', padding:'24px', boxShadow:'0 4px 20px rgba(0,0,0,0.08)', marginBottom:'20px' }}>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', color:'#2C1810', marginBottom:'16px' }}>
-              📦 Fulfillment
-            </h2>
+          <section className="tps-card" style={{ padding:'28px', marginBottom:'20px' }}>
+            <h2 className="tps-h4" style={{ marginBottom:'18px' }}>📦 Fulfillment</h2>
             <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
               <label style={{
-                display:'flex', alignItems:'center', gap:'12px', padding:'16px',
-                borderRadius:'12px', border:'2px solid #D4A853',
-                background:'rgba(212,168,83,0.1)', cursor:'pointer'
+                display:'flex', alignItems:'center', gap:'14px', padding:'18px',
+                borderRadius:'var(--radius-md)',
+                border:'2px solid var(--brand-accent)',
+                background:'rgba(212,168,83,0.08)',
+                cursor:'pointer',
               }}>
-                <input type="radio" checked={fulfillment === 'pickup'} readOnly style={{ accentColor:'#D4A853' }} />
+                <input type="radio" checked={fulfillment === 'pickup'} readOnly style={{ accentColor:'var(--brand-accent)', width:'18px', height:'18px' }} />
                 <div>
-                  <div style={{ fontWeight:'700', color:'#2C1810' }}>🏪 In-store Pickup</div>
-                  <div style={{ color:'#8B6914', fontSize:'13px' }}>
+                  <div style={{ fontWeight:'700', color:'var(--text)', marginBottom:'2px' }}>🏪 In-store Pickup</div>
+                  <div className="tps-subtle" style={{ fontSize:'13px' }}>
                     Collect your order at Tapas Reading Cafe. We'll notify you when it's ready.
                   </div>
                 </div>
               </label>
 
               <label style={{
-                display:'flex', alignItems:'center', gap:'12px', padding:'16px',
-                borderRadius:'12px', border:'2px solid #F5DEB3',
-                background:'#FFF8ED', cursor:'not-allowed', opacity:0.6
+                display:'flex', alignItems:'center', gap:'14px', padding:'18px',
+                borderRadius:'var(--radius-md)',
+                border:'2px solid var(--border)',
+                background:'var(--bg-subtle)',
+                cursor:'not-allowed', opacity:0.6,
               }}>
-                <input type="radio" disabled style={{ accentColor:'#D4A853' }} />
+                <input type="radio" disabled style={{ accentColor:'var(--brand-accent)', width:'18px', height:'18px' }} />
                 <div>
-                  <div style={{ fontWeight:'700', color:'#8B6914' }}>🚚 Home Delivery <span style={{ fontSize:'11px', background:'#D4A853', color:'#2C1810', padding:'2px 8px', borderRadius:'10px', marginLeft:'6px' }}>Coming Soon</span></div>
-                  <div style={{ color:'#8B6914', fontSize:'13px' }}>
+                  <div style={{ fontWeight:'700', color:'var(--text-subtle)', marginBottom:'2px' }}>
+                    🚚 Home Delivery <span className="tps-badge tps-badge-muted" style={{ marginLeft:'8px' }}>Coming Soon</span>
+                  </div>
+                  <div className="tps-subtle" style={{ fontSize:'13px' }}>
                     Delivery to your address will be available shortly.
                   </div>
                 </div>
@@ -181,25 +151,23 @@ export default function Checkout() {
             </div>
           </section>
 
-          <section style={{ background:'white', borderRadius:'16px', padding:'24px', boxShadow:'0 4px 20px rgba(0,0,0,0.08)' }}>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', color:'#2C1810', marginBottom:'16px' }}>
-              👤 Customer Details
-            </h2>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', fontSize:'14px', color:'#5C3A1E' }}>
+          <section className="tps-card" style={{ padding:'28px' }}>
+            <h2 className="tps-h4" style={{ marginBottom:'18px' }}>👤 Customer Details</h2>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', fontSize:'14px', color:'var(--text-muted)' }}>
               <div>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'4px' }}>Name</div>
+                <div className="tps-label">Name</div>
                 <div>{member.name || '(not set)'}</div>
               </div>
               <div>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'4px' }}>Email</div>
+                <div className="tps-label">Email</div>
                 <div>{member.email}</div>
               </div>
               <div>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'4px' }}>Phone</div>
+                <div className="tps-label">Phone</div>
                 <div>{member.phone || '(not set)'}</div>
               </div>
             </div>
-            <Link to="/profile" style={{ display:'inline-block', marginTop:'12px', color:'#D4A853', fontSize:'13px', fontWeight:'700', textDecoration:'none' }}>
+            <Link to="/profile" style={{ display:'inline-block', marginTop:'16px', color:'var(--brand-accent)', fontSize:'13px', fontWeight:'700', textDecoration:'none' }}>
               Edit in profile →
             </Link>
           </section>
@@ -207,31 +175,38 @@ export default function Checkout() {
 
         {/* Right: order summary */}
         <div>
-          <div style={{ background:'white', borderRadius:'16px', padding:'24px', boxShadow:'0 4px 20px rgba(0,0,0,0.08)', position:'sticky', top:'80px' }}>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', color:'#2C1810', marginBottom:'16px' }}>
-              🧾 Order Summary
-            </h2>
-            <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'16px' }}>
+          <div className="tps-card" style={{
+            padding:'28px',
+            position:'sticky', top:'90px',
+            background:'var(--gradient-subtle)',
+          }}>
+            <h2 className="tps-h4" style={{ marginBottom:'18px' }}>🧾 Order Summary</h2>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'16px' }}>
               {items.map(item => (
-                <div key={item.key} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#5C3A1E' }}>
-                  <span>{item.title} × {item.quantity}</span>
-                  <span>₹{(item.unit_price * item.quantity).toFixed(2)}</span>
+                <div key={item.key} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'var(--text-muted)' }}>
+                  <span style={{ flex:1, marginRight:'8px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {item.title} × {item.quantity}
+                  </span>
+                  <span style={{ fontWeight:'600', color:'var(--text)' }}>₹{(item.unit_price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
             </div>
-            <div style={{ borderTop:'1px solid #F5DEB3', paddingTop:'12px', marginTop:'12px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'14px', color:'#8B6914', marginBottom:'6px' }}>
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:'14px', marginTop:'14px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'var(--text-subtle)', marginBottom:'6px' }}>
                 <span>Subtotal</span>
                 <span>₹{subtotal.toFixed(2)}</span>
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'18px', fontWeight:'800', color:'#2C1810', marginTop:'12px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'22px', fontWeight:'800', color:'var(--text)', marginTop:'14px', fontFamily:'var(--font-heading)' }}>
                 <span>Total</span>
                 <span>₹{subtotal.toFixed(2)}</span>
               </div>
             </div>
 
             {error && (
-              <div style={{ marginTop:'16px', padding:'12px', borderRadius:'8px', background:'rgba(252,129,129,0.1)', border:'1px solid #FC8181', color:'#9B2335', fontSize:'13px' }}>
+              <div className="tps-badge tps-badge-danger" style={{
+                marginTop:'16px', padding:'12px', display:'block', width:'100%',
+                textAlign:'center', textTransform:'none', letterSpacing:'0', lineHeight:'1.5',
+              }}>
                 ⚠️ {error}
               </div>
             )}
@@ -239,17 +214,12 @@ export default function Checkout() {
             <button
               onClick={handlePlacePickupOrder}
               disabled={processing}
-              style={{
-                width:'100%', marginTop:'20px', padding:'14px',
-                background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-                border:'none', borderRadius:'12px', fontWeight:'700', fontSize:'16px',
-                cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.7 : 1,
-                fontFamily:'Lato, sans-serif',
-                boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
-              }}>
+              className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block"
+              style={{ marginTop:'22px' }}
+            >
               {processing ? '⏳ Reserving...' : '🔖 Reserve & Pay on Pickup'}
             </button>
-            <p style={{ marginTop:'12px', textAlign:'center', color:'#8B6914', fontSize:'12px' }}>
+            <p className="tps-subtle" style={{ marginTop:'12px', textAlign:'center', fontSize:'12px', lineHeight:'1.6' }}>
               We'll hold your books at Tapas Reading Cafe.<br/>
               Pay cash or UPI when you collect them.
             </p>
@@ -258,20 +228,17 @@ export default function Checkout() {
               <button
                 onClick={handleRazorpayPay}
                 disabled={processing}
-                style={{
-                  width:'100%', marginTop:'12px', padding:'12px',
-                  background:'white', color:'#2C1810',
-                  border:'2px solid #D4A853', borderRadius:'12px', fontWeight:'700', fontSize:'14px',
-                  cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.7 : 1,
-                  fontFamily:'Lato, sans-serif'
-                }}>
+                className="tps-btn tps-btn-secondary tps-btn-block"
+                style={{ marginTop:'12px' }}
+              >
                 💳 Or pay online with Razorpay
               </button>
             ) : (
               <div style={{
-                marginTop:'12px', padding:'12px', borderRadius:'12px',
-                background:'#FFF8ED', border:'1px dashed #D4A853',
-                textAlign:'center', color:'#8B6914', fontSize:'12px'
+                marginTop:'14px', padding:'14px', borderRadius:'var(--radius-md)',
+                background:'var(--surface-alt)',
+                border:'1px dashed var(--border-strong)',
+                textAlign:'center', color:'var(--text-subtle)', fontSize:'12px',
               }}>
                 💳 Online payment (Razorpay) coming soon
               </div>
@@ -279,6 +246,12 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 860px) {
+          .checkout-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

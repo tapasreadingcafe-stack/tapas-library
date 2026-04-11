@@ -60,7 +60,7 @@ export default function Offers() {
     : (sectionStyles.offers_hero_bg_color || 'transparent');
 
   return (
-    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
+    <div style={{ fontFamily:'var(--font-body)', background:'var(--bg)', color:'var(--text)' }}>
 
       {/* Editorial hero */}
       <section id="section-offers-hero" data-editable-section="offers" style={{
@@ -103,15 +103,16 @@ export default function Offers() {
             const isPopular = plan.popular;
             const isGold = plan.id === 'gold';
             return (
-              <div key={plan.id} style={{
-                background: isPopular ? 'linear-gradient(135deg, #2C1810, #4A2C17)' : 'white',
-                color:      isPopular ? '#F5DEB3' : '#2C1810',
-                borderRadius:'12px',
+              <div key={plan.id} className="tps-card" style={{
+                background: isPopular ? 'var(--gradient-hero)' : 'var(--surface)',
+                color:      isPopular ? '#F5DEB3' : 'var(--text)',
+                borderRadius:'var(--radius-xl)',
                 padding:'40px 32px 36px',
                 position:'relative', overflow:'hidden',
-                boxShadow: isPopular ? '0 20px 60px rgba(44,24,16,0.35)' : '0 6px 20px rgba(44,24,16,0.08)',
+                boxShadow: isPopular ? 'var(--shadow-xl)' : 'var(--shadow-md)',
                 transform: isPopular ? 'translateY(-8px)' : 'none',
                 display:'flex', flexDirection:'column',
+                border: isPopular ? 'none' : '1px solid var(--border)',
               }}>
                 {isPopular && (
                   <div style={{
@@ -126,11 +127,11 @@ export default function Offers() {
                 <div style={{ fontSize:'11px', fontWeight:'800', textTransform:'uppercase', letterSpacing:'2px', color: isPopular ? '#D4A853' : plan.accent, marginBottom:'10px' }}>
                   {plan.tier}
                 </div>
-                <p style={{ fontFamily:'"Playfair Display", serif', fontSize:'17px', fontStyle:'italic', color: isPopular ? 'rgba(245,222,179,0.75)' : '#8B6914', marginBottom:'24px' }}>
+                <p style={{ fontFamily:'"Playfair Display", serif', fontSize:'17px', fontStyle:'italic', color: isPopular ? 'rgba(245,222,179,0.75)' : 'var(--text-subtle)', marginBottom:'24px' }}>
                   {plan.tagline}
                 </p>
                 <div style={{ marginBottom:'28px' }}>
-                  <span style={{ fontSize:'52px', fontWeight:'800', color: isPopular ? '#F5DEB3' : '#2C1810', fontFamily:'"Playfair Display", serif' }}>
+                  <span style={{ fontSize:'52px', fontWeight:'800', color: isPopular ? '#F5DEB3' : 'var(--text)', fontFamily:'var(--font-heading)' }}>
                     {plan.price}
                   </span>
                   <span style={{ color: isPopular ? 'rgba(245,222,179,0.7)' : '#8B6914', fontSize:'15px' }}>{plan.period}</span>
@@ -139,7 +140,7 @@ export default function Offers() {
                   {plan.features.map(f => (
                     <li key={f} style={{ display:'flex', gap:'12px', alignItems:'flex-start', marginBottom:'12px', fontSize:'14px', lineHeight:'1.5' }}>
                       <span style={{ color: isPopular ? '#D4A853' : plan.accent, fontWeight:'700', flexShrink:0 }}>✓</span>
-                      <span style={{ color: isPopular ? 'rgba(245,222,179,0.9)' : '#5C3A1E' }}>{f}</span>
+                      <span style={{ color: isPopular ? 'rgba(245,222,179,0.9)' : 'var(--text-muted)' }}>{f}</span>
                     </li>
                   ))}
                 </ul>
@@ -164,7 +165,7 @@ export default function Offers() {
           })}
         </div>
 
-        <p data-editable="offers.plans_footer" style={{ textAlign:'center', color:'#8B6914', fontSize:'13px', marginTop:'40px', fontStyle:'italic' }}>
+        <p data-editable="offers.plans_footer" style={{ textAlign:'center', color:'var(--text-subtle)', fontSize:'13px', marginTop:'40px', fontStyle:'italic' }}>
           {offers.plans_footer}
         </p>
       </section>
@@ -172,7 +173,7 @@ export default function Offers() {
 
       {/* Why join block */}
       {visibility.offers_why_join !== false && (
-      <section id="section-offers-why-join" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      <section id="section-offers-why-join" style={{ background:'var(--bg-subtle)', padding:'80px 20px', borderTop:'1px solid var(--border)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ maxWidth:'900px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
             <div data-editable="offers.why_join_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
@@ -197,7 +198,7 @@ export default function Offers() {
                 <h3 data-editable={`offers.why_join_${i}_title`} style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'18px', color:brand.primary_color, marginBottom:'8px', fontWeight:'700' }}>
                   {offers[`why_join_${i}_title`]}
                 </h3>
-                <p data-editable={`offers.why_join_${i}_body`} style={{ color:'#5C3A1E', lineHeight:'1.7', fontSize:'14px', margin:0 }}>
+                <p data-editable={`offers.why_join_${i}_body`} style={{ color:'var(--text-muted)', lineHeight:'1.7', fontSize:'14px', margin:0 }}>
                   {offers[`why_join_${i}_body`]}
                 </p>
               </div>
@@ -220,7 +221,7 @@ export default function Offers() {
           }}>
             {offers.cta_headline}
           </h2>
-          <p data-editable="offers.cta_body" style={{ color:'#8B6914', fontSize:'15px', marginBottom:'32px', lineHeight:'1.6' }}>
+          <p data-editable="offers.cta_body" style={{ color:'var(--text-subtle)', fontSize:'15px', marginBottom:'32px', lineHeight:'1.6' }}>
             {offers.cta_body}
           </p>
           <Link to="/login?mode=signup" style={{

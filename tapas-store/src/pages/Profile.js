@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 function TabBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
-      padding:'10px 18px', border:'none', borderRadius:'8px', cursor:'pointer', fontFamily:'Lato, sans-serif',
+      padding:'10px 18px', border:'none', borderRadius:'8px', cursor:'pointer', fontFamily:'var(--font-body)',
       background: active ? '#2C1810' : 'transparent',
       color: active ? '#F5DEB3' : '#8B6914',
       fontWeight: active ? '700' : '400', fontSize:'14px', transition:'all 0.2s', whiteSpace:'nowrap'
@@ -179,14 +179,14 @@ export default function Profile() {
   };
 
   return (
-    <div style={{ maxWidth:'1100px', margin:'0 auto', padding:'40px 20px', fontFamily:'Lato, sans-serif' }}>
+    <div style={{ maxWidth:'1100px', margin:'0 auto', padding:'40px 20px', fontFamily:'var(--font-body)' }}>
 
       {/* Header */}
       <div style={{ background:'linear-gradient(135deg, #2C1810, #4A2C17)', borderRadius:'20px', padding:'32px', marginBottom:'32px', color:'white' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'16px' }}>
           <div>
             <div style={{ fontSize:'40px', marginBottom:'8px' }}>👤</div>
-            <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'32px', fontWeight:'700', color:'#F5DEB3', marginBottom:'4px' }}>
+            <h1 style={{ fontFamily:'var(--font-heading)', fontSize:'32px', fontWeight:'700', color:'#F5DEB3', marginBottom:'4px' }}>
               Welcome, {member.name?.split(' ')[0] || 'there'}!
             </h1>
             <p style={{ color:'rgba(245,222,179,0.7)', fontSize:'14px' }}>{member.email}</p>
@@ -217,7 +217,7 @@ export default function Profile() {
           ].map(s => (
             <div key={s.label} style={{ background:'rgba(255,255,255,0.08)', borderRadius:'12px', padding:'16px', textAlign:'center' }}>
               <div style={{ fontSize:'24px', marginBottom:'4px' }}>{s.icon}</div>
-              <div style={{ fontSize:'28px', fontWeight:'800', color: s.warning ? '#FC8181' : '#D4A853', fontFamily:'"Playfair Display", serif' }}>{s.num}</div>
+              <div style={{ fontSize:'28px', fontWeight:'800', color: s.warning ? '#FC8181' : '#D4A853', fontFamily:'var(--font-heading)' }}>{s.num}</div>
               <div style={{ color:'rgba(245,222,179,0.7)', fontSize:'12px' }}>{s.label}</div>
             </div>
           ))}
@@ -229,17 +229,17 @@ export default function Profile() {
         <div style={{ background:'rgba(252,129,129,0.15)', border:'2px solid #FC8181', borderRadius:'12px', padding:'16px 20px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px' }}>
           <div>
             <div style={{ fontWeight:'700', color:'#9B2335', fontSize:'16px', marginBottom:'4px' }}>⚠️ Outstanding Fines</div>
-            <div style={{ color:'#5C3A1E', fontSize:'14px' }}>You have {fines.length} overdue book{fines.length > 1 ? 's' : ''}. Please return them at the library.</div>
+            <div style={{ color:'var(--text-muted)', fontSize:'14px' }}>You have {fines.length} overdue book{fines.length > 1 ? 's' : ''}. Please return them at the library.</div>
           </div>
-          <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'24px', fontWeight:'800', color:'#FC8181' }}>
+          <div style={{ fontFamily:'var(--font-heading)', fontSize:'24px', fontWeight:'800', color:'#FC8181' }}>
             ₹{totalFines}
           </div>
         </div>
       )}
 
       {/* Tabs */}
-      <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.08)' }}>
-        <div style={{ background:'#FFF8ED', padding:'8px', display:'flex', gap:'4px', borderBottom:'1px solid #F5DEB3', overflowX:'auto' }}>
+      <div style={{ background:'var(--surface)', borderRadius:'16px', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.08)' }}>
+        <div style={{ background:'var(--bg-subtle)', padding:'8px', display:'flex', gap:'4px', borderBottom:'1px solid var(--border)', overflowX:'auto' }}>
           <TabBtn active={tab==='overview'}     onClick={() => setTab('overview')}>👤 Profile</TabBtn>
           <TabBtn active={tab==='orders'}       onClick={() => setTab('orders')}>🛒 Orders ({orders.length})</TabBtn>
           <TabBtn active={tab==='borrowed'}     onClick={() => setTab('borrowed')}>📚 Borrowed ({borrowed.length})</TabBtn>
@@ -249,39 +249,39 @@ export default function Profile() {
 
         <div style={{ padding:'24px' }}>
           {loading ? (
-            <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>Loading...</div>
+            <div style={{ textAlign:'center', padding:'40px', color:'var(--text-subtle)' }}>Loading...</div>
           ) : (
             <>
 
               {/* Overview — profile edit */}
               {tab === 'overview' && (
                 <div style={{ maxWidth:'560px' }}>
-                  <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px' }}>Personal Information</h3>
+                  <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px' }}>Personal Information</h3>
                   <form onSubmit={saveProfile} style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                     <div>
-                      <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Full Name</label>
+                      <label style={{ fontSize:'12px', fontWeight:'700', color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Full Name</label>
                       <input value={formName} onChange={e => setFormName(e.target.value)} required
-                        style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                        style={{ width:'100%', padding:'12px 16px', border:'2px solid var(--border)', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'var(--font-body)', boxSizing:'border-box' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Email (read-only)</label>
+                      <label style={{ fontSize:'12px', fontWeight:'700', color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Email (read-only)</label>
                       <input value={member.email || ''} disabled
-                        style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', background:'#FFF8ED', color:'#8B6914', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                        style={{ width:'100%', padding:'12px 16px', border:'2px solid var(--border)', borderRadius:'8px', fontSize:'15px', background:'var(--bg-subtle)', color:'var(--text-subtle)', fontFamily:'var(--font-body)', boxSizing:'border-box' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Phone</label>
+                      <label style={{ fontSize:'12px', fontWeight:'700', color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Phone</label>
                       <input value={formPhone} onChange={e => setFormPhone(e.target.value)} placeholder="+91 98765 43210"
-                        style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                        style={{ width:'100%', padding:'12px 16px', border:'2px solid var(--border)', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'var(--font-body)', boxSizing:'border-box' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Date of Birth</label>
+                      <label style={{ fontSize:'12px', fontWeight:'700', color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Date of Birth</label>
                       <input type="date" value={formDob || ''} onChange={e => setFormDob(e.target.value)}
-                        style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                        style={{ width:'100%', padding:'12px 16px', border:'2px solid var(--border)', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'var(--font-body)', boxSizing:'border-box' }} />
                     </div>
                     <button type="submit" disabled={saving} style={{
                       padding:'14px', background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3',
                       border:'none', borderRadius:'12px', fontWeight:'700', fontSize:'16px', cursor: saving ? 'not-allowed' : 'pointer',
-                      opacity: saving ? 0.7 : 1, fontFamily:'Lato, sans-serif', marginTop:'4px'
+                      opacity: saving ? 0.7 : 1, fontFamily:'var(--font-body)', marginTop:'4px'
                     }}>
                       {saving ? '⏳ Saving...' : '💾 Save Changes'}
                     </button>
@@ -293,9 +293,9 @@ export default function Profile() {
               {/* Orders */}
               {tab === 'orders' && (
                 <div>
-                  <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px' }}>My Online Orders</h3>
+                  <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px' }}>My Online Orders</h3>
                   {orders.length === 0 ? (
-                    <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>
+                    <div style={{ textAlign:'center', padding:'40px', color:'var(--text-subtle)' }}>
                       <div style={{ fontSize:'48px', marginBottom:'12px' }}>🛒</div>
                       <p>No online orders yet.</p>
                       <Link to="/books" style={{ color:'#D4A853', fontWeight:'700', textDecoration:'none', display:'inline-block', marginTop:'12px' }}>Browse Books →</Link>
@@ -303,26 +303,26 @@ export default function Profile() {
                   ) : (
                     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                       {orders.map(o => (
-                        <div key={o.id} style={{ background:'#FFF8ED', borderRadius:'12px', border:'1px solid #F5DEB3', padding:'20px' }}>
+                        <div key={o.id} style={{ background:'var(--bg-subtle)', borderRadius:'12px', border:'1px solid var(--border)', padding:'20px' }}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'12px', marginBottom:'12px' }}>
                             <div>
-                              <div style={{ fontWeight:'700', color:'#2C1810', fontSize:'16px' }}>
+                              <div style={{ fontWeight:'700', color:'var(--text)', fontSize:'16px' }}>
                                 Order #{o.order_number}
                               </div>
-                              <div style={{ color:'#8B6914', fontSize:'12px' }}>
+                              <div style={{ color:'var(--text-subtle)', fontSize:'12px' }}>
                                 {new Date(o.created_at).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' })}
                                 {' · '}
                                 {o.fulfillment_type === 'pickup' ? '🏪 Pickup' : '🚚 Delivery'}
                               </div>
                             </div>
                             <div style={{ textAlign:'right' }}>
-                              <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', fontWeight:'800', color:'#2C1810' }}>₹{Number(o.total).toFixed(2)}</div>
+                              <div style={{ fontFamily:'var(--font-heading)', fontSize:'22px', fontWeight:'800', color:'var(--text)' }}>₹{Number(o.total).toFixed(2)}</div>
                               <div style={{ marginTop:'4px' }}>{statusPill(o.status)}</div>
                             </div>
                           </div>
-                          <div style={{ borderTop:'1px solid #F5DEB3', paddingTop:'12px' }}>
+                          <div style={{ borderTop:'1px solid var(--border)', paddingTop:'12px' }}>
                             {(o.customer_order_items || []).map(it => (
-                              <div key={it.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#5C3A1E', padding:'4px 0' }}>
+                              <div key={it.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'var(--text-muted)', padding:'4px 0' }}>
                                 <span>{it.item_name} × {it.quantity}</span>
                                 <span>₹{Number(it.total_price).toFixed(2)}</span>
                               </div>
@@ -338,9 +338,9 @@ export default function Profile() {
               {/* Borrowed */}
               {tab === 'borrowed' && (
                 <div>
-                  <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px' }}>Currently Borrowed Books</h3>
+                  <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px' }}>Currently Borrowed Books</h3>
                   {borrowed.length === 0 ? (
-                    <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>
+                    <div style={{ textAlign:'center', padding:'40px', color:'var(--text-subtle)' }}>
                       <div style={{ fontSize:'48px', marginBottom:'12px' }}>📭</div>
                       <p>You haven't borrowed any books yet.</p>
                       <Link to="/books" style={{ color:'#D4A853', fontWeight:'700', textDecoration:'none', display:'inline-block', marginTop:'12px' }}>Browse Books →</Link>
@@ -354,11 +354,11 @@ export default function Profile() {
                         return (
                           <div key={b.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', background: overdue ? 'rgba(252,129,129,0.08)' : '#FFF8ED', borderRadius:'12px', border:`1px solid ${overdue ? 'rgba(252,129,129,0.3)' : '#F5DEB3'}`, flexWrap:'wrap', gap:'12px' }}>
                             <div>
-                              <div style={{ fontWeight:'700', color:'#2C1810', fontSize:'16px', marginBottom:'4px' }}>{b.books?.title}</div>
-                              <div style={{ color:'#8B6914', fontSize:'13px' }}>by {b.books?.author}</div>
+                              <div style={{ fontWeight:'700', color:'var(--text)', fontSize:'16px', marginBottom:'4px' }}>{b.books?.title}</div>
+                              <div style={{ color:'var(--text-subtle)', fontSize:'13px' }}>by {b.books?.author}</div>
                             </div>
                             <div style={{ textAlign:'right' }}>
-                              <div style={{ fontSize:'12px', color:'#8B6914', marginBottom:'4px' }}>Due date</div>
+                              <div style={{ fontSize:'12px', color:'var(--text-subtle)', marginBottom:'4px' }}>Due date</div>
                               <div style={{ fontWeight:'700', color: overdue ? '#FC8181' : daysLeft <= 3 ? '#F6AD55' : '#48BB78', fontSize:'15px' }}>
                                 {dueDate.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
                               </div>
@@ -377,9 +377,9 @@ export default function Profile() {
               {/* Reservations */}
               {tab === 'reservations' && (
                 <div>
-                  <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px' }}>My Reservations</h3>
+                  <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px' }}>My Reservations</h3>
                   {reservations.length === 0 ? (
-                    <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>
+                    <div style={{ textAlign:'center', padding:'40px', color:'var(--text-subtle)' }}>
                       <div style={{ fontSize:'48px', marginBottom:'12px' }}>🔖</div>
                       <p>No reservations yet.</p>
                       <Link to="/books" style={{ color:'#D4A853', fontWeight:'700', textDecoration:'none', display:'inline-block', marginTop:'12px' }}>Find a Book →</Link>
@@ -387,10 +387,10 @@ export default function Profile() {
                   ) : (
                     <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
                       {reservations.map(r => (
-                        <div key={r.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', background:'#FFF8ED', borderRadius:'12px', border:'1px solid #F5DEB3', flexWrap:'wrap', gap:'12px' }}>
+                        <div key={r.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', background:'var(--bg-subtle)', borderRadius:'12px', border:'1px solid var(--border)', flexWrap:'wrap', gap:'12px' }}>
                           <div>
-                            <div style={{ fontWeight:'700', color:'#2C1810', fontSize:'16px', marginBottom:'4px' }}>{r.books?.title}</div>
-                            <div style={{ color:'#8B6914', fontSize:'13px' }}>Reserved {new Date(r.created_at).toLocaleDateString('en-IN')}</div>
+                            <div style={{ fontWeight:'700', color:'var(--text)', fontSize:'16px', marginBottom:'4px' }}>{r.books?.title}</div>
+                            <div style={{ color:'var(--text-subtle)', fontSize:'13px' }}>Reserved {new Date(r.created_at).toLocaleDateString('en-IN')}</div>
                           </div>
                           <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
                             <span style={{
@@ -401,7 +401,7 @@ export default function Profile() {
                               {r.status === 'pending' ? '⏳ Pending' : r.status === 'available' ? '✅ Available' : r.status === 'cancelled' ? '❌ Cancelled' : r.status}
                             </span>
                             {r.status === 'pending' && (
-                              <button onClick={() => cancelReservation(r.id)} style={{ padding:'6px 12px', borderRadius:'8px', border:'1px solid #FC8181', background:'transparent', color:'#FC8181', cursor:'pointer', fontSize:'12px', fontFamily:'Lato, sans-serif' }}>
+                              <button onClick={() => cancelReservation(r.id)} style={{ padding:'6px 12px', borderRadius:'8px', border:'1px solid #FC8181', background:'transparent', color:'#FC8181', cursor:'pointer', fontSize:'12px', fontFamily:'var(--font-body)' }}>
                                 Cancel
                               </button>
                             )}
@@ -416,9 +416,9 @@ export default function Profile() {
               {/* Wishlist */}
               {tab === 'wishlist' && (
                 <div>
-                  <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px' }}>My Wishlist</h3>
+                  <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px' }}>My Wishlist</h3>
                   {wishlist.length === 0 ? (
-                    <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>
+                    <div style={{ textAlign:'center', padding:'40px', color:'var(--text-subtle)' }}>
                       <div style={{ fontSize:'48px', marginBottom:'12px' }}>❤️</div>
                       <p>Your wishlist is empty.</p>
                       <Link to="/books" style={{ color:'#D4A853', fontWeight:'700', textDecoration:'none', display:'inline-block', marginTop:'12px' }}>Discover Books →</Link>
@@ -426,11 +426,11 @@ export default function Profile() {
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'16px' }}>
                       {wishlist.map(w => (
-                        <div key={w.id} style={{ background:'#FFF8ED', borderRadius:'12px', padding:'16px', border:'1px solid #F5DEB3', position:'relative' }}>
+                        <div key={w.id} style={{ background:'var(--bg-subtle)', borderRadius:'12px', padding:'16px', border:'1px solid var(--border)', position:'relative' }}>
                           <button onClick={() => removeWishlist(w.book_id)} style={{ position:'absolute', top:'12px', right:'12px', background:'none', border:'none', cursor:'pointer', fontSize:'16px', color:'#FC8181' }}>✕</button>
                           <div style={{ fontSize:'32px', marginBottom:'8px' }}>📖</div>
-                          <h4 style={{ fontFamily:'"Playfair Display", serif', fontSize:'16px', color:'#2C1810', marginBottom:'4px', paddingRight:'24px' }}>{w.books?.title}</h4>
-                          <p style={{ color:'#8B6914', fontSize:'13px', marginBottom:'10px' }}>by {w.books?.author}</p>
+                          <h4 style={{ fontFamily:'var(--font-heading)', fontSize:'16px', color:'var(--text)', marginBottom:'4px', paddingRight:'24px' }}>{w.books?.title}</h4>
+                          <p style={{ color:'var(--text-subtle)', fontSize:'13px', marginBottom:'10px' }}>by {w.books?.author}</p>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                             <span style={{ fontSize:'12px', fontWeight:'700', padding:'3px 10px', borderRadius:'10px', background: w.books?.quantity_available > 0 ? 'rgba(72,187,120,0.15)' : 'rgba(252,129,129,0.15)', color: w.books?.quantity_available > 0 ? '#276749' : '#9B2335' }}>
                               {w.books?.quantity_available > 0 ? '✅ Available' : '❌ Out'}

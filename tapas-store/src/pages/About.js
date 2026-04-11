@@ -47,7 +47,7 @@ export default function About() {
   };
 
   return (
-    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
+    <div style={{ fontFamily:'var(--font-body)', background:'var(--bg)', color:'var(--text)' }}>
 
       {/* Editorial hero */}
       <section id="section-about-hero" data-editable-section="about" style={{
@@ -68,7 +68,7 @@ export default function About() {
             {about.hero_eyebrow}
           </div>
           <h1 style={{
-            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontFamily:'var(--font-heading)',
             fontSize: `clamp(32px, 6vw, ${styles.about_hero_headline_size || 'var(--tapas-h-xxl-size, 64px)'})`,
             fontWeight:'var(--tapas-h-weight, 800)', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px',
             textAlign: styles.about_hero_headline_align || 'center',
@@ -83,17 +83,17 @@ export default function About() {
       </section>
 
       {/* Story body */}
-      <section id="section-about-story" data-editable-section="about" style={{ maxWidth:'720px', margin:'-60px auto 0', background:'white', borderRadius:'8px', padding:'56px 48px', boxShadow:'0 20px 60px rgba(44,24,16,0.1)', position:'relative', zIndex:2 }}>
-        <p data-editable="about.story_pull_quote" style={{ color:'#5C3A1E', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontStyle:'italic' }}>
+      <section id="section-about-story" data-editable-section="about" style={{ maxWidth:'720px', margin:'-60px auto 0', background:'var(--surface)', borderRadius:'var(--radius-lg)', padding:'56px 48px', boxShadow:'var(--shadow-xl)', position:'relative', zIndex:2 }}>
+        <p data-editable="about.story_pull_quote" style={{ color:'var(--text-muted)', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'var(--font-heading)', fontStyle:'italic' }}>
           "{about.story_pull_quote}"
         </p>
-        <p data-editable="about.story_body_1" style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
+        <p data-editable="about.story_body_1" style={{ color:'var(--text-muted)', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
           {about.story_body_1}
         </p>
-        <p data-editable="about.story_body_2" style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
+        <p data-editable="about.story_body_2" style={{ color:'var(--text-muted)', fontSize:'16px', lineHeight:'1.85', marginBottom:'20px', whiteSpace:'pre-line' }}>
           {about.story_body_2}
         </p>
-        <p data-editable="about.story_body_3" style={{ color:'#5C3A1E', fontSize:'16px', lineHeight:'1.85', whiteSpace:'pre-line' }}>
+        <p data-editable="about.story_body_3" style={{ color:'var(--text-muted)', fontSize:'16px', lineHeight:'1.85', whiteSpace:'pre-line' }}>
           {about.story_body_3}
         </p>
       </section>
@@ -106,7 +106,7 @@ export default function About() {
             {about.values_eyebrow}
           </div>
           <h2 data-editable="about.values_heading" style={{
-            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontFamily:'var(--font-heading)',
             fontSize:'var(--tapas-h-xl-size, 40px)',
             fontWeight:'var(--tapas-h-weight, 800)',
             color:'var(--tapas-h-color, #2C1810)',
@@ -121,14 +121,14 @@ export default function About() {
             const body  = about[`values_${i}_body`];
             return (
               <div key={i} style={{ display:'flex', gap:'20px' }}>
-                <div style={{ flexShrink:0, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'42px', fontWeight:'800', color:brand.accent_color, lineHeight:1 }}>
+                <div style={{ flexShrink:0, fontFamily:'var(--font-heading)', fontSize:'42px', fontWeight:'800', color:brand.accent_color, lineHeight:1 }}>
                   0{i}
                 </div>
                 <div>
-                  <h3 data-editable={`about.values_${i}_title`} style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'20px', color:brand.primary_color, marginBottom:'10px', fontWeight:'700' }}>
+                  <h3 data-editable={`about.values_${i}_title`} style={{ fontFamily:'var(--font-heading)', fontSize:'20px', color:brand.primary_color, marginBottom:'10px', fontWeight:'700' }}>
                     {title}
                   </h3>
-                  <p data-editable={`about.values_${i}_body`} style={{ color:'#5C3A1E', lineHeight:'1.75', fontSize:'15px', margin:0 }}>{body}</p>
+                  <p data-editable={`about.values_${i}_body`} style={{ color:'var(--text-muted)', lineHeight:'1.75', fontSize:'15px', margin:0 }}>{body}</p>
                 </div>
               </div>
             );
@@ -139,21 +139,21 @@ export default function About() {
 
       {/* Visit us — hours + contact */}
       {visibility.about_visit !== false && (
-      <section id="section-about-visit" data-editable-section="contact" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      <section id="section-about-visit" data-editable-section="contact" style={{ background:'var(--bg-subtle)', padding:'80px 20px', borderTop:'1px solid var(--border)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ maxWidth:'1100px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
             <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
               Come say hello
             </div>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'40px', fontWeight:'800', color:'#2C1810', lineHeight:'1.1' }}>
+            <h2 style={{ fontFamily:'var(--font-heading)', fontSize:'40px', fontWeight:'800', color:'var(--text)', lineHeight:'1.1' }}>
               Visit us
             </h2>
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'40px' }} className="visit-grid">
             {/* Hours */}
-            <div style={{ background:'white', borderRadius:'8px', padding:'32px', boxShadow:'0 4px 20px rgba(44,24,16,0.06)' }}>
-              <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px', fontWeight:'700' }}>
+            <div style={{ background:'var(--surface)', borderRadius:'var(--radius-lg)', padding:'32px', boxShadow:'var(--shadow-sm)' }}>
+              <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px', fontWeight:'700' }}>
                 🕐 Opening hours
               </h3>
               <div>
@@ -163,16 +163,16 @@ export default function About() {
                     padding:'12px 0',
                     borderBottom: idx === HOURS.length - 1 ? 'none' : '1px solid #F5DEB3',
                   }}>
-                    <span style={{ fontFamily:'"Playfair Display", serif', color:'#2C1810', fontSize:'15px', fontWeight:'600' }}>{row.day}</span>
-                    <span style={{ color:'#8B6914', fontSize:'14px' }}>{row.time}</span>
+                    <span style={{ fontFamily:'var(--font-heading)', color:'var(--text)', fontSize:'15px', fontWeight:'600' }}>{row.day}</span>
+                    <span style={{ color:'var(--text-subtle)', fontSize:'14px' }}>{row.time}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Find us */}
-            <div style={{ background:'white', borderRadius:'8px', padding:'32px', boxShadow:'0 4px 20px rgba(44,24,16,0.06)' }}>
-              <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px', fontWeight:'700' }}>
+            <div style={{ background:'var(--surface)', borderRadius:'var(--radius-lg)', padding:'32px', boxShadow:'var(--shadow-sm)' }}>
+              <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', color:'var(--text)', marginBottom:'20px', fontWeight:'700' }}>
                 📍 Find us
               </h3>
               {[
@@ -181,10 +181,10 @@ export default function About() {
                 { label:'Email',   value: contact.email },
               ].map(c => (
                 <div key={c.label} style={{ marginBottom:'18px' }}>
-                  <div style={{ fontSize:'10px', fontWeight:'800', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1.5px', marginBottom:'4px' }}>
+                  <div style={{ fontSize:'10px', fontWeight:'800', color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'1.5px', marginBottom:'4px' }}>
                     {c.label}
                   </div>
-                  <div style={{ color:'#2C1810', fontSize:'15px', fontWeight:'600' }}>{c.value}</div>
+                  <div style={{ color:'var(--text)', fontSize:'15px', fontWeight:'600' }}>{c.value}</div>
                 </div>
               ))}
               <Link to="/login?mode=signup" style={{
@@ -219,17 +219,17 @@ export default function About() {
           <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
             Get in touch
           </div>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'800', color:'#2C1810', lineHeight:'1.1', marginBottom:'12px' }}>
+          <h2 style={{ fontFamily:'var(--font-heading)', fontSize:'36px', fontWeight:'800', color:'var(--text)', lineHeight:'1.1', marginBottom:'12px' }}>
             Have a question?
           </h2>
-          <p style={{ color:'#8B6914', fontSize:'15px', lineHeight:'1.6' }}>
+          <p style={{ color:'var(--text-subtle)', fontSize:'15px', lineHeight:'1.6' }}>
             Looking for a book we don't have, want to host a reading, or just
             say hi? Drop us a line and we'll get back to you.
           </p>
         </div>
 
         {sent && (
-          <div style={{ background:'rgba(72,187,120,0.12)', border:'1px solid #48BB78', borderRadius:'8px', padding:'16px', textAlign:'center', marginBottom:'24px', color:'#276749', fontWeight:'700', fontSize:'14px' }}>
+          <div style={{ background:'rgba(72,187,120,0.12)', border:'1px solid #48BB78', borderRadius:'var(--radius-lg)', padding:'16px', textAlign:'center', marginBottom:'24px', color:'#276749', fontWeight:'700', fontSize:'14px' }}>
             ✅ Thank you — we got your message and will reply soon.
           </div>
         )}
@@ -240,26 +240,26 @@ export default function About() {
               placeholder="Your name" required
               value={formData.name}
               onChange={e => setFormData(f => ({...f, name:e.target.value}))}
-              style={{ padding:'14px 18px', border:'1px solid rgba(212,168,83,0.4)', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', background:'white' }}
+              style={{ padding:'14px 18px', border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)', fontSize:'15px', outline:'none', fontFamily:'var(--font-body)', background:'var(--surface)' }}
             />
             <input
               placeholder="Email" type="email" required
               value={formData.email}
               onChange={e => setFormData(f => ({...f, email:e.target.value}))}
-              style={{ padding:'14px 18px', border:'1px solid rgba(212,168,83,0.4)', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', background:'white' }}
+              style={{ padding:'14px 18px', border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)', fontSize:'15px', outline:'none', fontFamily:'var(--font-body)', background:'var(--surface)' }}
             />
           </div>
           <input
             placeholder="Phone (optional)"
             value={formData.phone}
             onChange={e => setFormData(f => ({...f, phone:e.target.value}))}
-            style={{ padding:'14px 18px', border:'1px solid rgba(212,168,83,0.4)', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', background:'white' }}
+            style={{ padding:'14px 18px', border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)', fontSize:'15px', outline:'none', fontFamily:'var(--font-body)', background:'var(--surface)' }}
           />
           <textarea
             placeholder="What's on your mind?" required rows={5}
             value={formData.message}
             onChange={e => setFormData(f => ({...f, message:e.target.value}))}
-            style={{ padding:'14px 18px', border:'1px solid rgba(212,168,83,0.4)', borderRadius:'8px', fontSize:'15px', outline:'none', resize:'vertical', fontFamily:'Lato, sans-serif', background:'white' }}
+            style={{ padding:'14px 18px', border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)', fontSize:'15px', outline:'none', resize:'vertical', fontFamily:'var(--font-body)', background:'var(--surface)' }}
           />
           <button type="submit" style={{
             padding:'var(--tapas-btn-padding, 16px 32px)',
@@ -269,7 +269,7 @@ export default function About() {
             fontWeight:'var(--tapas-btn-font-weight, 700)',
             fontSize:'var(--tapas-btn-font-size, 14px)',
             cursor:'pointer',
-            fontFamily:'var(--tapas-body-font, Lato), sans-serif',
+            fontFamily:'var(--font-body)',
             letterSpacing:'var(--tapas-btn-letter-spacing, 1px)',
             textTransform:'var(--tapas-btn-text-transform, uppercase)',
             boxShadow:'0 6px 20px rgba(44,24,16,0.25)',

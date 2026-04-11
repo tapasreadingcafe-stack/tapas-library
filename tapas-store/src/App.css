@@ -1,13 +1,490 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* =====================================================================
+ * Tapas Reading Cafe — Design System (2025-2026)
+ * ---------------------------------------------------------------------
+ * Modern tokens: rounded corners, micro-interactions, dark mode, glass
+ * morphism (overlays only), gradient CTAs. Light theme is the default;
+ * dark mode activates via <body data-theme="dark"> or user preference.
+ * ===================================================================== */
 
-body {
-  font-family: 'Lato', sans-serif;
-  background: #FDF8F0;
-  color: #2C1810;
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+
+:root {
+  /* Brand (editable via SiteContent CMS — fall back to these) */
+  --brand-primary:       #2C1810;
+  --brand-primary-light: #4A2C17;
+  --brand-primary-dark:  #1A0E08;
+  --brand-accent:        #D4A853;
+  --brand-accent-dark:   #C49040;
+  --brand-sand:          #F5DEB3;
+  --brand-cream:         #FDF8F0;
+
+  /* Neutral scale (light mode) */
+  --bg:          #FDF8F0;       /* page background */
+  --bg-subtle:   #FFF8ED;       /* section tint */
+  --bg-muted:    #FAEBD7;       /* muted zone */
+  --surface:     #FFFFFF;       /* card / elevated */
+  --surface-alt: #FFFBF2;       /* alt card */
+  --border:      #EADDC6;       /* divider */
+  --border-strong:#D4A853;      /* accent divider */
+
+  --text:        #2C1810;       /* body text */
+  --text-muted:  #5C3A1E;       /* secondary text */
+  --text-subtle: #8B6914;       /* tertiary text */
+  --text-invert: #F5DEB3;       /* on dark bg */
+
+  --success: #16A34A;
+  --danger:  #DC2626;
+  --warning: #F59E0B;
+  --info:    #0EA5E9;
+
+  /* Radii */
+  --radius-xs:  6px;
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-2xl: 24px;
+  --radius-pill: 99px;
+
+  /* Shadows (light) */
+  --shadow-xs:  0 1px 2px rgba(44,24,16,0.06);
+  --shadow-sm:  0 2px 8px rgba(44,24,16,0.08);
+  --shadow-md:  0 4px 16px rgba(44,24,16,0.10);
+  --shadow-lg:  0 12px 32px rgba(44,24,16,0.14);
+  --shadow-xl:  0 20px 48px rgba(44,24,16,0.18);
+  --shadow-glow:0 0 0 3px rgba(212,168,83,0.25);
+
+  /* Motion */
+  --ease:        cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration:      200ms;
+  --duration-slow: 320ms;
+
+  /* Typography */
+  --font-body:    'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-mono:    ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Gradients — CTAs + hero only */
+  --gradient-cta:    linear-gradient(135deg, #D4A853 0%, #C49040 100%);
+  --gradient-hero:   linear-gradient(135deg, #2C1810 0%, #4A2C17 40%, #6B3D26 100%);
+  --gradient-subtle: linear-gradient(135deg, #FFF8ED 0%, #FAEBD7 100%);
+
+  color-scheme: light;
 }
 
-a { color: inherit; }
+/* Dark mode */
+[data-theme="dark"] {
+  --bg:          #0F172A;
+  --bg-subtle:   #1A2238;
+  --bg-muted:    #1E293B;
+  --surface:     #1E293B;
+  --surface-alt: #243044;
+  --border:      #334155;
+  --border-strong:#D4A853;
 
+  --text:        #E2E8F0;
+  --text-muted:  #CBD5E1;
+  --text-subtle: #94A3B8;
+  --text-invert: #F8FAFC;
+
+  --brand-cream: #1E293B;
+  --brand-sand:  #E2E8F0;
+
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.35);
+  --shadow-sm:  0 2px 8px rgba(0,0,0,0.40);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.45);
+  --shadow-lg:  0 12px 32px rgba(0,0,0,0.50);
+  --shadow-xl:  0 20px 48px rgba(0,0,0,0.55);
+  --shadow-glow:0 0 0 3px rgba(212,168,83,0.35);
+
+  --gradient-hero:   linear-gradient(135deg, #020617 0%, #1E293B 40%, #334155 100%);
+  --gradient-subtle: linear-gradient(135deg, #1E293B 0%, #243044 100%);
+
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+a { color: inherit; text-decoration: none; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+img { display: block; max-width: 100%; }
+
+/* =====================================================================
+ * SCROLLBAR (subtle, modern)
+ * ===================================================================== */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
+
+/* =====================================================================
+ * SELECTION
+ * ===================================================================== */
+::selection { background: var(--brand-accent); color: var(--brand-primary); }
+
+/* =====================================================================
+ * FOCUS RING — accessible + modern
+ * ===================================================================== */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
+  border-radius: var(--radius-sm);
+}
+
+/* =====================================================================
+ * TYPOGRAPHY UTILITIES
+ * ===================================================================== */
+.tps-h1, .tps-h2, .tps-h3, .tps-h4 {
+  font-family: var(--font-heading);
+  color: var(--text);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.tps-h1 { font-size: clamp(36px, 6vw, 72px); line-height: 1.05; }
+.tps-h2 { font-size: clamp(28px, 4vw, 44px); }
+.tps-h3 { font-size: clamp(22px, 3vw, 32px); }
+.tps-h4 { font-size: 20px; font-weight: 700; }
+
+.tps-eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--brand-accent);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+.tps-muted { color: var(--text-muted); }
+.tps-subtle { color: var(--text-subtle); }
+
+/* =====================================================================
+ * BUTTONS
+ * ===================================================================== */
+.tps-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--duration) var(--ease),
+              box-shadow var(--duration) var(--ease),
+              background var(--duration) var(--ease),
+              color var(--duration) var(--ease);
+  white-space: nowrap;
+  user-select: none;
+}
+.tps-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tps-btn-primary {
+  background: var(--gradient-cta);
+  color: var(--brand-primary);
+  box-shadow: 0 4px 14px rgba(212,168,83,0.35);
+}
+.tps-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(212,168,83,0.45);
+}
+.tps-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.tps-btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.tps-btn-secondary:hover:not(:disabled) {
+  border-color: var(--brand-accent);
+  background: var(--surface-alt);
+}
+
+.tps-btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid transparent;
+}
+.tps-btn-ghost:hover:not(:disabled) {
+  background: var(--bg-muted);
+}
+
+.tps-btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.tps-btn-outline:hover:not(:disabled) {
+  border-color: var(--brand-accent);
+  color: var(--brand-accent);
+}
+
+.tps-btn-sm { padding: 8px 16px; font-size: 13px; }
+.tps-btn-lg { padding: 16px 32px; font-size: 15px; }
+.tps-btn-block { width: 100%; }
+
+/* =====================================================================
+ * CARDS
+ * ===================================================================== */
+.tps-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: transform var(--duration) var(--ease),
+              box-shadow var(--duration) var(--ease),
+              border-color var(--duration) var(--ease);
+}
+.tps-card-interactive { cursor: pointer; }
+.tps-card-interactive:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--brand-accent);
+}
+
+.tps-card-body { padding: var(--space-5); }
+.tps-card-title {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+  margin: 0 0 4px;
+}
+.tps-card-meta { color: var(--text-subtle); font-size: 13px; }
+
+/* =====================================================================
+ * BADGES
+ * ===================================================================== */
+.tps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.tps-badge-accent {
+  background: rgba(212,168,83,0.15);
+  color: var(--brand-accent);
+  border: 1px solid rgba(212,168,83,0.35);
+}
+.tps-badge-success {
+  background: rgba(22,163,74,0.1);
+  color: var(--success);
+  border: 1px solid rgba(22,163,74,0.3);
+}
+.tps-badge-danger {
+  background: rgba(220,38,38,0.1);
+  color: var(--danger);
+  border: 1px solid rgba(220,38,38,0.3);
+}
+.tps-badge-muted {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* =====================================================================
+ * INPUTS
+ * ===================================================================== */
+.tps-input, .tps-textarea, .tps-select {
+  width: 100%;
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--duration) var(--ease),
+              box-shadow var(--duration) var(--ease);
+}
+.tps-input::placeholder, .tps-textarea::placeholder { color: var(--text-subtle); }
+.tps-input:focus, .tps-textarea:focus, .tps-select:focus {
+  border-color: var(--brand-accent);
+  box-shadow: var(--shadow-glow);
+}
+.tps-input-pill {
+  border-radius: var(--radius-pill);
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.tps-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* =====================================================================
+ * GLASS MORPHISM — overlays/modals only
+ * ===================================================================== */
+.tps-glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+}
+[data-theme="dark"] .tps-glass {
+  background: rgba(30,41,59,0.72);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.tps-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999;
+  animation: tps-fade-in var(--duration) var(--ease);
+}
+
+/* =====================================================================
+ * LAYOUT HELPERS
+ * ===================================================================== */
+.tps-container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+.tps-container-narrow { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+
+.tps-section { padding: var(--space-20) 20px; }
+.tps-section-sm { padding: var(--space-12) 20px; }
+
+.tps-stack > * + * { margin-top: var(--space-4); }
+.tps-stack-lg > * + * { margin-top: var(--space-6); }
+
+.tps-grid { display: grid; gap: var(--space-6); }
+.tps-grid-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.tps-grid-wide  { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+/* =====================================================================
+ * ANIMATIONS
+ * ===================================================================== */
+@keyframes tps-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tps-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes tps-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes tps-shimmer {
+  0%   { background-position: -800px 0; }
+  100% { background-position: 800px 0; }
+}
+@keyframes tps-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes tps-bookSpin {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.15); }
+}
+
+.tps-animate-in   { animation: tps-fade-up 500ms var(--ease-out) both; }
+.tps-animate-pop  { animation: tps-scale-in 300ms var(--ease-out) both; }
+
+/* =====================================================================
+ * SKELETON LOADERS
+ * ===================================================================== */
+.tps-skeleton {
+  background: linear-gradient(90deg, var(--bg-muted) 0%, var(--surface) 50%, var(--bg-muted) 100%);
+  background-size: 800px 100%;
+  animation: tps-shimmer 1.4s infinite linear;
+  border-radius: var(--radius-sm);
+}
+
+/* =====================================================================
+ * DARK MODE TOGGLE
+ * ===================================================================== */
+.tps-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--text-invert);
+  cursor: pointer;
+  transition: background var(--duration) var(--ease),
+              transform var(--duration) var(--ease);
+}
+.tps-theme-toggle:hover {
+  background: rgba(255,255,255,0.15);
+  transform: rotate(12deg);
+}
+
+/* =====================================================================
+ * RESPONSIVE
+ * ===================================================================== */
 @media (max-width: 768px) {
   .mobile-menu-btn { display: block !important; }
+  .tps-section { padding: var(--space-12) 16px; }
+  .tps-section-sm { padding: var(--space-10) 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

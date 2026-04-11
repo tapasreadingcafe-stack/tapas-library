@@ -3,6 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../App';
 
+// =====================================================================
+// CustomerLogin — 2025-2026 redesign
+// Modern auth card with segmented mode toggle, rounded inputs, subtle
+// glass morphism background. Dark-mode aware.
+// =====================================================================
+
 export default function CustomerLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -15,12 +21,12 @@ export default function CustomerLogin() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const initialMode = searchParams.get('mode') === 'signup' ? 'signup' : 'login';
-  const [mode, setMode] = useState(initialMode); // 'login' | 'otp' | 'signup'
+  const [mode, setMode] = useState(initialMode);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
 
   useEffect(() => {
-    if (member) navigate('/member');
+    if (member) navigate('/profile');
   }, [member, navigate]);
 
   const handleEmailLogin = async (e) => {
@@ -30,10 +36,6 @@ export default function CustomerLogin() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Don't navigate here — the useEffect watching `member` will redirect
-      // to /profile once AuthContext finishes loading the members row.
-      // Navigating directly races against onAuthStateChange and can land
-      // on /profile before the member is loaded, which bounces back here.
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -63,10 +65,6 @@ export default function CustomerLogin() {
     try {
       const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'email' });
       if (error) throw error;
-      // Don't navigate here — the useEffect watching `member` will redirect
-      // to /profile once AuthContext finishes loading the members row.
-      // Navigating directly races against onAuthStateChange and can land
-      // on /profile before the member is loaded, which bounces back here.
     } catch (err) {
       setError(err.message || 'Invalid OTP. Please try again.');
     } finally {
@@ -78,32 +76,20 @@ export default function CustomerLogin() {
     e.preventDefault();
     setError('');
     setInfo('');
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
+        email, password,
         options: {
           emailRedirectTo: `${window.location.origin}/profile`,
           data: { name: fullName.trim() },
         },
       });
       if (error) throw error;
-      // If session is returned immediately (email confirmation disabled), go straight in.
-      if (data.session) {
-        navigate('/profile');
-        return;
-      }
-      // Otherwise show the "check your email" message.
-      setInfo(`✅ Account created! Check ${email} for a confirmation link. Once confirmed, come back and log in.`);
+      if (data.session) { navigate('/profile'); return; }
+      setInfo(`✅ Account created! Check ${email} for a confirmation link.`);
     } catch (err) {
       setError(err.message || 'Signup failed. Please try again.');
     } finally {
@@ -112,32 +98,54 @@ export default function CustomerLogin() {
   };
 
   return (
-    <div style={{ minHeight:'80vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'40px 20px', fontFamily:'Lato, sans-serif', background:'linear-gradient(135deg, #FDF8F0, #FAEBD7)' }}>
-      <div style={{ width:'100%', maxWidth:'440px' }}>
+    <div style={{
+      minHeight:'85vh',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      padding:'40px 20px',
+      fontFamily:'var(--font-body)',
+      background:'var(--bg)',
+      position:'relative',
+      overflow:'hidden',
+    }}>
+      {/* Atmosphere glow */}
+      <div style={{ position:'absolute', top:'-120px', left:'-120px', width:'380px', height:'380px', borderRadius:'50%', background:'radial-gradient(circle, rgba(212,168,83,0.18), transparent 70%)', filter:'blur(40px)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', bottom:'-120px', right:'-120px', width:'380px', height:'380px', borderRadius:'50%', background:'radial-gradient(circle, rgba(44,24,16,0.15), transparent 70%)', filter:'blur(40px)', pointerEvents:'none' }} />
 
-        {/* Card */}
-        <div style={{ background:'white', borderRadius:'24px', padding:'40px', boxShadow:'0 20px 60px rgba(44,24,16,0.12)' }}>
-
+      <div style={{ width:'100%', maxWidth:'460px', position:'relative', zIndex:1 }}>
+        <div className="tps-card tps-animate-pop" style={{
+          padding:'44px 40px',
+          borderRadius:'var(--radius-2xl)',
+          boxShadow:'var(--shadow-xl)',
+        }}>
           <div style={{ textAlign:'center', marginBottom:'32px' }}>
-            <div style={{ fontSize:'48px', marginBottom:'12px' }}>📚</div>
-            <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'30px', fontWeight:'700', color:'#2C1810', marginBottom:'8px' }}>
-              {mode === 'signup' ? 'Create Account' : 'Member Login'}
+            <div style={{ fontSize:'52px', marginBottom:'10px' }}>📚</div>
+            <h1 className="tps-h3" style={{ marginBottom:'8px' }}>
+              {mode === 'signup' ? 'Create Account' : 'Welcome back'}
             </h1>
-            <p style={{ color:'#8B6914', fontSize:'14px' }}>
+            <p className="tps-subtle" style={{ fontSize:'14px' }}>
               {mode === 'signup'
                 ? 'Join Tapas Reading Cafe to shop, borrow, and reserve.'
-                : 'Welcome back! Access your books, reservations, and more.'}
+                : 'Access your books, reservations, and more.'}
             </p>
           </div>
 
-          {/* Mode Toggle */}
-          <div style={{ display:'flex', background:'#FFF8ED', borderRadius:'12px', padding:'4px', marginBottom:'28px', gap:'2px' }}>
+          {/* Mode toggle segmented control */}
+          <div style={{
+            display:'flex',
+            background:'var(--bg-muted)',
+            borderRadius:'var(--radius-pill)',
+            padding:'4px',
+            marginBottom:'28px',
+            gap:'2px',
+          }}>
             {[['login','Login'],['otp','OTP'],['signup','Sign Up']].map(([m, label]) => (
               <button key={m} onClick={() => { setMode(m); setError(''); setInfo(''); setOtpSent(false); }} style={{
-                flex:1, padding:'10px', borderRadius:'8px', border:'none', cursor:'pointer', fontFamily:'Lato, sans-serif',
-                background: mode === m ? '#2C1810' : 'transparent',
-                color: mode === m ? '#F5DEB3' : '#8B6914',
-                fontWeight: mode === m ? '700' : '400', fontSize:'14px', transition:'all 0.2s'
+                flex:1, padding:'10px', borderRadius:'var(--radius-pill)', border:'none', cursor:'pointer',
+                fontFamily:'var(--font-body)',
+                background: mode === m ? 'var(--text)' : 'transparent',
+                color: mode === m ? 'var(--bg)' : 'var(--text-subtle)',
+                fontWeight: mode === m ? '800' : '600', fontSize:'13px',
+                transition:'all 200ms var(--ease)',
               }}>
                 {label}
               </button>
@@ -145,12 +153,12 @@ export default function CustomerLogin() {
           </div>
 
           {error && (
-            <div style={{ background:'rgba(252,129,129,0.15)', border:'1px solid #FC8181', borderRadius:'8px', padding:'12px 16px', marginBottom:'20px', color:'#9B2335', fontSize:'14px' }}>
+            <div className="tps-badge tps-badge-danger" style={{ display:'block', width:'100%', padding:'12px 14px', marginBottom:'18px', textTransform:'none', letterSpacing:'0', textAlign:'left', lineHeight:'1.5' }}>
               ⚠️ {error}
             </div>
           )}
           {info && (
-            <div style={{ background:'rgba(72,187,120,0.12)', border:'1px solid #48BB78', borderRadius:'8px', padding:'12px 16px', marginBottom:'20px', color:'#276749', fontSize:'14px' }}>
+            <div className="tps-badge tps-badge-success" style={{ display:'block', width:'100%', padding:'12px 14px', marginBottom:'18px', textTransform:'none', letterSpacing:'0', textAlign:'left', lineHeight:'1.5' }}>
               {info}
             </div>
           )}
@@ -158,129 +166,88 @@ export default function CustomerLogin() {
           {mode === 'signup' && (
             <form onSubmit={handleSignUp} style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Full Name</label>
-                <input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name"
-                  style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                <label className="tps-label">Full Name</label>
+                <input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" className="tps-input" />
               </div>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Email Address</label>
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com"
-                  style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                <label className="tps-label">Email Address</label>
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="tps-input" />
               </div>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Password</label>
-                <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters"
-                  style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                <label className="tps-label">Password</label>
+                <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" className="tps-input" />
               </div>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Confirm Password</label>
-                <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password"
-                  style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }} />
+                <label className="tps-label">Confirm Password</label>
+                <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" className="tps-input" />
               </div>
-              <button type="submit" disabled={loading} style={{
-                padding:'14px', background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-                border:'none', borderRadius:'12px', fontWeight:'700', fontSize:'16px', cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1, fontFamily:'Lato, sans-serif', marginTop:'4px'
-              }}>
-                {loading ? '⏳ Creating account...' : '✨ Create My Account'}
+              <button type="submit" disabled={loading} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block" style={{ marginTop:'6px' }}>
+                {loading ? '⏳ Creating account…' : '✨ Create My Account'}
               </button>
-              <p style={{ textAlign:'center', color:'#8B6914', fontSize:'12px', margin:'4px 0 0 0' }}>
+              <p className="tps-subtle" style={{ textAlign:'center', fontSize:'12px', margin:'4px 0 0 0' }}>
                 Already have an account?{' '}
-                <button type="button" onClick={() => { setMode('login'); setError(''); setInfo(''); }} style={{ background:'none', border:'none', color:'#D4A853', fontWeight:'700', cursor:'pointer', fontSize:'12px', padding:0 }}>
+                <button type="button" onClick={() => { setMode('login'); setError(''); setInfo(''); }} style={{ background:'none', border:'none', color:'var(--brand-accent)', fontWeight:'800', cursor:'pointer', fontSize:'12px', padding:0 }}>
                   Log in →
                 </button>
               </p>
             </form>
           )}
 
-          {mode !== 'signup' && (<>
-          {mode === 'login' ? (
+          {mode === 'login' && (
             <form onSubmit={handleEmailLogin} style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Email Address</label>
-                <input
-                  type="email" required
-                  value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }}
-                  onFocus={e => e.target.style.borderColor='#D4A853'}
-                  onBlur={e => e.target.style.borderColor='#F5DEB3'}
-                />
+                <label className="tps-label">Email Address</label>
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="tps-input" />
               </div>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Password</label>
-                <input
-                  type="password" required
-                  value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }}
-                  onFocus={e => e.target.style.borderColor='#D4A853'}
-                  onBlur={e => e.target.style.borderColor='#F5DEB3'}
-                />
+                <label className="tps-label">Password</label>
+                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="tps-input" />
               </div>
-              <button type="submit" disabled={loading} style={{
-                padding:'14px', background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3',
-                border:'none', borderRadius:'12px', fontWeight:'700', fontSize:'16px', cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1, fontFamily:'Lato, sans-serif', marginTop:'4px'
-              }}>
-                {loading ? '⏳ Logging in...' : '🔓 Login to My Account'}
+              <button type="submit" disabled={loading} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block" style={{ marginTop:'6px' }}>
+                {loading ? '⏳ Logging in…' : '🔓 Login'}
               </button>
             </form>
-          ) : (
+          )}
+
+          {mode === 'otp' && (
             <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
               {!otpSent ? (
                 <form onSubmit={handleSendOtp}>
                   <div style={{ marginBottom:'16px' }}>
-                    <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Email Address</label>
-                    <input
-                      type="email" required
-                      value={email} onChange={e => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', boxSizing:'border-box' }}
-                    />
+                    <label className="tps-label">Email Address</label>
+                    <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="tps-input" />
                   </div>
-                  <button type="submit" disabled={loading} style={{
-                    width:'100%', padding:'14px', background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-                    border:'none', borderRadius:'12px', fontWeight:'700', fontSize:'16px', cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'Lato, sans-serif'
-                  }}>
-                    {loading ? '⏳ Sending...' : '📧 Send OTP to Email'}
+                  <button type="submit" disabled={loading} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block">
+                    {loading ? '⏳ Sending…' : '📧 Send OTP to Email'}
                   </button>
                 </form>
               ) : (
                 <form onSubmit={handleVerifyOtp}>
-                  <div style={{ textAlign:'center', background:'rgba(72,187,120,0.1)', border:'1px solid #48BB78', borderRadius:'8px', padding:'12px', marginBottom:'16px', color:'#276749', fontSize:'14px' }}>
+                  <div className="tps-badge tps-badge-success" style={{ display:'block', width:'100%', padding:'12px', marginBottom:'18px', textTransform:'none', letterSpacing:'0', textAlign:'center' }}>
                     ✅ OTP sent to <strong>{email}</strong>
                   </div>
                   <div style={{ marginBottom:'16px' }}>
-                    <label style={{ fontSize:'12px', fontWeight:'700', color:'#8B6914', textTransform:'uppercase', letterSpacing:'1px', display:'block', marginBottom:'8px' }}>Enter OTP</label>
-                    <input
-                      required
-                      value={otp} onChange={e => setOtp(e.target.value)}
-                      placeholder="Enter 6-digit OTP"
-                      maxLength={6}
-                      style={{ width:'100%', padding:'12px 16px', border:'2px solid #F5DEB3', borderRadius:'8px', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', textAlign:'center', letterSpacing:'4px', boxSizing:'border-box' }}
-                    />
+                    <label className="tps-label">Enter OTP</label>
+                    <input required value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-digit code" maxLength={6}
+                      className="tps-input"
+                      style={{ textAlign:'center', letterSpacing:'8px', fontSize:'18px', fontWeight:'800' }} />
                   </div>
-                  <button type="submit" disabled={loading} style={{
-                    width:'100%', padding:'14px', background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3',
-                    border:'none', borderRadius:'12px', fontWeight:'700', fontSize:'16px', cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'Lato, sans-serif', marginBottom:'10px'
-                  }}>
-                    {loading ? '⏳ Verifying...' : '✅ Verify & Login'}
+                  <button type="submit" disabled={loading} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block" style={{ marginBottom:'10px' }}>
+                    {loading ? '⏳ Verifying…' : '✓ Verify & Login'}
                   </button>
-                  <button type="button" onClick={() => { setOtpSent(false); setOtp(''); }} style={{ width:'100%', padding:'10px', background:'transparent', border:'1px solid #F5DEB3', borderRadius:'8px', color:'#8B6914', cursor:'pointer', fontSize:'13px', fontFamily:'Lato, sans-serif' }}>
+                  <button type="button" onClick={() => { setOtpSent(false); setOtp(''); }} className="tps-btn tps-btn-ghost tps-btn-sm tps-btn-block">
                     ← Change Email
                   </button>
                 </form>
               )}
             </div>
           )}
-          </>)}
 
           {mode !== 'signup' && (
             <div style={{ marginTop:'24px', textAlign:'center' }}>
-              <p style={{ color:'#8B6914', fontSize:'14px' }}>
+              <p className="tps-subtle" style={{ fontSize:'14px' }}>
                 Not a member yet?{' '}
-                <button type="button" onClick={() => { setMode('signup'); setError(''); setInfo(''); }} style={{ background:'none', border:'none', color:'#D4A853', fontWeight:'700', cursor:'pointer', fontSize:'14px', padding:0 }}>
+                <button type="button" onClick={() => { setMode('signup'); setError(''); setInfo(''); }} style={{ background:'none', border:'none', color:'var(--brand-accent)', fontWeight:'800', cursor:'pointer', fontSize:'14px', padding:0 }}>
                   Create an account →
                 </button>
               </p>
@@ -288,10 +255,9 @@ export default function CustomerLogin() {
           )}
         </div>
 
-        {/* Info */}
-        <div style={{ marginTop:'24px', textAlign:'center' }}>
-          <p style={{ color:'#8B6914', fontSize:'13px' }}>
-            🔒 Your account is secured by Supabase Auth
+        <div style={{ marginTop:'20px', textAlign:'center' }}>
+          <p className="tps-subtle" style={{ fontSize:'12px' }}>
+            🔒 Secured by Supabase Auth
           </p>
         </div>
       </div>

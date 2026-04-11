@@ -4,6 +4,36 @@ import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useSiteContent } from '../context/SiteContent';
+import { useTheme } from '../context/ThemeContext';
+
+function ThemeToggle({ brand }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+  return (
+    <button
+      onClick={toggleTheme}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Light mode' : 'Dark mode'}
+      style={{
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        color: brand?.sand_color || '#F5DEB3',
+        cursor: 'pointer',
+        fontSize: '16px',
+        padding: '6px 10px',
+        borderRadius: '99px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'transform 200ms, background 200ms',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.transform = 'rotate(12deg)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'rotate(0)'; }}
+    >
+      {isDark ? '☀️' : '🌙'}
+    </button>
+  );
+}
 
 // =====================================================================
 // HeaderTemplates — 10 swappable navbar layouts.
@@ -147,6 +177,7 @@ function AuthActions({ member, header, brand, handleLogout }) {
 function IconsRow({ wishlistCount, itemCount, brand, searchOpen, setSearchOpen, searchTerm, setSearchTerm, handleSearch, placeholder }) {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+      <ThemeToggle brand={brand} />
       {searchOpen ? (
         <form onSubmit={handleSearch} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
           <input autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)}

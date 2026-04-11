@@ -5,9 +5,9 @@ import { useCart } from '../context/CartContext';
 import { useSiteContent } from '../context/SiteContent';
 
 // =====================================================================
-// Catalog — editorial browse page inspired by powells.com.
-// Sidebar filters on desktop, collapsible on mobile.
-// Clean grid of book cards with cover-first presentation, minimal chrome.
+// Catalog — 2025-2026 redesign
+// Clean minimal layout with sticky filter bar, pill chips, modern cards
+// with scale hover, skeleton loading states.
 // =====================================================================
 
 const GENRES = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Children', 'Business', 'Travel', 'Arts', 'Biography', 'Mystery', 'Romance', 'Fantasy', 'Self-Help'];
@@ -33,76 +33,76 @@ function BookTile({ book }) {
   };
 
   return (
-    <Link to={`/books/${book.id}`} style={{ textDecoration:'none', color:'inherit' }}>
-      <div style={{
-        display:'flex', flexDirection:'column', gap:'14px',
-        padding:'16px', borderRadius:'8px',
-        transition:'background 0.2s',
-        cursor:'pointer', height:'100%',
-      }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,222,179,0.4)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-      >
-        <div style={{ display:'flex', justifyContent:'center' }}>
-          <div style={{
-            width:'160px', height:'220px',
-            borderRadius:'4px', overflow:'hidden',
-            background:'linear-gradient(145deg, #F5DEB3, #D4A853)',
-            boxShadow:'0 10px 30px rgba(44,24,16,0.2), 0 0 0 1px rgba(44,24,16,0.05)',
-            display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
-          }}>
-            {src ? (
-              <img src={src} alt={book.title} loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-            ) : (
-              <div style={{ textAlign:'center', padding:'14px' }}>
-                <div style={{ fontSize:'40px', marginBottom:'4px' }}>📖</div>
-                <div style={{ fontSize:'10px', color:'#8B6914', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px' }}>
-                  {book.genre || book.category || 'Book'}
-                </div>
+    <Link to={`/books/${book.id}`} className="tps-card tps-card-interactive" style={{
+      textDecoration:'none', color:'inherit',
+      padding:'16px', display:'flex', flexDirection:'column', gap:'14px', height:'100%',
+    }}>
+      <div style={{ display:'flex', justifyContent:'center' }}>
+        <div style={{
+          width:'160px', height:'220px',
+          borderRadius:'var(--radius-md)', overflow:'hidden',
+          background:'linear-gradient(145deg, #F5DEB3, #D4A853)',
+          boxShadow:'0 12px 28px rgba(44,24,16,0.15), 0 0 0 1px rgba(44,24,16,0.04)',
+          display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
+        }}>
+          {src ? (
+            <img src={src} alt={book.title} loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          ) : (
+            <div style={{ textAlign:'center', padding:'14px' }}>
+              <div style={{ fontSize:'40px', marginBottom:'4px' }}>📖</div>
+              <div style={{ fontSize:'10px', color:'#8B6914', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px' }}>
+                {book.genre || book.category || 'Book'}
               </div>
-            )}
-            {!inStock && (
-              <div style={{
-                position:'absolute', inset:0, background:'rgba(44,24,16,0.55)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                color:'#F5DEB3', fontSize:'11px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px',
-              }}>
-                Sold Out
-              </div>
-            )}
-          </div>
+            </div>
+          )}
+          {!inStock && (
+            <div style={{
+              position:'absolute', inset:0, background:'rgba(15,23,42,0.55)', backdropFilter:'blur(2px)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              color:'#F5DEB3', fontSize:'11px', fontWeight:'800', textTransform:'uppercase', letterSpacing:'1.5px',
+            }}>
+              Sold Out
+            </div>
+          )}
         </div>
+      </div>
 
-        <div>
-          <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'16px', fontWeight:'600', color:'#2C1810', lineHeight:'1.3', marginBottom:'4px', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
-            {book.title}
-          </h3>
-          <p style={{ color:'#8B6914', fontSize:'13px', marginBottom:'8px', fontStyle:'italic' }}>{book.author}</p>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            {forSale ? (
-              <span style={{ color:'#D4A853', fontWeight:'800', fontSize:'17px', fontFamily:'"Playfair Display", serif' }}>₹{book.sales_price}</span>
-            ) : (
-              <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'12px', textTransform:'uppercase', letterSpacing:'0.5px' }}>Borrow only</span>
-            )}
-            {forSale && inStock && (
-              <button
-                onClick={handleAddToCart}
-                style={{
-                  background:'transparent', border:'1px solid #D4A853', color:'#8B6914',
-                  padding:'5px 12px', borderRadius:'50px',
-                  fontWeight:'700', fontSize:'11px', cursor:'pointer',
-                  fontFamily:'Lato, sans-serif', letterSpacing:'0.5px', textTransform:'uppercase',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#D4A853'; e.currentTarget.style.color = '#2C1810'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8B6914'; }}
-              >
-                + Cart
-              </button>
-            )}
-          </div>
+      <div style={{ flex:1 }}>
+        <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'16px', fontWeight:'700', color:'var(--text)', lineHeight:'1.3', marginBottom:'4px', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+          {book.title}
+        </h3>
+        <p className="tps-subtle" style={{ fontSize:'13px', marginBottom:'10px', fontStyle:'italic' }}>{book.author}</p>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          {forSale ? (
+            <span style={{ color:'var(--brand-accent)', fontWeight:'800', fontSize:'18px', fontFamily:'var(--font-heading)' }}>₹{book.sales_price}</span>
+          ) : (
+            <span className="tps-badge tps-badge-success">Borrow</span>
+          )}
+          {forSale && inStock && (
+            <button
+              onClick={handleAddToCart}
+              className="tps-btn tps-btn-outline tps-btn-sm"
+              style={{ padding:'6px 14px', fontSize:'11px' }}
+            >
+              + Cart
+            </button>
+          )}
         </div>
       </div>
     </Link>
+  );
+}
+
+function BookTileSkeleton() {
+  return (
+    <div className="tps-card" style={{ padding:'16px', display:'flex', flexDirection:'column', gap:'14px' }}>
+      <div className="tps-skeleton" style={{ width:'160px', height:'220px', margin:'0 auto', borderRadius:'var(--radius-md)' }} />
+      <div>
+        <div className="tps-skeleton" style={{ height:'16px', width:'90%', marginBottom:'8px' }} />
+        <div className="tps-skeleton" style={{ height:'12px', width:'60%', marginBottom:'12px' }} />
+        <div className="tps-skeleton" style={{ height:'18px', width:'40%' }} />
+      </div>
+    </div>
   );
 }
 
@@ -165,96 +165,90 @@ export default function Catalog() {
   const hasFilters = search || (genre && genre !== 'All') || availableOnly;
 
   return (
-    <div style={{ maxWidth:'1280px', margin:'0 auto', padding:'60px 20px', fontFamily:'Lato, sans-serif' }}>
+    <div style={{ maxWidth:'1280px', margin:'0 auto', padding:'56px 20px', fontFamily:'var(--font-body)' }}>
 
       {/* Editorial header */}
-      <header style={{ marginBottom:'48px', textAlign:'center' }}>
-        <div data-editable="catalog.header_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+      <header style={{ marginBottom:'40px', textAlign:'center' }}>
+        <div data-editable="catalog.header_eyebrow" className="tps-eyebrow" style={{ marginBottom:'14px' }}>
           {catalog.header_eyebrow || 'The Collection'}
         </div>
-        <h1 data-editable="catalog.header_title" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(36px, 5vw, 52px)', fontWeight:'800', color:'#2C1810', marginBottom:'12px', lineHeight:'1.1' }}>
+        <h1 data-editable="catalog.header_title" className="tps-h1" style={{ marginBottom:'14px' }}>
           {catalog.header_title || 'Every book on our shelves'}
         </h1>
-        <p style={{ color:'#8B6914', fontSize:'16px', maxWidth:'540px', margin:'0 auto', lineHeight:'1.6' }}>
+        <p className="tps-subtle" style={{ fontSize:'16px', maxWidth:'560px', margin:'0 auto', lineHeight:'1.6' }}>
           {loading ? 'Loading…' : `${total} ${catalog.header_subtitle_suffix || 'titles curated by the Tapas team. Browse by genre or search for something specific.'}`}
         </p>
       </header>
 
-      {/* Sticky filter strip */}
+      {/* Sticky filter card */}
       <div style={{
-        position:'sticky', top:'70px', zIndex:10,
-        background:'rgba(253,248,240,0.95)', backdropFilter:'blur(10px)',
-        borderBottom:'1px solid rgba(212,168,83,0.3)',
-        padding:'20px 0', marginBottom:'40px',
+        position:'sticky', top:'72px', zIndex:10,
+        background:'color-mix(in srgb, var(--bg) 90%, transparent)',
+        backdropFilter:'blur(14px) saturate(180%)',
+        WebkitBackdropFilter:'blur(14px) saturate(180%)',
+        border:'1px solid var(--border)',
+        borderRadius:'var(--radius-lg)',
+        padding:'18px 20px',
+        marginBottom:'36px',
+        boxShadow:'var(--shadow-sm)',
       }}>
-        <div style={{ display:'flex', gap:'16px', alignItems:'center', flexWrap:'wrap' }}>
-          {/* Search */}
-          <div style={{ flex:'1 1 260px', minWidth:'240px' }}>
+        <div style={{ display:'flex', gap:'14px', alignItems:'center', flexWrap:'wrap' }}>
+          <div style={{ flex:'1 1 280px', minWidth:'240px', position:'relative' }}>
+            <span style={{ position:'absolute', left:'18px', top:'50%', transform:'translateY(-50%)', fontSize:'15px', pointerEvents:'none' }}>🔍</span>
             <input
               defaultValue={search}
               onKeyDown={e => { if (e.key === 'Enter') setParam('search', e.target.value); }}
               onBlur={e => setParam('search', e.target.value)}
               placeholder="Search title, author, or genre…"
-              style={{
-                width:'100%', padding:'12px 18px',
-                border:'1px solid rgba(212,168,83,0.4)', borderRadius:'50px',
-                fontSize:'14px', outline:'none', fontFamily:'Lato, sans-serif',
-                background:'white', color:'#2C1810', boxSizing:'border-box',
-              }}
-              onFocus={e => e.target.style.borderColor = '#D4A853'}
+              className="tps-input tps-input-pill"
+              style={{ paddingLeft:'42px' }}
             />
           </div>
 
-          {/* Sort */}
           <select
             value={sort}
             onChange={e => setParam('sort', e.target.value)}
-            style={{
-              padding:'12px 18px',
-              border:'1px solid rgba(212,168,83,0.4)', borderRadius:'50px',
-              fontSize:'14px', outline:'none', background:'white',
-              fontFamily:'Lato, sans-serif', color:'#2C1810', cursor:'pointer',
-            }}
+            className="tps-select"
+            style={{ borderRadius:'var(--radius-pill)', width:'auto', paddingRight:'36px', cursor:'pointer' }}
           >
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
 
-          {/* Available toggle */}
-          <label style={{ display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', whiteSpace:'nowrap', color:'#2C1810', fontSize:'14px', fontWeight:'600' }}>
+          <label style={{ display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', whiteSpace:'nowrap', color:'var(--text)', fontSize:'13px', fontWeight:'600' }}>
             <input
               type="checkbox"
               checked={availableOnly}
               onChange={e => setParam('available', e.target.checked ? 'true' : 'false')}
-              style={{ width:'18px', height:'18px', accentColor:'#D4A853', cursor:'pointer' }}
+              style={{ width:'18px', height:'18px', accentColor:'var(--brand-accent)', cursor:'pointer' }}
             />
             In stock only
           </label>
 
           {hasFilters && (
-            <button onClick={clearFilters} style={{
-              padding:'10px 18px', border:'none', background:'transparent',
-              color:'#9B2335', fontWeight:'700', cursor:'pointer',
-              fontFamily:'Lato, sans-serif', fontSize:'13px', textDecoration:'underline',
-            }}>
+            <button onClick={clearFilters} className="tps-btn tps-btn-ghost tps-btn-sm" style={{ color:'var(--danger)' }}>
               Clear filters
             </button>
           )}
         </div>
 
         {/* Genre pills */}
-        <div style={{ marginTop:'16px', display:'flex', flexWrap:'wrap', gap:'8px' }}>
+        <div style={{ marginTop:'14px', display:'flex', flexWrap:'wrap', gap:'8px' }}>
           {GENRES.map(g => {
             const active = genre === g;
             return (
               <button key={g} onClick={() => setParam('genre', active ? 'All' : g)} style={{
-                padding:'6px 16px', borderRadius:'20px',
-                border: active ? 'none' : '1px solid rgba(212,168,83,0.4)',
-                background: active ? '#2C1810' : 'transparent',
-                color: active ? '#F5DEB3' : '#8B6914',
-                fontWeight: active ? '700' : '500',
-                cursor:'pointer', fontSize:'12px', transition:'all 0.15s',
-                fontFamily:'Lato, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
-              }}>
+                padding:'7px 16px', borderRadius:'var(--radius-pill)',
+                border: active ? 'none' : '1.5px solid var(--border)',
+                background: active ? 'var(--text)' : 'transparent',
+                color: active ? 'var(--bg)' : 'var(--text-subtle)',
+                fontWeight: active ? '800' : '600',
+                cursor:'pointer', fontSize:'12px',
+                transition:'all 200ms var(--ease)',
+                fontFamily:'var(--font-body)', letterSpacing:'0.3px',
+              }}
+              onMouseEnter={(e) => { if (!active) { e.currentTarget.style.borderColor = 'var(--brand-accent)'; e.currentTarget.style.color = 'var(--text)'; } }}
+              onMouseLeave={(e) => { if (!active) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-subtle)'; } }}
+              >
                 {g}
               </button>
             );
@@ -264,63 +258,43 @@ export default function Catalog() {
 
       {/* Results */}
       {loading ? (
-        <div style={{ textAlign:'center', padding:'80px 20px', color:'#8B6914' }}>
-          <div style={{ fontSize:'40px', marginBottom:'16px' }}>📚</div>
-          Loading books…
+        <div className="tps-grid" style={{ gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:'16px', marginBottom:'56px' }}>
+          {Array.from({ length: 8 }).map((_, i) => <BookTileSkeleton key={i} />)}
         </div>
       ) : books.length === 0 ? (
-        <div style={{ textAlign:'center', padding:'80px 20px', color:'#8B6914' }}>
-          <div style={{ fontSize:'56px', marginBottom:'16px' }}>🔍</div>
-          <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'24px', color:'#2C1810', marginBottom:'8px' }}>Nothing matched</h3>
-          <p>Try adjusting your filters or search terms.</p>
+        <div style={{ textAlign:'center', padding:'80px 20px', color:'var(--text-subtle)' }}>
+          <div style={{ fontSize:'64px', marginBottom:'16px' }}>🔍</div>
+          <h3 className="tps-h3" style={{ marginBottom:'10px' }}>Nothing matched</h3>
+          <p style={{ marginBottom:'20px' }}>Try adjusting your filters or search terms.</p>
           {hasFilters && (
-            <button onClick={clearFilters} style={{
-              marginTop:'16px', padding:'12px 28px',
-              background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
-              border:'none', borderRadius:'50px', fontWeight:'700', cursor:'pointer',
-              fontFamily:'Lato, sans-serif', fontSize:'14px',
-            }}>
+            <button onClick={clearFilters} className="tps-btn tps-btn-primary">
               Clear filters
             </button>
           )}
         </div>
       ) : (
         <>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:'12px', marginBottom:'56px' }}>
+          <div className="tps-grid" style={{ gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:'16px', marginBottom:'56px' }}>
             {books.map(book => <BookTile key={book.id} book={book} />)}
           </div>
 
           {/* Pagination */}
           {total > PER_PAGE && (
-            <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:'20px', paddingBottom:'20px' }}>
+            <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:'18px', paddingBottom:'20px' }}>
               <button
                 onClick={() => setPage(p => Math.max(0, p-1))}
                 disabled={page === 0}
-                style={{
-                  padding:'10px 24px', borderRadius:'50px',
-                  border:'1px solid rgba(212,168,83,0.4)',
-                  background: page === 0 ? '#f5f5f5' : 'white',
-                  cursor: page === 0 ? 'not-allowed' : 'pointer',
-                  color: page === 0 ? '#ccc' : '#8B6914',
-                  fontWeight:'600', fontFamily:'Lato, sans-serif', fontSize:'13px',
-                }}
+                className="tps-btn tps-btn-secondary tps-btn-sm"
               >
                 ← Prev
               </button>
-              <span style={{ color:'#8B6914', fontSize:'14px', fontFamily:'"Playfair Display", serif', fontStyle:'italic' }}>
+              <span className="tps-subtle" style={{ fontSize:'14px', fontFamily:'var(--font-heading)', fontStyle:'italic' }}>
                 Page {page + 1} of {Math.ceil(total / PER_PAGE)}
               </span>
               <button
                 onClick={() => setPage(p => p+1)}
                 disabled={(page+1) * PER_PAGE >= total}
-                style={{
-                  padding:'10px 24px', borderRadius:'50px',
-                  border:'1px solid rgba(212,168,83,0.4)',
-                  background: (page+1)*PER_PAGE >= total ? '#f5f5f5' : 'white',
-                  cursor: (page+1)*PER_PAGE >= total ? 'not-allowed' : 'pointer',
-                  color: (page+1)*PER_PAGE >= total ? '#ccc' : '#8B6914',
-                  fontWeight:'600', fontFamily:'Lato, sans-serif', fontSize:'13px',
-                }}
+                className="tps-btn tps-btn-secondary tps-btn-sm"
               >
                 Next →
               </button>
