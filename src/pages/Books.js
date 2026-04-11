@@ -95,7 +95,7 @@ export default function Books() {
     try {
       let query = supabase
         .from('books')
-        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable')
+        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable')
         .order('created_at', { ascending: false })
         .limit(100);
 
