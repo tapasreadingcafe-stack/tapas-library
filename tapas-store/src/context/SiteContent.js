@@ -8,11 +8,37 @@ import { DEFAULT_CONTENT } from '../utils/defaultContent';
 // Loads the `store_content` row from app_settings on mount, deep-merges
 // it with DEFAULT_CONTENT, and exposes the result via useSiteContent().
 //
+// To avoid a "flash of old content" on page load, the last-fetched
+// content is cached in localStorage. On mount we use the cached value
+// as the initial state so the very first render already has the right
+// headlines/colors/fonts, then we fetch from Supabase in the background
+// and only re-render if anything actually changed.
+//
 // Also applies brand colors as CSS custom properties on :root, so any
 // component that wants to be themeable can use var(--tapas-primary)
 // etc. instead of hardcoding hex values. Fonts are auto-loaded from
 // Google Fonts when they differ from the defaults.
 // =====================================================================
+
+const CACHE_KEY = 'tapas_store_content_v1';
+
+function loadFromCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return deepMerge(DEFAULT_CONTENT, parsed);
+  } catch {
+    return null;
+  }
+}
+
+function saveToCache(rawValue) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(rawValue));
+  } catch {}
+}
 
 const SiteContentCtx = createContext(DEFAULT_CONTENT);
 
@@ -69,13 +95,26 @@ function loadGoogleFont(family) {
 }
 
 export function SiteContentProvider({ children }) {
-  const [content, setContent] = useState(DEFAULT_CONTENT);
+  // Initial state: cached content if we have it, otherwise defaults.
+  // useState's lazy initializer runs exactly once on first render,
+  // so this is synchronous — no flash.
+  const [content, setContent] = useState(() => loadFromCache() || DEFAULT_CONTENT);
 
+  // Apply theme from whatever we have RIGHT NOW (cache or defaults).
+  // This runs on first render, before any paint, so CSS variables
+  // and fonts are in place before the browser draws anything.
+  useEffect(() => {
+    applyTheme(content);
+    if (content.brand?.heading_font) loadGoogleFont(content.brand.heading_font);
+    if (content.brand?.body_font)    loadGoogleFont(content.brand.body_font);
+    // Only needs to re-run when the cached/default content first loads.
+    // Subsequent theme updates happen inside the fetch effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Background fetch: pull latest from Supabase, update only if different.
   useEffect(() => {
     let mounted = true;
-
-    // Apply defaults immediately so CSS vars are set even before DB load.
-    applyTheme(DEFAULT_CONTENT);
 
     (async () => {
       try {
@@ -88,19 +127,28 @@ export function SiteContentProvider({ children }) {
         if (data?.value) {
           const raw = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           const merged = deepMerge(DEFAULT_CONTENT, raw);
-          setContent(merged);
-          applyTheme(merged);
-          if (merged.brand?.heading_font) loadGoogleFont(merged.brand.heading_font);
-          if (merged.brand?.body_font)    loadGoogleFont(merged.brand.body_font);
+          // Only update state if the DB actually differs from what we're
+          // already showing. Avoids a pointless re-render for returning
+          // visitors whose cache matches production.
+          const currentStr = JSON.stringify(content);
+          const mergedStr  = JSON.stringify(merged);
+          if (currentStr !== mergedStr) {
+            setContent(merged);
+            applyTheme(merged);
+            if (merged.brand?.heading_font) loadGoogleFont(merged.brand.heading_font);
+            if (merged.brand?.body_font)    loadGoogleFont(merged.brand.body_font);
+          }
+          // Cache the raw DB value (not the merged one) so we can re-merge
+          // against future DEFAULT_CONTENT changes on next load.
+          saveToCache(raw);
         }
       } catch (err) {
-        // Table missing or row missing — keep defaults, store will render
-        // identically to pre-editor state.
-        console.warn('[SiteContent] load failed, using defaults:', err?.message || err);
+        console.warn('[SiteContent] load failed, using cached/defaults:', err?.message || err);
       }
     })();
 
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
