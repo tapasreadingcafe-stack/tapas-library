@@ -153,8 +153,8 @@ export default function BookDetail() {
             background:'linear-gradient(145deg, #F5DEB3, #D4A853)',
             boxShadow:'0 20px 60px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center'
           }}>
-            {book.cover_image ? (
-              <img src={book.cover_image} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            {(book.book_image || book.cover_image) ? (
+              <img src={(book.book_image || book.cover_image)} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
             ) : (
               <div style={{ textAlign:'center', padding:'30px' }}>
                 <div style={{ fontSize:'80px', marginBottom:'16px' }}>📖</div>
@@ -326,7 +326,7 @@ export default function BookDetail() {
                   onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.07)'; }}
                 >
                   <div style={{ height:'140px', background:'linear-gradient(145deg, #F5DEB3, #D4A853)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    {b.cover_image ? <img src={b.cover_image} alt={b.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:'40px' }}>📖</span>}
+                    {(b.book_image || b.cover_image) ? <img src={b.book_image || b.cover_image} alt={b.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:'40px' }}>📖</span>}
                   </div>
                   <div style={{ padding:'12px' }}>
                     <h4 style={{ fontFamily:'"Playfair Display", serif', fontSize:'13px', color:'#2C1810', marginBottom:'4px', lineHeight:'1.3' }}>{b.title}</h4>

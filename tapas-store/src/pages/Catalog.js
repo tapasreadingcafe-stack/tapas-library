@@ -33,8 +33,8 @@ function BookCard({ book }) {
         onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 3px 12px rgba(0,0,0,0.08)'; }}
       >
         <div style={{ height:'200px', background:'linear-gradient(145deg, #F5DEB3 0%, #D4A853 100%)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', flexShrink:0 }}>
-          {book.cover_image ? (
-            <img src={book.cover_image} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} loading="lazy" />
+          {(book.book_image || book.cover_image) ? (
+            <img src={(book.book_image || book.cover_image)} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} loading="lazy" />
           ) : (
             <div style={{ textAlign:'center', padding:'16px' }}>
               <div style={{ fontSize:'52px', marginBottom:'8px' }}>📖</div>
