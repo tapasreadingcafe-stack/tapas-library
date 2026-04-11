@@ -81,7 +81,6 @@ function BookCard({ book }) {
 export default function Home() {
   const [featuredBooks, setFeaturedBooks] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
-  const [stats, setStats] = useState({ books:0, members:0, genres:0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
