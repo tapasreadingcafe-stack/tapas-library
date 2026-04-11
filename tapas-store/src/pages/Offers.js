@@ -67,7 +67,7 @@ export default function Offers() {
     <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* Editorial hero */}
-      <section style={{
+      <section id="section-offers-hero" data-editable-section="offers" style={{
         maxWidth:'780px', margin:'0 auto',
         padding:'80px 20px 40px', textAlign:'center',
       }}>

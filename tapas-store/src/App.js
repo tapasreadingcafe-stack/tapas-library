@@ -3,6 +3,7 @@ import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-r
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { SiteContentProvider, useSiteContent } from './context/SiteContent';
+import StoreEditorSync from './components/StoreEditorSync';
 import './App.css';
 
 const Home            = React.lazy(() => import('./pages/Home'));
@@ -252,6 +253,7 @@ function AppShell() {
   return (
     <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Lato:wght@300;400;600;700&display=swap" />
+      <StoreEditorSync />
       <div style={{ minHeight:'100vh', background:'#FDF8F0' }}>
         <Navbar />
         <Suspense fallback={<PageLoader />}>

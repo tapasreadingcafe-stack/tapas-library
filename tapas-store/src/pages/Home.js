@@ -218,7 +218,7 @@ export default function Home() {
       {/* ================================================================ */}
       {/* 1. EDITORIAL HERO — headline + search + featured book on the right */}
       {/* ================================================================ */}
-      <section style={{
+      <section id="section-home-hero" data-editable-section="home" style={{
         background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`,
         color:brand.sand_color, position:'relative', overflow:'hidden',
       }}>
@@ -339,7 +339,7 @@ export default function Home() {
       {/* ================================================================ */}
       {/* 3. STAFF PICKS — curated rail                                     */}
       {/* ================================================================ */}
-      <section style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      <section id="section-home-staff-picks" data-editable-section="home" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
             <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
@@ -404,7 +404,7 @@ export default function Home() {
       {/* ================================================================ */}
       {/* 5. CAFE STORY — editorial block about the reading cafe            */}
       {/* ================================================================ */}
-      <section style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px' }}>
+      <section id="section-home-cafe-story" data-editable-section="home" style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px' }}>
         <div style={{ maxWidth:'980px', margin:'0 auto', textAlign:'center' }}>
           <div style={{ fontSize:'48px', marginBottom:'16px' }}>☕</div>
           <h2 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(32px, 4.5vw, 48px)', fontWeight:'800', color:brand.sand_color, marginBottom:'24px', lineHeight:'1.15' }}>
@@ -436,7 +436,7 @@ export default function Home() {
       {/* ================================================================ */}
       {/* 6. NEWSLETTER                                                     */}
       {/* ================================================================ */}
-      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
+      <section id="section-newsletter" data-editable-section="newsletter" style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
         <div style={{
           background:'linear-gradient(135deg, #FFF8ED, #FAEBD7)',
           borderRadius:'20px', padding:'50px 40px', textAlign:'center',

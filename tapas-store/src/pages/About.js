@@ -46,7 +46,7 @@ export default function About() {
     <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
       {/* Editorial hero */}
-      <section style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px 120px', position:'relative', overflow:'hidden' }}>
+      <section id="section-about-hero" data-editable-section="about" style={{ background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`, color:brand.sand_color, padding:'100px 20px 120px', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', right:'-100px', top:'-60px', width:'380px', height:'380px', borderRadius:'50%', background:'rgba(212,168,83,0.06)', border:'1px solid rgba(212,168,83,0.12)' }} />
         <div style={{ maxWidth:'780px', margin:'0 auto', position:'relative', zIndex:1, textAlign:'center' }}>
           <div style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
@@ -63,7 +63,7 @@ export default function About() {
       </section>
 
       {/* Story body */}
-      <section style={{ maxWidth:'720px', margin:'-60px auto 0', background:'white', borderRadius:'8px', padding:'56px 48px', boxShadow:'0 20px 60px rgba(44,24,16,0.1)', position:'relative', zIndex:2 }}>
+      <section id="section-about-story" data-editable-section="about" style={{ maxWidth:'720px', margin:'-60px auto 0', background:'white', borderRadius:'8px', padding:'56px 48px', boxShadow:'0 20px 60px rgba(44,24,16,0.1)', position:'relative', zIndex:2 }}>
         <p style={{ color:'#5C3A1E', fontSize:'18px', lineHeight:'1.9', marginBottom:'20px', fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontStyle:'italic' }}>
           "{about.story_pull_quote}"
         </p>
@@ -106,7 +106,7 @@ export default function About() {
       </section>
 
       {/* Visit us — hours + contact */}
-      <section style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      <section id="section-about-visit" data-editable-section="contact" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'1100px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
             <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
