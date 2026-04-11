@@ -59,6 +59,9 @@ const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
 const DeviceManager         = React.lazy(() => import('./pages/DeviceManager'));
 const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 
+// ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
+const CustomerOrders        = React.lazy(() => import('./pages/CustomerOrders'));
+
 // ── Page loader ───────────────────────────────────────────────────────────────
 
 function PageLoader() {
@@ -127,6 +130,12 @@ const NAV_CONFIG = [
     ],
   },
   { to: '/reports', icon: '📑', label: 'Reports' },
+  {
+    icon: '🛒', label: 'Online Store', key: 'store',
+    children: [
+      { to: '/store/orders', icon: '📦', label: 'Online Orders' },
+    ],
+  },
   {
     icon: '💳', label: 'Accounts', key: 'accounts',
     children: [
@@ -364,6 +373,9 @@ function App() {
             <Route path="/settings/profile"                   element={<SettingsProfile />} />
             <Route path="/settings/activity"                  element={<ActivityLog />} />
             <Route path="/settings/devices"                  element={<DeviceManager />} />
+
+            {/* Online Store */}
+            <Route path="/store/orders"                       element={<CustomerOrders />} />
 
             {/* Public & Kiosk */}
             <Route path="/catalog"                            element={<PublicCatalog />} />

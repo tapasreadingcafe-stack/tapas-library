@@ -64,7 +64,7 @@ function Members() {
       setLoading(true);
       const { data, error } = await supabase
         .from('members')
-        .select('id, sequential_id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, profile_photo, created_at')
+        .select('id, sequential_id, name, phone, email, age, date_of_birth, plan, plan_duration_days, plan_price, borrow_limit, discount_percent, subscription_start, subscription_end, membership_type, status_color, status, customer_type, profile_photo, created_at, auth_user_id')
         .order('created_at', { ascending: false })
         .limit(200);
 
@@ -446,6 +446,11 @@ function Members() {
                       </div>
                     )}
                     {member.name}
+                    {member.auth_user_id && (
+                      <span title="Registered on the online store" style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '10px', background: '#e6f4ea', color: '#276749', fontWeight: '700', marginLeft: '4px' }}>
+                        🌐 Online
+                      </span>
+                    )}
                   </td>
                   <td className="text-center">
                     {member.age ? (
