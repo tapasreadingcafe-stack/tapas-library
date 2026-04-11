@@ -184,6 +184,12 @@ export const DEFAULT_CONTENT = {
     text_transform: 'none',
     letter_spacing: '0.5px',
   },
+  // Per-element CSS override map. Keyed by the data-editable path;
+  // values are camelCase CSS property objects applied via an injected
+  // <style> tag with !important so they win over hardcoded inline styles.
+  // Edited by the "element inspector" in the dashboard when an element
+  // is clicked on the preview canvas.
+  element_styles: {},
   section_styles: {
     // Per-section overrides. All nullable — empty means "use defaults".
     home_hero_padding_top:      80,

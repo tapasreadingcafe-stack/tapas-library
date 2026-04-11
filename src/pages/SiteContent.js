@@ -403,6 +403,367 @@ const FIELD_RENDERERS = {
   sectionOrder: SectionOrderField,
 };
 
+// =====================================================================
+// Element Inspector — shown when a [data-editable] element is clicked
+// on the canvas. Exposes CSS overrides for that element only. Each
+// group is collapsible (Figma-style).
+// =====================================================================
+
+const ELEMENT_GROUPS = [
+  {
+    key: 'typography',
+    title: 'Typography',
+    icon: 'T',
+    fields: [
+      { cssProp: 'fontSize',       label: 'Size',       type: 'css-size' },
+      { cssProp: 'fontWeight',     label: 'Weight',     type: 'css-select',
+        options: ['', '300', '400', '500', '600', '700', '800', '900'] },
+      { cssProp: 'color',          label: 'Color',      type: 'css-color' },
+      { cssProp: 'lineHeight',     label: 'Line height',type: 'css-text',  placeholder: '1.5' },
+      { cssProp: 'letterSpacing',  label: 'Letter',     type: 'css-text',  placeholder: '0.02em' },
+      { cssProp: 'textAlign',      label: 'Align',      type: 'css-select',
+        options: ['', 'left', 'center', 'right', 'justify'] },
+      { cssProp: 'textTransform',  label: 'Case',       type: 'css-select',
+        options: ['', 'none', 'uppercase', 'lowercase', 'capitalize'] },
+      { cssProp: 'fontStyle',      label: 'Italic',     type: 'css-select',
+        options: ['', 'normal', 'italic'] },
+    ],
+  },
+  {
+    key: 'spacing',
+    title: 'Spacing',
+    icon: '⬚',
+    fields: [
+      { cssProp: 'marginTop',    label: 'Margin top',    type: 'css-text', placeholder: '20px' },
+      { cssProp: 'marginBottom', label: 'Margin bottom', type: 'css-text', placeholder: '20px' },
+      { cssProp: 'paddingTop',   label: 'Padding top',   type: 'css-text', placeholder: '0' },
+      { cssProp: 'paddingBottom',label: 'Padding bottom',type: 'css-text', placeholder: '0' },
+      { cssProp: 'paddingLeft',  label: 'Padding left',  type: 'css-text', placeholder: '0' },
+      { cssProp: 'paddingRight', label: 'Padding right', type: 'css-text', placeholder: '0' },
+    ],
+  },
+  {
+    key: 'size',
+    title: 'Size',
+    icon: '⟷',
+    fields: [
+      { cssProp: 'width',     label: 'Width',     type: 'css-text', placeholder: 'auto / 100%' },
+      { cssProp: 'maxWidth',  label: 'Max width', type: 'css-text', placeholder: 'none' },
+      { cssProp: 'minWidth',  label: 'Min width', type: 'css-text', placeholder: '0' },
+      { cssProp: 'height',    label: 'Height',    type: 'css-text', placeholder: 'auto' },
+    ],
+  },
+  {
+    key: 'effects',
+    title: 'Effects',
+    icon: '◐',
+    fields: [
+      { cssProp: 'borderRadius', label: 'Radius',     type: 'css-text', placeholder: '0' },
+      { cssProp: 'border',       label: 'Border',     type: 'css-text', placeholder: '1px solid #000' },
+      { cssProp: 'boxShadow',    label: 'Shadow',     type: 'css-text', placeholder: '0 4px 12px rgba(0,0,0,0.1)' },
+      { cssProp: 'opacity',      label: 'Opacity',    type: 'css-text', placeholder: '1' },
+      { cssProp: 'background',   label: 'Background', type: 'css-text', placeholder: 'transparent' },
+    ],
+  },
+];
+
+function CssTextField({ field, value, onChange }) {
+  return (
+    <Row label={field.label} iconType="text">
+      <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+        placeholder={field.placeholder || ''}
+        style={inputBaseStyle}
+        onFocus={e => { e.target.style.border = `1px solid ${S.accent}`; e.target.style.background = '#FFF'; }}
+        onBlur={e  => { e.target.style.border = `1px solid transparent`; e.target.style.background = S.panelAlt; }}
+      />
+    </Row>
+  );
+}
+
+function CssSizeField({ field, value, onChange }) {
+  // Numeric input that always stores "{n}px" unless user types the unit.
+  const raw = value || '';
+  const m = /^(-?\d+(?:\.\d+)?)(px|em|rem|%)?$/.exec(raw);
+  const num = m ? m[1] : '';
+  const unit = (m && m[2]) || 'px';
+  return (
+    <Row label={field.label} iconType="number">
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: S.panelAlt, borderRadius: '2px', height: '28px', padding: '0 6px' }}>
+        <input type="text" value={num}
+          onChange={e => {
+            const v = e.target.value.trim();
+            if (!v) { onChange(''); return; }
+            if (/^-?\d+(?:\.\d+)?$/.test(v)) onChange(`${v}${unit}`);
+            else onChange(v);
+          }}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '11px', color: S.text, textAlign: 'right', fontFamily: 'ui-monospace, monospace', minWidth: 0 }} />
+        <select value={unit}
+          onChange={e => { if (num) onChange(`${num}${e.target.value}`); }}
+          style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '10px', color: S.textDim, cursor: 'pointer' }}>
+          <option value="px">px</option>
+          <option value="em">em</option>
+          <option value="rem">rem</option>
+          <option value="%">%</option>
+        </select>
+      </div>
+    </Row>
+  );
+}
+
+function CssSelectField({ field, value, onChange }) {
+  return (
+    <Row label={field.label} iconType="select">
+      <select value={value || ''} onChange={e => onChange(e.target.value)}
+        style={{ ...inputBaseStyle, cursor: 'pointer' }}>
+        {(field.options || []).map(opt => (
+          <option key={opt} value={opt}>{opt || '— auto —'}</option>
+        ))}
+      </select>
+    </Row>
+  );
+}
+
+function CssColorField({ field, value, onChange }) {
+  return (
+    <Row label={field.label} iconType="color" iconColor={value || S.textDim}>
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: S.panelAlt, borderRadius: '2px', height: '28px', padding: '0 6px' }}>
+        <div style={{ position: 'relative', width: '16px', height: '16px', flexShrink: 0 }}>
+          <div style={{
+            width: '100%', height: '100%', borderRadius: '2px',
+            background: value || 'transparent',
+            border: `1px solid ${S.borderStrong}`,
+            backgroundImage: value ? 'none' : 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+            backgroundSize: '6px 6px',
+            backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
+          }} />
+          <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+        </div>
+        <input type="text" value={(value || '').replace('#', '').toUpperCase()}
+          onChange={e => onChange(e.target.value ? '#' + e.target.value.replace('#', '') : '')}
+          placeholder="—"
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '11px', fontFamily: 'ui-monospace, monospace', color: S.text, minWidth: 0 }} />
+      </div>
+    </Row>
+  );
+}
+
+const CSS_RENDERERS = {
+  'css-text':   CssTextField,
+  'css-size':   CssSizeField,
+  'css-select': CssSelectField,
+  'css-color':  CssColorField,
+};
+
+function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup }) {
+  const shortPath = path.split('.').slice(-1)[0].replace(/_/g, ' ');
+  return (
+    <>
+      {/* Header with back button */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '10px 12px',
+        borderBottom: `1px solid ${S.border}`,
+        background: S.panel, flexShrink: 0,
+      }}>
+        <button onClick={onBack} title="Back to section"
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: S.textDim, fontSize: '14px', padding: '2px 6px', borderRadius: '2px' }}>
+          ←
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '10px', color: S.textFaint, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Selected element
+          </div>
+          <div style={{ fontSize: '12px', color: S.text, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>
+            {shortPath}
+          </div>
+        </div>
+        <button
+          onClick={onClear}
+          disabled={!styles || Object.keys(styles).length === 0}
+          title="Clear all overrides on this element"
+          style={{ background: 'transparent', border: 'none', color: S.textDim, fontSize: '12px', cursor: 'pointer', padding: '4px 6px', borderRadius: '2px' }}
+        >
+          ↺
+        </button>
+      </div>
+
+      {/* Groups */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '40px' }}>
+        {ELEMENT_GROUPS.map(group => {
+          const isOpen = expandedGroups.has(group.key);
+          return (
+            <div key={group.key} style={{ borderBottom: `1px solid ${S.divider}` }}>
+              <button
+                onClick={() => toggleGroup(group.key)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 16px',
+                  background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <span style={{
+                  fontSize: '9px', color: S.textDim, width: '10px',
+                  transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.15s',
+                }}>▶</span>
+                <span style={{ fontSize: '11px', fontFamily: 'ui-monospace, monospace', color: S.textDim, width: '12px' }}>{group.icon}</span>
+                <span style={{ flex: 1, fontSize: '11px', fontWeight: '600', color: S.text }}>{group.title}</span>
+              </button>
+              {isOpen && (
+                <div style={{ padding: '4px 0 12px' }}>
+                  {group.fields.map(field => {
+                    const Renderer = CSS_RENDERERS[field.type] || CssTextField;
+                    const value = styles?.[field.cssProp];
+                    return (
+                      <Renderer
+                        key={field.cssProp}
+                        field={field}
+                        value={value}
+                        onChange={(v) => onChangeStyle(field.cssProp, v)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// ---- Element-level CSS inspector --------------------------------------
+// When the user clicks an editable element on the preview canvas, the
+// right panel swaps from content-editing mode to element-styling mode.
+// These controls write into content.element_styles[fieldPath][propName]
+// which the store applies via an injected <style> tag.
+
+const FONT_WEIGHT_OPTIONS = [
+  { value: '', label: '—' },
+  { value: '300', label: 'Light' },
+  { value: '400', label: 'Regular' },
+  { value: '500', label: 'Medium' },
+  { value: '600', label: 'Semibold' },
+  { value: '700', label: 'Bold' },
+  { value: '800', label: 'Extra Bold' },
+  { value: '900', label: 'Black' },
+];
+const TEXT_ALIGN_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'left', label: 'Left' },
+  { value: 'center', label: 'Center' },
+  { value: 'right', label: 'Right' },
+];
+const TEXT_TRANSFORM_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'none', label: 'Normal' },
+  { value: 'uppercase', label: 'UPPER' },
+  { value: 'capitalize', label: 'Caps' },
+  { value: 'lowercase', label: 'lower' },
+];
+
+// Each entry: { key, label, icon (type for FieldIcon), type, options? }
+const ELEMENT_STYLE_GROUPS = [
+  {
+    key: 'typography',
+    title: 'Typography',
+    fields: [
+      { key: 'fontSize',      label: 'Size',       type: 'text', iconType: 'text',   placeholder: '48px' },
+      { key: 'fontWeight',    label: 'Weight',     type: 'select', iconType: 'select', options: FONT_WEIGHT_OPTIONS },
+      { key: 'color',         label: 'Color',      type: 'color',  iconType: 'color' },
+      { key: 'lineHeight',    label: 'Line',       type: 'text', iconType: 'text',   placeholder: '1.4' },
+      { key: 'letterSpacing', label: 'Tracking',   type: 'text', iconType: 'text',   placeholder: '0.02em' },
+      { key: 'textAlign',     label: 'Align',      type: 'select', iconType: 'select', options: TEXT_ALIGN_OPTIONS },
+      { key: 'textTransform', label: 'Case',       type: 'select', iconType: 'select', options: TEXT_TRANSFORM_OPTIONS },
+    ],
+  },
+  {
+    key: 'spacing',
+    title: 'Spacing',
+    fields: [
+      { key: 'marginTop',    label: 'Mar top',    type: 'text', iconType: 'text', placeholder: '20px' },
+      { key: 'marginBottom', label: 'Mar bot',    type: 'text', iconType: 'text', placeholder: '20px' },
+      { key: 'paddingTop',   label: 'Pad top',    type: 'text', iconType: 'text', placeholder: '12px' },
+      { key: 'paddingBottom',label: 'Pad bot',    type: 'text', iconType: 'text', placeholder: '12px' },
+      { key: 'paddingLeft',  label: 'Pad left',   type: 'text', iconType: 'text', placeholder: '16px' },
+      { key: 'paddingRight', label: 'Pad right',  type: 'text', iconType: 'text', placeholder: '16px' },
+    ],
+  },
+  {
+    key: 'size',
+    title: 'Size',
+    fields: [
+      { key: 'width',    label: 'Width',    type: 'text', iconType: 'text', placeholder: 'auto / 500px / 50%' },
+      { key: 'maxWidth', label: 'Max W',    type: 'text', iconType: 'text', placeholder: '1200px' },
+      { key: 'minWidth', label: 'Min W',    type: 'text', iconType: 'text' },
+      { key: 'height',   label: 'Height',   type: 'text', iconType: 'text' },
+    ],
+  },
+  {
+    key: 'effects',
+    title: 'Effects',
+    fields: [
+      { key: 'opacity',      label: 'Opacity', type: 'text', iconType: 'number', placeholder: '1' },
+      { key: 'borderRadius', label: 'Radius',  type: 'text', iconType: 'number', placeholder: '8px' },
+      { key: 'boxShadow',    label: 'Shadow',  type: 'text', iconType: 'text',   placeholder: '0 4px 12px rgba(0,0,0,0.1)' },
+      { key: 'background',   label: 'BG',      type: 'color',iconType: 'color' },
+    ],
+  },
+];
+
+// Renders a single element-style property row. Generic enough to handle
+// text / select / color without reusing the heavier FIELD_RENDERERS (those
+// hardcode some labels and don't know about placeholders).
+function ElementStyleRow({ field, value, onChange }) {
+  if (field.type === 'select') {
+    return (
+      <Row label={field.label} iconType={field.iconType}>
+        <select value={value || ''} onChange={e => onChange(e.target.value)}
+          style={{ ...inputBaseStyle, cursor: 'pointer' }}>
+          {field.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+        </select>
+      </Row>
+    );
+  }
+  if (field.type === 'color') {
+    return (
+      <Row label={field.label} iconType="color" iconColor={value || S.textDim}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: S.panelAlt, borderRadius: '2px', height: '28px', padding: '0 6px' }}>
+          <div style={{ position: 'relative', width: '16px', height: '16px', flexShrink: 0 }}>
+            <div style={{
+              width: '100%', height: '100%', borderRadius: '2px',
+              background: value || 'transparent',
+              border: `1px solid ${S.borderStrong}`,
+              backgroundImage: value ? 'none' : 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+              backgroundSize: '6px 6px',
+              backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
+            }} />
+            <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)}
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+          </div>
+          <input type="text" value={(value || '').replace('#', '').toUpperCase()}
+            onChange={e => onChange(e.target.value ? '#' + e.target.value.replace('#', '') : '')}
+            placeholder="—"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '11px', fontFamily: 'ui-monospace, monospace', color: S.text, minWidth: 0 }} />
+        </div>
+      </Row>
+    );
+  }
+  // text
+  return (
+    <Row label={field.label} iconType={field.iconType}>
+      <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+        placeholder={field.placeholder || ''}
+        style={inputBaseStyle}
+        onFocus={e => { e.target.style.border = `1px solid ${S.accent}`; e.target.style.background = '#FFF'; }}
+        onBlur={e  => { e.target.style.border = `1px solid transparent`; e.target.style.background = S.panelAlt; }}
+      />
+    </Row>
+  );
+}
+
 // ---- Main --------------------------------------------------------------
 
 export default function SiteContent() {
@@ -416,6 +777,11 @@ export default function SiteContent() {
   const [pushedAt, setPushedAt] = useState(null);
   const [error,   setError]     = useState('');
   const [activeSection, setActiveSection] = useState('brand');
+  // Selected element on the canvas (fieldPath string). When set, the
+  // right panel shows an Element Inspector with CSS overrides.
+  const [selectedElement, setSelectedElement] = useState(null);
+  // Which of the 4 element-inspector groups are expanded.
+  const [expandedGroups, setExpandedGroups] = useState(new Set(['typography', 'spacing']));
   // Expanded sections in the right panel — Set of schema keys.
   const [expanded, setExpanded] = useState(new Set(['brand']));
   const [viewport, setViewport]   = useState('desktop');
@@ -465,6 +831,22 @@ export default function SiteContent() {
       ...prev,
       [storageKey]: { ...(prev[storageKey] || {}), [fieldKey]: value },
     }));
+  };
+
+  // Update a single CSS property on the currently selected element.
+  // Empty string clears the override.
+  const updateElementStyle = (path, cssProp, value) => {
+    setDraftContent(prev => {
+      const currentMap = prev.element_styles || {};
+      const currentEl  = currentMap[path] || {};
+      const nextEl     = { ...currentEl };
+      if (value === '' || value === null || value === undefined) delete nextEl[cssProp];
+      else nextEl[cssProp] = value;
+      const nextMap = { ...currentMap };
+      if (Object.keys(nextEl).length === 0) delete nextMap[path];
+      else nextMap[path] = nextEl;
+      return { ...prev, element_styles: nextMap };
+    });
   };
 
   // Dirty = draft differs from live.
@@ -567,6 +949,33 @@ export default function SiteContent() {
     });
   };
 
+  const toggleGroup = (groupKey) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedElement(null);
+    // Also tell the iframe to clear its outline.
+    try {
+      iframeRef.current?.contentWindow?.postMessage({ type: 'tapas:clear-selection' }, '*');
+    } catch {}
+  };
+
+  const clearElementStyles = (path) => {
+    if (!path) return;
+    if (!window.confirm('Clear all style overrides on this element?')) return;
+    setDraftContent(prev => {
+      const next = { ...(prev.element_styles || {}) };
+      delete next[path];
+      return { ...prev, element_styles: next };
+    });
+  };
+
   // Receive messages from the iframe (click-to-edit)
   useEffect(() => {
     const onMessage = (event) => {
@@ -589,6 +998,22 @@ export default function SiteContent() {
           );
           pendingScrollRef.current = null;
         }
+      }
+      if (msg.type === 'tapas:select' && typeof msg.fieldPath === 'string') {
+        setSelectedElement(msg.fieldPath);
+        return;
+      }
+      if (msg.type === 'tapas:deselect') {
+        setSelectedElement(null);
+        return;
+      }
+      if (msg.type === 'tapas:select' && typeof msg.fieldPath === 'string') {
+        setSelectedElement(msg.fieldPath);
+        return;
+      }
+      if (msg.type === 'tapas:deselect') {
+        setSelectedElement(null);
+        return;
       }
       if (msg.type === 'tapas:edit-field' && typeof msg.fieldPath === 'string') {
         const sectionKey = sectionForFieldPath(msg.fieldPath);
@@ -873,6 +1298,18 @@ export default function SiteContent() {
           display: 'flex',
           flexDirection: 'column',
         }}>
+          {selectedElement ? (
+            <ElementInspector
+              path={selectedElement}
+              styles={draftContent.element_styles?.[selectedElement]}
+              expandedGroups={expandedGroups}
+              toggleGroup={toggleGroup}
+              onChangeStyle={(cssProp, value) => updateElementStyle(selectedElement, cssProp, value)}
+              onClear={() => clearElementStyles(selectedElement)}
+              onBack={clearSelection}
+            />
+          ) : (
+          <>
           {/* Design / Prototype tab bar */}
           <div style={{
             display: 'flex',
@@ -978,6 +1415,8 @@ export default function SiteContent() {
               </>
             )}
           </div>
+          </>
+          )}
         </aside>
       </div>
     </div>

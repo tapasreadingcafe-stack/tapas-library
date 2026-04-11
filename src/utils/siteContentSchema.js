@@ -174,6 +174,7 @@ export const DEFAULT_CONTENT = {
     text_transform: 'none',
     letter_spacing: '0.5px',
   },
+  element_styles: {},
   section_styles: {
     home_hero_padding_top:      80,
     home_hero_padding_bottom:   100,

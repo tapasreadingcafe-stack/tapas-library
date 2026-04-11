@@ -78,6 +78,38 @@ function deepMerge(base, override) {
   return out;
 }
 
+// Apply per-element CSS override rules by injecting a single <style>
+// tag whose rules target [data-editable="..."] selectors. Each rule
+// uses !important so it wins over inline styles hardcoded in JSX.
+function applyElementStyles(elementStyles) {
+  const existing = document.getElementById('tapas-element-styles');
+  if (existing) existing.remove();
+  if (!elementStyles || typeof elementStyles !== 'object') return;
+
+  const rules = [];
+  for (const [path, props] of Object.entries(elementStyles)) {
+    if (!props || typeof props !== 'object') continue;
+    const decls = Object.entries(props)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => {
+        const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
+        return `${cssProp}: ${v} !important`;
+      })
+      .join('; ');
+    if (decls) {
+      // Escape any quotes in the path just in case.
+      const safePath = String(path).replace(/"/g, '\\"');
+      rules.push(`[data-editable="${safePath}"] { ${decls}; }`);
+    }
+  }
+
+  if (!rules.length) return;
+  const style = document.createElement('style');
+  style.id = 'tapas-element-styles';
+  style.innerHTML = rules.join('\n');
+  document.head.appendChild(style);
+}
+
 // Apply brand + typography + button tokens to :root as CSS custom props.
 function applyTheme(content) {
   const root = document.documentElement;
@@ -116,6 +148,9 @@ function applyTheme(content) {
     root.style.setProperty('--tapas-btn-text-transform', btn.text_transform || 'none');
     root.style.setProperty('--tapas-btn-letter-spacing', btn.letter_spacing || '0.5px');
   }
+
+  // Per-element overrides (rendered from [data-editable] attributes).
+  applyElementStyles(content?.element_styles);
 }
 
 // Load any Google Fonts the user has picked that aren't already loaded.
