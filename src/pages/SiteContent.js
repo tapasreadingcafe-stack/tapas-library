@@ -234,12 +234,154 @@ function ImageField({ field, value, onChange, inputRef }) {
   );
 }
 
+function ToggleField({ field, value, onChange }) {
+  const on = value !== false;
+  return (
+    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 10px', background: '#fafbfc', borderRadius: '6px' }}>
+      <button
+        type="button"
+        onClick={() => onChange(!on)}
+        aria-pressed={on}
+        style={{
+          width: '36px', height: '20px', borderRadius: '12px',
+          background: on ? '#48BB78' : '#cbd5e0',
+          border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0,
+          transition: 'background 0.15s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: '2px',
+          left: on ? '18px' : '2px',
+          width: '16px', height: '16px',
+          background: 'white', borderRadius: '50%',
+          transition: 'left 0.15s',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }} />
+      </button>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: '12px', color: '#2c3e50', fontWeight: '600' }}>{field.label}</div>
+        {field.hint && <div style={{ ...hintStyle, marginTop: '2px' }}>{field.hint}</div>}
+      </div>
+    </div>
+  );
+}
+
+function NumberField({ field, value, onChange, inputRef }) {
+  const v = Number(value) || 0;
+  const min = field.min ?? 12;
+  const max = field.max ?? 120;
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <label style={labelStyle}>{field.label}</label>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <input
+          type="range" min={min} max={max} value={v}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{ flex: 1, accentColor: '#667eea' }}
+        />
+        <input
+          ref={inputRef}
+          type="number" min={min} max={max} value={v}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{ ...inputStyle, width: '72px', textAlign: 'center' }}
+        />
+      </div>
+      {field.hint && <div style={hintStyle}>{field.hint}</div>}
+    </div>
+  );
+}
+
+function SelectField({ field, value, onChange, inputRef }) {
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <label style={labelStyle}>{field.label}</label>
+      <select
+        ref={inputRef}
+        value={value || (field.options?.[0]?.value ?? '')}
+        onChange={e => onChange(e.target.value)}
+        style={{ ...inputStyle, cursor: 'pointer' }}
+      >
+        {(field.options || []).map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      {field.hint && <div style={hintStyle}>{field.hint}</div>}
+    </div>
+  );
+}
+
+function SectionOrderField({ field, value, onChange }) {
+  // value is a comma-separated string of section ids.
+  // Render them as a list with up/down arrows.
+  const current = (value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const known = (field.options || []).map(o => o.value);
+  // Append any known ids that aren't in current, so nothing ever disappears.
+  const ordered = [...current, ...known.filter(k => !current.includes(k))];
+  const labelFor = (id) => (field.options || []).find(o => o.value === id)?.label || id;
+
+  const move = (idx, delta) => {
+    const newOrder = [...ordered];
+    const target = idx + delta;
+    if (target < 0 || target >= newOrder.length) return;
+    [newOrder[idx], newOrder[target]] = [newOrder[target], newOrder[idx]];
+    onChange(newOrder.join(','));
+  };
+
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <label style={labelStyle}>{field.label}</label>
+      <div style={{ background: '#fafbfc', borderRadius: '6px', padding: '6px', border: '1px solid #dfe4ea' }}>
+        {ordered.map((id, idx) => (
+          <div key={id} style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'white', padding: '10px 12px', borderRadius: '4px',
+            marginBottom: idx === ordered.length - 1 ? 0 : '4px',
+            border: '1px solid #e4e9f0',
+          }}>
+            <span style={{ color: '#c0c8d4', fontSize: '14px' }}>☰</span>
+            <span style={{ flex: 1, fontSize: '13px', color: '#2c3e50', fontWeight: '600' }}>{labelFor(id)}</span>
+            <button
+              type="button"
+              onClick={() => move(idx, -1)}
+              disabled={idx === 0}
+              title="Move up"
+              style={{
+                width: '28px', height: '28px', padding: 0,
+                background: 'white', border: '1px solid #dfe4ea', borderRadius: '4px',
+                cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                color: idx === 0 ? '#dfe4ea' : '#5a6c7d', fontSize: '14px',
+              }}
+            >↑</button>
+            <button
+              type="button"
+              onClick={() => move(idx, 1)}
+              disabled={idx === ordered.length - 1}
+              title="Move down"
+              style={{
+                width: '28px', height: '28px', padding: 0,
+                background: 'white', border: '1px solid #dfe4ea', borderRadius: '4px',
+                cursor: idx === ordered.length - 1 ? 'not-allowed' : 'pointer',
+                color: idx === ordered.length - 1 ? '#dfe4ea' : '#5a6c7d', fontSize: '14px',
+              }}
+            >↓</button>
+          </div>
+        ))}
+      </div>
+      {field.hint && <div style={hintStyle}>{field.hint}</div>}
+    </div>
+  );
+}
+
 const FIELD_RENDERERS = {
   text: TextField,
   textarea: TextArea,
   color: ColorField,
   font: FontField,
   image: ImageField,
+  toggle: ToggleField,
+  number: NumberField,
+  select: SelectField,
+  sectionOrder: SectionOrderField,
 };
 
 // ---- Main component -----------------------------------------------------

@@ -208,7 +208,7 @@ function Footer() {
               </div>
             </div>
             <p style={{ color:'#A0856A', fontSize:'14px', lineHeight:'1.6' }}>
-              Your neighbourhood library and book store. Discover, borrow, and buy books you'll love.
+              {content.footer?.tagline || "Your neighbourhood library and book store. Discover, borrow, and buy books you'll love."}
             </p>
           </div>
 
@@ -242,7 +242,7 @@ function Footer() {
           </div>
         </div>
         <div style={{ borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:'20px', textAlign:'center', color:'#A0856A', fontSize:'13px' }}>
-          © {new Date().getFullYear()} {content.brand.name} {content.brand.tagline}. All rights reserved.
+          © {new Date().getFullYear()} {content.brand.name} {content.brand.tagline}. {content.footer?.copyright_text || 'All rights reserved.'}
         </div>
       </div>
     </footer>

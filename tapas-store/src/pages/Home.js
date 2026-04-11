@@ -139,6 +139,17 @@ export default function Home() {
   const home = content.home;
   const newsletter = content.newsletter;
   const images = content.images || {};
+  const visibility = content.visibility || {};
+  const styles = content.styles || {};
+  const layout = content.layout || {};
+
+  // Section order from dashboard. Unknown ids fall to the end.
+  const orderArr = (layout.home_section_order || 'hero,genres,staff_picks,new_arrivals,cafe_story,newsletter')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const getOrder = (id) => {
+    const idx = orderArr.indexOf(id);
+    return idx === -1 ? 999 : idx;
+  };
 
   const [featured, setFeatured] = useState(null);     // big hero book
   const [staffPicks, setStaffPicks] = useState([]);    // 4 curated
@@ -214,12 +225,14 @@ export default function Home() {
   };
 
   return (
-    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
+    <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color, display:'flex', flexDirection:'column' }}>
 
       {/* ================================================================ */}
       {/* 1. EDITORIAL HERO — headline + search + featured book on the right */}
       {/* ================================================================ */}
+      {visibility.home_hero !== false && (
       <section id="section-home-hero" data-editable-section="home" style={{
+        order: getOrder('hero'),
         background: images.home_hero_bg_url
           ? `linear-gradient(135deg, ${brand.primary_color}ee 0%, ${brand.primary_color_light}dd 40%, rgba(107,61,38,0.85) 100%), url("${images.home_hero_bg_url}") center/cover`
           : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 40%, #6B3D26 100%)`,
@@ -238,7 +251,12 @@ export default function Home() {
             <div data-editable="home.hero_eyebrow" style={{ display:'inline-block', background:'rgba(212,168,83,0.15)', border:'1px solid rgba(212,168,83,0.35)', borderRadius:'20px', padding:'6px 16px', fontSize:'12px', color:brand.accent_color, letterSpacing:'2px', marginBottom:'28px', textTransform:'uppercase', fontWeight:'700' }}>
               📚 {home.hero_eyebrow}
             </div>
-            <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 72px)', fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:brand.sand_color }}>
+            <h1 style={{
+              fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+              fontSize: `clamp(32px, 6vw, ${styles.home_hero_headline_size || 72}px)`,
+              fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:brand.sand_color,
+              textAlign: styles.home_hero_headline_align || 'left',
+            }}>
               <span data-editable="home.hero_headline_line1">{home.hero_headline_line1}</span><br />
               <span data-editable="home.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{home.hero_headline_line2}</span>
             </h1>
@@ -304,11 +322,13 @@ export default function Home() {
           }
         `}</style>
       </section>
+      )}
 
       {/* ================================================================ */}
       {/* 2. BROWSE BY GENRE — editorial category strip                     */}
       {/* ================================================================ */}
-      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px 40px' }}>
+      {visibility.home_genres !== false && (
+      <section id="section-home-genres" style={{ order: getOrder('genres'), maxWidth:'1200px', margin:'0 auto', padding:'80px 20px 40px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
           <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'32px', fontWeight:'700', color:'#2C1810', margin:0 }}>
             Browse by genre
@@ -338,11 +358,13 @@ export default function Home() {
           ))}
         </div>
       </section>
+      )}
 
       {/* ================================================================ */}
       {/* 3. STAFF PICKS — curated rail                                     */}
       {/* ================================================================ */}
-      <section id="section-home-staff-picks" data-editable-section="home" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+      {visibility.home_staff_picks !== false && (
+      <section id="section-home-staff-picks" data-editable-section="home" style={{ order: getOrder('staff_picks'), background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
             <div data-editable="home.staff_picks_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
@@ -372,11 +394,13 @@ export default function Home() {
           )}
         </div>
       </section>
+      )}
 
       {/* ================================================================ */}
       {/* 4. NEW & NOTEWORTHY                                               */}
       {/* ================================================================ */}
-      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
+      {visibility.home_new_arrivals !== false && (
+      <section id="section-home-new-arrivals" style={{ order: getOrder('new_arrivals'), maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
           <div>
             <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'8px' }}>
@@ -403,11 +427,14 @@ export default function Home() {
           </div>
         )}
       </section>
+      )}
 
       {/* ================================================================ */}
       {/* 5. CAFE STORY — editorial block about the reading cafe            */}
       {/* ================================================================ */}
+      {visibility.home_cafe_story !== false && (
       <section id="section-home-cafe-story" data-editable-section="home" style={{
+        order: getOrder('cafe_story'),
         background: images.cafe_story_bg_url
           ? `linear-gradient(135deg, ${brand.primary_color}ee 0%, ${brand.primary_color_light}dd 100%), url("${images.cafe_story_bg_url}") center/cover`
           : `linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`,
@@ -440,11 +467,13 @@ export default function Home() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ================================================================ */}
       {/* 6. NEWSLETTER                                                     */}
       {/* ================================================================ */}
-      <section id="section-newsletter" data-editable-section="newsletter" style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
+      {visibility.home_newsletter !== false && (
+      <section id="section-newsletter" data-editable-section="newsletter" style={{ order: getOrder('newsletter'), maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
         <div style={{
           background:'linear-gradient(135deg, #FFF8ED, #FAEBD7)',
           borderRadius:'20px', padding:'50px 40px', textAlign:'center',
@@ -484,6 +513,7 @@ export default function Home() {
           )}
         </div>
       </section>
+      )}
 
     </div>
   );

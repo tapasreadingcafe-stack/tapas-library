@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useCart } from '../context/CartContext';
+import { useSiteContent } from '../context/SiteContent';
 
 // =====================================================================
 // Catalog — editorial browse page inspired by powells.com.
@@ -106,6 +107,8 @@ function BookTile({ book }) {
 }
 
 export default function Catalog() {
+  const content = useSiteContent();
+  const catalog = content.catalog || {};
   const [searchParams, setSearchParams] = useSearchParams();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -166,14 +169,14 @@ export default function Catalog() {
 
       {/* Editorial header */}
       <header style={{ marginBottom:'48px', textAlign:'center' }}>
-        <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
-          The Collection
+        <div data-editable="catalog.header_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+          {catalog.header_eyebrow || 'The Collection'}
         </div>
-        <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(36px, 5vw, 52px)', fontWeight:'800', color:'#2C1810', marginBottom:'12px', lineHeight:'1.1' }}>
-          Every book on our shelves
+        <h1 data-editable="catalog.header_title" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(36px, 5vw, 52px)', fontWeight:'800', color:'#2C1810', marginBottom:'12px', lineHeight:'1.1' }}>
+          {catalog.header_title || 'Every book on our shelves'}
         </h1>
         <p style={{ color:'#8B6914', fontSize:'16px', maxWidth:'540px', margin:'0 auto', lineHeight:'1.6' }}>
-          {loading ? 'Loading…' : `${total} titles curated by the Tapas team. Browse by genre or search for something specific.`}
+          {loading ? 'Loading…' : `${total} ${catalog.header_subtitle_suffix || 'titles curated by the Tapas team. Browse by genre or search for something specific.'}`}
         </p>
       </header>
 

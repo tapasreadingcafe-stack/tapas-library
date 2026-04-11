@@ -3,66 +3,55 @@ import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContent';
 
 // =====================================================================
-// Offers / Memberships — editorial treatment, Powell's-style.
-// Dropped the fabricated "winter reading fest", "refer a friend" etc.
-// Focus on real membership tiers and what makes each one worth it.
-// Edit the PLANS array below when you launch new offers.
+// Offers / Memberships — all text now editable from the dashboard.
+// Plan tiers, features, headlines — everything reads from SiteContent.
 // =====================================================================
 
-const PLANS = [
-  {
-    id: 'basic',
-    tier: 'Basic',
-    price: '₹300',
-    period: '/month',
-    tagline: 'For the occasional reader.',
-    features: [
-      '5 books borrowed at a time',
-      '30-day borrowing period',
-      'Access to the full collection',
-      'Standard reservations',
-    ],
-    accent: '#8B6914',
-  },
-  {
-    id: 'silver',
-    tier: 'Silver',
-    price: '₹500',
-    period: '/month',
-    tagline: 'Our most popular plan.',
-    features: [
-      '10 books borrowed at a time',
-      '45-day borrowing period',
-      'Priority reservations',
-      '10% off every book purchase',
-      'Early access to new arrivals',
-      'Monthly reading newsletter',
-    ],
-    accent: '#2C1810',
-    popular: true,
-  },
-  {
-    id: 'gold',
-    tier: 'Gold',
-    price: '₹800',
-    period: '/month',
-    tagline: 'For the voracious reader.',
-    features: [
-      'Unlimited books at a time',
-      '60-day borrowing period',
-      '20% off every book purchase',
-      'Free home delivery in Nagpur',
-      '2 guest passes per month',
-      'Members-only events',
-    ],
-    accent: '#D4A853',
-  },
-];
+function splitFeatures(text) {
+  return (text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+function buildPlans(plans) {
+  return [
+    {
+      id: 'basic',
+      tier:    plans.basic_tier,
+      price:   plans.basic_price,
+      period:  plans.basic_period,
+      tagline: plans.basic_tagline,
+      features: splitFeatures(plans.basic_features),
+      accent: '#8B6914',
+    },
+    {
+      id: 'silver',
+      tier:    plans.silver_tier,
+      price:   plans.silver_price,
+      period:  plans.silver_period,
+      tagline: plans.silver_tagline,
+      features: splitFeatures(plans.silver_features),
+      accent: '#2C1810',
+      popular: true,
+    },
+    {
+      id: 'gold',
+      tier:    plans.gold_tier,
+      price:   plans.gold_price,
+      period:  plans.gold_period,
+      tagline: plans.gold_tagline,
+      features: splitFeatures(plans.gold_features),
+      accent: '#D4A853',
+    },
+  ];
+}
 
 export default function Offers() {
   const content = useSiteContent();
   const brand = content.brand;
   const offers = content.offers;
+  const plans = content.plans || {};
+  const visibility = content.visibility || {};
+  const styles = content.styles || {};
+  const PLANS = buildPlans(plans);
   return (
     <div style={{ fontFamily:'var(--tapas-body-font, Lato), sans-serif', background:brand.cream_color }}>
 
@@ -74,7 +63,12 @@ export default function Offers() {
         <div data-editable="offers.hero_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
           {offers.hero_eyebrow}
         </div>
-        <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:brand.primary_color, lineHeight:'1.05', marginBottom:'20px' }}>
+        <h1 style={{
+          fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+          fontSize: `clamp(32px, 6vw, ${styles.offers_hero_headline_size || 64}px)`,
+          fontWeight:'800', color:brand.primary_color, lineHeight:'1.05', marginBottom:'20px',
+          textAlign: styles.offers_hero_headline_align || 'center',
+        }}>
           <span data-editable="offers.hero_headline_line1">{offers.hero_headline_line1}</span><br />
           <span data-editable="offers.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{offers.hero_headline_line2}</span>
         </h1>
@@ -84,6 +78,7 @@ export default function Offers() {
       </section>
 
       {/* Plans */}
+      {visibility.offers_plans !== false && (
       <section style={{ maxWidth:'1100px', margin:'0 auto', padding:'40px 20px 80px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'24px', alignItems:'stretch' }}>
           {PLANS.map(plan => {
@@ -150,8 +145,10 @@ export default function Offers() {
           {offers.plans_footer}
         </p>
       </section>
+      )}
 
       {/* Why join block */}
+      {visibility.offers_why_join !== false && (
       <section id="section-offers-why-join" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'900px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
@@ -179,8 +176,10 @@ export default function Offers() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Final CTA */}
+      {visibility.offers_cta !== false && (
       <section id="section-offers-cta" style={{ padding:'80px 20px', textAlign:'center' }}>
         <div style={{ maxWidth:'580px', margin:'0 auto' }}>
           <h2 data-editable="offers.cta_headline" style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'36px', fontWeight:'800', color:brand.primary_color, marginBottom:'16px', lineHeight:'1.15' }}>
@@ -201,6 +200,7 @@ export default function Offers() {
           </Link>
         </div>
       </section>
+      )}
     </div>
   );
 }

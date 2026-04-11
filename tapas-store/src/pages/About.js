@@ -13,6 +13,8 @@ export default function About() {
   const brand = content.brand;
   const about = content.about;
   const contact = content.contact;
+  const visibility = content.visibility || {};
+  const styles = content.styles || {};
 
   const HOURS = [
     { day:'Monday',    time: contact.hours_weekdays },
@@ -50,7 +52,12 @@ export default function About() {
           <div data-editable="about.hero_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'16px' }}>
             {about.hero_eyebrow}
           </div>
-          <h1 style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'clamp(40px, 6vw, 64px)', fontWeight:'800', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px' }}>
+          <h1 style={{
+            fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif',
+            fontSize: `clamp(32px, 6vw, ${styles.about_hero_headline_size || 64}px)`,
+            fontWeight:'800', color:brand.sand_color, lineHeight:'1.1', marginBottom:'24px',
+            textAlign: styles.about_hero_headline_align || 'center',
+          }}>
             <span data-editable="about.hero_headline_line1">{about.hero_headline_line1}</span><br />
             <span data-editable="about.hero_headline_line2" style={{ color:brand.accent_color, fontStyle:'italic' }}>{about.hero_headline_line2}</span>
           </h1>
@@ -77,6 +84,7 @@ export default function About() {
       </section>
 
       {/* Values */}
+      {visibility.about_values !== false && (
       <section id="section-about-values" style={{ maxWidth:'1100px', margin:'0 auto', padding:'100px 20px 60px' }}>
         <div style={{ textAlign:'center', marginBottom:'56px' }}>
           <div data-editable="about.values_eyebrow" style={{ fontSize:'11px', fontWeight:'800', color:brand.accent_color, textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
@@ -106,8 +114,10 @@ export default function About() {
           })}
         </div>
       </section>
+      )}
 
       {/* Visit us — hours + contact */}
+      {visibility.about_visit !== false && (
       <section id="section-about-visit" data-editable-section="contact" style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
         <div style={{ maxWidth:'1100px', margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:'48px' }}>
@@ -175,8 +185,10 @@ export default function About() {
           }
         `}</style>
       </section>
+      )}
 
       {/* Contact form */}
+      {visibility.about_contact_form !== false && (
       <section style={{ maxWidth:'680px', margin:'0 auto', padding:'80px 20px' }}>
         <div style={{ textAlign:'center', marginBottom:'40px' }}>
           <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
@@ -234,6 +246,7 @@ export default function About() {
           </button>
         </form>
       </section>
+      )}
     </div>
   );
 }
