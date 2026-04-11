@@ -83,7 +83,9 @@ function StaffPickCard({ book, pickedBy }) {
         </h3>
         <p style={{ color:'#8B6914', fontSize:'13px', marginBottom:'12px' }}>by {book.author}</p>
         <p style={{ color:'#5C3A1E', fontSize:'13px', lineHeight:'1.6', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight:'60px' }}>
-          {book.description ? `"${book.description}"` : FALLBACK_BLURB}
+          {book.staff_pick_blurb
+            ? `"${book.staff_pick_blurb}"`
+            : (book.description ? `"${book.description}"` : FALLBACK_BLURB)}
         </p>
       </div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', borderTop:'1px solid #F5DEB3', paddingTop:'12px' }}>
@@ -147,13 +149,15 @@ export default function Home() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [picksRes, newRes] = await Promise.all([
+      // Staff picks come from books the team has explicitly flagged.
+      // Fall back to top-rated if nothing is flagged yet.
+      const [flaggedRes, newRes] = await Promise.all([
         supabase
           .from('books')
           .select('*')
           .eq('store_visible', true)
-          .gt('quantity_available', 0)
-          .order('rating', { ascending: false, nullsFirst: false })
+          .eq('is_staff_pick', true)
+          .order('created_at', { ascending: false })
           .limit(5),
         supabase
           .from('books')
@@ -163,16 +167,26 @@ export default function Home() {
           .limit(10),
       ]);
 
-      const picks = picksRes.data || [];
+      let picks = flaggedRes.data || [];
       const newest = newRes.data || [];
 
-      // Featured book for the hero — prefer the top-rated pick, fall back
-      // to the newest book if nothing has a rating yet.
+      // Fallback: if no flagged picks yet, show the top-rated in-stock books
+      // so the section isn't empty on first launch.
+      if (picks.length === 0) {
+        const { data: ratedFallback } = await supabase
+          .from('books')
+          .select('*')
+          .eq('store_visible', true)
+          .gt('quantity_available', 0)
+          .order('rating', { ascending: false, nullsFirst: false })
+          .limit(5);
+        picks = ratedFallback || [];
+      }
+
+      // Featured book for the hero — first staff pick, fall back to newest.
       setFeatured(picks[0] || newest[0] || null);
-      // Staff picks shown on the curated rail — exclude the hero book so
-      // it doesn't show twice.
+      // Curated rail excludes the hero so the same book doesn't render twice.
       setStaffPicks((picks[0] ? picks.slice(1) : picks).slice(0, 4));
-      // Keep new arrivals distinct from the featured slot too.
       setNewArrivals(newest.filter(b => !picks[0] || b.id !== picks[0].id).slice(0, 8));
     } catch (err) {
       console.error(err);

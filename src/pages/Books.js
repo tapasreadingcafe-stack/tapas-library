@@ -70,6 +70,8 @@ export default function Books() {
     condition: 'Good',
     store_visible: false,
     is_borrowable: true,
+    is_staff_pick: false,
+    staff_pick_blurb: '',
   };
 
   const [formData, setFormData] = useState(emptyForm);
@@ -95,7 +97,7 @@ export default function Books() {
     try {
       let query = supabase
         .from('books')
-        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable')
+        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -735,7 +737,7 @@ export default function Books() {
                   />
                   <span><strong>Show on www.tapasreadingcafe.com</strong> — customers can buy this book online (needs Selling Price set)</span>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '14px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', cursor: 'pointer', fontSize: '14px' }}>
                   <input
                     type="checkbox"
                     checked={formData.is_borrowable !== false}
@@ -744,6 +746,34 @@ export default function Books() {
                   />
                   <span><strong>Part of lending library</strong> — members can borrow this book (uncheck for bookstore-only stock)</span>
                 </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', cursor: 'pointer', fontSize: '14px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!formData.is_staff_pick}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_staff_pick: e.target.checked }))}
+                    style={{ width: '18px', height: '18px', accentColor: '#D4A853', cursor: 'pointer' }}
+                  />
+                  <span>⭐ <strong>Staff pick</strong> — feature this book in the "Handpicked by our librarians" section on the storefront home</span>
+                </label>
+                {formData.is_staff_pick && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#8B6914', marginBottom: '6px' }}>
+                      STAFF PICK BLURB
+                    </label>
+                    <textarea
+                      name="staff_pick_blurb"
+                      value={formData.staff_pick_blurb || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, staff_pick_blurb: e.target.value }))}
+                      placeholder="One or two sentences on why your team loves this book. Shown under the book cover on the Home page."
+                      rows={3}
+                      maxLength={280}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ fontSize: '11px', color: '#999', textAlign: 'right', marginTop: '2px' }}>
+                      {(formData.staff_pick_blurb || '').length}/280
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
