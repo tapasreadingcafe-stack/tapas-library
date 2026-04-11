@@ -43,6 +43,34 @@ export const DEFAULT_CONTENT = {
     hero_headline_line2: 'your shelf.',
     hero_description: "A curated collection of books to borrow or own — handpicked by the Tapas Reading Cafe team. Fiction, memoirs, kids' favourites, and everything in between.",
     search_placeholder: 'Search title, author, or genre…',
+
+    // Hero carousel — toggle on to show rotating slides below the headline
+    // for events, announcements, or featured offers. Each slide is a card
+    // with an image, eyebrow, title, body, and a link target.
+    hero_carousel_enabled: true,
+    hero_carousel_autoplay_seconds: 6,
+
+    hero_slide_1_eyebrow: '📅 Event',
+    hero_slide_1_title: 'Monthly Book Club',
+    hero_slide_1_body: 'Join us the first Saturday of every month for coffee, conversation, and a new book to read together.',
+    hero_slide_1_cta_label: 'Reserve your spot →',
+    hero_slide_1_cta_link: '/offers',
+    hero_slide_1_image: '',
+
+    hero_slide_2_eyebrow: '☕ New arrival',
+    hero_slide_2_title: 'Filter coffee is back',
+    hero_slide_2_body: 'South-Indian filter coffee, brewed slow, served strong. Pair it with any book from our shelves.',
+    hero_slide_2_cta_label: 'See menu →',
+    hero_slide_2_cta_link: '/about',
+    hero_slide_2_image: '',
+
+    hero_slide_3_eyebrow: '🎁 Members',
+    hero_slide_3_title: '20% off every purchase',
+    hero_slide_3_body: 'Tapas members save on every book they take home — plus free events, reserved reads, and filter coffee on the house.',
+    hero_slide_3_cta_label: 'Become a member →',
+    hero_slide_3_cta_link: '/offers',
+    hero_slide_3_image: '',
+
     staff_picks_eyebrow: '★ ★ ★',
     staff_picks_title: 'Handpicked by our librarians',
     staff_picks_subtitle: "Every week our team picks a handful of books we can't stop talking about. Here's what's on our desks right now.",

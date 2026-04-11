@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useSiteContent } from '../context/SiteContent';
+import HeroCarousel from '../components/HeroCarousel';
 
 // =====================================================================
 // Home — 2025-2026 redesign
@@ -320,6 +321,11 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* Hero carousel — rotating cards for events/announcements */}
+        {home.hero_carousel_enabled !== false && home.hero_carousel_enabled !== 'false' && (
+          <HeroCarousel home={home} />
+        )}
 
         <style>{`
           @media (max-width: 860px) {

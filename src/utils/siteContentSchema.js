@@ -255,6 +255,41 @@ export const CONTENT_SCHEMA = [
     ],
   },
   {
+    key: 'home',
+    parent: 'home',
+    title: 'Home — Hero carousel',
+    subtitle: 'Rotating slides under the hero headline. Use for events, new arrivals, announcements. Leave slide titles empty to hide.',
+    icon: '🎠',
+    fields: [
+      { key: 'hero_carousel_enabled',          label: 'Show hero carousel',                  type: 'select', options: [
+        { value: true,  label: 'Yes — show slides' },
+        { value: false, label: 'No — hide carousel' },
+      ] },
+      { key: 'hero_carousel_autoplay_seconds', label: 'Autoplay interval (seconds)',         type: 'number', hint: 'How often slides rotate. Set to 0 to disable autoplay.' },
+
+      { key: 'hero_slide_1_eyebrow',           label: 'Slide 1 — eyebrow',                   type: 'text' },
+      { key: 'hero_slide_1_title',             label: 'Slide 1 — title',                     type: 'text' },
+      { key: 'hero_slide_1_body',              label: 'Slide 1 — body',                      type: 'textarea' },
+      { key: 'hero_slide_1_cta_label',         label: 'Slide 1 — button label',              type: 'text' },
+      { key: 'hero_slide_1_cta_link',          label: 'Slide 1 — button link',               type: 'text', hint: 'Internal path like /offers or full URL.' },
+      { key: 'hero_slide_1_image',             label: 'Slide 1 — background image',          type: 'image' },
+
+      { key: 'hero_slide_2_eyebrow',           label: 'Slide 2 — eyebrow',                   type: 'text' },
+      { key: 'hero_slide_2_title',             label: 'Slide 2 — title',                     type: 'text' },
+      { key: 'hero_slide_2_body',              label: 'Slide 2 — body',                      type: 'textarea' },
+      { key: 'hero_slide_2_cta_label',         label: 'Slide 2 — button label',              type: 'text' },
+      { key: 'hero_slide_2_cta_link',          label: 'Slide 2 — button link',               type: 'text' },
+      { key: 'hero_slide_2_image',             label: 'Slide 2 — background image',          type: 'image' },
+
+      { key: 'hero_slide_3_eyebrow',           label: 'Slide 3 — eyebrow',                   type: 'text' },
+      { key: 'hero_slide_3_title',             label: 'Slide 3 — title',                     type: 'text' },
+      { key: 'hero_slide_3_body',              label: 'Slide 3 — body',                      type: 'textarea' },
+      { key: 'hero_slide_3_cta_label',         label: 'Slide 3 — button label',              type: 'text' },
+      { key: 'hero_slide_3_cta_link',          label: 'Slide 3 — button link',               type: 'text' },
+      { key: 'hero_slide_3_image',             label: 'Slide 3 — background image',          type: 'image' },
+    ],
+  },
+  {
     key: 'images',
     title: 'Images',
     subtitle: 'Background photos used on hero sections. Leave blank for the default gradient.',

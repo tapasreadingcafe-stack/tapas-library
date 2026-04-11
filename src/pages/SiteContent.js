@@ -219,9 +219,32 @@ function TextArea({ field, value, onChange, inputRef }) {
   );
 }
 
+// Parse a color value (#RRGGBB or #RRGGBBAA) into base hex + alpha (0-100).
+function parseColorAlpha(raw) {
+  const v = (raw || '').trim();
+  if (!v) return { base: '', alpha: 100 };
+  if (v.length === 9 && v.startsWith('#')) {
+    const a = parseInt(v.slice(7, 9), 16);
+    return { base: v.slice(0, 7).toUpperCase(), alpha: Math.round((a / 255) * 100) };
+  }
+  return { base: v.toUpperCase(), alpha: 100 };
+}
+
+// Compose base hex + alpha % back into a hex string (strips alpha if 100%).
+function composeColor(base, alphaPct) {
+  if (!base) return '';
+  const pct = Math.max(0, Math.min(100, Math.round(alphaPct)));
+  if (pct === 100) return base;
+  const a = Math.round((pct / 100) * 255).toString(16).padStart(2, '0');
+  return `${base}${a.toUpperCase()}`;
+}
+
 function ColorField({ field, value, onChange, inputRef }) {
+  const { base, alpha } = parseColorAlpha(value);
+  const setHex = (hex) => onChange(composeColor(hex, alpha));
+  const setAlpha = (pct) => onChange(composeColor(base || '#000000', pct));
   return (
-    <Row label={field.label} iconType="color" iconColor={value || S.textDim}>
+    <Row label={field.label} iconType="color" iconColor={base || S.textDim}>
       <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: S.panelAlt, borderRadius: '2px', height: '28px', padding: '0 6px' }}>
         <div style={{ position: 'relative', width: '16px', height: '16px', flexShrink: 0 }}>
           <div style={{
@@ -232,14 +255,43 @@ function ColorField({ field, value, onChange, inputRef }) {
             backgroundSize: '6px 6px',
             backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
           }} />
-          <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)}
+          <input type="color" value={base || '#000000'} onChange={e => setHex(e.target.value)}
             style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
         </div>
-        <input ref={inputRef} type="text" value={(value || '').replace('#', '').toUpperCase()}
-          onChange={e => onChange('#' + e.target.value.replace('#', ''))}
+        <input ref={inputRef} type="text" value={(base || '').replace('#', '').toUpperCase()}
+          onChange={e => {
+            const cleaned = e.target.value.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+            setHex('#' + cleaned);
+          }}
           placeholder="—"
           style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '11px', fontFamily: 'ui-monospace, monospace', color: S.text, letterSpacing: '0.3px', minWidth: 0 }} />
-        <span style={{ fontSize: '10px', color: S.textFaint, flexShrink: 0 }}>100%</span>
+        {/* Opacity editor — type or use mouse wheel */}
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={alpha}
+          onChange={(e) => setAlpha(Number(e.target.value) || 0)}
+          onWheel={(e) => {
+            e.preventDefault();
+            const step = e.shiftKey ? 10 : 1;
+            setAlpha(alpha + (e.deltaY > 0 ? -step : step));
+          }}
+          title="Opacity (0–100%). Scroll to adjust."
+          style={{
+            width: '32px',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: '10px',
+            color: S.textFaint,
+            textAlign: 'right',
+            flexShrink: 0,
+            fontFamily: 'ui-monospace, monospace',
+            padding: 0,
+          }}
+        />
+        <span style={{ fontSize: '10px', color: S.textFaint, flexShrink: 0 }}>%</span>
       </div>
     </Row>
   );
@@ -777,6 +829,10 @@ export default function SiteContent() {
   const [pushedAt, setPushedAt] = useState(null);
   const [error,   setError]     = useState('');
   const [activeSection, setActiveSection] = useState('brand');
+  // Right-panel top tab. 'design' is the full field editor; 'prototype'
+  // is a placeholder for interaction / animation settings — not wired up
+  // yet but we show it clearly marked as coming soon instead of a dead tab.
+  const [panelTab, setPanelTab] = useState('design');
   // Selected element on the canvas (fieldPath string). When set, the
   // right panel shows an Element Inspector with CSS overrides.
   const [selectedElement, setSelectedElement] = useState(null);
@@ -1425,7 +1481,7 @@ export default function SiteContent() {
             <iframe
               ref={iframeRef}
               key={iframeKey}
-              src={`${STORE_URL}${iframePath}${iframePath.includes('?') ? '&' : '?'}preview=draft`}
+              src={`${STORE_URL}${iframePath}${iframePath.includes('?') ? '&' : '?'}preview=draft&cb=${iframeKey}`}
               title="Tapas store draft preview"
               style={{
                 width: vp.width, maxWidth: vp.maxWidth,
@@ -1467,32 +1523,77 @@ export default function SiteContent() {
             background: S.panel,
             flexShrink: 0,
           }}>
-            <div style={{
-              flex: 1,
-              padding: '10px 0',
-              textAlign: 'center',
-              fontSize: '11px',
-              fontWeight: '600',
-              color: S.text,
-              borderBottom: `2px solid ${S.accent}`,
-              marginBottom: '-1px',
-            }}>
+            <button
+              onClick={() => setPanelTab('design')}
+              style={{
+                flex: 1,
+                padding: '10px 0',
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: panelTab === 'design' ? '700' : '500',
+                color: panelTab === 'design' ? S.text : S.textFaint,
+                borderBottom: panelTab === 'design' ? `2px solid ${S.accent}` : '2px solid transparent',
+                marginBottom: '-1px',
+                background: 'transparent',
+                border: 'none',
+                borderBottomStyle: 'solid',
+                borderBottomWidth: '2px',
+                cursor: 'pointer',
+                transition: 'color 150ms',
+              }}
+            >
               Design
-            </div>
-            <div style={{
-              flex: 1,
-              padding: '10px 0',
-              textAlign: 'center',
-              fontSize: '11px',
-              fontWeight: '500',
-              color: S.textFaint,
-            }}>
+            </button>
+            <button
+              onClick={() => setPanelTab('prototype')}
+              style={{
+                flex: 1,
+                padding: '10px 0',
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: panelTab === 'prototype' ? '700' : '500',
+                color: panelTab === 'prototype' ? S.text : S.textFaint,
+                borderBottom: panelTab === 'prototype' ? `2px solid ${S.accent}` : '2px solid transparent',
+                marginBottom: '-1px',
+                background: 'transparent',
+                border: 'none',
+                borderBottomStyle: 'solid',
+                borderBottomWidth: '2px',
+                cursor: 'pointer',
+                transition: 'color 150ms',
+              }}
+            >
               Prototype
-            </div>
+            </button>
           </div>
 
+          {panelTab === 'prototype' && (
+            <div style={{ padding: '56px 24px', textAlign: 'center', color: S.textDim, fontSize: '12px', lineHeight: 1.7 }}>
+              <div style={{ fontSize: '42px', marginBottom: '14px' }}>🎬</div>
+              <div style={{ fontWeight: '700', color: S.text, marginBottom: '8px', fontSize: '13px' }}>Prototype — coming soon</div>
+              <p style={{ margin: '0 auto 18px', maxWidth: '260px' }}>
+                Interactive prototypes with animations, transitions, and click-through flows will land here.
+              </p>
+              <button
+                onClick={() => setPanelTab('design')}
+                style={{
+                  padding: '7px 16px',
+                  background: S.accent,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                ← Back to Design
+              </button>
+            </div>
+          )}
+
           {/* Section header — "Frame" style */}
-          {!loading && (
+          {panelTab === 'design' && !loading && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1532,6 +1633,7 @@ export default function SiteContent() {
           )}
 
           {/* Fields */}
+          {panelTab === 'design' && (
           <div style={{ flex: 1, overflowY: 'auto', paddingTop: '12px', paddingBottom: '40px' }}>
             {loading ? (
               <div style={{ color: S.textDim, textAlign: 'center', padding: '40px', fontSize: '11px' }}>Loading…</div>
@@ -1582,6 +1684,7 @@ export default function SiteContent() {
               </>
             )}
           </div>
+          )}
           </>
           )}
         </aside>
