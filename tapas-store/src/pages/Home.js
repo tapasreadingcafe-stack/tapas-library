@@ -2,76 +2,128 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 
-const CATEGORIES = [
-  { icon:'🧙', label:'Fiction', color:'#667EEA' },
-  { icon:'📰', label:'Non-Fiction', color:'#F6AD55' },
-  { icon:'🔬', label:'Science', color:'#68D391' },
-  { icon:'📜', label:'History', color:'#FC8181' },
-  { icon:'👦', label:'Children', color:'#76E4F7' },
-  { icon:'💼', label:'Business', color:'#B794F4' },
-  { icon:'🌍', label:'Travel', color:'#F6E05E' },
-  { icon:'🎨', label:'Arts', color:'#FBB6CE' },
+// =====================================================================
+// Home — editorial bookstore homepage inspired by powells.com.
+//
+// Layout, top to bottom:
+//   1. Editorial hero — headline + search, with a featured book cover
+//      on the right (Powell's-style "marquee" treatment)
+//   2. Curated section bar — "Browse by genre" with short descriptors
+//   3. Staff Picks — headline section with up-to-5 hand-picked books,
+//      each card includes a short "why we love it" blurb
+//   4. New & Noteworthy — latest arrivals, grid layout
+//   5. The cafe story — warm editorial block about the reading cafe
+//   6. Newsletter signup — "Get our weekly reading list"
+// =====================================================================
+
+const GENRES = [
+  { icon:'📖', label:'Fiction',      blurb:'Novels and short stories from India and beyond',         color:'#667EEA' },
+  { icon:'🧠', label:'Non-Fiction',  blurb:'Memoirs, essays, and books that explain the world',       color:'#F6AD55' },
+  { icon:'🔬', label:'Science',      blurb:'From cosmology to the future of biology',                  color:'#68D391' },
+  { icon:'📜', label:'History',      blurb:'People, places, and the forces that shaped us',           color:'#FC8181' },
+  { icon:'🧒', label:'Children',     blurb:'Picture books, chapter books, and YA favourites',         color:'#76E4F7' },
+  { icon:'💼', label:'Business',     blurb:'Strategy, leadership, and entrepreneurial stories',       color:'#B794F4' },
+  { icon:'🌍', label:'Travel',       blurb:'Guides and memoirs from the road less travelled',         color:'#F6E05E' },
+  { icon:'🎨', label:'Arts',         blurb:'Photography, design, and the craft of making things',     color:'#FBB6CE' },
 ];
 
-const TESTIMONIALS = [
-  { name:'Priya S.', text:'Best library in town! The collection is amazing and staff is super helpful.', rating:5 },
-  { name:'Rahul M.', text:'Love the online reservation system. Makes borrowing books so convenient!', rating:5 },
-  { name:'Anita K.', text:'My kids love the children\'s section. A wonderful community space.', rating:5 },
-];
+// Short blurbs used for staff picks fallback when book.description is missing.
+const FALLBACK_BLURB = 'Picked by our team — a must-read this month.';
 
-function StarRating({ rating }) {
+function BookCover({ book, size = 200 }) {
+  const src = book.book_image || book.cover_image;
   return (
-    <span>
-      {[1,2,3,4,5].map(i => (
-        <span key={i} style={{ color: i <= rating ? '#D4A853' : '#ddd', fontSize:'16px' }}>★</span>
-      ))}
-    </span>
+    <div style={{
+      width: size,
+      height: size * 1.35,
+      borderRadius: '4px',
+      overflow: 'hidden',
+      background: 'linear-gradient(145deg, #F5DEB3, #D4A853)',
+      boxShadow: '0 14px 40px rgba(44,24,16,0.25), 0 0 0 1px rgba(44,24,16,0.05)',
+      flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {src ? (
+        <img src={src} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+      ) : (
+        <div style={{ textAlign:'center', padding:'20px' }}>
+          <div style={{ fontSize: size * 0.22, marginBottom:'8px' }}>📖</div>
+          <div style={{ fontSize:'10px', color:'#8B6914', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px' }}>
+            {book.genre || book.category || 'Book'}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-function BookCard({ book }) {
+function StaffPickCard({ book, pickedBy }) {
+  const forSale = Number(book.sales_price || 0) > 0;
+  return (
+    <Link to={`/books/${book.id}`} style={{
+      textDecoration:'none', color:'inherit',
+      display:'flex', flexDirection:'column', gap:'16px',
+      background:'white', borderRadius:'12px', padding:'24px',
+      boxShadow:'0 4px 20px rgba(44,24,16,0.08)',
+      transition:'transform 0.25s, box-shadow 0.25s',
+      height:'100%',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.transform='translateY(-6px)'; e.currentTarget.style.boxShadow='0 16px 40px rgba(44,24,16,0.15)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 20px rgba(44,24,16,0.08)'; }}
+    >
+      <div style={{ display:'flex', justifyContent:'center' }}>
+        <BookCover book={book} size={160} />
+      </div>
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:'10px', fontWeight:'700', color:'#D4A853', textTransform:'uppercase', letterSpacing:'1.5px', marginBottom:'6px' }}>
+          ★ Staff Pick{pickedBy ? ` — ${pickedBy}` : ''}
+        </div>
+        <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'18px', fontWeight:'700', color:'#2C1810', marginBottom:'4px', lineHeight:'1.25' }}>
+          {book.title}
+        </h3>
+        <p style={{ color:'#8B6914', fontSize:'13px', marginBottom:'12px' }}>by {book.author}</p>
+        <p style={{ color:'#5C3A1E', fontSize:'13px', lineHeight:'1.6', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight:'60px' }}>
+          {book.description ? `"${book.description}"` : FALLBACK_BLURB}
+        </p>
+      </div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', borderTop:'1px solid #F5DEB3', paddingTop:'12px' }}>
+        {forSale ? (
+          <span style={{ color:'#D4A853', fontWeight:'800', fontSize:'18px', fontFamily:'"Playfair Display", serif' }}>₹{book.sales_price}</span>
+        ) : (
+          <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'13px' }}>Borrow Only</span>
+        )}
+        <span style={{ color:'#8B6914', fontSize:'12px', fontWeight:'600' }}>View →</span>
+      </div>
+    </Link>
+  );
+}
+
+function GridBookCard({ book }) {
+  const forSale = Number(book.sales_price || 0) > 0;
   return (
     <Link to={`/books/${book.id}`} style={{ textDecoration:'none', color:'inherit' }}>
       <div style={{
-        background:'white', borderRadius:'12px', overflow:'hidden',
-        boxShadow:'0 4px 15px rgba(0,0,0,0.08)', transition:'transform 0.2s, box-shadow 0.2s',
-        cursor:'pointer', height:'100%'
+        display:'flex', flexDirection:'column', gap:'14px',
+        padding:'12px', borderRadius:'8px',
+        transition:'background 0.2s',
+        cursor:'pointer', height:'100%',
       }}
-        onMouseEnter={e => { e.currentTarget.style.transform='translateY(-4px)'; e.currentTarget.style.boxShadow='0 8px 25px rgba(0,0,0,0.15)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 15px rgba(0,0,0,0.08)'; }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,222,179,0.4)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
       >
-        <div style={{ height:'180px', background:'linear-gradient(135deg, #F5DEB3, #D4A853)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-          {(book.book_image || book.cover_image) ? (
-            <img src={book.book_image || book.cover_image} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-          ) : (
-            <div style={{ textAlign:'center', padding:'20px' }}>
-              <div style={{ fontSize:'48px', marginBottom:'8px' }}>📖</div>
-              <div style={{ fontSize:'11px', color:'#8B6914', fontWeight:'600', textTransform:'uppercase', letterSpacing:'1px' }}>
-                {book.genre || book.category || 'Book'}
-              </div>
-            </div>
-          )}
-          <div style={{
-            position:'absolute', top:'10px', right:'10px',
-            background: book.quantity_available > 0 ? '#48BB78' : '#FC8181',
-            color:'white', fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px'
-          }}>
-            {book.quantity_available > 0 ? '✅ In Stock' : '❌ Sold Out'}
-          </div>
+        <div style={{ display:'flex', justifyContent:'center' }}>
+          <BookCover book={book} size={150} />
         </div>
-        <div style={{ padding:'16px' }}>
-          <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'15px', fontWeight:'600', marginBottom:'6px', lineHeight:'1.3', color:'#2C1810' }}>
+        <div>
+          <h4 style={{ fontFamily:'"Playfair Display", serif', fontSize:'15px', fontWeight:'600', color:'#2C1810', marginBottom:'4px', lineHeight:'1.3', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
             {book.title}
-          </h3>
-          <p style={{ color:'#8B6914', fontSize:'13px', marginBottom:'10px' }}>{book.author}</p>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            {Number(book.sales_price || 0) > 0 ? (
-              <span style={{ color:'#D4A853', fontWeight:'700', fontSize:'16px' }}>₹{book.sales_price}</span>
-            ) : (
-              <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'13px' }}>Borrow Only</span>
-            )}
-            <span style={{ color:'#D4A853', fontSize:'13px' }}>★ {book.rating || '4.5'}</span>
-          </div>
+          </h4>
+          <p style={{ color:'#8B6914', fontSize:'12px', marginBottom:'8px' }}>{book.author}</p>
+          {forSale ? (
+            <span style={{ color:'#D4A853', fontWeight:'700', fontSize:'15px', fontFamily:'"Playfair Display", serif' }}>₹{book.sales_price}</span>
+          ) : (
+            <span style={{ color:'#48BB78', fontWeight:'600', fontSize:'12px' }}>Borrow Only</span>
+          )}
         </div>
       </div>
     </Link>
@@ -79,10 +131,13 @@ function BookCard({ book }) {
 }
 
 export default function Home() {
-  const [featuredBooks, setFeaturedBooks] = useState([]);
-  const [newArrivals, setNewArrivals] = useState([]);
+  const [featured, setFeatured] = useState(null);     // big hero book
+  const [staffPicks, setStaffPicks] = useState([]);    // 4 curated
+  const [newArrivals, setNewArrivals] = useState([]);  // 8 latest
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -90,14 +145,35 @@ export default function Home() {
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [booksRes, newRes] = await Promise.all([
-        supabase.from('books').select('*').eq('store_visible', true).gt('quantity_available', 0).limit(8).order('title'),
-        supabase.from('books').select('*').eq('store_visible', true).limit(8).order('created_at', { ascending:false }),
+      const [picksRes, newRes] = await Promise.all([
+        supabase
+          .from('books')
+          .select('*')
+          .eq('store_visible', true)
+          .gt('quantity_available', 0)
+          .order('rating', { ascending: false, nullsFirst: false })
+          .limit(5),
+        supabase
+          .from('books')
+          .select('*')
+          .eq('store_visible', true)
+          .order('created_at', { ascending: false })
+          .limit(10),
       ]);
 
-      setFeaturedBooks(booksRes.data || []);
-      setNewArrivals(newRes.data || []);
+      const picks = picksRes.data || [];
+      const newest = newRes.data || [];
+
+      // Featured book for the hero — prefer the top-rated pick, fall back
+      // to the newest book if nothing has a rating yet.
+      setFeatured(picks[0] || newest[0] || null);
+      // Staff picks shown on the curated rail — exclude the hero book so
+      // it doesn't show twice.
+      setStaffPicks((picks[0] ? picks.slice(1) : picks).slice(0, 4));
+      // Keep new arrivals distinct from the featured slot too.
+      setNewArrivals(newest.filter(b => !picks[0] || b.id !== picks[0].id).slice(0, 8));
     } catch (err) {
       console.error(err);
     } finally {
@@ -110,226 +186,281 @@ export default function Home() {
     if (searchTerm.trim()) navigate(`/books?search=${encodeURIComponent(searchTerm.trim())}`);
   };
 
-  return (
-    <div style={{ fontFamily:'Lato, sans-serif' }}>
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    // Placeholder — wire this to a mailing list table or Resend/Mailchimp later.
+    if (emailInput.trim()) setSubscribed(true);
+  };
 
-      {/* HERO */}
+  return (
+    <div style={{ fontFamily:'Lato, sans-serif', background:'#FDF8F0' }}>
+
+      {/* ================================================================ */}
+      {/* 1. EDITORIAL HERO — headline + search + featured book on the right */}
+      {/* ================================================================ */}
       <section style={{
         background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 40%, #6B3D26 100%)',
-        color:'white', minHeight:'85vh', display:'flex', alignItems:'center',
-        position:'relative', overflow:'hidden'
+        color:'#F5DEB3', position:'relative', overflow:'hidden',
       }}>
-        <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(circle at 20% 50%, rgba(212,168,83,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(245,222,179,0.05) 0%, transparent 50%)' }} />
-        <div style={{ position:'absolute', right:'-100px', top:'-100px', width:'500px', height:'500px', borderRadius:'50%', background:'rgba(212,168,83,0.05)', border:'2px solid rgba(212,168,83,0.1)' }} />
-        <div style={{ position:'absolute', left:'-50px', bottom:'-50px', width:'300px', height:'300px', borderRadius:'50%', background:'rgba(245,222,179,0.03)' }} />
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+          backgroundImage:'radial-gradient(circle at 15% 50%, rgba(212,168,83,0.10) 0%, transparent 55%), radial-gradient(circle at 85% 20%, rgba(245,222,179,0.06) 0%, transparent 50%)' }} />
+        <div style={{ position:'absolute', right:'-120px', top:'-120px', width:'420px', height:'420px', borderRadius:'50%', background:'rgba(212,168,83,0.06)', border:'1px solid rgba(212,168,83,0.12)' }} />
 
-        <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px', position:'relative', zIndex:1, width:'100%' }}>
-          <div style={{ maxWidth:'650px' }}>
-            <div style={{ display:'inline-block', background:'rgba(212,168,83,0.2)', border:'1px solid rgba(212,168,83,0.4)', borderRadius:'20px', padding:'6px 16px', fontSize:'13px', color:'#D4A853', letterSpacing:'1px', marginBottom:'24px', textTransform:'uppercase', fontWeight:'600' }}>
-              📚 Your Neighbourhood Book Store
+        <div style={{
+          maxWidth:'1200px', margin:'0 auto', padding:'80px 20px 100px',
+          position:'relative', zIndex:1,
+          display:'grid', gridTemplateColumns:'1.3fr 1fr', gap:'60px', alignItems:'center',
+        }} className="hero-grid">
+          <div>
+            <div style={{ display:'inline-block', background:'rgba(212,168,83,0.15)', border:'1px solid rgba(212,168,83,0.35)', borderRadius:'20px', padding:'6px 16px', fontSize:'12px', color:'#D4A853', letterSpacing:'2px', marginBottom:'28px', textTransform:'uppercase', fontWeight:'700' }}>
+              📚 Nagpur's Reading Cafe
             </div>
-            <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(36px, 6vw, 68px)', fontWeight:'800', lineHeight:'1.1', marginBottom:'24px', color:'#F5DEB3' }}>
-              Tapas Library<br />
-              <span style={{ color:'#D4A853' }}>&amp; Book Store</span>
+            <h1 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(40px, 6vw, 72px)', fontWeight:'800', lineHeight:'1.05', marginBottom:'24px', color:'#F5DEB3' }}>
+              Stories worth<br />
+              <span style={{ color:'#D4A853', fontStyle:'italic' }}>your shelf.</span>
             </h1>
-            <p style={{ fontSize:'18px', lineHeight:'1.7', color:'rgba(245,222,179,0.85)', marginBottom:'40px', maxWidth:'500px' }}>
-              Discover thousands of books, borrow your favourites, or own them forever. Your next great read is waiting.
+            <p style={{ fontSize:'18px', lineHeight:'1.7', color:'rgba(245,222,179,0.85)', marginBottom:'36px', maxWidth:'540px' }}>
+              A curated collection of books to borrow or own — handpicked by
+              the Tapas Reading Cafe team. Fiction, memoirs, kids' favourites,
+              and everything in between.
             </p>
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} style={{ display:'flex', gap:'0', marginBottom:'32px', maxWidth:'500px', borderRadius:'50px', overflow:'hidden', boxShadow:'0 8px 30px rgba(0,0,0,0.3)' }}>
+            <form onSubmit={handleSearch} style={{ display:'flex', gap:'0', marginBottom:'28px', maxWidth:'520px', borderRadius:'50px', overflow:'hidden', boxShadow:'0 10px 30px rgba(0,0,0,0.35)' }}>
               <input
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search by title, author, or genre..."
-                style={{ flex:1, padding:'16px 24px', border:'none', fontSize:'15px', outline:'none', background:'white', color:'#2C1810' }}
+                placeholder="Search title, author, or genre…"
+                style={{ flex:1, padding:'18px 26px', border:'none', fontSize:'15px', outline:'none', background:'#FFF8ED', color:'#2C1810', fontFamily:'Lato, sans-serif' }}
               />
-              <button type="submit" style={{ padding:'16px 28px', background:'linear-gradient(135deg, #D4A853, #C49040)', border:'none', color:'#2C1810', fontWeight:'700', cursor:'pointer', fontSize:'15px' }}>
-                🔍 Search
+              <button type="submit" style={{ padding:'18px 30px', background:'linear-gradient(135deg, #D4A853, #C49040)', border:'none', color:'#2C1810', fontWeight:'700', cursor:'pointer', fontSize:'15px', letterSpacing:'0.5px' }}>
+                Search
               </button>
             </form>
 
-            <div style={{ display:'flex', gap:'20px', flexWrap:'wrap' }}>
-              <Link to="/books" style={{ background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810', textDecoration:'none', padding:'14px 32px', borderRadius:'50px', fontWeight:'700', fontSize:'16px', boxShadow:'0 4px 15px rgba(212,168,83,0.4)' }}>
-                Browse Books →
+            <div style={{ display:'flex', gap:'28px', flexWrap:'wrap', alignItems:'center', color:'rgba(245,222,179,0.65)', fontSize:'13px' }}>
+              <Link to="/books" style={{ color:'#D4A853', textDecoration:'none', fontWeight:'700', borderBottom:'1px solid #D4A853', paddingBottom:'2px' }}>
+                Browse full catalog →
               </Link>
-              <Link to="/offers" style={{ border:'2px solid rgba(245,222,179,0.5)', color:'#F5DEB3', textDecoration:'none', padding:'14px 32px', borderRadius:'50px', fontWeight:'600', fontSize:'16px' }}>
-                View Offers
-              </Link>
+              <span>·</span>
+              <Link to="/books?genre=Fiction" style={{ color:'rgba(245,222,179,0.7)', textDecoration:'none' }}>Fiction</Link>
+              <Link to="/books?genre=Non-Fiction" style={{ color:'rgba(245,222,179,0.7)', textDecoration:'none' }}>Non-Fiction</Link>
+              <Link to="/books?genre=Children" style={{ color:'rgba(245,222,179,0.7)', textDecoration:'none' }}>Children</Link>
             </div>
           </div>
+
+          {/* Featured book card on the right */}
+          {featured && (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'20px' }}>
+              <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px' }}>
+                ★ This week's pick
+              </div>
+              <Link to={`/books/${featured.id}`} style={{ textDecoration:'none', color:'inherit' }}>
+                <BookCover book={featured} size={230} />
+              </Link>
+              <div style={{ textAlign:'center', maxWidth:'260px' }}>
+                <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', fontWeight:'700', color:'#F5DEB3', marginBottom:'4px', lineHeight:'1.25' }}>
+                  {featured.title}
+                </h3>
+                <p style={{ color:'rgba(245,222,179,0.7)', fontSize:'13px', marginBottom:'14px' }}>by {featured.author}</p>
+                <Link to={`/books/${featured.id}`} style={{
+                  display:'inline-block',
+                  background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
+                  textDecoration:'none', padding:'10px 24px', borderRadius:'50px',
+                  fontWeight:'700', fontSize:'13px', boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
+                }}>
+                  Read more →
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Responsive hero grid breakpoint */}
+        <style>{`
+          @media (max-width: 860px) {
+            .hero-grid { grid-template-columns: 1fr !important; text-align: center; }
+            .hero-grid > div:first-child { margin: 0 auto; }
+          }
+        `}</style>
       </section>
 
-      {/* STATS BAR */}
-      <section style={{ background:'linear-gradient(135deg, #D4A853, #C49040)', padding:'30px 20px' }}>
-        <div style={{ maxWidth:'1200px', margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:'20px', textAlign:'center' }}>
-          {[
-            { num:'5000+', label:'Books Available' },
-            { num:'2000+', label:'Happy Members' },
-            { num:'15+', label:'Genres' },
-            { num:'10+', label:'Years of Service' },
-          ].map(s => (
-            <div key={s.label}>
-              <div style={{ fontSize:'32px', fontWeight:'800', color:'#2C1810', fontFamily:'"Playfair Display", serif' }}>{s.num}</div>
-              <div style={{ fontSize:'14px', color:'#5C3A1E', fontWeight:'600' }}>{s.label}</div>
-            </div>
+      {/* ================================================================ */}
+      {/* 2. BROWSE BY GENRE — editorial category strip                     */}
+      {/* ================================================================ */}
+      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px 40px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
+          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'32px', fontWeight:'700', color:'#2C1810', margin:0 }}>
+            Browse by genre
+          </h2>
+          <Link to="/books" style={{ color:'#8B6914', fontSize:'14px', textDecoration:'none', fontWeight:'600', borderBottom:'1px solid #8B6914' }}>
+            See every category →
+          </Link>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'16px' }}>
+          {GENRES.map(cat => (
+            <Link key={cat.label} to={`/books?genre=${encodeURIComponent(cat.label)}`} style={{ textDecoration:'none' }}>
+              <div style={{
+                background:'white', borderRadius:'10px', padding:'22px 20px',
+                borderLeft:`4px solid ${cat.color}`,
+                boxShadow:'0 2px 10px rgba(44,24,16,0.06)',
+                transition:'all 0.2s', cursor:'pointer', height:'100%',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform='translateX(4px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(44,24,16,0.12)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform='translateX(0)'; e.currentTarget.style.boxShadow='0 2px 10px rgba(44,24,16,0.06)'; }}
+              >
+                <div style={{ fontSize:'26px', marginBottom:'8px' }}>{cat.icon}</div>
+                <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'17px', fontWeight:'700', color:'#2C1810', marginBottom:'4px' }}>{cat.label}</div>
+                <div style={{ color:'#8B6914', fontSize:'13px', lineHeight:'1.5' }}>{cat.blurb}</div>
+              </div>
+            </Link>
           ))}
         </div>
       </section>
 
-      {/* FEATURED BOOKS */}
-      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'60px 20px' }}>
-        <div style={{ textAlign:'center', marginBottom:'40px' }}>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#2C1810', marginBottom:'12px' }}>
-            ⭐ Featured Books
-          </h2>
-          <p style={{ color:'#8B6914', fontSize:'16px' }}>Hand-picked favourites from our collection</p>
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>Loading books...</div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'24px', marginBottom:'32px' }}>
-            {featuredBooks.map(book => <BookCard key={book.id} book={book} />)}
+      {/* ================================================================ */}
+      {/* 3. STAFF PICKS — curated rail                                     */}
+      {/* ================================================================ */}
+      <section style={{ background:'#FFF8ED', padding:'80px 20px', borderTop:'1px solid rgba(212,168,83,0.2)', borderBottom:'1px solid rgba(212,168,83,0.2)' }}>
+        <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
+          <div style={{ textAlign:'center', marginBottom:'48px' }}>
+            <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'12px' }}>
+              ★ ★ ★
+            </div>
+            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'42px', fontWeight:'800', color:'#2C1810', marginBottom:'12px', lineHeight:'1.1' }}>
+              Handpicked by our librarians
+            </h2>
+            <p style={{ color:'#8B6914', fontSize:'16px', maxWidth:'560px', margin:'0 auto', lineHeight:'1.6' }}>
+              Every week our team picks a handful of books we can't stop
+              talking about. Here's what's on our desks right now.
+            </p>
           </div>
-        )}
 
-        <div style={{ textAlign:'center' }}>
-          <Link to="/books" style={{ background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3', textDecoration:'none', padding:'14px 40px', borderRadius:'50px', fontWeight:'600', fontSize:'15px', display:'inline-block' }}>
-            View All Books →
+          {loading ? (
+            <div style={{ textAlign:'center', padding:'60px', color:'#8B6914' }}>Loading picks…</div>
+          ) : staffPicks.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'60px', color:'#8B6914' }}>
+              Staff picks are on their way. In the meantime,{' '}
+              <Link to="/books" style={{ color:'#D4A853', fontWeight:'700' }}>browse the catalog</Link>.
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:'24px' }}>
+              {staffPicks.map(book => (
+                <StaffPickCard key={book.id} book={book} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* 4. NEW & NOTEWORTHY                                               */}
+      {/* ================================================================ */}
+      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
+          <div>
+            <div style={{ fontSize:'11px', fontWeight:'800', color:'#D4A853', textTransform:'uppercase', letterSpacing:'2.5px', marginBottom:'8px' }}>
+              Just in
+            </div>
+            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'32px', fontWeight:'700', color:'#2C1810', margin:0 }}>
+              New &amp; noteworthy
+            </h2>
+          </div>
+          <Link to="/books?sort=newest" style={{ color:'#8B6914', fontSize:'14px', textDecoration:'none', fontWeight:'600', borderBottom:'1px solid #8B6914' }}>
+            View all new arrivals →
           </Link>
         </div>
-      </section>
 
-      {/* CATEGORIES */}
-      <section style={{ background:'#FFF8ED', padding:'60px 20px' }}>
-        <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:'40px' }}>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#2C1810', marginBottom:'12px' }}>
-              Browse by Genre
-            </h2>
-            <p style={{ color:'#8B6914', fontSize:'16px' }}>Find your perfect read</p>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:'16px' }}>
-            {CATEGORIES.map(cat => (
-              <Link key={cat.label} to={`/books?genre=${encodeURIComponent(cat.label)}`} style={{ textDecoration:'none' }}>
-                <div style={{
-                  background:'white', borderRadius:'16px', padding:'24px 16px', textAlign:'center',
-                  boxShadow:'0 2px 10px rgba(0,0,0,0.06)', cursor:'pointer', transition:'all 0.2s',
-                  border:`2px solid transparent`
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = cat.color; e.currentTarget.style.transform = 'translateY(-3px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.transform = 'translateY(0)'; }}
-                >
-                  <div style={{ fontSize:'36px', marginBottom:'10px' }}>{cat.icon}</div>
-                  <div style={{ fontWeight:'600', fontSize:'14px', color:'#2C1810' }}>{cat.label}</div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* NEW ARRIVALS */}
-      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'60px 20px' }}>
-        <div style={{ textAlign:'center', marginBottom:'40px' }}>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#2C1810', marginBottom:'12px' }}>
-            🆕 New Arrivals
-          </h2>
-          <p style={{ color:'#8B6914', fontSize:'16px' }}>Fresh additions to our collection</p>
-        </div>
         {loading ? (
-          <div style={{ textAlign:'center', padding:'40px', color:'#8B6914' }}>Loading...</div>
+          <div style={{ textAlign:'center', padding:'60px', color:'#8B6914' }}>Loading…</div>
+        ) : newArrivals.length === 0 ? (
+          <div style={{ padding:'40px', color:'#8B6914', textAlign:'center' }}>
+            No new arrivals yet. Check back soon.
+          </div>
         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'24px', marginBottom:'32px' }}>
-            {newArrivals.map(book => <BookCard key={book.id} book={book} />)}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'8px' }}>
+            {newArrivals.map(book => <GridBookCard key={book.id} book={book} />)}
           </div>
         )}
       </section>
 
-      {/* OFFERS BANNER */}
-      <section style={{
-        background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)',
-        padding:'60px 20px', textAlign:'center', color:'white'
-      }}>
-        <div style={{ maxWidth:'700px', margin:'0 auto' }}>
-          <div style={{ fontSize:'48px', marginBottom:'16px' }}>🎉</div>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#F5DEB3', marginBottom:'16px' }}>
-            Exclusive Member Offers
+      {/* ================================================================ */}
+      {/* 5. CAFE STORY — editorial block about the reading cafe            */}
+      {/* ================================================================ */}
+      <section style={{ background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)', color:'#F5DEB3', padding:'100px 20px' }}>
+        <div style={{ maxWidth:'980px', margin:'0 auto', textAlign:'center' }}>
+          <div style={{ fontSize:'48px', marginBottom:'16px' }}>☕</div>
+          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'clamp(32px, 4.5vw, 48px)', fontWeight:'800', color:'#F5DEB3', marginBottom:'24px', lineHeight:'1.15' }}>
+            More than a bookstore.<br />
+            <span style={{ color:'#D4A853', fontStyle:'italic' }}>A reading home.</span>
           </h2>
-          <p style={{ color:'rgba(245,222,179,0.8)', fontSize:'16px', marginBottom:'32px', lineHeight:'1.6' }}>
-            Join as a Gold member and get unlimited borrows, priority reservations, and 20% off all book purchases!
+          <p style={{ color:'rgba(245,222,179,0.82)', fontSize:'17px', lineHeight:'1.8', maxWidth:'680px', margin:'0 auto 36px' }}>
+            Tapas Reading Cafe is part library, part bookshop, part
+            neighbourhood café. Members borrow from a curated collection,
+            visitors stop in for filter coffee and a book-of-the-week, and
+            everyone is welcome to stay a while. Come find your next read.
           </p>
           <div style={{ display:'flex', gap:'16px', justifyContent:'center', flexWrap:'wrap' }}>
-            <Link to="/offers" style={{ background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810', textDecoration:'none', padding:'14px 32px', borderRadius:'50px', fontWeight:'700', fontSize:'16px' }}>
-              See All Offers →
+            <Link to="/about" style={{
+              background:'linear-gradient(135deg, #D4A853, #C49040)', color:'#2C1810',
+              textDecoration:'none', padding:'14px 32px', borderRadius:'50px',
+              fontWeight:'700', fontSize:'15px', boxShadow:'0 4px 15px rgba(212,168,83,0.4)'
+            }}>
+              Our story →
             </Link>
-            <Link to="/login" style={{ border:'2px solid rgba(245,222,179,0.5)', color:'#F5DEB3', textDecoration:'none', padding:'14px 32px', borderRadius:'50px', fontWeight:'600', fontSize:'16px' }}>
-              Become a Member
+            <Link to="/login?mode=signup" style={{
+              border:'2px solid rgba(245,222,179,0.5)', color:'#F5DEB3',
+              textDecoration:'none', padding:'14px 32px', borderRadius:'50px',
+              fontWeight:'600', fontSize:'15px'
+            }}>
+              Become a member
             </Link>
           </div>
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section style={{ background:'#FFF8ED', padding:'60px 20px' }}>
-        <div style={{ maxWidth:'1200px', margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:'40px' }}>
-            <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#2C1810', marginBottom:'12px' }}>
-              What Our Members Say
-            </h2>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'24px' }}>
-            {TESTIMONIALS.map(t => (
-              <div key={t.name} style={{ background:'white', borderRadius:'16px', padding:'28px', boxShadow:'0 4px 15px rgba(0,0,0,0.07)' }}>
-                <StarRating rating={t.rating} />
-                <p style={{ color:'#5C3A1E', lineHeight:'1.7', margin:'16px 0', fontSize:'15px', fontStyle:'italic' }}>"{t.text}"</p>
-                <div style={{ fontWeight:'700', color:'#2C1810' }}>— {t.name}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* MEMBERSHIP CTA */}
-      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'60px 20px' }}>
-        <div style={{ background:'linear-gradient(135deg, #FFF8ED, #FAEBD7)', borderRadius:'24px', padding:'50px', textAlign:'center', border:'2px solid rgba(212,168,83,0.3)' }}>
-          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'700', color:'#2C1810', marginBottom:'12px' }}>
-            Join Tapas Library Today
+      {/* ================================================================ */}
+      {/* 6. NEWSLETTER                                                     */}
+      {/* ================================================================ */}
+      <section style={{ maxWidth:'1200px', margin:'0 auto', padding:'80px 20px' }}>
+        <div style={{
+          background:'linear-gradient(135deg, #FFF8ED, #FAEBD7)',
+          borderRadius:'20px', padding:'50px 40px', textAlign:'center',
+          border:'1px solid rgba(212,168,83,0.3)',
+          boxShadow:'0 10px 40px rgba(44,24,16,0.08)'
+        }}>
+          <div style={{ fontSize:'40px', marginBottom:'12px' }}>📬</div>
+          <h2 style={{ fontFamily:'"Playfair Display", serif', fontSize:'32px', fontWeight:'700', color:'#2C1810', marginBottom:'10px' }}>
+            Our weekly reading list
           </h2>
-          <p style={{ color:'#8B6914', fontSize:'16px', marginBottom:'40px', maxWidth:'500px', margin:'0 auto 40px' }}>
-            Choose the membership that suits you best and start your reading journey.
+          <p style={{ color:'#8B6914', fontSize:'15px', marginBottom:'28px', maxWidth:'480px', margin:'0 auto 28px', lineHeight:'1.6' }}>
+            One email every Sunday — staff picks, new arrivals, and what's
+            happening at the cafe. No spam, easy unsubscribe.
           </p>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'20px', maxWidth:'800px', margin:'0 auto' }}>
-            {[
-              { tier:'Basic', price:'₹300', period:'/month', features:['5 books at a time', 'Standard access', 'Email support'], color:'#8B6914', bg:'white' },
-              { tier:'Silver', price:'₹500', period:'/month', features:['10 books at a time', 'Priority reservations', 'Phone support', '10% book discount'], color:'white', bg:'linear-gradient(135deg, #2C1810, #4A2C17)', popular:true },
-              { tier:'Gold', price:'₹800', period:'/month', features:['Unlimited borrows', 'Earliest access', 'Dedicated support', '20% book discount', 'Guest passes'], color:'#2C1810', bg:'linear-gradient(135deg, #D4A853, #C49040)' },
-            ].map(plan => (
-              <div key={plan.tier} style={{
-                background: plan.bg, borderRadius:'16px', padding:'30px', textAlign:'center',
-                boxShadow: plan.popular ? '0 8px 30px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.07)',
-                transform: plan.popular ? 'scale(1.05)' : 'scale(1)',
-                position:'relative', overflow:'hidden'
+
+          {subscribed ? (
+            <div style={{ color:'#276749', fontWeight:'700', fontSize:'15px' }}>
+              ✅ You're on the list — check your inbox soon!
+            </div>
+          ) : (
+            <form onSubmit={handleSubscribe} style={{ display:'flex', gap:'10px', maxWidth:'460px', margin:'0 auto', flexWrap:'wrap', justifyContent:'center' }}>
+              <input
+                type="email" required
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                placeholder="your@email.com"
+                style={{ flex:'1 1 240px', padding:'14px 20px', borderRadius:'50px', border:'2px solid #F5DEB3', fontSize:'15px', outline:'none', fontFamily:'Lato, sans-serif', minWidth:0 }}
+              />
+              <button type="submit" style={{
+                padding:'14px 28px', borderRadius:'50px', border:'none',
+                background:'linear-gradient(135deg, #2C1810, #4A2C17)', color:'#F5DEB3',
+                fontWeight:'700', fontSize:'14px', cursor:'pointer',
+                fontFamily:'Lato, sans-serif', letterSpacing:'0.5px'
               }}>
-                {plan.popular && (
-                  <div style={{ position:'absolute', top:'12px', right:'12px', background:'#D4A853', color:'#2C1810', fontSize:'10px', fontWeight:'800', padding:'3px 10px', borderRadius:'10px', letterSpacing:'1px' }}>
-                    POPULAR
-                  </div>
-                )}
-                <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', fontWeight:'700', color: plan.color, marginBottom:'8px' }}>{plan.tier}</div>
-                <div style={{ fontSize:'36px', fontWeight:'800', color: plan.color, fontFamily:'"Playfair Display", serif' }}>{plan.price}</div>
-                <div style={{ color: plan.color, opacity:0.7, fontSize:'13px', marginBottom:'20px' }}>{plan.period}</div>
-                {plan.features.map(f => (
-                  <div key={f} style={{ color: plan.color, opacity:0.9, fontSize:'13px', marginBottom:'8px' }}>✓ {f}</div>
-                ))}
-                <Link to="/login" style={{ display:'block', marginTop:'20px', padding:'10px', borderRadius:'25px', background: plan.popular ? '#D4A853' : 'rgba(0,0,0,0.1)', color: plan.popular ? '#2C1810' : plan.color, textDecoration:'none', fontWeight:'700', fontSize:'14px' }}>
-                  Get Started
-                </Link>
-              </div>
-            ))}
-          </div>
+                Subscribe
+              </button>
+            </form>
+          )}
         </div>
       </section>
 
