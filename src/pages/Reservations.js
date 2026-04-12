@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const STATUS_COLORS = {
   pending:   { bg: '#fff3cd', text: '#856404', label: 'Waiting' },
@@ -20,6 +22,7 @@ export default function Reservations() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [hasExpiresAt, setHasExpiresAt] = useState(false);
+  const { isReadOnly } = usePermission();
 
   useEffect(() => {
     probeSchema().then(fetchAll);
@@ -190,6 +193,7 @@ export default function Reservations() {
 
   return (
     <div style={{ padding: '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
@@ -200,9 +204,11 @@ export default function Reservations() {
           <button onClick={() => probeSchema().then(fetchAll)} style={{ padding: '8px 16px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
             🔄 Refresh
           </button>
-          <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
-            + New Reservation
-          </button>
+          {!isReadOnly && (
+            <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+              + New Reservation
+            </button>
+          )}
         </div>
       </div>
 
@@ -312,12 +318,12 @@ export default function Reservations() {
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {r.status === 'available' && (
-                          <button onClick={() => markFulfilled(r.id)} style={{ padding: '4px 10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                          <button onClick={() => markFulfilled(r.id)} disabled={isReadOnly} style={{ padding: '4px 10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>
                             ✓ Fulfilled
                           </button>
                         )}
                         {(r.status === 'pending' || r.status === 'available') && (
-                          <button onClick={() => cancelReservation(r.id)} style={{ padding: '4px 10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                          <button onClick={() => cancelReservation(r.id)} disabled={isReadOnly} style={{ padding: '4px 10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>
                             ✕ Cancel
                           </button>
                         )}
@@ -386,8 +392,8 @@ export default function Reservations() {
                   style={{ padding: '9px 20px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={saving}
-                  style={{ padding: '9px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+                <button type="submit" disabled={saving || isReadOnly}
+                  style={{ padding: '9px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: (saving || isReadOnly) ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                   {saving ? 'Saving...' : 'Reserve Book'}
                 </button>
               </div>

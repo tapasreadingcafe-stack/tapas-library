@@ -5,6 +5,8 @@ import { useDevMode } from '../components/DevMode';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
 import BarcodeScanner from '../BarcodeScanner';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -109,6 +111,7 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
 // ── Main POS component ────────────────────────────────────────────────────────
 export default function POS() {
   const { devMode } = useDevMode();
+  const { isReadOnly } = usePermission();
 
   // Catalog
   const [allBooks, setAllBooks]         = useState([]);
@@ -652,6 +655,8 @@ export default function POS() {
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh' }}>
 
+      {isReadOnly && <ViewOnlyBanner />}
+
       {/* ── DAILY SUMMARY BAR ── */}
       <div style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -774,6 +779,7 @@ export default function POS() {
                     <ServiceCard key={svc.id} svc={svc} fmt={fmt}
                       onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
                       onClick={() => {
+                        if (isReadOnly) return;
                         if (svc.custom) {
                           setCustomAmtModal(svc);
                           setCustomAmtVal('');
@@ -841,8 +847,8 @@ export default function POS() {
                               </div>
                               <button
                                 onClick={() => handleAddBookToCart(book)}
-                                disabled={!inStock}
-                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: inStock ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: inStock ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
+                                disabled={!inStock || isReadOnly}
+                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: (inStock && !isReadOnly) ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: (inStock && !isReadOnly) ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
                               >+</button>
                             </div>
                           </div>
@@ -1031,9 +1037,9 @@ export default function POS() {
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '0 4px', flexShrink: 0 }}
                           title="View copies">👁️</button>
                       )}
-                      <button onClick={() => removeFromCart(item.cartId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '14px', lineHeight: 1, padding: 0, flexShrink: 0 }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                        onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}
+                      <button onClick={() => removeFromCart(item.cartId)} disabled={isReadOnly} style={{ background: 'none', border: 'none', cursor: isReadOnly ? 'not-allowed' : 'pointer', color: '#d1d5db', fontSize: '14px', lineHeight: 1, padding: 0, flexShrink: 0, opacity: isReadOnly ? 0.4 : 1 }}
+                        onMouseEnter={e => { if (!isReadOnly) e.currentTarget.style.color = '#ef4444'; }}
+                        onMouseLeave={e => { if (!isReadOnly) e.currentTarget.style.color = '#d1d5db'; }}
                       >✕</button>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1042,9 +1048,9 @@ export default function POS() {
                           <span style={{ fontSize: '11px', color: '#9ca3af' }}>×1</span>
                         ) : (
                           <>
-                            <button onClick={() => updateQty(item.cartId, -1)} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>−</button>
+                            <button onClick={() => updateQty(item.cartId, -1)} disabled={isReadOnly} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', opacity: isReadOnly ? 0.4 : 1 }}>−</button>
                             <span style={{ fontSize: '13px', fontWeight: '800', minWidth: '18px', textAlign: 'center', color: '#374151' }}>{item.qty}</span>
-                            <button onClick={() => updateQty(item.cartId, 1)} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
+                            <button onClick={() => updateQty(item.cartId, 1)} disabled={isReadOnly} style={{ width: '22px', height: '22px', background: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', opacity: isReadOnly ? 0.4 : 1 }}>+</button>
                           </>
                         )}
                       </div>
@@ -1183,11 +1189,11 @@ export default function POS() {
             )}
 
             {/* CHECKOUT button */}
-            <button onClick={handleCheckout} disabled={cart.length === 0 || checkingOut} style={{
+            <button onClick={handleCheckout} disabled={cart.length === 0 || checkingOut || isReadOnly} style={{
               width: '100%', padding: '14px',
-              background: cart.length > 0 ? 'linear-gradient(135deg, #059669, #047857)' : '#d1d5db',
+              background: (cart.length > 0 && !isReadOnly) ? 'linear-gradient(135deg, #059669, #047857)' : '#d1d5db',
               color: 'white', border: 'none', borderRadius: '9px',
-              cursor: cart.length > 0 ? 'pointer' : 'not-allowed',
+              cursor: (cart.length > 0 && !isReadOnly) ? 'pointer' : 'not-allowed',
               fontSize: '16px', fontWeight: '900', letterSpacing: '0.5px',
               boxShadow: cart.length > 0 ? '0 4px 14px rgba(5,150,105,0.35)' : 'none',
               transition: 'all 0.2s',

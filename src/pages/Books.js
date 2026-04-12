@@ -8,6 +8,8 @@ import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/b
 import { exportToCSV } from '../utils/exportCSV';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const PRESET_CATEGORIES = [
   'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
@@ -30,6 +32,7 @@ export default function Books() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
+  const { isReadOnly } = usePermission();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -391,10 +394,11 @@ export default function Books() {
 
   return (
     <div style={{ padding: isMobile ? '12px' : '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h1>📚 Books</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button
+          {!isReadOnly && <button
             onClick={() => {
               setShowAddForm(true);
               setEditingId(null);
@@ -404,8 +408,8 @@ export default function Books() {
             style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
           >
             ➕ Add Book
-          </button>
-          <div style={{ position: 'relative' }}>
+          </button>}
+          {!isReadOnly && <div style={{ position: 'relative' }}>
             <button onClick={() => setShowImportExport(!showImportExport)}
               style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}>
               📁 Import / Export ▾
@@ -447,7 +451,7 @@ export default function Books() {
                 </div>
               </>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -777,10 +781,10 @@ export default function Books() {
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button type="submit" style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
+                <button type="submit" disabled={isReadOnly} style={{ padding: '10px 20px', background: isReadOnly ? '#ccc' : '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
                   {editingId ? 'Update Book' : 'Add Book'}
                 </button>
-                {!editingId && (
+                {!editingId && !isReadOnly && (
                   <button type="submit" onClick={() => setPrintAfterAdd(true)}
                     style={{ padding: '10px 20px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
                     Add + 🖨️ Print Barcode
@@ -867,8 +871,8 @@ export default function Books() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
-                    <button onClick={() => handleEditBook(book)}
-                      style={{ width: '36px', height: '36px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    <button onClick={() => handleEditBook(book)} disabled={isReadOnly}
+                      style={{ width: '36px', height: '36px', background: isReadOnly ? '#ccc' : '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Edit book">
                       ✏️
                     </button>
@@ -877,11 +881,11 @@ export default function Books() {
                       title="Manage copies">
                       📦
                     </button>
-                    <button onClick={() => handleDeleteBook(book.id)}
+                    {!isReadOnly && <button onClick={() => handleDeleteBook(book.id)}
                       style={{ width: '36px', height: '36px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Delete book">
                       🗑️
-                    </button>
+                    </button>}
                   </div>
                 </div>
               );
@@ -930,8 +934,8 @@ export default function Books() {
                       <td style={{ padding: '12px' }}>₹{book.price?.toLocaleString('en-IN')}</td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: '5px' }}>
-                          <button onClick={() => handleEditBook(book)}
-                            style={{ padding: '4px 8px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                          <button onClick={() => handleEditBook(book)} disabled={isReadOnly}
+                            style={{ padding: '4px 8px', background: isReadOnly ? '#ccc' : '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px' }}
                             title="Edit book">
                             ✏️
                           </button>
@@ -940,11 +944,11 @@ export default function Books() {
                             title="Manage copies & print barcodes">
                             📦
                           </button>
-                          <button onClick={() => handleDeleteBook(book.id)}
+                          {!isReadOnly && <button onClick={() => handleDeleteBook(book.id)}
                             style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                             title="Delete book">
                             🗑️
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

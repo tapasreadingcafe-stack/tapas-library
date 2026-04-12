@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 export default function CafeOrders() {
   const toast = useToast();
   const confirm = useConfirm();
+  const { isReadOnly } = usePermission();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -99,6 +102,8 @@ export default function CafeOrders() {
         }
       `}</style>
 
+      {isReadOnly && <ViewOnlyBanner />}
+
       <div className="cafe-orders-header">
         <h1>📋 Cafe Orders</h1>
         <div className="cafe-orders-stats">
@@ -149,7 +154,7 @@ export default function CafeOrders() {
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button onClick={() => viewOrder(order)} style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>View</button>
                         {order.status === 'completed' && (
-                          <button onClick={() => cancelOrder(order.id)} style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+                          <button onClick={() => cancelOrder(order.id)} disabled={isReadOnly} style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Cancel</button>
                         )}
                       </div>
                     </td>

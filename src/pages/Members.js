@@ -5,6 +5,8 @@ import FilterBar from '../components/FilterBar';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
 import { logActivity, ACTIONS } from '../utils/activityLog';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 import {
   calculateStatusColor,
@@ -26,6 +28,7 @@ function Members() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
+  const { isReadOnly } = usePermission();
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -386,12 +389,15 @@ function Members() {
 
   return (
     <div className="page-content">
+      {isReadOnly && <ViewOnlyBanner />}
       <div className="page-header">
         <h1>👥 Members Management</h1>
         <div className="header-actions">
-          <button className="btn btn-primary" onClick={handleAddMember}>
-            + Add Member
-          </button>
+          {!isReadOnly && (
+            <button className="btn btn-primary" onClick={handleAddMember}>
+              + Add Member
+            </button>
+          )}
         </div>
       </div>
 
@@ -466,9 +472,9 @@ function Members() {
                   <td className="text-center">{member.borrow_limit || 0}</td>
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
-                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit">✏️</button>
+                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly}>✏️</button>
                     <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile">👁️</button>
-                    <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>
+                    {!isReadOnly && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>}
                   </td>
                 </tr>
               ))
@@ -676,7 +682,7 @@ function Members() {
               <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSaveMember}>
+              <button className="btn btn-primary" onClick={handleSaveMember} disabled={isReadOnly}>
                 {modalMode === 'addPlan' ? 'Add Plan to Member' : editingMember ? 'Update Member' : 'Create Member'}
               </button>
             </div>

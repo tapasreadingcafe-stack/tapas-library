@@ -26,7 +26,7 @@ function formatTimeAgo(dateStr) {
   return `${days}d ago`;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ staffId }) {
   const [notifications, setNotifications] = useState([]);
   const [dismissedIds, setDismissedIdsState] = useState(getDismissedIds);
   const [open, setOpen] = useState(false);
@@ -108,8 +108,37 @@ export default function NotificationBell() {
       console.error('Failed to fetch low stock books:', e);
     }
 
+    // Personal notifications from staff_notifications table
+    if (staffId) {
+      try {
+        const { data: personal } = await supabase
+          .from('staff_notifications')
+          .select('*')
+          .eq('staff_id', staffId)
+          .eq('is_read', false)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (personal) {
+          const typeIcons = { permissions: '\uD83D\uDD10', info: '\u2139\uFE0F', warning: '\u26A0\uFE0F', task: '\uD83D\uDCCB' };
+          personal.forEach((item) => {
+            results.push({
+              id: `personal-${item.id}`,
+              type: 'personal',
+              icon: typeIcons[item.type] || '\uD83D\uDD14',
+              text: item.title + (item.message ? `: ${item.message}` : ''),
+              timestamp: item.created_at,
+              dbId: item.id,
+            });
+          });
+        }
+      } catch (e) {
+        console.error('Failed to fetch personal notifications:', e);
+      }
+    }
+
     setNotifications(results);
-  }, []);
+  }, [staffId]);
 
   useEffect(() => {
     fetchNotifications();
@@ -133,26 +162,59 @@ export default function NotificationBell() {
   );
   const count = activeNotifications.length;
 
-  const handleMarkAllRead = () => {
-    const allIds = notifications.map((n) => n.id);
-    const merged = [...new Set([...dismissedIds, ...allIds])];
+  const handleMarkAllRead = async () => {
+    // Mark system notifications as dismissed (localStorage)
+    const systemIds = notifications.filter(n => !n.dbId).map(n => n.id);
+    const merged = [...new Set([...dismissedIds, ...systemIds])];
     setDismissedIdsState(merged);
     setDismissedIds(merged);
+
+    // Mark personal notifications as read in DB
+    const personalDbIds = notifications.filter(n => n.dbId).map(n => n.dbId);
+    if (personalDbIds.length > 0) {
+      try {
+        await supabase
+          .from('staff_notifications')
+          .update({ is_read: true })
+          .in('id', personalDbIds);
+      } catch (e) {
+        console.error('Failed to mark personal notifications as read:', e);
+      }
+    }
+
+    fetchNotifications();
   };
 
-  const handleDismiss = (id) => {
-    const merged = [...new Set([...dismissedIds, id])];
-    setDismissedIdsState(merged);
-    setDismissedIds(merged);
+  const handleDismiss = async (id) => {
+    const notif = notifications.find(n => n.id === id);
+    if (notif?.dbId) {
+      // Personal notification — mark as read in DB
+      try {
+        await supabase
+          .from('staff_notifications')
+          .update({ is_read: true })
+          .eq('id', notif.dbId);
+        fetchNotifications();
+      } catch (e) {
+        console.error('Failed to dismiss personal notification:', e);
+      }
+    } else {
+      // System notification — dismiss via localStorage
+      const merged = [...new Set([...dismissedIds, id])];
+      setDismissedIdsState(merged);
+      setDismissedIds(merged);
+    }
   };
 
   const grouped = {
+    personal: activeNotifications.filter((n) => n.type === 'personal'),
     overdue: activeNotifications.filter((n) => n.type === 'overdue'),
     expiring: activeNotifications.filter((n) => n.type === 'expiring'),
     lowstock: activeNotifications.filter((n) => n.type === 'lowstock'),
   };
 
   const groupLabels = {
+    personal: { label: 'For You', color: '#8b5cf6' },
     overdue: { label: 'Overdue Books', color: '#e74c3c' },
     expiring: { label: 'Expiring Memberships', color: '#f39c12' },
     lowstock: { label: 'Low Stock', color: '#667eea' },

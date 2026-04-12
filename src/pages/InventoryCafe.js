@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS cafe_inventory (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -20,6 +22,7 @@ CREATE POLICY "open" ON cafe_inventory FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function InventoryCafe() {
   const toast = useToast();
+  const { isReadOnly } = usePermission();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -90,13 +93,14 @@ export default function InventoryCafe() {
 
   return (
     <div style={{ padding: '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
       <style>{`
         @media (max-width: 768px) { .inv-cafe-controls { flex-direction: column; } .inv-cafe-controls input, .inv-cafe-controls select { width: 100%; } }
         @media (max-width: 480px) { .inv-cafe-table th, .inv-cafe-table td { padding: 8px 6px; font-size: 12px; } }
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h1 style={{ fontSize: '28px', margin: 0 }}>☕ Cafe Stock</h1>
-        <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Item</button>
+        {!isReadOnly && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Item</button>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '20px' }}>
@@ -150,9 +154,9 @@ export default function InventoryCafe() {
                     <td style={{ padding: '10px 12px', fontSize: '13px' }}>₹{item.cost_per_unit}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        <button onClick={() => restock(item, 10)} style={{ padding: '3px 8px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>+10</button>
-                        <button onClick={() => openEdit(item)} style={{ padding: '3px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Edit</button>
-                        <button onClick={() => deleteItem(item.id)} style={{ padding: '3px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Del</button>
+                        {!isReadOnly && <button onClick={() => restock(item, 10)} style={{ padding: '3px 8px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>+10</button>}
+                        {!isReadOnly && <button onClick={() => openEdit(item)} style={{ padding: '3px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Edit</button>}
+                        {!isReadOnly && <button onClick={() => deleteItem(item.id)} style={{ padding: '3px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Del</button>}
                       </div>
                     </td>
                   </tr>
@@ -186,7 +190,7 @@ export default function InventoryCafe() {
               </div>
             ))}
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <button onClick={saveItem} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>{editItem ? 'Update' : 'Add'}</button>
+              <button onClick={saveItem} disabled={isReadOnly} style={{ flex: 1, padding: '10px', background: isReadOnly ? '#ccc' : '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>{editItem ? 'Update' : 'Add'}</button>
               <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>

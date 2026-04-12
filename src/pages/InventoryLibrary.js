@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 export default function InventoryLibrary() {
+  const { isReadOnly } = usePermission();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -61,6 +64,7 @@ export default function InventoryLibrary() {
         }
       `}</style>
 
+      {isReadOnly && <ViewOnlyBanner />}
       <h1>📚 Library Stock</h1>
 
       <div className="inv-lib-stats">

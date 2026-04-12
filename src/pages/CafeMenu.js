@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const CATEGORIES = ['tea', 'coffee', 'juice', 'bakery', 'snacks', 'other'];
 const CAT_ICONS = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🍰', snacks: '🍿', other: '🍽️' };
@@ -9,6 +11,7 @@ const CAT_ICONS = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🍰', s
 export default function CafeMenu() {
   const toast = useToast();
   const confirm = useConfirm();
+  const { isReadOnly } = usePermission();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -87,6 +90,7 @@ export default function CafeMenu() {
 
   return (
     <div className="cafe-menu-page">
+      {isReadOnly && <ViewOnlyBanner />}
       <style>{`
         .cafe-menu-page { padding: 20px; }
         .cafe-menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
@@ -128,9 +132,9 @@ export default function CafeMenu() {
 
       <div className="cafe-menu-header">
         <h1>📝 Manage Cafe Menu</h1>
-        <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+        {!isReadOnly && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
           + Add Item
-        </button>
+        </button>}
       </div>
 
       <div className="cafe-menu-filters">
@@ -169,14 +173,14 @@ export default function CafeMenu() {
                   <td style={{ fontWeight: '600', color: '#667eea' }}>₹{item.price}</td>
                   <td style={{ color: '#999' }}>₹{item.cost_price || 0}</td>
                   <td>
-                    <button className={`cafe-avail-badge ${item.is_available ? 'available' : 'unavailable'}`} onClick={() => toggleAvail(item)}>
+                    <button className={`cafe-avail-badge ${item.is_available ? 'available' : 'unavailable'}`} onClick={() => toggleAvail(item)} disabled={isReadOnly}>
                       {item.is_available ? 'Available' : 'Unavailable'}
                     </button>
                   </td>
                   <td>
                     <div className="cafe-menu-actions">
-                      <button onClick={() => openEdit(item)} style={{ background: '#667eea', color: 'white' }}>Edit</button>
-                      <button onClick={() => deleteItem(item.id)} style={{ background: '#ff6b6b', color: 'white' }}>Delete</button>
+                      <button onClick={() => openEdit(item)} style={{ background: '#667eea', color: 'white' }} disabled={isReadOnly}>Edit</button>
+                      {!isReadOnly && <button onClick={() => deleteItem(item.id)} style={{ background: '#ff6b6b', color: 'white' }}>Delete</button>}
                     </div>
                   </td>
                 </tr>
@@ -223,7 +227,7 @@ export default function CafeMenu() {
               <label style={{ margin: 0 }}>Available for ordering</label>
             </div>
             <div className="cafe-form-actions">
-              <button onClick={saveItem} style={{ background: '#667eea', color: 'white' }}>{editItem ? 'Update' : 'Add Item'}</button>
+              <button onClick={saveItem} style={{ background: '#667eea', color: 'white' }} disabled={isReadOnly}>{editItem ? 'Update' : 'Add Item'}</button>
               <button onClick={() => setShowModal(false)} style={{ background: '#e0e0e0', color: '#333' }}>Cancel</button>
             </div>
           </div>

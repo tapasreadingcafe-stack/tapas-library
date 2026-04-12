@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '' };
 
@@ -14,6 +16,7 @@ export default function StaffManagement() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
+  const { isReadOnly } = usePermission();
   const [staffList, setStaffList]       = useState([]);
   const [loading, setLoading]           = useState(true);
   const [tableExists, setTableExists]   = useState(null);
@@ -203,14 +206,17 @@ ON CONFLICT (email) DO NOTHING;`;
 
   return (
     <div style={{ padding: '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>👥 Staff Management</h1>
           <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>Admin only — manage library staff accounts</p>
         </div>
-        <button onClick={openAdd} style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
-          + Add Staff Member
-        </button>
+        {!isReadOnly && (
+          <button onClick={openAdd} style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+            + Add Staff Member
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -296,26 +302,30 @@ ON CONFLICT (email) DO NOTHING;`;
                       <button onClick={() => navigate(`/staff/${member.id}`)} style={{ padding: '5px 10px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
                         👁️ View
                       </button>
-                      <button onClick={() => openEdit(member)} style={{ padding: '5px 10px', background: '#e8f0ff', color: '#667eea', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                        ✏️ Edit
-                      </button>
-                      <button onClick={() => setShowPwModal(member)} style={{ padding: '5px 10px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}>
-                        🔑 Reset PW
-                      </button>
-                      <button onClick={() => toggleActive(member)} style={{ padding: '5px 10px', background: member.is_active ? '#fff5f5' : '#f0fff4', color: member.is_active ? '#e74c3c' : '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                        {member.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button onClick={async () => {
-                        if (!window.confirm(`Permanently delete ${member.name}? This cannot be undone.`)) return;
-                        try {
-                          await supabase.from('staff').delete().eq('id', member.id);
-                          setStaffList(prev => prev.filter(s => s.id !== member.id));
-                        } catch (err) {
-                          alert('Failed to delete: ' + (err.message || err));
-                        }
-                      }} style={{ padding: '5px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                        🗑 Delete
-                      </button>
+                      {!isReadOnly && (
+                        <>
+                          <button onClick={() => openEdit(member)} style={{ padding: '5px 10px', background: '#e8f0ff', color: '#667eea', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                            ✏️ Edit
+                          </button>
+                          <button onClick={() => setShowPwModal(member)} style={{ padding: '5px 10px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}>
+                            🔑 Reset PW
+                          </button>
+                          <button onClick={() => toggleActive(member)} style={{ padding: '5px 10px', background: member.is_active ? '#fff5f5' : '#f0fff4', color: member.is_active ? '#e74c3c' : '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                            {member.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button onClick={async () => {
+                            if (!window.confirm(`Permanently delete ${member.name}? This cannot be undone.`)) return;
+                            try {
+                              await supabase.from('staff').delete().eq('id', member.id);
+                              setStaffList(prev => prev.filter(s => s.id !== member.id));
+                            } catch (err) {
+                              alert('Failed to delete: ' + (err.message || err));
+                            }
+                          }} style={{ padding: '5px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                            🗑 Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -389,7 +399,7 @@ ON CONFLICT (email) DO NOTHING;`;
               <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: '11px', background: '#f0f0f0', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '14px' }}>
                 Cancel
               </button>
-              <button onClick={saveStaff} disabled={saving} style={{ flex: 1, padding: '11px', background: '#667eea', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+              <button onClick={saveStaff} disabled={saving || isReadOnly} style={{ flex: 1, padding: '11px', background: isReadOnly ? '#d1d5db' : '#667eea', color: 'white', border: 'none', borderRadius: '7px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontWeight: '700', fontSize: '14px' }}>
                 {saving ? 'Saving...' : editingStaff ? '✓ Save Changes' : '✓ Create Account'}
               </button>
             </div>

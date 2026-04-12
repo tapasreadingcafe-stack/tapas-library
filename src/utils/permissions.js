@@ -1,0 +1,62 @@
+// Permission functions shared between App.js (route gating) and page components (view-only mode)
+
+// Map routes to permission keys (from StaffDetail.js PAGE_PERMISSIONS)
+export const ROUTE_PERMISSION_MAP = {
+  '/': 'dashboard',
+  '/books': 'books', '/books/': 'books',
+  '/Borrow': 'borrow', '/overdue': 'borrow', '/availability': 'books', '/statistics': 'books',
+  '/recommendations': 'books', '/wishlist': 'books', '/reviews': 'books', '/reservations': 'borrow',
+  '/pos': 'pos',
+  '/cafe': 'cafe',
+  '/members': 'members', '/fines': 'fines', '/member/': 'members',
+  '/inventory': 'inventory',
+  '/events': 'events',
+  '/reports': 'reports',
+  '/accounts': 'accounts',
+  '/staff': 'staff',
+  '/vendors': 'vendors',
+  '/settings': 'settings',
+  '/store': 'dashboard', '/marketing': 'dashboard', '/promo-codes': 'dashboard',
+  '/loyalty': 'dashboard', '/growth': 'dashboard', '/campaigns': 'dashboard',
+  '/automations': 'dashboard', '/engagement': 'dashboard', '/newsletter': 'dashboard',
+  '/communications': 'dashboard', '/community': 'dashboard', '/advanced-tools': 'dashboard',
+  '/integrations': 'dashboard', '/marketing-hub': 'dashboard', '/marketing-dashboard': 'dashboard',
+  '/tasks': 'dashboard',
+};
+
+// Default permissions for staff role (non-admin)
+export const STAFF_DEFAULT_PERMISSIONS = {
+  dashboard: 'full',
+  books: 'view',
+  borrow: 'full',
+  members: 'view',
+  pos: 'full',
+  fines: 'view',
+  cafe: 'full',
+  events: 'view',
+  inventory: 'view',
+  reports: 'none',
+  accounts: 'none',
+  vendors: 'none',
+  settings: 'none',
+  staff: 'none',
+};
+
+export function getPermissionForPath(pathname) {
+  // Exact match first
+  if (ROUTE_PERMISSION_MAP[pathname]) return ROUTE_PERMISSION_MAP[pathname];
+  // Prefix match
+  for (const [prefix, perm] of Object.entries(ROUTE_PERMISSION_MAP)) {
+    if (prefix.endsWith('/') && pathname.startsWith(prefix)) return perm;
+    if (pathname.startsWith(prefix + '/')) return perm;
+  }
+  return 'dashboard'; // default
+}
+
+export function getStaffPermission(staff, permKey) {
+  if (staff?.role === 'admin') return 'full';
+  const perms = staff?.permissions || {};
+  // Explicit permission wins. Otherwise use staff defaults.
+  if (perms[permKey]) return perms[permKey];
+  return STAFF_DEFAULT_PERMISSIONS[permKey] || 'full';
+}

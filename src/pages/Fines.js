@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const FINE_RATE = 10; // ₹10 per day
 
 export default function Fines() {
+  const { isReadOnly } = usePermission();
   const [activeTab, setActiveTab] = useState('outstanding');
   const [outstanding, setOutstanding] = useState([]);
   const [history, setHistory] = useState([]);
@@ -181,6 +184,7 @@ export default function Fines() {
 
   return (
     <div style={{ padding: '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
@@ -277,12 +281,12 @@ export default function Fines() {
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
-                        <button onClick={() => openModal(item, 'pay')}
-                          style={{ padding: '4px 12px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                        <button onClick={() => openModal(item, 'pay')} disabled={isReadOnly}
+                          style={{ padding: '4px 12px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                           ₹ Collect
                         </button>
-                        <button onClick={() => openModal(item, 'waive')}
-                          style={{ padding: '4px 12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                        <button onClick={() => openModal(item, 'waive')} disabled={isReadOnly}
+                          style={{ padding: '4px 12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>
                           🤝 Waive
                         </button>
                       </div>

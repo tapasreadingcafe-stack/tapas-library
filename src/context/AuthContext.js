@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading]         = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const inactivityTimer               = useRef(null);
+  const isRefreshing                  = useRef(false);
 
   const logout = useCallback(async (reason) => {
     clearTimeout(inactivityTimer.current);
@@ -43,6 +44,35 @@ export function AuthProvider({ children }) {
     localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
     inactivityTimer.current = setTimeout(() => logout('inactivity'), INACTIVITY_MS);
   }, [logout]);
+
+  // ── Heartbeat: update last_login in DB ─────────────────────────────
+  const updateHeartbeat = useCallback(async (staffId) => {
+    if (!staffId) return;
+    try {
+      await supabase
+        .from('staff')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', staffId);
+    } catch (e) {
+      console.error('[Auth] heartbeat error:', e);
+    }
+  }, []);
+
+  // ── Refresh staff data (permissions + heartbeat) ───────────────────
+  const refreshStaff = useCallback(async () => {
+    if (!user || isRefreshing.current) return;
+    isRefreshing.current = true;
+    try {
+      const row = await fetchStaffRow(user.email);
+      if (!row || !row.is_active) { logout(); return; }
+      setStaff(row);
+      updateHeartbeat(row.id);
+    } catch (e) {
+      console.error('[Auth] refresh error:', e);
+    } finally {
+      isRefreshing.current = false;
+    }
+  }, [user, logout, updateHeartbeat]);
 
   // ── Init: check existing session on mount ──────────────────────────
   useEffect(() => {
@@ -69,6 +99,8 @@ export function AuthProvider({ children }) {
           if (staffRow && staffRow.is_active) {
             setUser(session.user);
             setStaff(staffRow);
+            // Update last_login on session init (heartbeat)
+            updateHeartbeat(staffRow.id);
           } else {
             // Valid session but not staff — sign out
             await supabase.auth.signOut();
@@ -96,7 +128,7 @@ export function AuthProvider({ children }) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [updateHeartbeat]);
 
   // ── Activity tracking ──────────────────────────────────────────────
   useEffect(() => {
@@ -110,6 +142,20 @@ export function AuthProvider({ children }) {
     };
   }, [user, resetInactivityTimer]);
 
+  // ── Periodic refresh (2 min) + tab focus refresh ───────────────────
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(refreshStaff, 2 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshStaff();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user, refreshStaff]);
+
   // ── Login ──────────────────────────────────────────────────────────
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -120,6 +166,8 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       setStaff(staffRow);
       setSessionExpired(false);
+      // Update last_login on login (heartbeat)
+      updateHeartbeat(staffRow.id);
     } else {
       await supabase.auth.signOut();
       setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
@@ -146,7 +194,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, staff, loading, sessionExpired,
-      login, logout, sendPasswordReset, changePassword, isAdmin,
+      login, logout, sendPasswordReset, changePassword, isAdmin, refreshStaff,
     }}>
       {children}
     </AuthContext.Provider>

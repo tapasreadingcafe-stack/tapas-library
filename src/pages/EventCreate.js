@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/Toast';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 export default function EventCreate() {
   const toast = useToast();
   const navigate = useNavigate();
+  const { isReadOnly } = usePermission();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
   const [saving, setSaving] = useState(false);
@@ -62,6 +65,7 @@ export default function EventCreate() {
 
   return (
     <div className="event-create-page">
+      {isReadOnly && <ViewOnlyBanner />}
       <style>{`
         .event-create-page { padding: 20px; max-width: 700px; }
         .event-create-page h1 { font-size: 28px; margin-bottom: 20px; }
@@ -94,18 +98,18 @@ export default function EventCreate() {
       <form className="event-form" onSubmit={handleSubmit}>
         <div className="event-form-group">
           <label>Event Title *</label>
-          <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Book Club Meeting" required />
+          <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Book Club Meeting" required disabled={isReadOnly} />
         </div>
 
         <div className="event-form-group">
           <label>Description</label>
-          <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="What is this event about?" />
+          <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="What is this event about?" disabled={isReadOnly} />
         </div>
 
         <div className="event-form-row">
           <div className="event-form-group">
             <label>Event Type</label>
-            <select value={form.event_type} onChange={e => set('event_type', e.target.value)}>
+            <select value={form.event_type} onChange={e => set('event_type', e.target.value)} disabled={isReadOnly}>
               <option value="one_time">One-time</option>
               <option value="recurring">Recurring</option>
             </select>
@@ -113,7 +117,7 @@ export default function EventCreate() {
           {form.event_type === 'recurring' && (
             <div className="event-form-group">
               <label>Recurrence</label>
-              <select value={form.recurrence_rule} onChange={e => set('recurrence_rule', e.target.value)}>
+              <select value={form.recurrence_rule} onChange={e => set('recurrence_rule', e.target.value)} disabled={isReadOnly}>
                 <option value="">Select...</option>
                 <option value="weekly">Weekly</option>
                 <option value="biweekly">Bi-weekly</option>
@@ -126,58 +130,58 @@ export default function EventCreate() {
         <div className="event-form-row">
           <div className="event-form-group">
             <label>Start Date *</label>
-            <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required />
+            <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required disabled={isReadOnly} />
           </div>
           <div className="event-form-group">
             <label>End Date</label>
-            <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
+            <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} disabled={isReadOnly} />
           </div>
         </div>
 
         <div className="event-form-row-3">
           <div className="event-form-group">
             <label>Start Time</label>
-            <input type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} />
+            <input type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} disabled={isReadOnly} />
           </div>
           <div className="event-form-group">
             <label>End Time</label>
-            <input type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} />
+            <input type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} disabled={isReadOnly} />
           </div>
           <div className="event-form-group">
             <label>Location</label>
-            <input value={form.location} onChange={e => set('location', e.target.value)} placeholder="Library Hall" />
+            <input value={form.location} onChange={e => set('location', e.target.value)} placeholder="Library Hall" disabled={isReadOnly} />
           </div>
         </div>
 
         <div className="event-form-group">
           <label>Capacity (leave empty for unlimited)</label>
-          <input type="number" value={form.capacity} onChange={e => set('capacity', e.target.value)} placeholder="e.g. 30" min="1" />
+          <input type="number" value={form.capacity} onChange={e => set('capacity', e.target.value)} placeholder="e.g. 30" min="1" disabled={isReadOnly} />
         </div>
 
         <div className="event-form-check">
-          <input type="checkbox" id="waitlist" checked={form.waitlist_enabled} onChange={e => set('waitlist_enabled', e.target.checked)} />
+          <input type="checkbox" id="waitlist" checked={form.waitlist_enabled} onChange={e => set('waitlist_enabled', e.target.checked)} disabled={isReadOnly} />
           <label htmlFor="waitlist">Enable waitlist when full</label>
         </div>
 
         <div className="event-form-check">
-          <input type="checkbox" id="paid" checked={form.is_paid} onChange={e => set('is_paid', e.target.checked)} />
+          <input type="checkbox" id="paid" checked={form.is_paid} onChange={e => set('is_paid', e.target.checked)} disabled={isReadOnly} />
           <label htmlFor="paid">This is a paid event</label>
         </div>
 
         {form.is_paid && (
           <div className="event-form-group">
             <label>Ticket Price (₹)</label>
-            <input type="number" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0" min="0" />
+            <input type="number" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0" min="0" disabled={isReadOnly} />
           </div>
         )}
 
         <div className="event-form-group">
           <label>Image URL (optional)</label>
-          <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://..." />
+          <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://..." disabled={isReadOnly} />
         </div>
 
         <div className="event-form-actions">
-          <button type="submit" disabled={saving} style={{ background: '#667eea', color: 'white' }}>
+          <button type="submit" disabled={saving || isReadOnly} style={{ background: isReadOnly ? '#ccc' : '#667eea', color: 'white', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
             {saving ? 'Saving...' : editId ? 'Update Event' : 'Create Event'}
           </button>
           <button type="button" onClick={() => navigate('/events')} style={{ background: '#e0e0e0', color: '#333' }}>Cancel</button>

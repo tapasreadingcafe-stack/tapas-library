@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS vendors (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -13,6 +15,7 @@ CREATE POLICY "open" ON vendors FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function VendorList() {
   const toast = useToast();
+  const { isReadOnly } = usePermission();
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -67,10 +70,11 @@ export default function VendorList() {
 
   return (
     <div style={{ padding: '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
       <style>{`@media(max-width:768px){.vendor-page h1{font-size:22px!important}}`}</style>
       <div className="vendor-page" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h1 style={{ fontSize: '28px', margin: 0 }}>🏪 Vendors</h1>
-        <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Vendor</button>
+        {!isReadOnly && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Vendor</button>}
       </div>
       <input placeholder="Search vendors..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', maxWidth: '400px', padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', marginBottom: '16px' }} />
 
@@ -87,8 +91,8 @@ export default function VendorList() {
               {v.email && <p style={{ fontSize: '13px', color: '#666', margin: '2px 0' }}>📧 {v.email}</p>}
               <p style={{ fontSize: '11px', color: '#999', marginTop: '6px', textTransform: 'capitalize' }}>Type: {v.vendor_type}</p>
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                <button onClick={() => openEdit(v)} style={{ padding: '4px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>
-                <button onClick={() => deleteVendor(v.id)} style={{ padding: '4px 12px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+                <button onClick={() => openEdit(v)} disabled={isReadOnly} style={{ padding: '4px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>Edit</button>
+                {!isReadOnly && <button onClick={() => deleteVendor(v.id)} style={{ padding: '4px 12px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
               </div>
             </div>
           ))}
@@ -120,7 +124,7 @@ export default function VendorList() {
               <label style={{ fontSize: '13px' }}>Active vendor</label>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={saveVendor} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>{editVendor ? 'Update' : 'Add'}</button>
+              <button onClick={saveVendor} disabled={isReadOnly} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: isReadOnly ? 'not-allowed' : 'pointer', opacity: isReadOnly ? 0.5 : 1 }}>{editVendor ? 'Update' : 'Add'}</button>
               <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor:
@@ -59,6 +61,7 @@ CREATE POLICY "open" ON event_attendance FOR ALL USING (true) WITH CHECK (true);
 export default function EventListing() {
   const toast = useToast();
   const confirm = useConfirm();
+  const { isReadOnly } = usePermission();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -163,6 +166,7 @@ export default function EventListing() {
 
   return (
     <div className="events-page">
+      {isReadOnly && <ViewOnlyBanner />}
       <style>{`
         .events-page { padding: 20px; }
         .events-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
@@ -197,7 +201,7 @@ export default function EventListing() {
 
       <div className="events-header">
         <h1>🎉 Events</h1>
-        <a href="/events/create" style={{ padding: '8px 16px', background: '#667eea', color: 'white', borderRadius: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>+ Create Event</a>
+        {!isReadOnly && <a href="/events/create" style={{ padding: '8px 16px', background: '#667eea', color: 'white', borderRadius: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>+ Create Event</a>}
       </div>
 
       <div className="events-tabs">
@@ -264,10 +268,10 @@ export default function EventListing() {
 
             {/* Registration actions */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <button onClick={() => setShowRegModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+              {!isReadOnly && <button onClick={() => setShowRegModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
                 + Register Member
-              </button>
-              {selectedEvent.status !== 'cancelled' && (
+              </button>}
+              {!isReadOnly && selectedEvent.status !== 'cancelled' && (
                 <button onClick={() => cancelEvent(selectedEvent.id)} style={{ padding: '8px 16px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
                   Cancel Event
                 </button>
@@ -289,7 +293,7 @@ export default function EventListing() {
                       <td><span style={statusBadge(reg.status)}>{reg.status}</span></td>
                       <td>₹{reg.amount_paid}</td>
                       <td>
-                        {reg.status === 'registered' && (
+                        {!isReadOnly && reg.status === 'registered' && (
                           <button onClick={() => cancelReg(reg.id)} style={{ padding: '2px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
                         )}
                       </td>

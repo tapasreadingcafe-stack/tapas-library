@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const PAGE_PERMISSIONS = [
   { key: 'dashboard',  label: 'Dashboard',        icon: '📊', desc: 'Main overview' },
@@ -56,6 +59,8 @@ export default function StaffDetail() {
   const { staffId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { staff: currentStaff } = useAuth();
+  const { isReadOnly } = usePermission();
 
   const [staff, setStaff] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +133,20 @@ export default function StaffDetail() {
         .update({ permissions: payload })
         .eq('id', staffId);
       if (error) throw error;
+
+      // Notify the staff member about the permission change
+      try {
+        await supabase.from('staff_notifications').insert({
+          staff_id: staffId,
+          type: 'permissions',
+          title: 'Your permissions were updated',
+          message: 'An admin has changed your access permissions. Changes take effect automatically.',
+          metadata: { updated_by: currentStaff?.id },
+        });
+      } catch (e) {
+        console.error('Failed to send permission notification:', e);
+      }
+
       toast.success('Permissions saved!');
     } catch (err) {
       toast.error('Failed to save: ' + err.message);
@@ -163,6 +182,8 @@ export default function StaffDetail() {
         ← Back to Staff
       </button>
 
+      {isReadOnly && <ViewOnlyBanner />}
+
       {/* ── PROFILE HEADER ── */}
       <div style={{ background: 'white', borderRadius: '14px', padding: '24px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Avatar */}
@@ -179,7 +200,7 @@ export default function StaffDetail() {
           <div style={{
             position: 'absolute', bottom: '2px', right: '2px',
             width: '18px', height: '18px', borderRadius: '50%',
-            background: isOnline ? '#22c55e' : staff.status === 'active' ? '#f59e0b' : '#ef4444',
+            background: isOnline ? '#22c55e' : staff.is_active ? '#f59e0b' : '#ef4444',
             border: '3px solid white',
           }} />
         </div>
@@ -197,10 +218,10 @@ export default function StaffDetail() {
             </span>
             <span style={{
               padding: '3px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
-              background: staff.status === 'active' ? '#d1fae5' : '#fee2e2',
-              color: staff.status === 'active' ? '#059669' : '#dc2626',
+              background: staff.is_active ? '#d1fae5' : '#fee2e2',
+              color: staff.is_active ? '#059669' : '#dc2626',
             }}>
-              {staff.status === 'active' ? '● Active' : '○ Inactive'}
+              {staff.is_active ? '● Active' : '○ Inactive'}
             </span>
           </div>
           <div style={{ display: 'flex', gap: '20px', fontSize: '13px', color: '#6b7280', flexWrap: 'wrap' }}>
@@ -237,12 +258,12 @@ export default function StaffDetail() {
             <h2 style={{ margin: '0 0 4px', fontSize: '17px' }}>🔐 Page Permissions</h2>
             <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>Control which pages this staff member can access</p>
           </div>
-          <button onClick={handleSavePermissions} disabled={saving}
+          <button onClick={handleSavePermissions} disabled={saving || isReadOnly}
             style={{
-              padding: '10px 24px', background: saving ? '#d1d5db' : '#059669', color: 'white',
-              border: 'none', borderRadius: '8px', cursor: saving ? 'wait' : 'pointer',
+              padding: '10px 24px', background: (saving || isReadOnly) ? '#d1d5db' : '#059669', color: 'white',
+              border: 'none', borderRadius: '8px', cursor: (saving || isReadOnly) ? 'not-allowed' : 'pointer',
               fontWeight: '700', fontSize: '13px',
-              boxShadow: saving ? 'none' : '0 2px 8px rgba(5,150,105,0.3)',
+              boxShadow: (saving || isReadOnly) ? 'none' : '0 2px 8px rgba(5,150,105,0.3)',
             }}>
             {saving ? '⏳ Saving...' : '💾 Save Permissions'}
           </button>
@@ -277,11 +298,14 @@ export default function StaffDetail() {
                   const colors = LEVEL_COLORS[level];
                   return (
                     <button key={level} onClick={() => setPermissions(p => ({ ...p, [page.key]: level }))}
+                      disabled={isReadOnly}
                       style={{
-                        flex: 1, padding: '6px 4px', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                        flex: 1, padding: '6px 4px', border: 'none', borderRadius: '6px',
+                        cursor: isReadOnly ? 'not-allowed' : 'pointer',
                         fontSize: '11px', fontWeight: '700', transition: 'all 0.15s',
                         background: active ? colors.bg : 'transparent',
                         color: active ? colors.color : '#9ca3af',
+                        opacity: isReadOnly ? 0.6 : 1,
                       }}>
                       {LEVEL_LABELS[level]}
                     </button>
@@ -303,12 +327,14 @@ export default function StaffDetail() {
             const enabled = features[feat.key] !== false;
             return (
               <div key={feat.key}
-                onClick={() => setFeatures(f => ({ ...f, [feat.key]: !enabled }))}
+                onClick={() => !isReadOnly && setFeatures(f => ({ ...f, [feat.key]: !enabled }))}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px',
-                  borderRadius: '8px', cursor: 'pointer', transition: 'all 0.15s',
+                  borderRadius: '8px', cursor: isReadOnly ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
                   border: `1.5px solid ${enabled ? '#a7f3d0' : '#e5e7eb'}`,
                   background: enabled ? '#f0fdf4' : '#fafafa',
+                  pointerEvents: isReadOnly ? 'none' : 'auto',
+                  opacity: isReadOnly ? 0.6 : 1,
                 }}>
                 <span style={{ fontSize: '16px' }}>{feat.icon}</span>
                 <span style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: enabled ? '#374151' : '#9ca3af' }}>{feat.label}</span>

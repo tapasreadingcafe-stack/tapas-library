@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
+import { usePermission } from '../hooks/usePermission';
+import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 const FINE_PER_DAY = 10;
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
@@ -105,6 +107,8 @@ export default function Borrow() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  const { isReadOnly } = usePermission();
 
   // Toast
   const toast = useToast();
@@ -511,6 +515,7 @@ export default function Borrow() {
 
   return (
     <div style={{ padding: isMobile ? '12px' : '20px' }}>
+      {isReadOnly && <ViewOnlyBanner />}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
@@ -828,12 +833,13 @@ export default function Borrow() {
               )}
               <button
                 onClick={handleCheckout}
-                disabled={!selectedMember || !selectedBook || !dueDate}
+                disabled={isReadOnly || !selectedMember || !selectedBook || !dueDate}
                 style={{
                   padding: '11px 32px', fontWeight: '700', fontSize: '15px',
-                  background: (!selectedMember || !selectedBook || !dueDate) ? '#ccc' : '#667eea',
+                  background: (isReadOnly || !selectedMember || !selectedBook || !dueDate) ? '#ccc' : '#667eea',
                   color: 'white', border: 'none', borderRadius: '6px',
-                  cursor: (!selectedMember || !selectedBook || !dueDate) ? 'not-allowed' : 'pointer',
+                  cursor: (isReadOnly || !selectedMember || !selectedBook || !dueDate) ? 'not-allowed' : 'pointer',
+                  opacity: isReadOnly ? 0.5 : 1,
                   width: isMobile ? '100%' : 'auto',
                 }}>
                 ✓ Checkout Book
@@ -902,15 +908,16 @@ export default function Borrow() {
                         <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                           <button
                             onClick={() => openRenewal(item)}
-                            disabled={(item.renewal_count || 0) >= 3}
+                            disabled={isReadOnly || (item.renewal_count || 0) >= 3}
                             style={{
-                              padding: '8px 14px', border: 'none', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: (item.renewal_count || 0) >= 3 ? 'not-allowed' : 'pointer',
-                              background: (item.renewal_count || 0) >= 3 ? '#f5f5f5' : '#e8f0ff',
-                              color: (item.renewal_count || 0) >= 3 ? '#ccc' : '#667eea',
+                              padding: '8px 14px', border: 'none', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: (isReadOnly || (item.renewal_count || 0) >= 3) ? 'not-allowed' : 'pointer',
+                              background: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#f5f5f5' : '#e8f0ff',
+                              color: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#ccc' : '#667eea',
+                              opacity: isReadOnly ? 0.5 : 1,
                             }}>
                             ♻️ Renew
                           </button>
-                          <button onClick={() => openReturn(item)} style={{ padding: '8px 14px', background: '#e8faf0', color: '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                          <button onClick={() => openReturn(item)} disabled={isReadOnly} style={{ padding: '8px 14px', background: isReadOnly ? '#f5f5f5' : '#e8faf0', color: isReadOnly ? '#ccc' : '#27ae60', border: 'none', borderRadius: '5px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                             ✓ Return
                           </button>
                         </div>
@@ -963,15 +970,16 @@ export default function Borrow() {
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button
                               onClick={() => openRenewal(item)}
-                              disabled={(item.renewal_count || 0) >= 3}
+                              disabled={isReadOnly || (item.renewal_count || 0) >= 3}
                               style={{
-                                padding: '5px 10px', border: 'none', borderRadius: '5px', fontSize: '12px', fontWeight: '600', cursor: (item.renewal_count || 0) >= 3 ? 'not-allowed' : 'pointer',
-                                background: (item.renewal_count || 0) >= 3 ? '#f5f5f5' : '#e8f0ff',
-                                color: (item.renewal_count || 0) >= 3 ? '#ccc' : '#667eea',
+                                padding: '5px 10px', border: 'none', borderRadius: '5px', fontSize: '12px', fontWeight: '600', cursor: (isReadOnly || (item.renewal_count || 0) >= 3) ? 'not-allowed' : 'pointer',
+                                background: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#f5f5f5' : '#e8f0ff',
+                                color: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#ccc' : '#667eea',
+                                opacity: isReadOnly ? 0.5 : 1,
                               }}>
                               ♻️ Renew
                             </button>
-                            <button onClick={() => openReturn(item)} style={{ padding: '5px 10px', background: '#e8faf0', color: '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                            <button onClick={() => openReturn(item)} disabled={isReadOnly} style={{ padding: '5px 10px', background: isReadOnly ? '#f5f5f5' : '#e8faf0', color: isReadOnly ? '#ccc' : '#27ae60', border: 'none', borderRadius: '5px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                               ✓ Return
                             </button>
                           </div>
@@ -1111,7 +1119,7 @@ export default function Borrow() {
               <button onClick={() => setReturnModal(null)} style={{ flex: 1, padding: '10px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button onClick={handleReturn} style={{ flex: 1, padding: '10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+              <button onClick={handleReturn} disabled={isReadOnly} style={{ flex: 1, padding: '10px', background: isReadOnly ? '#ccc' : '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                 ✓ Confirm Return
               </button>
             </div>
@@ -1148,11 +1156,12 @@ export default function Borrow() {
                 Cancel
               </button>
               <button onClick={handleRenewal}
-                disabled={(renewalModal.renewal_count || 0) >= 3}
+                disabled={isReadOnly || (renewalModal.renewal_count || 0) >= 3}
                 style={{
                   flex: 1, padding: '10px', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600',
-                  background: (renewalModal.renewal_count || 0) >= 3 ? '#ccc' : '#667eea',
-                  cursor: (renewalModal.renewal_count || 0) >= 3 ? 'not-allowed' : 'pointer',
+                  background: (isReadOnly || (renewalModal.renewal_count || 0) >= 3) ? '#ccc' : '#667eea',
+                  cursor: (isReadOnly || (renewalModal.renewal_count || 0) >= 3) ? 'not-allowed' : 'pointer',
+                  opacity: isReadOnly ? 0.5 : 1,
                 }}>
                 ♻️ Renew
               </button>
