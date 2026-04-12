@@ -4,7 +4,9 @@ import { HintBubble } from './components/HintTooltip';
 import GlobalTooltip from './components/GlobalTooltip';
 import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
+import { useAuth } from './context/AuthContext';
 import NotificationBell from './components/NotificationBell';
+import Login from './pages/Login';
 import './App.css';
 
 // ── Lazy-loaded pages (Existing) ─────────────────────────────────────────────
@@ -180,6 +182,37 @@ function App() {
   const location = useLocation();
   const { dark, toggleTheme } = useTheme();
   const { devMode, getLabel } = useDevMode();
+  const { user, staff, loading: authLoading } = useAuth();
+
+  // ── Auth gate ────────────────────────────────────────────────────────────
+  // Show a spinner while AuthProvider is checking the Supabase session on
+  // mount. This prevents a flash of the Login page for users who are
+  // already signed in.
+  if (authLoading) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', gap: '16px',
+        background: '#0f172a', color: '#e2e8f0',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}>
+        <div style={{ fontSize: '48px', animation: 'pulse 1.4s ease-in-out infinite' }}>📚</div>
+        <div style={{ fontSize: '14px', color: '#94a3b8' }}>Loading Tapas dashboard…</div>
+        <style>{`
+          @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.1);opacity:0.75} }
+        `}</style>
+      </div>
+    );
+  }
+
+  // If not signed in, show only the Login page. No routes, no sidebar.
+  // `staff` is set to a sentinel object ({_not_staff: true}, {_deactivated: true},
+  // {_error: ...}) after a failed staff check, so an error banner can be
+  // surfaced in the Login component.
+  if (!user || !staff || staff._not_staff || staff._deactivated || staff._error) {
+    return <Login staffStatus={staff} />;
+  }
 
   // Determine which groups should start expanded (based on active route)
   const getInitialOpenGroups = () => {

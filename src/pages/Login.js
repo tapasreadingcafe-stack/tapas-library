@@ -1,29 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
-export default function Login() {
-  const { login, user, sessionExpired } = useAuth();
-  const navigate = useNavigate();
+// =====================================================================
+// Login — staff-only gate for the dashboard
+// ---------------------------------------------------------------------
+// Single email + password form. No signup (staff accounts are provisioned
+// by an admin in Supabase Auth + the `staff` table). A forgot-password
+// link sends a Supabase reset email.
+//
+// Accepts `staffStatus` from App.js so it can surface specific errors
+// like "not a staff account" or "account deactivated" when an auth
+// session was created but rejected by the staff-table check.
+// =====================================================================
 
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
+export default function Login({ staffStatus }) {
+  const { login, sessionExpired } = useAuth();
+
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Forgot password state
   const [forgotMode, setForgotMode]   = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent]   = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
 
-  // If already logged in, redirect to dashboard
-  useEffect(() => {
-    if (user) navigate('/', { replace: true });
-  }, [user, navigate]);
+  // Translate the staff-status sentinel from AuthContext into a user
+  // message. Only shown when present — not on every render.
+  const staffError = (() => {
+    if (!staffStatus) return '';
+    if (staffStatus._not_staff)   return 'This account is not registered as staff. Contact your administrator.';
+    if (staffStatus._deactivated) return 'This staff account has been deactivated. Contact your administrator.';
+    if (staffStatus._error)       return 'Unable to verify your staff profile. Please try again.';
+    return '';
+  })();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -32,15 +45,11 @@ export default function Login() {
     setError('');
     try {
       await login(email.trim().toLowerCase(), password);
-      // If remember me is unchecked, set a flag to expire on tab close
-      if (!rememberMe) {
-        sessionStorage.setItem('tapas_session_only', '1');
-      } else {
-        sessionStorage.removeItem('tapas_session_only');
-      }
-      navigate('/', { replace: true });
+      // The AuthContext onAuthStateChange handler loads the staff row
+      // and either grants access or flips `staff` into a sentinel; the
+      // App.js gate reacts automatically — no navigate() needed here.
     } catch (err) {
-      setError('Invalid email or password. Please try again.');
+      setError('Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -65,189 +74,301 @@ export default function Login() {
     }
   };
 
-  const inputStyle = {
-    width: '100%', padding: '11px 14px', border: '1.5px solid #e0e0e0',
-    borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box',
-    transition: 'border-color 0.2s',
-    fontFamily: 'inherit',
-  };
-
-  const labelStyle = {
-    display: 'block', fontSize: '12px', fontWeight: '700',
-    color: '#888', marginBottom: '6px', letterSpacing: '0.5px',
-  };
-
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px',
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px',
+      background: 'radial-gradient(ellipse at top, #1e293b 0%, #0f172a 60%, #020617 100%)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif',
+      position: 'relative',
+      overflow: 'hidden',
     }}>
+      {/* Atmospheric glows */}
+      <div style={{ position: 'absolute', top: '-200px', left: '-200px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(212,168,83,0.14), transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-200px', right: '-200px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(102,126,234,0.14), transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+
       <div style={{
-        background: 'white', borderRadius: '16px', padding: '40px',
-        width: '100%', maxWidth: '420px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+        width: '100%',
+        maxWidth: '420px',
+        position: 'relative',
+        zIndex: 1,
       }}>
-
-        {/* Logo + Title */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ fontSize: '52px', marginBottom: '10px', lineHeight: 1 }}>📚</div>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: '26px', fontWeight: '800', color: '#1a1a2e' }}>
-            Tapas Library
-          </h1>
-          <p style={{ margin: 0, color: '#aaa', fontSize: '13px' }}>Staff Management System</p>
-        </div>
-
-        {/* Session expired banner */}
-        {sessionExpired && !error && (
-          <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '10px 14px', marginBottom: '18px', fontSize: '13px', color: '#856404', fontWeight: '600' }}>
-            Session expired due to inactivity. Please sign in again.
+        {/* Card */}
+        <div style={{
+          background: 'rgba(30, 41, 59, 0.72)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          borderRadius: '20px',
+          padding: '44px 40px',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.55)',
+          animation: 'fadeUp 480ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        }}>
+          {/* Logo + title */}
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{ fontSize: '56px', marginBottom: '14px', lineHeight: 1 }}>📚</div>
+            <h1 style={{
+              margin: '0 0 6px 0',
+              fontSize: '24px',
+              fontWeight: '800',
+              color: '#f8fafc',
+              letterSpacing: '-0.02em',
+            }}>
+              Tapas Reading Cafe
+            </h1>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
+              Staff Dashboard
+            </p>
           </div>
-        )}
 
-        {/* Error message */}
-        {error && (
-          <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: '8px', padding: '10px 14px', marginBottom: '18px', fontSize: '13px', color: '#721c24', fontWeight: '600' }}>
-            {error}
-          </div>
-        )}
+          {/* Session expired banner */}
+          {sessionExpired && !error && !staffError && (
+            <Banner tone="warning">
+              Session expired due to inactivity. Please sign in again.
+            </Banner>
+          )}
 
-        {/* ── FORGOT PASSWORD MODE ── */}
-        {forgotMode ? (
-          forgotSent ? (
-            <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📧</div>
-              <h3 style={{ margin: '0 0 8px 0', color: '#333' }}>Check your email</h3>
-              <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px' }}>
-                We sent a password reset link to <strong>{forgotEmail}</strong>
-              </p>
-              <button
-                onClick={() => { setForgotMode(false); setForgotSent(false); setForgotEmail(''); setError(''); }}
-                style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
-              >
-                Back to Login
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleForgotPassword}>
-              <h3 style={{ margin: '0 0 6px 0', color: '#333', fontSize: '18px' }}>Reset Password</h3>
-              <p style={{ margin: '0 0 20px 0', color: '#888', fontSize: '13px' }}>
-                Enter your email and we'll send a reset link.
-              </p>
-              <div style={{ marginBottom: '18px' }}>
-                <label style={labelStyle}>EMAIL</label>
-                <input
-                  type="email"
-                  value={forgotEmail}
-                  onChange={e => setForgotEmail(e.target.value)}
-                  placeholder="you@tapaslibrary.com"
-                  required
-                  style={inputStyle}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={forgotLoading}
-                style={{ width: '100%', padding: '12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '15px', marginBottom: '12px' }}
-              >
-                {forgotLoading ? 'Sending...' : 'Send Reset Link'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setForgotMode(false); setError(''); }}
-                style={{ width: '100%', padding: '10px', background: 'transparent', color: '#667eea', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
-              >
-                ← Back to Login
-              </button>
-            </form>
-          )
-        ) : (
-          /* ── NORMAL LOGIN MODE ── */
-          <form onSubmit={handleLogin}>
-            {/* Email */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>EMAIL</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@tapaslibrary.com"
-                required
-                autoComplete="email"
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#667eea'}
-                onBlur={e => e.target.style.borderColor = '#e0e0e0'}
-              />
-            </div>
+          {/* Staff-check error (signed into Supabase but not in staff table) */}
+          {staffError && !error && (
+            <Banner tone="danger">{staffError}</Banner>
+          )}
 
-            {/* Password */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>PASSWORD</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  autoComplete="current-password"
-                  style={{ ...inputStyle, paddingRight: '44px' }}
-                  onFocus={e => e.target.style.borderColor = '#667eea'}
-                  onBlur={e => e.target.style.borderColor = '#e0e0e0'}
-                />
+          {/* Login error */}
+          {error && <Banner tone="danger">{error}</Banner>}
+
+          {/* ── FORGOT PASSWORD MODE ─────────────────────────────── */}
+          {forgotMode ? (
+            forgotSent ? (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <div style={{ fontSize: '44px', marginBottom: '14px' }}>📧</div>
+                <h3 style={{ margin: '0 0 10px 0', color: '#f8fafc', fontSize: '18px' }}>Check your email</h3>
+                <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '26px', lineHeight: 1.6 }}>
+                  We sent a password reset link to<br />
+                  <strong style={{ color: '#e2e8f0' }}>{forgotEmail}</strong>
+                </p>
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '16px', padding: '0' }}
+                  onClick={() => { setForgotMode(false); setForgotSent(false); setForgotEmail(''); setError(''); }}
+                  style={primaryButtonStyle(false)}
                 >
-                  {showPassword ? '🙈' : '👁️'}
+                  ← Back to Login
                 </button>
               </div>
-            </div>
-
-            {/* Remember me */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#555', userSelect: 'none' }}>
+            ) : (
+              <form onSubmit={handleForgotPassword}>
+                <h3 style={{ margin: '0 0 6px 0', color: '#f8fafc', fontSize: '17px', fontWeight: '700' }}>Reset Password</h3>
+                <p style={{ margin: '0 0 22px 0', color: '#94a3b8', fontSize: '13px' }}>
+                  Enter your email and we'll send a reset link.
+                </p>
+                <Field label="Email">
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    placeholder="you@tapasreadingcafe.com"
+                    required
+                    style={inputStyle}
+                    onFocus={e => e.target.style.borderColor = '#D4A853'}
+                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                  />
+                </Field>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={primaryButtonStyle(forgotLoading)}
+                >
+                  {forgotLoading ? 'Sending…' : 'Send Reset Link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(false); setError(''); }}
+                  style={{
+                    width: '100%', marginTop: '10px', padding: '10px',
+                    background: 'transparent', color: '#94a3b8', border: 'none',
+                    cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                  }}
+                >
+                  ← Back to Login
+                </button>
+              </form>
+            )
+          ) : (
+            /* ── NORMAL LOGIN ────────────────────────────────────── */
+            <form onSubmit={handleLogin}>
+              <Field label="Email">
                 <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#667eea' }}
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@tapasreadingcafe.com"
+                  required
+                  autoComplete="email"
+                  autoFocus
+                  style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = '#D4A853'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
                 />
-                Remember me for 7 days
-              </label>
+              </Field>
+
+              <Field label="Password">
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    autoComplete="current-password"
+                    style={{ ...inputStyle, paddingRight: '44px' }}
+                    onFocus={e => e.target.style.borderColor = '#D4A853'}
+                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      fontSize: '16px',
+                      padding: '4px',
+                    }}
+                  >
+                    {showPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </Field>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '22px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(true); setError(''); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#D4A853',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    padding: 0,
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+
               <button
-                type="button"
-                onClick={() => { setForgotMode(true); setError(''); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#667eea', fontSize: '13px', fontWeight: '600', padding: 0 }}
+                type="submit"
+                disabled={loading}
+                style={primaryButtonStyle(loading)}
               >
-                Forgot password?
+                {loading ? '⏳ Signing in…' : 'Sign In'}
               </button>
-            </div>
+            </form>
+          )}
+        </div>
 
-            {/* Login button */}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%', padding: '13px',
-                background: loading ? '#a0aec0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white', border: 'none', borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: '700', fontSize: '16px',
-                boxShadow: loading ? 'none' : '0 4px 14px rgba(102,126,234,0.4)',
-                transition: 'all 0.2s',
-              }}
-            >
-              {loading ? '⏳ Signing in...' : 'Sign In'}
-            </button>
-
-            <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: '#ccc' }}>
-              No account? Contact your administrator.
-            </p>
-          </form>
-        )}
+        <p style={{
+          textAlign: 'center',
+          marginTop: '20px',
+          fontSize: '12px',
+          color: '#64748b',
+        }}>
+          🔒 Staff access only · Tapas Reading Cafe
+        </p>
       </div>
+
+      <style>{`
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Subcomponents / styles ──────────────────────────────────────────────
+
+const inputStyle = {
+  width: '100%',
+  padding: '13px 16px',
+  border: '1.5px solid rgba(255,255,255,0.12)',
+  borderRadius: '10px',
+  fontSize: '15px',
+  outline: 'none',
+  boxSizing: 'border-box',
+  transition: 'border-color 0.2s, background 0.2s',
+  fontFamily: 'inherit',
+  background: 'rgba(15, 23, 42, 0.6)',
+  color: '#f1f5f9',
+};
+
+function primaryButtonStyle(disabled) {
+  return {
+    width: '100%',
+    padding: '14px',
+    background: disabled ? '#64748b' : 'linear-gradient(135deg, #D4A853 0%, #C49040 100%)',
+    color: '#1a0f08',
+    border: 'none',
+    borderRadius: '10px',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontWeight: '800',
+    fontSize: '15px',
+    letterSpacing: '0.3px',
+    boxShadow: disabled ? 'none' : '0 8px 24px rgba(212,168,83,0.35)',
+    transition: 'transform 0.15s, box-shadow 0.15s',
+    fontFamily: 'inherit',
+  };
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: '18px' }}>
+      <label style={{
+        display: 'block',
+        fontSize: '11px',
+        fontWeight: '700',
+        color: '#94a3b8',
+        marginBottom: '8px',
+        letterSpacing: '0.8px',
+        textTransform: 'uppercase',
+      }}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function Banner({ tone, children }) {
+  const tones = {
+    danger:  { bg: 'rgba(220, 38, 38, 0.15)',  border: 'rgba(220, 38, 38, 0.4)',  color: '#fca5a5' },
+    warning: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', color: '#fcd34d' },
+    success: { bg: 'rgba(22, 163, 74, 0.15)',  border: 'rgba(22, 163, 74, 0.4)',  color: '#86efac' },
+  };
+  const t = tones[tone] || tones.danger;
+  return (
+    <div style={{
+      background: t.bg,
+      border: `1px solid ${t.border}`,
+      borderRadius: '10px',
+      padding: '11px 14px',
+      marginBottom: '18px',
+      fontSize: '13px',
+      color: t.color,
+      fontWeight: '600',
+      lineHeight: 1.5,
+    }}>
+      {children}
     </div>
   );
 }
