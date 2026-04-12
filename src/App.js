@@ -80,6 +80,7 @@ const Newsletter            = React.lazy(() => import('./pages/Newsletter'));
 const Communications        = React.lazy(() => import('./pages/Communications'));
 const CommunityBlog         = React.lazy(() => import('./pages/CommunityBlog'));
 const AdvancedTools         = React.lazy(() => import('./pages/AdvancedTools'));
+const Integrations          = React.lazy(() => import('./pages/Integrations'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -211,6 +212,7 @@ const NAV_CONFIG = [
       { to: '/communications', icon: '📲', label: 'Communications' },
       { to: '/community',      icon: '👥', label: 'Community & Blog' },
       { to: '/advanced-tools', icon: '🧪', label: 'Advanced Tools' },
+      { to: '/integrations',   icon: '🔌', label: 'Integrations' },
       { to: '/marketing-hub',  icon: '🔧', label: 'Marketing Hub' },
       { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
     ],
@@ -512,6 +514,7 @@ function DashboardShell() {
             <Route path="/communications"                     element={<Communications />} />
             <Route path="/community"                          element={<CommunityBlog />} />
             <Route path="/advanced-tools"                     element={<AdvancedTools />} />
+            <Route path="/integrations"                        element={<Integrations />} />
             <Route path="/marketing-hub"                      element={<MarketingHub />} />
             <Route path="/marketing"                          element={<MarketingTools />} />
 
