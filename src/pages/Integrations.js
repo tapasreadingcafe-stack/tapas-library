@@ -132,9 +132,10 @@ export default function Integrations() {
   const [saving, setSaving] = useState(null);
   const [savedAt, setSavedAt] = useState({});
   const [search, setSearch] = useState('');
-  // Lift expanded state to the parent so it survives re-renders
-  // when loading/config state changes after Supabase queries.
-  const [expandedKey, setExpandedKey] = useState(null);
+  // Track which services are expanded. Use a Set so multiple cards
+  // can be open at once, and functional setState so we never capture
+  // stale closures.
+  const [expandedKeys, setExpandedKeys] = useState(new Set());
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -252,8 +253,13 @@ export default function Integrations() {
             connected={isConnected(service.key)}
             saving={saving === service.key}
             savedAt={savedAt[service.key]}
-            expanded={expandedKey === service.key}
-            onToggleExpand={() => setExpandedKey(expandedKey === service.key ? null : service.key)}
+            expanded={expandedKeys.has(service.key)}
+            onToggleExpand={() => setExpandedKeys(prev => {
+              const next = new Set(prev);
+              if (next.has(service.key)) next.delete(service.key);
+              else next.add(service.key);
+              return next;
+            })}
             onUpdate={(fieldKey, value) => updateField(service.key, fieldKey, value)}
             onSave={() => saveService(service.key)}
             onDisconnect={() => disconnect(service.key)}
