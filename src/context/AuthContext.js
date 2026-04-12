@@ -169,6 +169,12 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // Load staff profile immediately instead of waiting for the async
+    // onAuthStateChange callback — this ensures both user AND staff are
+    // set by the time login() returns to the caller.
+    if (data?.user) {
+      await loadStaffProfile(data.user);
+    }
     return data;
   };
 
