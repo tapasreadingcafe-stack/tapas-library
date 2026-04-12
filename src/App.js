@@ -65,6 +65,10 @@ const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 const CustomerOrders        = React.lazy(() => import('./pages/CustomerOrders'));
 const SiteContent           = React.lazy(() => import('./pages/SiteContent'));
 
+// ── Lazy-loaded pages (New - Phase 6: Productivity) ─────────────────────────
+const Tasks                 = React.lazy(() => import('./pages/Tasks'));
+const MarketingTools        = React.lazy(() => import('./pages/MarketingTools'));
+
 // ── Page loader ───────────────────────────────────────────────────────────────
 
 function PageLoader() {
@@ -138,6 +142,13 @@ const NAV_CONFIG = [
     children: [
       { to: '/store/orders',  icon: '📦', label: 'Online Orders' },
       { to: '/store/content', icon: '🎨', label: 'Edit Website' },
+    ],
+  },
+  {
+    icon: '✨', label: 'Productivity', key: 'productivity',
+    children: [
+      { to: '/tasks',     icon: '📒', label: 'Tasks & Notes' },
+      { to: '/marketing', icon: '📣', label: 'Marketing Tools' },
     ],
   },
   {
@@ -417,6 +428,10 @@ function DashboardShell() {
             {/* Online Store */}
             <Route path="/store/orders"                       element={<CustomerOrders />} />
             <Route path="/store/content"                      element={<SiteContent />} />
+
+            {/* Productivity */}
+            <Route path="/tasks"                              element={<Tasks />} />
+            <Route path="/marketing"                          element={<MarketingTools />} />
 
             {/* Public & Kiosk */}
             <Route path="/catalog"                            element={<PublicCatalog />} />
