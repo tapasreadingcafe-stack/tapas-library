@@ -305,6 +305,17 @@ ON CONFLICT (email) DO NOTHING;`;
                       <button onClick={() => toggleActive(member)} style={{ padding: '5px 10px', background: member.is_active ? '#fff5f5' : '#f0fff4', color: member.is_active ? '#e74c3c' : '#27ae60', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
                         {member.is_active ? 'Deactivate' : 'Activate'}
                       </button>
+                      <button onClick={async () => {
+                        if (!window.confirm(`Permanently delete ${member.name}? This cannot be undone.`)) return;
+                        try {
+                          await supabase.from('staff').delete().eq('id', member.id);
+                          setStaffList(prev => prev.filter(s => s.id !== member.id));
+                        } catch (err) {
+                          alert('Failed to delete: ' + (err.message || err));
+                        }
+                      }} style={{ padding: '5px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                        🗑 Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
