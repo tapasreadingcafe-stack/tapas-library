@@ -292,6 +292,83 @@ function App() {
 
 // ── DashboardShell — the real app UI once the staff member is signed in ────
 
+function ProfileDropdown() {
+  const { staff, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const name = staff?.name || 'Staff';
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          background: 'rgba(255,255,255,0.1)', border: 'none',
+          borderRadius: '20px', padding: '4px 12px 4px 4px',
+          cursor: 'pointer', color: 'white', fontSize: '13px', fontWeight: '600',
+        }}
+      >
+        <span style={{
+          width: '28px', height: '28px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #D4A853, #C49040)',
+          color: '#1a0f08', fontSize: '11px', fontWeight: '800',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>{initials}</span>
+        {name.split(' ')[0]}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+          <div style={{
+            position: 'absolute', top: '40px', right: 0, zIndex: 100,
+            background: 'white', borderRadius: '10px',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
+            padding: '8px', width: '200px',
+          }}>
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
+              <div style={{ fontWeight: '700', color: '#333', fontSize: '13px' }}>{name}</div>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{staff?.email}</div>
+              <div style={{ fontSize: '10px', color: '#667eea', fontWeight: '600', marginTop: '2px', textTransform: 'uppercase' }}>{staff?.role}</div>
+            </div>
+            <a href="/settings/profile" style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '8px 12px', borderRadius: '6px', textDecoration: 'none',
+              color: '#333', fontSize: '13px',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              👤 My Profile
+            </a>
+            <a href="/settings/app" style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '8px 12px', borderRadius: '6px', textDecoration: 'none',
+              color: '#333', fontSize: '13px',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              ⚙️ Settings
+            </a>
+            <button onClick={() => { setOpen(false); logout(); }} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '8px 12px', borderRadius: '6px', width: '100%',
+              border: 'none', background: 'transparent', textAlign: 'left',
+              color: '#e74c3c', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              🚪 Sign Out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function DashboardShell() {
   const isMobile = () => window.innerWidth <= 768;
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
@@ -373,7 +450,7 @@ function DashboardShell() {
           <button onClick={toggleTheme} className="menu-toggle" title={dark ? 'Light mode' : 'Dark mode'} style={{ fontSize: '18px' }}>
             {dark ? '☀️' : '🌙'}
           </button>
-          <span className="user-info">👤 Admin</span>
+          <ProfileDropdown />
         </div>
       </nav>
 
