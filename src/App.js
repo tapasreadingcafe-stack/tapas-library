@@ -297,6 +297,12 @@ function ProfileDropdown() {
   const [open, setOpen] = useState(false);
   const name = staff?.name || 'Staff';
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const isAdmin = staff?.role === 'admin';
+  // Admin = gold, Staff = blue
+  const avatarBg = isAdmin
+    ? 'linear-gradient(135deg, #D4A853, #C49040)'
+    : 'linear-gradient(135deg, #667eea, #764ba2)';
+  const avatarColor = isAdmin ? '#1a0f08' : '#ffffff';
 
   return (
     <div style={{ position: 'relative' }}>
@@ -311,8 +317,8 @@ function ProfileDropdown() {
       >
         <span style={{
           width: '28px', height: '28px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, #D4A853, #C49040)',
-          color: '#1a0f08', fontSize: '11px', fontWeight: '800',
+          background: avatarBg,
+          color: avatarColor, fontSize: '11px', fontWeight: '800',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>{initials}</span>
         {name.split(' ')[0]}
@@ -329,7 +335,12 @@ function ProfileDropdown() {
             <div style={{ padding: '10px 12px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
               <div style={{ fontWeight: '700', color: '#333', fontSize: '13px' }}>{name}</div>
               <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{staff?.email}</div>
-              <div style={{ fontSize: '10px', color: '#667eea', fontWeight: '600', marginTop: '2px', textTransform: 'uppercase' }}>{staff?.role}</div>
+              <div style={{
+                fontSize: '10px', fontWeight: '600', marginTop: '4px', textTransform: 'uppercase',
+                display: 'inline-block', padding: '2px 8px', borderRadius: '4px',
+                background: isAdmin ? '#fef3c7' : '#dbeafe',
+                color: isAdmin ? '#92400e' : '#1e40af',
+              }}>{staff?.role}</div>
             </div>
             <a href="/settings/profile" style={{
               display: 'flex', alignItems: 'center', gap: '8px',
@@ -341,16 +352,18 @@ function ProfileDropdown() {
             >
               👤 My Profile
             </a>
-            <a href="/settings/app" style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '8px 12px', borderRadius: '6px', textDecoration: 'none',
-              color: '#333', fontSize: '13px',
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              ⚙️ Settings
-            </a>
+            {isAdmin && (
+              <a href="/settings/app" style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 12px', borderRadius: '6px', textDecoration: 'none',
+                color: '#333', fontSize: '13px',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                ⚙️ Settings
+              </a>
+            )}
             <button onClick={() => { setOpen(false); logout(); }} style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '8px 12px', borderRadius: '6px', width: '100%',
@@ -404,16 +417,42 @@ function getPermissionForPath(pathname) {
   return 'dashboard'; // default
 }
 
+// Default permissions for staff role (non-admin). Admin-only pages
+// are set to 'none' by default. Staff get view access to most pages
+// and full access to their core workflows.
+const STAFF_DEFAULT_PERMISSIONS = {
+  dashboard: 'full',
+  books: 'view',
+  borrow: 'full',
+  members: 'view',
+  pos: 'full',
+  fines: 'view',
+  cafe: 'full',
+  events: 'view',
+  inventory: 'view',
+  reports: 'none',     // admin only
+  accounts: 'none',    // admin only
+  vendors: 'none',     // admin only
+  settings: 'none',    // admin only
+  staff: 'none',       // admin only
+};
+
+function getStaffPermission(staff, permKey) {
+  if (staff?.role === 'admin') return 'full';
+  const perms = staff?.permissions || {};
+  // Explicit permission wins. Otherwise use staff defaults.
+  if (perms[permKey]) return perms[permKey];
+  return STAFF_DEFAULT_PERMISSIONS[permKey] || 'full';
+}
+
 function PermissionGate({ children }) {
   const { staff } = useAuth();
   const location = useLocation();
 
-  // Admins bypass all permission checks
   if (staff?.role === 'admin') return children;
 
-  const perms = staff?.permissions || {};
   const needed = getPermissionForPath(location.pathname);
-  const level = perms[needed] || 'full'; // default to full if not set
+  const level = getStaffPermission(staff, needed);
 
   if (level === 'none') {
     return (
@@ -428,6 +467,70 @@ function PermissionGate({ children }) {
   }
 
   return children;
+}
+
+function SidebarNav({ sidebarOpen, openGroups, toggleGroup, isActive, isGroupActive }) {
+  const { staff } = useAuth();
+  const { devMode, getLabel } = useDevMode();
+
+  // Filter nav items: hide pages where permission = 'none'
+  const canSee = (routePath) => {
+    const permKey = getPermissionForPath(routePath);
+    return getStaffPermission(staff, permKey) !== 'none';
+  };
+
+  const filteredNav = NAV_CONFIG.map(item => {
+    if (item.children) {
+      const visibleChildren = item.children.filter(child => canSee(child.to));
+      if (visibleChildren.length === 0) return null;
+      return { ...item, children: visibleChildren };
+    }
+    return canSee(item.to) ? item : null;
+  }).filter(Boolean);
+
+  return (
+    <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+      <nav className="sidebar-nav">
+        {filteredNav.map((item) =>
+          item.children ? (
+            <div key={item.key} className="nav-group">
+              <button
+                className={`nav-group-header ${isGroupActive(item) ? 'has-active' : ''}`}
+                onClick={() => toggleGroup(item.key)}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label"><Editable id={`nav_${item.key}`}>{devMode ? getLabel(`nav_${item.key}`, item.label) : item.label}</Editable></span>
+                <span className={`nav-chevron ${openGroups[item.key] ? 'open' : ''}`}>›</span>
+              </button>
+              <div className={`nav-group-children ${openGroups[item.key] ? 'expanded' : 'collapsed'}`}>
+                {item.children.map(child => (
+                  <HintBubble key={child.to} path={child.to}>
+                    <Link
+                      to={child.to}
+                      className={`nav-link nav-link-child ${isActive(child.to) ? 'active' : ''}`}
+                    >
+                      <span className="nav-icon">{child.icon}</span>
+                      <span className="nav-label"><Editable id={`nav_${child.to}`}>{child.label}</Editable></span>
+                    </Link>
+                  </HintBubble>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <HintBubble key={item.to} path={item.to}>
+              <Link
+                to={item.to}
+                className={`nav-link ${isActive(item.to) ? 'active' : ''}`}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label"><Editable id={`nav_${item.to}`}>{item.label}</Editable></span>
+              </Link>
+            </HintBubble>
+          )
+        )}
+      </nav>
+    </aside>
+  );
 }
 
 function DashboardShell() {
@@ -521,48 +624,14 @@ function DashboardShell() {
         onClick={() => setSidebarOpen(false)}
       />
 
-      {/* SIDEBAR */}
-      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-        <nav className="sidebar-nav">
-          {NAV_CONFIG.map((item, idx) =>
-            item.children ? (
-              <div key={item.key} className="nav-group">
-                <button
-                  className={`nav-group-header ${isGroupActive(item) ? 'has-active' : ''}`}
-                  onClick={() => toggleGroup(item.key)}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-label"><Editable id={`nav_${item.key}`}>{item.label}</Editable></span>
-                  <span className={`nav-chevron ${openGroups[item.key] ? 'open' : ''}`}>›</span>
-                </button>
-                <div className={`nav-group-children ${openGroups[item.key] ? 'expanded' : 'collapsed'}`}>
-                  {item.children.map(child => (
-                    <HintBubble key={child.to} path={child.to}>
-                      <Link
-                        to={child.to}
-                        className={`nav-link nav-link-child ${isActive(child.to) ? 'active' : ''}`}
-                      >
-                        <span className="nav-icon">{child.icon}</span>
-                        <span className="nav-label"><Editable id={`nav_${child.to}`}>{child.label}</Editable></span>
-                      </Link>
-                    </HintBubble>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <HintBubble key={item.to} path={item.to}>
-                <Link
-                  to={item.to}
-                  className={`nav-link ${isActive(item.to) ? 'active' : ''}`}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-label"><Editable id={`nav_${item.to}`}>{item.label}</Editable></span>
-                </Link>
-              </HintBubble>
-            )
-          )}
-        </nav>
-      </aside>
+      {/* SIDEBAR — filtered by permissions for non-admin staff */}
+      <SidebarNav
+        sidebarOpen={sidebarOpen}
+        openGroups={openGroups}
+        toggleGroup={toggleGroup}
+        isActive={isActive}
+        isGroupActive={isGroupActive}
+      />
 
       {/* MAIN CONTENT */}
       <main className={`main-content ${sidebarOpen ? 'expanded' : 'full'}`}>
