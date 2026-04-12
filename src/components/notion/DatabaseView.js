@@ -126,6 +126,79 @@ export default function DatabaseView({
     });
   };
 
+  // ── CSV Export ─────────────────────────────────────────────────
+  const exportCSV = useCallback(() => {
+    const headers = ['Name', ...schema.properties.map(p => p.name)];
+    const csvRows = [headers.join(',')];
+    for (const row of rows) {
+      const cells = [
+        `"${(row.title || '').replace(/"/g, '""')}"`,
+        ...schema.properties.map(p => {
+          let val = row.properties?.[p.id] ?? '';
+          if (p.type === 'select') {
+            const opt = p.options?.find(o => o.id === val);
+            val = opt?.name || '';
+          }
+          if (p.type === 'person') {
+            const person = (_staffCache || []).find(s => s.id === val);
+            val = person?.name || '';
+          }
+          if (p.type === 'checkbox') val = val ? 'Yes' : 'No';
+          return `"${String(val).replace(/"/g, '""')}"`;
+        }),
+      ];
+      csvRows.push(cells.join(','));
+    }
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${database?.title || 'database'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [rows, schema, database]);
+
+  // ── CSV Import ─────────────────────────────────────────────────
+  const importRef = useRef(null);
+  const handleImport = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return alert('CSV needs a header row + at least one data row.');
+    const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+    let imported = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].match(/(".*?"|[^,]*)/g)?.map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim()) || [];
+      const title = cells[0] || 'Untitled';
+      const props = {};
+      schema.properties.forEach((prop, pi) => {
+        const raw = cells[pi + 1] || '';
+        if (!raw) return;
+        if (prop.type === 'select') {
+          let opt = prop.options?.find(o => o.name.toLowerCase() === raw.toLowerCase());
+          if (!opt) {
+            opt = { id: uid(), name: raw, color: SELECT_COLORS[(prop.options?.length || 0) % SELECT_COLORS.length] };
+            prop.options = [...(prop.options || []), opt];
+          }
+          props[prop.id] = opt.id;
+        } else if (prop.type === 'checkbox') {
+          props[prop.id] = ['yes','true','1','✓'].includes(raw.toLowerCase());
+        } else if (prop.type === 'number') {
+          props[prop.id] = Number(raw) || null;
+        } else {
+          props[prop.id] = raw;
+        }
+      });
+      await onCreateRow({ title, properties: props });
+      imported++;
+    }
+    // Update schema if new select options were added
+    onUpdateSchema(schema);
+    alert(`Imported ${imported} row(s).`);
+    if (importRef.current) importRef.current.value = '';
+  }, [schema, onCreateRow, onUpdateSchema]);
+
   // ── Render ───────────────────────────────────────────────────────
   return (
     <div>
@@ -155,7 +228,17 @@ export default function DatabaseView({
           <AddViewButton onAdd={addView} />
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {/* Export / Import */}
+          <button onClick={exportCSV} style={styles.toolBtn} title="Export as CSV (opens in Excel)">
+            📥 Export
+          </button>
+          <label style={{ ...styles.toolBtn, cursor: 'pointer' }} title="Import from CSV">
+            📤 Import
+            <input ref={importRef} type="file" accept=".csv" onChange={handleImport}
+              style={{ display: 'none' }} />
+          </label>
+
           {activeView?.type === 'board' && (
             <GroupBySelect
               schema={schema}
@@ -408,34 +491,72 @@ function BoardView({ schema, rows, groupBy, onCreateRow, onUpdateRow, onOpenRow 
     else byGroup.__none__.push(r);
   });
 
+  const [dragOverGroup, setDragOverGroup] = useState(null);
+
+  const handleDragStart = (e, rowId) => {
+    e.dataTransfer.setData('text/plain', rowId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e) => {
+    e.currentTarget.style.opacity = '1';
+    setDragOverGroup(null);
+  };
+
+  const handleDrop = (e, groupId) => {
+    e.preventDefault();
+    setDragOverGroup(null);
+    const rowId = e.dataTransfer.getData('text/plain');
+    if (!rowId) return;
+    const newValue = groupId === '__none__' ? null : groupId;
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+    onUpdateRow(rowId, {
+      properties: { ...(row.properties || {}), [prop.id]: newValue },
+    });
+  };
+
   return (
     <div style={styles.boardWrap}>
       {groups.map(g => {
         const color = COLOR_STYLES[g.color] || COLOR_STYLES.gray;
         const items = byGroup[g.id];
+        const isOver = dragOverGroup === g.id;
         return (
-          <div key={g.id} style={styles.boardColumn}>
+          <div
+            key={g.id}
+            style={{
+              ...styles.boardColumn,
+              background: isOver ? '#dbeafe' : N.bgAlt,
+              border: isOver ? '2px dashed #3b82f6' : '2px solid transparent',
+              transition: 'background 150ms, border 150ms',
+            }}
+            onDragOver={(e) => { e.preventDefault(); setDragOverGroup(g.id); }}
+            onDragLeave={() => setDragOverGroup(null)}
+            onDrop={(e) => handleDrop(e, g.id)}
+          >
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '10px',
-              padding: '4px 6px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              marginBottom: '10px', padding: '4px 6px',
             }}>
               <span style={{
-                display: 'inline-block',
-                padding: '3px 10px',
-                borderRadius: '99px',
-                background: color.bg,
-                color: color.fg,
-                fontSize: '11px',
-                fontWeight: 700,
+                display: 'inline-block', padding: '3px 10px',
+                borderRadius: '99px', background: color.bg,
+                color: color.fg, fontSize: '11px', fontWeight: 700,
               }}>{g.name}</span>
               <span style={{ color: N.textFaint, fontSize: '11px' }}>{items.length}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '60px' }}>
               {items.map(row => (
-                <BoardCard key={row.id} row={row} schema={schema} onClick={() => onOpenRow(row)} />
+                <BoardCard
+                  key={row.id}
+                  row={row}
+                  schema={schema}
+                  onClick={() => onOpenRow(row)}
+                  onDragStart={(e) => handleDragStart(e, row.id)}
+                  onDragEnd={handleDragEnd}
+                />
               ))}
               <button
                 onClick={() => onCreateRow({
@@ -453,16 +574,19 @@ function BoardView({ schema, rows, groupBy, onCreateRow, onUpdateRow, onOpenRow 
   );
 }
 
-function BoardCard({ row, schema, onClick }) {
+function BoardCard({ row, schema, onClick, onDragStart, onDragEnd }) {
   return (
     <div
+      draggable
       onClick={onClick}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       style={{
         background: 'white',
         borderRadius: '8px',
         padding: '12px',
         border: `1px solid ${N.border}`,
-        cursor: 'pointer',
+        cursor: 'grab',
         transition: 'all 150ms',
         boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
       }}
@@ -1292,6 +1416,19 @@ const styles = {
     color: N.textMuted,
     marginBottom: '-1px',
     borderBottom: '2px solid transparent',
+  },
+  toolBtn: {
+    padding: '5px 12px',
+    background: N.bgAlt,
+    border: `1px solid ${N.border}`,
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: N.textDim,
+    fontFamily: 'inherit',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
   },
   iconBtn: {
     background: 'transparent',

@@ -228,7 +228,7 @@ export default function Tasks() {
           owner_id: staff?.id || null,
           workspace: activePage.workspace,
           parent_id: activePage.id,
-          title: 'Untitled',
+          title: initial.title || 'Untitled',
           icon: '📄',
           blocks: [newBlock('text', '')],
           is_database: false,
