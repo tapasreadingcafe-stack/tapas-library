@@ -169,12 +169,32 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    // Load staff profile immediately instead of waiting for the async
-    // onAuthStateChange callback — this ensures both user AND staff are
-    // set by the time login() returns to the caller.
+
+    // Query staff table directly here — don't rely on loadStaffProfile
+    // or onAuthStateChange which have timing issues.
     if (data?.user) {
-      await loadStaffProfile(data.user);
+      try {
+        const { data: staffRow } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('email', data.user.email)
+          .maybeSingle();
+
+        setUser(data.user);
+        if (staffRow && staffRow.is_active) {
+          setStaff(staffRow);
+          writeCachedStaff(staffRow);
+        } else {
+          setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
+          writeCachedStaff(null);
+        }
+      } catch (e) {
+        // Staff query failed — still set user so we don't lose the session
+        setUser(data.user);
+        setStaff({ _error: e.message || 'Staff query failed' });
+      }
     }
+
     return data;
   };
 
