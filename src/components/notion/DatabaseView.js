@@ -750,6 +750,8 @@ function TextCell({ value, onChange, placeholder }) {
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder || ''}
       style={styles.cellInput}
+      onFocus={e => { e.target.style.borderColor = N.accent; e.target.style.background = '#fefce8'; }}
+      onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'; }}
     />
   );
 }
@@ -1455,12 +1457,15 @@ const styles = {
   cellInput: {
     width: '100%',
     padding: '6px 10px',
-    border: 'none',
+    border: '1.5px solid transparent',
+    borderRadius: '4px',
     background: 'transparent',
     fontSize: '13px',
     fontFamily: 'inherit',
     color: N.text,
     outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 120ms, background 120ms',
   },
   openBtn: {
     width: '22px',
@@ -1479,11 +1484,14 @@ const styles = {
   },
   rowDeleteBtn: {
     background: 'transparent',
-    border: 'none',
+    border: '1px solid transparent',
+    borderRadius: '4px',
     cursor: 'pointer',
-    color: N.textFaint,
-    fontSize: '12px',
-    padding: '4px',
+    color: '#dc2626',
+    fontSize: '14px',
+    padding: '4px 6px',
+    transition: 'all 120ms',
+    opacity: 0.6,
   },
   boardWrap: {
     display: 'flex',

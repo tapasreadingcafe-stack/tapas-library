@@ -249,7 +249,6 @@ export default function Tasks() {
   };
 
   const deleteRow = async (rowId) => {
-    if (!window.confirm('Delete this row?')) return;
     try {
       const { error: err } = await supabase
         .from('tasks_pages')
