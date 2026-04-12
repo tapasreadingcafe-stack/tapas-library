@@ -73,6 +73,10 @@ const MarketingHub          = React.lazy(() => import('./pages/MarketingHub'));
 const LoyaltySystem         = React.lazy(() => import('./pages/LoyaltySystem'));
 const GrowthTools           = React.lazy(() => import('./pages/GrowthTools'));
 const CampaignTools         = React.lazy(() => import('./pages/CampaignTools'));
+const Automations           = React.lazy(() => import('./pages/Automations'));
+const EngagementTools       = React.lazy(() => import('./pages/EngagementTools'));
+const MarketingDashboard    = React.lazy(() => import('./pages/MarketingDashboard'));
+const Newsletter            = React.lazy(() => import('./pages/Newsletter'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -193,11 +197,15 @@ const NAV_CONFIG = [
   {
     icon: '📣', label: 'Marketing', key: 'marketing',
     children: [
+      { to: '/marketing-dashboard', icon: '📊', label: 'Overview' },
       { to: '/promo-codes',    icon: '🏷️', label: 'Promo Codes' },
       { to: '/loyalty',        icon: '🏆', label: 'Loyalty & Rewards' },
       { to: '/growth',         icon: '🌱', label: 'Growth Tools' },
       { to: '/campaigns',      icon: '📢', label: 'Campaigns' },
-      { to: '/marketing-hub',  icon: '⚡', label: 'Marketing Hub' },
+      { to: '/automations',    icon: '⚡', label: 'Automations' },
+      { to: '/engagement',     icon: '💬', label: 'Engagement' },
+      { to: '/newsletter',     icon: '✉️', label: 'Newsletter' },
+      { to: '/marketing-hub',  icon: '🔧', label: 'Marketing Hub' },
       { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
     ],
   },
@@ -487,10 +495,14 @@ function DashboardShell() {
             <Route path="/store/content"                      element={<SiteContent />} />
 
             {/* Marketing */}
+            <Route path="/marketing-dashboard"                element={<MarketingDashboard />} />
             <Route path="/promo-codes"                        element={<PromoCodes />} />
             <Route path="/loyalty"                            element={<LoyaltySystem />} />
             <Route path="/growth"                             element={<GrowthTools />} />
             <Route path="/campaigns"                          element={<CampaignTools />} />
+            <Route path="/automations"                        element={<Automations />} />
+            <Route path="/engagement"                         element={<EngagementTools />} />
+            <Route path="/newsletter"                         element={<Newsletter />} />
             <Route path="/marketing-hub"                      element={<MarketingHub />} />
             <Route path="/marketing"                          element={<MarketingTools />} />
 
