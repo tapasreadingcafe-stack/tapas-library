@@ -17,10 +17,8 @@ import { newBlock, starterDbSchema, uid, N } from '../components/notion/shared';
 // =====================================================================
 
 const WORKSPACES = [
-  { key: 'work',     label: 'Work',     icon: '💼', desc: 'Shared with all staff' },
-  { key: 'personal', label: 'Personal', icon: '👤', desc: 'Private to you' },
-  { key: 'shopping', label: 'Shopping', icon: '🛒', desc: 'Shared lists' },
-  { key: 'ideas',    label: 'Ideas',    icon: '💡', desc: 'Notes + drafts' },
+  { key: 'work',     label: 'Work',     icon: '💼', desc: 'Shared tasks and notes' },
+  { key: 'personal', label: 'Personal', icon: '👤', desc: 'Only you can see this' },
 ];
 
 const PAGE_TEMPLATES = {
@@ -288,77 +286,71 @@ export default function Tasks() {
       {/* LEFT SIDEBAR */}
       <aside style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
-          <div style={{ fontSize: '13px', fontWeight: 800, color: N.text }}>📒 Tasks & Notes</div>
-          <div style={{ fontSize: '11px', color: N.textMuted, marginTop: '2px' }}>
-            Notion-style workspace
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: N.text }}>📒 Tasks & Notes</div>
+            <CreateMenu
+              onCreateDoc={() => createDoc('work')}
+              onCreateDatabase={() => createDatabase('work')}
+            />
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+          {/* Workspaces */}
           {WORKSPACES.map(ws => {
             const wsPages = topLevelByWorkspace[ws.key] || [];
             return (
-              <div key={ws.key} style={{ marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px 4px 14px' }}>
-                  <span style={{ fontSize: '13px' }}>{ws.icon}</span>
+              <div key={ws.key}>
+                {/* Workspace header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 14px 4px',
+                  marginTop: '8px',
+                }}>
+                  <span style={{ fontSize: '12px' }}>{ws.icon}</span>
                   <span style={{
-                    flex: 1,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    color: N.textMuted,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.6px',
+                    flex: 1, fontSize: '11px', fontWeight: 700,
+                    color: N.textFaint, textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
                   }}>{ws.label}</span>
                   <CreateMenu
                     onCreateDoc={() => createDoc(ws.key)}
                     onCreateDatabase={() => createDatabase(ws.key)}
                   />
                 </div>
-                {wsPages.length === 0 ? (
-                  <div style={{ padding: '4px 14px 4px 30px', fontSize: '12px', color: '#cbd5e1' }}>
-                    No pages yet
-                  </div>
-                ) : (
-                  wsPages.map(p => {
-                    const active = p.id === activePageId;
-                    return (
-                      <div
-                        key={p.id}
-                        onClick={() => setActivePageId(p.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '5px 12px 5px 26px',
-                          cursor: 'pointer',
-                          background: active ? '#e2e8f0' : 'transparent',
-                          borderLeft: active ? '2px solid #D4A853' : '2px solid transparent',
-                          transition: 'background 120ms',
-                        }}
-                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = N.bgAlt; }}
-                        onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <span style={{ fontSize: '14px', flexShrink: 0 }}>
-                          {p.is_database ? '🗂' : (p.icon || '📄')}
-                        </span>
-                        <span style={{
-                          flex: 1,
-                          fontSize: '13px',
-                          color: active ? N.text : N.textDim,
-                          fontWeight: active ? 600 : 500,
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                        }}>
-                          {p.title}
-                        </span>
-                        {p.is_database && (
-                          <span style={{ fontSize: '10px', color: N.textFaint, fontWeight: 700 }}>DB</span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
+
+                {/* Pages under this workspace */}
+                {wsPages.map(p => {
+                  const active = p.id === activePageId;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setActivePageId(p.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '6px 14px 6px 32px',
+                        cursor: 'pointer',
+                        background: active ? '#e2e8f0' : 'transparent',
+                        borderLeft: active ? '3px solid #D4A853' : '3px solid transparent',
+                        transition: 'background 100ms',
+                      }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f1f5f9'; }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span style={{ fontSize: '13px', flexShrink: 0 }}>
+                        {p.is_database ? '🗂' : (p.icon || '📄')}
+                      </span>
+                      <span style={{
+                        flex: 1, fontSize: '13px',
+                        color: active ? N.text : N.textDim,
+                        fontWeight: active ? 600 : 400,
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      }}>
+                        {p.title}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
