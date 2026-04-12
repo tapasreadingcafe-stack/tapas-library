@@ -137,7 +137,6 @@ export default function Integrations() {
   const [expandedKey, setExpandedKey] = useState(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const { data } = await supabase
       .from('app_settings')
       .select('value')
@@ -147,7 +146,6 @@ export default function Integrations() {
       const raw = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
       setConfig(raw);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -245,27 +243,23 @@ export default function Integrations() {
         ))}
       </div>
 
-      {loading ? (
-        <div style={S.empty}>Loading integrations…</div>
-      ) : (
-        <div style={S.grid}>
-          {filtered.map(service => (
-            <ServiceCard
-              key={service.key}
-              service={service}
-              values={config[service.key] || {}}
-              connected={isConnected(service.key)}
-              saving={saving === service.key}
-              savedAt={savedAt[service.key]}
-              expanded={expandedKey === service.key}
-              onToggleExpand={() => setExpandedKey(expandedKey === service.key ? null : service.key)}
-              onUpdate={(fieldKey, value) => updateField(service.key, fieldKey, value)}
-              onSave={() => saveService(service.key)}
-              onDisconnect={() => disconnect(service.key)}
-            />
-          ))}
-        </div>
-      )}
+      <div style={S.grid}>
+        {filtered.map(service => (
+          <ServiceCard
+            key={service.key}
+            service={service}
+            values={config[service.key] || {}}
+            connected={isConnected(service.key)}
+            saving={saving === service.key}
+            savedAt={savedAt[service.key]}
+            expanded={expandedKey === service.key}
+            onToggleExpand={() => setExpandedKey(expandedKey === service.key ? null : service.key)}
+            onUpdate={(fieldKey, value) => updateField(service.key, fieldKey, value)}
+            onSave={() => saveService(service.key)}
+            onDisconnect={() => disconnect(service.key)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
