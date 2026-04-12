@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useSiteContent } from '../context/SiteContent';
 import HeroCarousel from '../components/HeroCarousel';
@@ -128,10 +128,10 @@ export default function Home() {
   const content = useSiteContent();
   const home = content.home;
   const newsletter = content.newsletter;
-  const images = content.images || {};
   const visibility = content.visibility || {};
   const layout = content.layout || {};
   const sectionStyles = content.section_styles || {};
+  const images = content.images || {};
 
   const bgOverlay = 'linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(44,24,16,0.78) 100%)';
   const resolveBg = (imgUrl, solidColor, fallbackImgUrl, defaultBg) => {
@@ -148,14 +148,11 @@ export default function Home() {
     return idx === -1 ? 999 : idx;
   };
 
-  const [featured, setFeatured] = useState(null);
   const [staffPicks, setStaffPicks] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [emailInput, setEmailInput] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchData();
@@ -175,7 +172,6 @@ export default function Home() {
         const { data: ratedFallback } = await supabase.from('books').select('*').eq('store_visible', true).gt('quantity_available', 0).order('rating', { ascending: false, nullsFirst: false }).limit(5);
         picks = ratedFallback || [];
       }
-      setFeatured(picks[0] || newest[0] || null);
       setStaffPicks((picks[0] ? picks.slice(1) : picks).slice(0, 4));
       setNewArrivals(newest.filter(b => !picks[0] || b.id !== picks[0].id).slice(0, 8));
     } catch (err) {
@@ -183,11 +179,6 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchTerm.trim()) navigate(`/books?search=${encodeURIComponent(searchTerm.trim())}`);
   };
 
   const handleSubscribe = (e) => {
@@ -199,148 +190,23 @@ export default function Home() {
     <div style={{ fontFamily:'var(--font-body)', background:'var(--bg)', display:'flex', flexDirection:'column' }}>
 
       {/* ================================================================ */}
-      {/* 1. HERO                                                           */}
+      {/* 1. HERO — full-width rotating carousel                            */}
       {/* ================================================================ */}
       {visibility.home_hero !== false && (
-      <section id="section-home-hero" data-editable-section="home" style={{
-        order: getOrder('hero'),
-        background: resolveBg(
-          sectionStyles.home_hero_bg_image,
-          sectionStyles.home_hero_bg_color,
-          images.home_hero_bg_url,
-          'var(--gradient-hero)'
-        ),
-        color: '#F5DEB3', position: 'relative', overflow: 'hidden',
-        paddingTop:    `${sectionStyles.home_hero_padding_top ?? 88}px`,
-        paddingBottom: `${sectionStyles.home_hero_padding_bottom ?? 112}px`,
-      }}>
-        {/* Subtle atmosphere */}
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none',
-          backgroundImage:'radial-gradient(circle at 18% 50%, rgba(212,168,83,0.14) 0%, transparent 55%), radial-gradient(circle at 82% 18%, rgba(245,222,179,0.08) 0%, transparent 50%)' }} />
-        <div style={{ position:'absolute', right:'-140px', top:'-140px', width:'480px', height:'480px', borderRadius:'50%', background:'rgba(212,168,83,0.05)', border:'1px solid rgba(212,168,83,0.12)', filter:'blur(1px)' }} />
-
-        <div className="tps-container hero-grid" style={{
-          position:'relative', zIndex:1,
-          display:'grid', gridTemplateColumns:'1.3fr 1fr', gap:'60px', alignItems:'center',
-        }}>
-          <div className="tps-animate-in">
-            <div data-editable="home.hero_eyebrow" className="tps-badge tps-badge-accent" style={{ marginBottom:'28px' }}>
-              📚 {home.hero_eyebrow}
-            </div>
-            <h1 style={{
-              fontFamily:'var(--font-heading)',
-              fontSize: 'clamp(36px, 6vw, 76px)',
-              fontWeight:'800', lineHeight:'1.04', marginBottom:'24px',
-              color:'#F5DEB3',
-              letterSpacing:'-0.02em',
-            }}>
-              <span data-editable="home.hero_headline_line1">{home.hero_headline_line1}</span><br />
-              <span data-editable="home.hero_headline_line2" style={{ color:'#D4A853', fontStyle:'italic' }}>{home.hero_headline_line2}</span>
-            </h1>
-            <p data-editable="home.hero_description" style={{ fontSize:'18px', lineHeight:'1.7', color:'rgba(245,222,179,0.82)', marginBottom:'36px', maxWidth:'540px' }}>
-              {home.hero_description}
-            </p>
-
-            <form onSubmit={handleSearch} style={{
-              display:'flex',
-              maxWidth:'540px',
-              borderRadius:'99px',
-              overflow:'hidden',
-              background:'rgba(255,255,255,0.08)',
-              backdropFilter:'blur(12px)',
-              WebkitBackdropFilter:'blur(12px)',
-              border:'1px solid rgba(245,222,179,0.18)',
-              boxShadow:'0 10px 30px rgba(0,0,0,0.35)',
-              marginBottom:'24px',
-            }}>
-              <input
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder={home.search_placeholder}
-                style={{ flex:1, padding:'16px 26px', border:'none', fontSize:'15px', outline:'none', background:'transparent', color:'#F5DEB3', fontFamily:'var(--font-body)' }}
-              />
-              <button type="submit" style={{
-                padding:'16px 30px',
-                background:'var(--gradient-cta)',
-                border:'none', color:'#2C1810',
-                fontWeight:'800', cursor:'pointer',
-                fontSize:'14px',
-                letterSpacing:'0.5px',
-                borderRadius:'99px',
-                margin:'6px',
-                transition:'transform 200ms',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.04)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-              >
-                Search
-              </button>
-            </form>
-
-            <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', alignItems:'center' }}>
-              {['Fiction','Non-Fiction','Children','Science'].map(g => (
-                <Link key={g} to={`/books?genre=${encodeURIComponent(g)}`} style={{
-                  color:'rgba(245,222,179,0.85)',
-                  textDecoration:'none',
-                  padding:'6px 14px',
-                  borderRadius:'99px',
-                  border:'1px solid rgba(245,222,179,0.22)',
-                  fontSize:'12px',
-                  fontWeight:'600',
-                  transition:'all 200ms',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,168,83,0.18)'; e.currentTarget.style.borderColor = '#D4A853'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(245,222,179,0.22)'; }}
-                >
-                  {g}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {featured && (
-            <div className="tps-animate-in" style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'18px' }}>
-              <div className="tps-eyebrow" style={{ color:'#D4A853' }}>
-                ★ This week's pick
-              </div>
-              <Link to={`/books/${featured.id}`} style={{ textDecoration:'none', color:'inherit', transition:'transform 300ms var(--ease)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; }}
-              >
-                <BookCover book={featured} size={240} />
-              </Link>
-              <div style={{ textAlign:'center', maxWidth:'280px' }}>
-                <h3 style={{ fontFamily:'var(--font-heading)', fontSize:'22px', fontWeight:'700', color:'#F5DEB3', marginBottom:'6px', lineHeight:'1.25' }}>
-                  {featured.title}
-                </h3>
-                <p style={{ color:'rgba(245,222,179,0.65)', fontSize:'13px', marginBottom:'16px' }}>by {featured.author}</p>
-                <Link to={`/books/${featured.id}`} className="tps-btn tps-btn-primary">
-                  Read more →
-                </Link>
-              </div>
-            </div>
-          )}
+        <div style={{ order: getOrder('hero') }}>
+          <HeroCarousel home={home} sectionStyles={sectionStyles} />
         </div>
-
-        {/* Hero carousel — rotating cards for events/announcements */}
-        {home.hero_carousel_enabled !== false && home.hero_carousel_enabled !== 'false' && (
-          <HeroCarousel home={home} />
-        )}
-
-        <style>{`
-          @media (max-width: 860px) {
-            .hero-grid { grid-template-columns: 1fr !important; text-align: center; }
-            .hero-grid > div:first-child { margin: 0 auto; }
-          }
-        `}</style>
-      </section>
       )}
 
       {/* ================================================================ */}
       {/* 2. GENRES                                                         */}
       {/* ================================================================ */}
       {visibility.home_genres !== false && (
-      <section id="section-home-genres" className="tps-section" style={{ order: getOrder('genres') }}>
+      <section id="section-home-genres" className="tps-section" style={{
+        order: getOrder('genres'),
+        background: sectionStyles.home_genres_bg_color || undefined,
+        textAlign: sectionStyles.home_genres_text_align || undefined,
+      }}>
         <div className="tps-container">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
             <div>
@@ -414,7 +280,11 @@ export default function Home() {
       {/* 4. NEW ARRIVALS                                                   */}
       {/* ================================================================ */}
       {visibility.home_new_arrivals !== false && (
-      <section id="section-home-new-arrivals" className="tps-section" style={{ order: getOrder('new_arrivals') }}>
+      <section id="section-home-new-arrivals" className="tps-section" style={{
+        order: getOrder('new_arrivals'),
+        background: sectionStyles.home_new_arrivals_bg_color || undefined,
+        textAlign: sectionStyles.home_new_arrivals_text_align || undefined,
+      }}>
         <div className="tps-container">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
             <div>
@@ -495,7 +365,11 @@ export default function Home() {
       {/* 6. NEWSLETTER                                                     */}
       {/* ================================================================ */}
       {visibility.home_newsletter !== false && (
-      <section id="section-newsletter" data-editable-section="newsletter" className="tps-section" style={{ order: getOrder('newsletter') }}>
+      <section id="section-newsletter" data-editable-section="newsletter" className="tps-section" style={{
+        order: getOrder('newsletter'),
+        background: sectionStyles.home_newsletter_bg_color || undefined,
+        textAlign: sectionStyles.home_newsletter_text_align || undefined,
+      }}>
         <div className="tps-container-narrow">
           <div style={{
             background:'var(--gradient-subtle)',

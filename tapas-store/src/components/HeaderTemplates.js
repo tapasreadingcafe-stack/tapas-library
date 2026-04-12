@@ -68,7 +68,21 @@ function useHeaderState() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const brand = content.brand;
+  const ss = content.section_styles || {};
+  // Apply per-section overrides by merging into the brand colors the
+  // header templates read. Empty string = keep brand default.
+  const brand = {
+    ...content.brand,
+    // The header templates use primary_color / primary_color_light for
+    // their background gradient. Override both with the section bg so
+    // the whole navbar recolours.
+    primary_color:       ss.header_bg_color || content.brand?.primary_color,
+    primary_color_light: ss.header_bg_color || content.brand?.primary_color_light,
+    // sand_color drives brand name + nav link color in all templates.
+    sand_color:          ss.header_text_color || content.brand?.sand_color,
+    // accent_color drives active link color + tagline.
+    accent_color:        ss.header_link_active_color || content.brand?.accent_color,
+  };
   const header = content.header || {};
   const contact = content.contact || {};
 
@@ -559,5 +573,14 @@ export default function HeaderTemplate() {
   const state = useHeaderState();
   const template = state.header.template || 'classic';
   const Component = TEMPLATES[template] || HeaderClassic;
-  return <Component {...state} />;
+  const ss = state.content?.section_styles || {};
+  const cssOverrides = `
+    ${ss.header_link_color ? `.tapas-header-root nav a { color: ${ss.header_link_color} !important; }` : ''}
+  `;
+  return (
+    <div className="tapas-header-root">
+      <style>{cssOverrides}</style>
+      <Component {...state} />
+    </div>
+  );
 }

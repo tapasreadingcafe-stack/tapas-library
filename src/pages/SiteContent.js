@@ -58,9 +58,11 @@ const SECTION_DEFAULT_PATH = {
   about: '/about', about_values: '/about',
   offers: '/offers', offers_why_join: '/offers', offers_cta: '/offers', offers_cta_mock: '/offers',
   newsletter: '/', plans_basic: '/offers', plans_silver: '/offers', plans_gold: '/offers',
-  catalog: '/books', footer: '/', visibility: '/', styles: '/', layout: '/',
+  catalog: '/books', footer: '/', header: '/', visibility: '/', styles: '/', layout: '/',
   section_style_home_hero: '/', section_style_home_staff_picks: '/', section_style_home_cafe_story: '/',
   section_style_about_hero: '/about', section_style_offers_hero: '/offers',
+  section_style_header: '/', section_style_footer: '/',
+  section_style_home_genres: '/', section_style_home_new_arrivals: '/', section_style_home_newsletter: '/',
 };
 
 function storageKeyForSection(section) { return section.parent || section.key; }
@@ -1048,7 +1050,14 @@ export default function SiteContent() {
       return next;
     });
     const path = SECTION_DEFAULT_PATH[sectionKey] || '/';
-    if (iframePath !== path) setIframePath(path);
+    if (iframePath !== path) {
+      setIframePath(path);
+      // Force full iframe remount so the new page gets a fresh bundle
+      // and cache-buster param. Without this the browser may serve a
+      // cached chunk from a previous deploy.
+      setIframeKey(k => k + 1);
+      setIframeReady(false);
+    }
     // Scroll the section card into view in the right panel after the
     // render cycle completes.
     setTimeout(() => {

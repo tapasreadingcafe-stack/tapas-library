@@ -22,12 +22,26 @@ import { useSiteContent } from '../context/SiteContent';
 
 function useFooterState() {
   const content = useSiteContent();
+  const ss = content.section_styles || {};
+  // Apply per-section overrides by merging them into the brand colors
+  // that footer templates read. Empty string = keep brand default.
+  const brand = {
+    ...content.brand,
+    // Footer bg overrides brand primary_color_dark only for the footer.
+    primary_color_dark: ss.footer_bg_color || content.brand?.primary_color_dark,
+    // Footer body text color overrides sand_color (if set).
+    sand_color: ss.footer_text_color || content.brand?.sand_color,
+    // Heading color overrides accent (if set).
+    accent_color: ss.footer_heading_color || content.brand?.accent_color,
+  };
   return {
     content,
-    brand: content.brand,
+    brand,
     footer: content.footer || {},
     contact: content.contact || {},
     header: content.header || {},
+    // Raw section style map for additional tweaks (alignment, link color)
+    sectionStyles: ss,
   };
 }
 
@@ -501,5 +515,19 @@ export default function FooterTemplate() {
   const state = useFooterState();
   const template = state.footer.template || 'classic';
   const Component = TEMPLATES[template] || FooterClassic;
-  return <Component {...state} />;
+  const ss = state.sectionStyles || {};
+  // Section-level CSS overrides applied to the whole footer block. This
+  // layers on top of the inline styles each template uses, using high
+  // specificity + !important so it always wins.
+  const cssOverrides = `
+    .tapas-footer-root { text-align: ${ss.footer_text_align || 'left'} !important; }
+    ${ss.footer_text_align === 'center' ? '.tapas-footer-root .tapas-foot-grid > div { text-align: center; }' : ''}
+    ${ss.footer_link_color ? `.tapas-footer-root a { color: ${ss.footer_link_color} !important; }` : ''}
+  `;
+  return (
+    <div className="tapas-footer-root">
+      <style>{cssOverrides}</style>
+      <Component {...state} />
+    </div>
+  );
 }

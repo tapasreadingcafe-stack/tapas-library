@@ -198,6 +198,23 @@ export const DEFAULT_CONTENT = {
     offers_hero_padding_bottom: 40,
     offers_hero_bg_color:       '',
     offers_hero_bg_image:       '',
+    // Per-section color / alignment overrides for header + footer + main
+    // content sections. Empty string means "use brand defaults".
+    header_bg_color:            '',
+    header_text_color:          '',
+    header_link_color:          '',
+    header_link_active_color:   '',
+    footer_bg_color:            '',
+    footer_text_color:          '',
+    footer_heading_color:       '',
+    footer_link_color:          '',
+    footer_text_align:          'left',
+    home_genres_bg_color:       '',
+    home_genres_text_align:     'left',
+    home_new_arrivals_bg_color: '',
+    home_new_arrivals_text_align: 'left',
+    home_newsletter_bg_color:   '',
+    home_newsletter_text_align: 'center',
   },
 };
 
@@ -648,6 +665,82 @@ export const CONTENT_SCHEMA = [
       { key: 'offers_hero_padding_bottom', label: 'Padding bottom (px)', type: 'number', min: 0, max: 300 },
       { key: 'offers_hero_bg_color',       label: 'Background color',    type: 'color' },
       { key: 'offers_hero_bg_image',       label: 'Background image',    type: 'image' },
+    ],
+  },
+  {
+    key: 'section_style_header',
+    parent: 'section_styles',
+    title: 'Header — colors',
+    subtitle: 'Per-section color overrides for the navbar. Empty = use brand defaults.',
+    icon: '🎨',
+    fields: [
+      { key: 'header_bg_color',          label: 'Background color',   type: 'color', hint: 'Navbar background. Leave blank for the default gradient.' },
+      { key: 'header_text_color',        label: 'Text color',         type: 'color', hint: 'Brand name / small tagline.' },
+      { key: 'header_link_color',        label: 'Nav link color',     type: 'color' },
+      { key: 'header_link_active_color', label: 'Active link color',  type: 'color', hint: 'Current page link.' },
+    ],
+  },
+  {
+    key: 'section_style_footer',
+    parent: 'section_styles',
+    title: 'Footer — colors & alignment',
+    subtitle: 'Per-section color and alignment overrides for the footer.',
+    icon: '🎨',
+    fields: [
+      { key: 'footer_bg_color',      label: 'Background color', type: 'color' },
+      { key: 'footer_text_color',    label: 'Body text color',  type: 'color' },
+      { key: 'footer_heading_color', label: 'Heading color',    type: 'color', hint: 'Quick Links / Hours / Contact headings.' },
+      { key: 'footer_link_color',    label: 'Link color',       type: 'color' },
+      { key: 'footer_text_align',    label: 'Text alignment',   type: 'select', options: [
+        { value: 'left',   label: 'Left' },
+        { value: 'center', label: 'Center' },
+        { value: 'right',  label: 'Right' },
+      ] },
+    ],
+  },
+  {
+    key: 'section_style_home_genres',
+    parent: 'section_styles',
+    title: 'Home genres — colors & alignment',
+    subtitle: '"Browse by genre" section colors.',
+    icon: '🎨',
+    fields: [
+      { key: 'home_genres_bg_color',    label: 'Background color', type: 'color' },
+      { key: 'home_genres_text_align',  label: 'Text alignment',   type: 'select', options: [
+        { value: 'left',   label: 'Left' },
+        { value: 'center', label: 'Center' },
+        { value: 'right',  label: 'Right' },
+      ] },
+    ],
+  },
+  {
+    key: 'section_style_home_new_arrivals',
+    parent: 'section_styles',
+    title: 'Home new arrivals — colors & alignment',
+    subtitle: '"New & noteworthy" section colors.',
+    icon: '🎨',
+    fields: [
+      { key: 'home_new_arrivals_bg_color',   label: 'Background color', type: 'color' },
+      { key: 'home_new_arrivals_text_align', label: 'Text alignment',   type: 'select', options: [
+        { value: 'left',   label: 'Left' },
+        { value: 'center', label: 'Center' },
+        { value: 'right',  label: 'Right' },
+      ] },
+    ],
+  },
+  {
+    key: 'section_style_home_newsletter',
+    parent: 'section_styles',
+    title: 'Home newsletter — colors & alignment',
+    subtitle: 'Newsletter subscribe section.',
+    icon: '🎨',
+    fields: [
+      { key: 'home_newsletter_bg_color',   label: 'Background color', type: 'color' },
+      { key: 'home_newsletter_text_align', label: 'Text alignment',   type: 'select', options: [
+        { value: 'left',   label: 'Left' },
+        { value: 'center', label: 'Center' },
+        { value: 'right',  label: 'Right' },
+      ] },
     ],
   },
 ];

@@ -44,31 +44,30 @@ export const DEFAULT_CONTENT = {
     hero_description: "A curated collection of books to borrow or own — handpicked by the Tapas Reading Cafe team. Fiction, memoirs, kids' favourites, and everything in between.",
     search_placeholder: 'Search title, author, or genre…',
 
-    // Hero carousel — toggle on to show rotating slides below the headline
-    // for events, announcements, or featured offers. Each slide is a card
-    // with an image, eyebrow, title, body, and a link target.
+    // Hero carousel — the home hero IS this carousel. 3 rotating slides,
+    // each editable from the dashboard. Empty title hides the slide.
     hero_carousel_enabled: true,
     hero_carousel_autoplay_seconds: 6,
 
-    hero_slide_1_eyebrow: '📅 Event',
-    hero_slide_1_title: 'Monthly Book Club',
-    hero_slide_1_body: 'Join us the first Saturday of every month for coffee, conversation, and a new book to read together.',
-    hero_slide_1_cta_label: 'Reserve your spot →',
-    hero_slide_1_cta_link: '/offers',
+    hero_slide_1_eyebrow: '✨ Coming soon',
+    hero_slide_1_title: 'Something wonderful is on its way.',
+    hero_slide_1_body: 'A brand new reading experience is being crafted for you. Stay tuned for announcements, events, and curated picks from the Tapas Reading Cafe team.',
+    hero_slide_1_cta_label: 'Browse our books →',
+    hero_slide_1_cta_link: '/books',
     hero_slide_1_image: '',
 
-    hero_slide_2_eyebrow: '☕ New arrival',
-    hero_slide_2_title: 'Filter coffee is back',
-    hero_slide_2_body: 'South-Indian filter coffee, brewed slow, served strong. Pair it with any book from our shelves.',
-    hero_slide_2_cta_label: 'See menu →',
-    hero_slide_2_cta_link: '/about',
+    hero_slide_2_eyebrow: '📅 Coming soon',
+    hero_slide_2_title: 'Events, workshops, and reading circles.',
+    hero_slide_2_body: 'Monthly book clubs, author visits, and open-mic evenings — all taking shape. Become a member today to be the first to hear when we launch.',
+    hero_slide_2_cta_label: 'Become a member →',
+    hero_slide_2_cta_link: '/offers',
     hero_slide_2_image: '',
 
-    hero_slide_3_eyebrow: '🎁 Members',
-    hero_slide_3_title: '20% off every purchase',
-    hero_slide_3_body: 'Tapas members save on every book they take home — plus free events, reserved reads, and filter coffee on the house.',
-    hero_slide_3_cta_label: 'Become a member →',
-    hero_slide_3_cta_link: '/offers',
+    hero_slide_3_eyebrow: '☕ Coming soon',
+    hero_slide_3_title: 'Filter coffee, slow reading, long afternoons.',
+    hero_slide_3_body: 'Our café is being readied for its next chapter. Hot filter coffee, a quiet corner, and a wall full of stories waiting for you.',
+    hero_slide_3_cta_label: 'Visit us →',
+    hero_slide_3_cta_link: '/about',
     hero_slide_3_image: '',
 
     staff_picks_eyebrow: '★ ★ ★',
@@ -242,6 +241,22 @@ export const DEFAULT_CONTENT = {
     offers_hero_padding_bottom: 40,
     offers_hero_bg_color:       '',
     offers_hero_bg_image:       '',
+    // Per-section color / alignment overrides.
+    header_bg_color:            '',
+    header_text_color:          '',
+    header_link_color:          '',
+    header_link_active_color:   '',
+    footer_bg_color:            '',
+    footer_text_color:          '',
+    footer_heading_color:       '',
+    footer_link_color:          '',
+    footer_text_align:          'left',
+    home_genres_bg_color:       '',
+    home_genres_text_align:     'left',
+    home_new_arrivals_bg_color: '',
+    home_new_arrivals_text_align: 'left',
+    home_newsletter_bg_color:   '',
+    home_newsletter_text_align: 'center',
   },
 };
 
