@@ -77,6 +77,9 @@ const Automations           = React.lazy(() => import('./pages/Automations'));
 const EngagementTools       = React.lazy(() => import('./pages/EngagementTools'));
 const MarketingDashboard    = React.lazy(() => import('./pages/MarketingDashboard'));
 const Newsletter            = React.lazy(() => import('./pages/Newsletter'));
+const Communications        = React.lazy(() => import('./pages/Communications'));
+const CommunityBlog         = React.lazy(() => import('./pages/CommunityBlog'));
+const AdvancedTools         = React.lazy(() => import('./pages/AdvancedTools'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -205,6 +208,9 @@ const NAV_CONFIG = [
       { to: '/automations',    icon: '⚡', label: 'Automations' },
       { to: '/engagement',     icon: '💬', label: 'Engagement' },
       { to: '/newsletter',     icon: '✉️', label: 'Newsletter' },
+      { to: '/communications', icon: '📲', label: 'Communications' },
+      { to: '/community',      icon: '👥', label: 'Community & Blog' },
+      { to: '/advanced-tools', icon: '🧪', label: 'Advanced Tools' },
       { to: '/marketing-hub',  icon: '🔧', label: 'Marketing Hub' },
       { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
     ],
@@ -503,6 +509,9 @@ function DashboardShell() {
             <Route path="/automations"                        element={<Automations />} />
             <Route path="/engagement"                         element={<EngagementTools />} />
             <Route path="/newsletter"                         element={<Newsletter />} />
+            <Route path="/communications"                     element={<Communications />} />
+            <Route path="/community"                          element={<CommunityBlog />} />
+            <Route path="/advanced-tools"                     element={<AdvancedTools />} />
             <Route path="/marketing-hub"                      element={<MarketingHub />} />
             <Route path="/marketing"                          element={<MarketingTools />} />
 
