@@ -129,9 +129,12 @@ const SETTINGS_KEY = 'integrations';
 export default function Integrations() {
   const [config, setConfig] = useState({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(null); // which service key is saving
+  const [saving, setSaving] = useState(null);
   const [savedAt, setSavedAt] = useState({});
   const [search, setSearch] = useState('');
+  // Lift expanded state to the parent so it survives re-renders
+  // when loading/config state changes after Supabase queries.
+  const [expandedKey, setExpandedKey] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -254,6 +257,8 @@ export default function Integrations() {
               connected={isConnected(service.key)}
               saving={saving === service.key}
               savedAt={savedAt[service.key]}
+              expanded={expandedKey === service.key}
+              onToggleExpand={() => setExpandedKey(expandedKey === service.key ? null : service.key)}
               onUpdate={(fieldKey, value) => updateField(service.key, fieldKey, value)}
               onSave={() => saveService(service.key)}
               onDisconnect={() => disconnect(service.key)}
@@ -265,8 +270,7 @@ export default function Integrations() {
   );
 }
 
-function ServiceCard({ service, values, connected, saving, savedAt, onUpdate, onSave, onDisconnect }) {
-  const [expanded, setExpanded] = useState(false);
+function ServiceCard({ service, values, connected, saving, savedAt, expanded, onToggleExpand, onUpdate, onSave, onDisconnect }) {
 
   return (
     <div style={{
@@ -319,7 +323,7 @@ function ServiceCard({ service, values, connected, saving, savedAt, onUpdate, on
       {/* Connect / configure button */}
       {!expanded ? (
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => setExpanded(true)} style={{
+          <button onClick={onToggleExpand} style={{
             ...S.connectBtn,
             background: connected ? '#f1f5f9' : 'linear-gradient(135deg, #D4A853, #C49040)',
             color: connected ? '#475569' : '#1a0f08',
@@ -352,7 +356,7 @@ function ServiceCard({ service, values, connected, saving, savedAt, onUpdate, on
             <button onClick={onSave} disabled={saving} style={S.saveBtn}>
               {saving ? '⏳ Saving…' : '✓ Save'}
             </button>
-            <button onClick={() => setExpanded(false)} style={S.cancelBtn}>
+            <button onClick={onToggleExpand} style={S.cancelBtn}>
               Close
             </button>
             {connected && (
