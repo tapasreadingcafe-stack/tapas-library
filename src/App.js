@@ -369,6 +369,67 @@ function ProfileDropdown() {
   );
 }
 
+// Map routes to permission keys (from StaffDetail.js PAGE_PERMISSIONS)
+const ROUTE_PERMISSION_MAP = {
+  '/': 'dashboard',
+  '/books': 'books', '/books/': 'books',
+  '/Borrow': 'borrow', '/overdue': 'borrow', '/availability': 'books', '/statistics': 'books',
+  '/recommendations': 'books', '/wishlist': 'books', '/reviews': 'books', '/reservations': 'borrow',
+  '/pos': 'pos',
+  '/cafe': 'cafe',
+  '/members': 'members', '/fines': 'fines', '/member/': 'members',
+  '/inventory': 'inventory',
+  '/events': 'events',
+  '/reports': 'reports',
+  '/accounts': 'accounts',
+  '/staff': 'staff',
+  '/vendors': 'vendors',
+  '/settings': 'settings',
+  '/store': 'dashboard', '/marketing': 'dashboard', '/promo-codes': 'dashboard',
+  '/loyalty': 'dashboard', '/growth': 'dashboard', '/campaigns': 'dashboard',
+  '/automations': 'dashboard', '/engagement': 'dashboard', '/newsletter': 'dashboard',
+  '/communications': 'dashboard', '/community': 'dashboard', '/advanced-tools': 'dashboard',
+  '/integrations': 'dashboard', '/marketing-hub': 'dashboard', '/marketing-dashboard': 'dashboard',
+  '/tasks': 'dashboard',
+};
+
+function getPermissionForPath(pathname) {
+  // Exact match first
+  if (ROUTE_PERMISSION_MAP[pathname]) return ROUTE_PERMISSION_MAP[pathname];
+  // Prefix match
+  for (const [prefix, perm] of Object.entries(ROUTE_PERMISSION_MAP)) {
+    if (prefix.endsWith('/') && pathname.startsWith(prefix)) return perm;
+    if (pathname.startsWith(prefix + '/')) return perm;
+  }
+  return 'dashboard'; // default
+}
+
+function PermissionGate({ children }) {
+  const { staff } = useAuth();
+  const location = useLocation();
+
+  // Admins bypass all permission checks
+  if (staff?.role === 'admin') return children;
+
+  const perms = staff?.permissions || {};
+  const needed = getPermissionForPath(location.pathname);
+  const level = perms[needed] || 'full'; // default to full if not set
+
+  if (level === 'none') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '16px', textAlign: 'center' }}>
+        <div style={{ fontSize: '56px' }}>🔒</div>
+        <h2 style={{ margin: 0, color: '#333', fontSize: '22px' }}>Access restricted</h2>
+        <p style={{ color: '#888', fontSize: '14px', maxWidth: '360px' }}>
+          You don't have permission to view this page. Contact your admin to update your access level.
+        </p>
+      </div>
+    );
+  }
+
+  return children;
+}
+
 function DashboardShell() {
   const isMobile = () => window.innerWidth <= 768;
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
@@ -506,6 +567,7 @@ function DashboardShell() {
       {/* MAIN CONTENT */}
       <main className={`main-content ${sidebarOpen ? 'expanded' : 'full'}`}>
         <ChunkErrorBoundary>
+        <PermissionGate>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Dashboard */}
@@ -600,6 +662,7 @@ function DashboardShell() {
             <Route path="/kiosk"                              element={<KioskMode />} />
           </Routes>
         </Suspense>
+        </PermissionGate>
         </ChunkErrorBoundary>
       </main>
       <GlobalTooltip />
