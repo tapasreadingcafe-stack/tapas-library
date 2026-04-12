@@ -217,12 +217,7 @@ const NAV_CONFIG = [
       { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
     ],
   },
-  {
-    icon: '✨', label: 'Productivity', key: 'productivity',
-    children: [
-      { to: '/tasks',     icon: '📒', label: 'Tasks & Notes' },
-    ],
-  },
+  { to: '/tasks', icon: '📒', label: 'Tasks & Notes' },
   {
     icon: '💳', label: 'Accounts', key: 'accounts',
     children: [
