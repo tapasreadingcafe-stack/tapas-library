@@ -2,158 +2,103 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { supabase } from '../utils/supabase';
 
 const AuthContext = createContext(null);
-
-const INACTIVITY_MS = 8 * 60 * 60 * 1000; // 8 hours
+const INACTIVITY_MS = 8 * 60 * 60 * 1000;
 const LAST_ACTIVITY_KEY = 'tapas_last_activity';
-const STAFF_CACHE_KEY = 'tapas_staff_cache';
 
-function readCachedStaff() {
-  try {
-    const raw = sessionStorage.getItem(STAFF_CACHE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
-}
+// =====================================================================
+// Simple, robust auth. Two paths:
+//   1. Mount → getSession → if session, query staff → done
+//   2. Login button → signInWithPassword → query staff → done
+// No caching tricks, no event-handler dedup, no refs.
+// =====================================================================
 
-function writeCachedStaff(staff) {
-  try {
-    if (staff && !staff._not_staff && !staff._deactivated && !staff._error) {
-      sessionStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(staff));
-    } else {
-      sessionStorage.removeItem(STAFF_CACHE_KEY);
-    }
-  } catch {}
+async function fetchStaffRow(email) {
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('email', email)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
 export function AuthProvider({ children }) {
-  const cached = readCachedStaff();
-  const [user, setUser]               = useState(cached ? { email: cached.email, _cached: true } : null);
-  const [staff, setStaff]             = useState(cached);
-  const [loading, setLoading]         = useState(!cached);
+  const [user, setUser]               = useState(null);
+  const [staff, setStaff]             = useState(null);
+  const [loading, setLoading]         = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const inactivityTimer               = useRef(null);
 
-  // ─── logout ───────────────────────────────────────────────────────────
   const logout = useCallback(async (reason) => {
     clearTimeout(inactivityTimer.current);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
-    sessionStorage.removeItem(STAFF_CACHE_KEY);
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch {}
     setUser(null);
     setStaff(null);
     if (reason === 'inactivity') setSessionExpired(true);
   }, []);
 
-  // ─── inactivity timer reset ───────────────────────────────────────────
   const resetInactivityTimer = useCallback(() => {
     clearTimeout(inactivityTimer.current);
     localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
     inactivityTimer.current = setTimeout(() => logout('inactivity'), INACTIVITY_MS);
   }, [logout]);
 
-  // ─── load staff profile from DB ──────────────────────────────────────
-  const loadStaffProfile = useCallback(async (authUser) => {
-    setUser(authUser);
-    try {
-      const { data, error } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('email', authUser.email)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!data) {
-        await supabase.auth.signOut();
-        setUser(null);
-        setStaff({ _not_staff: true });
-        writeCachedStaff(null);
-        return;
-      }
-
-      if (!data.is_active) {
-        await supabase.auth.signOut();
-        setUser(null);
-        setStaff({ _deactivated: true });
-        writeCachedStaff(null);
-        return;
-      }
-
-      setStaff(data);
-      writeCachedStaff(data);
-      supabase.from('staff')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', data.id)
-        .then(() => {});
-    } catch (err) {
-      console.error('Failed to load staff profile:', err);
-      try { await supabase.auth.signOut(); } catch (_) {}
-      setUser(null);
-      setStaff({ _error: err.message || String(err) });
-      writeCachedStaff(null);
-    }
-  }, []);
-
-  // ─── initialise on mount ─────────────────────────────────────────────
+  // ── Init: check existing session on mount ──────────────────────────
   useEffect(() => {
-    if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
-      setLoading(false);
-      return;
-    }
+    let cancelled = false;
 
-    const timeout = setTimeout(() => setLoading(false), 4000);
-    let profileLoaded = false; // local flag to deduplicate within this effect
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-        if (session?.user) {
-          const last = localStorage.getItem(LAST_ACTIVITY_KEY);
-          if (last && Date.now() - parseInt(last, 10) > INACTIVITY_MS) {
-            await supabase.auth.signOut();
-            sessionStorage.removeItem(STAFF_CACHE_KEY);
-            setUser(null);
-            setStaff(null);
-            setSessionExpired(true);
-            setLoading(false);
-            clearTimeout(timeout);
-            return;
-          }
-
-          setSessionExpired(false);
-          setUser(session.user);
-
-          // Load staff profile — skip only if we JUST loaded it in
-          // this same effect cycle (dedup INITIAL_SESSION + SIGNED_IN).
-          if (!profileLoaded) {
-            profileLoaded = true;
-            await loadStaffProfile(session.user);
-          }
-        } else if (event === 'INITIAL_SESSION' && !session) {
-          sessionStorage.removeItem(STAFF_CACHE_KEY);
-          setUser(null);
-          setStaff(null);
+    const init = async () => {
+      try {
+        // Inactivity check
+        const last = localStorage.getItem(LAST_ACTIVITY_KEY);
+        if (last && Date.now() - parseInt(last, 10) > INACTIVITY_MS) {
+          await supabase.auth.signOut();
+          if (!cancelled) { setSessionExpired(true); setLoading(false); }
+          return;
         }
-        setLoading(false);
-        clearTimeout(timeout);
-      } else if (event === 'SIGNED_OUT') {
-        profileLoaded = false;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+
+        const staffRow = await fetchStaffRow(session.user.email);
+        if (!cancelled) {
+          if (staffRow && staffRow.is_active) {
+            setUser(session.user);
+            setStaff(staffRow);
+          } else {
+            // Valid session but not staff — sign out
+            await supabase.auth.signOut();
+            setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
+          }
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('[Auth] init error:', e);
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    init();
+
+    // Listen for sign-out (e.g. from another tab)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
         setUser(null);
         setStaff(null);
-        sessionStorage.removeItem(STAFF_CACHE_KEY);
-        setLoading(false);
-        clearTimeout(timeout);
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        setUser(session.user);
       }
     });
 
     return () => {
-      clearTimeout(timeout);
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, [loadStaffProfile]);
+  }, []);
 
-  // ─── activity tracking (only when logged in) ─────────────────────────
+  // ── Activity tracking ──────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
@@ -165,34 +110,20 @@ export function AuthProvider({ children }) {
     };
   }, [user, resetInactivityTimer]);
 
-  // ─── public API ───────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────────────
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
 
-    // Query staff table directly here — don't rely on loadStaffProfile
-    // or onAuthStateChange which have timing issues.
-    if (data?.user) {
-      try {
-        const { data: staffRow } = await supabase
-          .from('staff')
-          .select('*')
-          .eq('email', data.user.email)
-          .maybeSingle();
-
-        setUser(data.user);
-        if (staffRow && staffRow.is_active) {
-          setStaff(staffRow);
-          writeCachedStaff(staffRow);
-        } else {
-          setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
-          writeCachedStaff(null);
-        }
-      } catch (e) {
-        // Staff query failed — still set user so we don't lose the session
-        setUser(data.user);
-        setStaff({ _error: e.message || 'Staff query failed' });
-      }
+    const staffRow = await fetchStaffRow(data.user.email);
+    if (staffRow && staffRow.is_active) {
+      setUser(data.user);
+      setStaff(staffRow);
+      setSessionExpired(false);
+    } else {
+      await supabase.auth.signOut();
+      setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
+      throw new Error(staffRow ? 'Account deactivated' : 'Not a staff account');
     }
 
     return data;
