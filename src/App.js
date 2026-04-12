@@ -70,6 +70,9 @@ const Tasks                 = React.lazy(() => import('./pages/Tasks'));
 const MarketingTools        = React.lazy(() => import('./pages/MarketingTools'));
 const PromoCodes            = React.lazy(() => import('./pages/PromoCodes'));
 const MarketingHub          = React.lazy(() => import('./pages/MarketingHub'));
+const LoyaltySystem         = React.lazy(() => import('./pages/LoyaltySystem'));
+const GrowthTools           = React.lazy(() => import('./pages/GrowthTools'));
+const CampaignTools         = React.lazy(() => import('./pages/CampaignTools'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -191,6 +194,9 @@ const NAV_CONFIG = [
     icon: '📣', label: 'Marketing', key: 'marketing',
     children: [
       { to: '/promo-codes',    icon: '🏷️', label: 'Promo Codes' },
+      { to: '/loyalty',        icon: '🏆', label: 'Loyalty & Rewards' },
+      { to: '/growth',         icon: '🌱', label: 'Growth Tools' },
+      { to: '/campaigns',      icon: '📢', label: 'Campaigns' },
       { to: '/marketing-hub',  icon: '⚡', label: 'Marketing Hub' },
       { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
     ],
@@ -482,6 +488,9 @@ function DashboardShell() {
 
             {/* Marketing */}
             <Route path="/promo-codes"                        element={<PromoCodes />} />
+            <Route path="/loyalty"                            element={<LoyaltySystem />} />
+            <Route path="/growth"                             element={<GrowthTools />} />
+            <Route path="/campaigns"                          element={<CampaignTools />} />
             <Route path="/marketing-hub"                      element={<MarketingHub />} />
             <Route path="/marketing"                          element={<MarketingTools />} />
 
