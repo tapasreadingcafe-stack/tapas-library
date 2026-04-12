@@ -16,10 +16,12 @@ export default function SettingsProfile() {
   useEffect(() => {
     if (staff) {
       setName(staff.name || '');
-      setEmail(staff.email || user?.email || '');
-      setPhone(staff.phone || '');
+      setEmail(staff.email || '');
+      // Only set phone if it's actually a phone number, not an email
+      const ph = staff.phone || '';
+      setPhone(ph.includes('@') ? '' : ph);
     }
-  }, [staff, user]);
+  }, [staff]);
 
   const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -47,7 +49,9 @@ export default function SettingsProfile() {
     setSaving(true);
     setMessage('');
     try {
-      await changePassword(newPassword);
+      // Use supabase.auth.updateUser directly — it uses the stored session
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
       setNewPassword('');
       setConfirmPassword('');
       setMessage('✅ Password changed successfully!');
