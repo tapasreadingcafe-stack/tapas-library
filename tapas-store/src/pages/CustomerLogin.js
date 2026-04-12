@@ -103,7 +103,7 @@ export default function CustomerLogin() {
       display:'flex', alignItems:'center', justifyContent:'center',
       padding:'40px 20px',
       fontFamily:'var(--font-body)',
-      background:'var(--bg)',
+      background:'var(--surface)',
       position:'relative',
       overflow:'hidden',
     }}>

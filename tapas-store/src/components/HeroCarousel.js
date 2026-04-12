@@ -91,7 +91,7 @@ export default function HeroCarousel({ home, sectionStyles = {} }) {
   const heroBg = sectionStyles.home_hero_bg_color ||
     (sectionStyles.home_hero_bg_image
       ? `url("${sectionStyles.home_hero_bg_image}") center/cover`
-      : 'linear-gradient(135deg, #2C1810 0%, #4A2C17 40%, #6B3D26 100%)');
+      : 'linear-gradient(135deg, #26170c 0%, #3d2b1f 40%, #5c3d2e 100%)');
 
   return (
     <section

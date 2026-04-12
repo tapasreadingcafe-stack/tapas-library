@@ -17,17 +17,17 @@
 
 export const DEFAULT_CONTENT = {
   brand: {
-    name: 'Tapas Library',
-    tagline: '& BOOK STORE',
-    primary_color: '#2C1810',
-    primary_color_dark: '#1A0F0A',
-    primary_color_light: '#4A2C17',
-    accent_color: '#D4A853',
-    accent_color_dark: '#C49040',
-    cream_color: '#FDF8F0',
-    sand_color: '#F5DEB3',
-    heading_font: 'Playfair Display',
-    body_font: 'Lato',
+    name: 'Tapas Reading Cafe',
+    tagline: 'A quiet place for messy thoughts.',
+    primary_color: '#26170c',
+    primary_color_dark: '#1a0f08',
+    primary_color_light: '#3d2b1f',
+    accent_color: '#006a6a',
+    accent_color_dark: '#004d4d',
+    cream_color: '#f5f5dc',
+    sand_color: '#fbfbe2',
+    heading_font: 'Newsreader',
+    body_font: 'Plus Jakarta Sans',
   },
   contact: {
     phone: '+91 98765 43210',
