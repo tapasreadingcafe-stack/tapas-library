@@ -30,13 +30,17 @@ function writeCachedStaff(staff) {
 export function AuthProvider({ children }) {
   // Optimistic initialisation from cache — lets us skip the loading
   // spinner entirely when the user refreshes with a valid session.
+  // We cache both the staff row AND the user email so the auth gate
+  // can pass immediately without waiting for INITIAL_SESSION.
   const cached = readCachedStaff();
-  const [user, setUser]               = useState(null);
+  // Create a temporary user-like object from cache so !user doesn't
+  // trip the gate before INITIAL_SESSION fires.
+  const [user, setUser]               = useState(cached ? { email: cached.email, _cached: true } : null);
   const [staff, setStaff]             = useState(cached);
   const [loading, setLoading]         = useState(!cached); // skip loading if cached
   const [sessionExpired, setSessionExpired] = useState(false);
   const inactivityTimer               = useRef(null);
-  const staffLoadedRef                = useRef(false); // prevent double-load
+  const staffLoadedRef                = useRef(!!cached); // if cached, don't re-load until INITIAL_SESSION confirms
 
   // ─── logout ───────────────────────────────────────────────────────────
   const logout = useCallback(async (reason) => {
@@ -133,6 +137,9 @@ export function AuthProvider({ children }) {
           const last = localStorage.getItem(LAST_ACTIVITY_KEY);
           if (last && Date.now() - parseInt(last, 10) > INACTIVITY_MS) {
             await supabase.auth.signOut();
+            sessionStorage.removeItem(STAFF_CACHE_KEY);
+            setUser(null);
+            setStaff(null);
             setSessionExpired(true);
             setLoading(false);
             clearTimeout(timeout);
@@ -140,7 +147,23 @@ export function AuthProvider({ children }) {
           }
 
           setSessionExpired(false);
-          await loadStaffProfile(session.user);
+          // Always set the real user object from the session.
+          setUser(session.user);
+          // If we already loaded staff from cache, only do a background
+          // refresh (don't block the UI). If no cache, load now.
+          if (cached && staffLoadedRef.current) {
+            // Background refresh — update cache silently.
+            staffLoadedRef.current = false;
+            loadStaffProfile(session.user);
+          } else {
+            staffLoadedRef.current = true;
+            await loadStaffProfile(session.user);
+          }
+        } else if (event === 'INITIAL_SESSION' && !session) {
+          // No stored session — clear any stale cache.
+          sessionStorage.removeItem(STAFF_CACHE_KEY);
+          setUser(null);
+          setStaff(null);
         }
         setLoading(false);
         clearTimeout(timeout);

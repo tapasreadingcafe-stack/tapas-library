@@ -86,6 +86,47 @@ function PageLoader() {
   );
 }
 
+// ── Error boundary for chunk-load failures ─────────────────────────────────────
+// After a deploy, old cached JS chunks may 404. When React.lazy() fails to fetch
+// a chunk, Suspense can't recover — the page stays on the loading spinner forever.
+// This error boundary catches the load failure and offers a one-click hard refresh.
+class ChunkErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', height: '60vh', gap: '16px', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '48px' }}>🔄</div>
+          <h3 style={{ margin: 0, color: '#333', fontSize: '18px' }}>New version available</h3>
+          <p style={{ color: '#888', fontSize: '14px', maxWidth: '360px' }}>
+            The dashboard was updated. Please refresh to load the latest version.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 24px', background: 'linear-gradient(135deg, #667eea, #764ba2)',
+              color: 'white', border: 'none', borderRadius: '8px',
+              cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+            }}
+          >
+            Refresh now
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ── Navigation config (hierarchical) ─────────────────────────────────────────
 
 const NAV_CONFIG = [
@@ -359,6 +400,7 @@ function DashboardShell() {
 
       {/* MAIN CONTENT */}
       <main className={`main-content ${sidebarOpen ? 'expanded' : 'full'}`}>
+        <ChunkErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Dashboard */}
@@ -438,6 +480,7 @@ function DashboardShell() {
             <Route path="/kiosk"                              element={<KioskMode />} />
           </Routes>
         </Suspense>
+        </ChunkErrorBoundary>
       </main>
       <GlobalTooltip />
     </div>
