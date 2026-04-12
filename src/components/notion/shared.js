@@ -36,6 +36,7 @@ export const PROPERTY_TYPES = [
   { type: 'text',     label: 'Text',     icon: '𝗧' },
   { type: 'number',   label: 'Number',   icon: '#' },
   { type: 'select',   label: 'Select',   icon: '◉' },
+  { type: 'person',   label: 'Person',   icon: '👤' },
   { type: 'date',     label: 'Date',     icon: '📅' },
   { type: 'checkbox', label: 'Checkbox', icon: '☑' },
   { type: 'url',      label: 'URL',      icon: '🔗' },
@@ -87,14 +88,16 @@ export function starterDbSchema() {
       { id: uid(), name: 'High',   color: 'red' },
     ],
   };
+  const assigneeProp = { id: uid(), name: 'Assignee', type: 'person' };
   const dueProp = { id: uid(), name: 'Due date', type: 'date' };
 
   return {
-    properties: [statusProp, priorityProp, dueProp],
+    properties: [statusProp, priorityProp, assigneeProp, dueProp],
     views: [
-      { id: uid(), name: 'All',      type: 'table' },
+      { id: uid(), name: 'All',       type: 'table' },
       { id: uid(), name: 'By status', type: 'board',   group_by: statusProp.id },
-      { id: uid(), name: 'Cards',    type: 'gallery' },
+      { id: uid(), name: 'Cards',     type: 'gallery' },
+      { id: uid(), name: 'List',      type: 'list' },
     ],
   };
 }

@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { supabase } from '../../utils/supabase';
 import {
   uid,
   PROPERTY_TYPES,
@@ -8,6 +9,32 @@ import {
   formatDateDisplay,
   N,
 } from './shared';
+
+// ── Staff cache for Person property ────────────────────────────────
+// Loaded once, shared across all PersonCell instances.
+let _staffCache = null;
+let _staffLoading = false;
+let _staffListeners = [];
+
+function getStaffList() {
+  if (_staffCache) return Promise.resolve(_staffCache);
+  if (_staffLoading) {
+    return new Promise(resolve => { _staffListeners.push(resolve); });
+  }
+  _staffLoading = true;
+  return supabase
+    .from('staff')
+    .select('id, name, email, role, avatar_url')
+    .eq('is_active', true)
+    .order('name')
+    .then(({ data }) => {
+      _staffCache = data || [];
+      _staffLoading = false;
+      _staffListeners.forEach(fn => fn(_staffCache));
+      _staffListeners = [];
+      return _staffCache;
+    });
+}
 
 // =====================================================================
 // DatabaseView — Notion-style database with Table / Board / Gallery / List
@@ -576,6 +603,8 @@ function PropertyCell({ prop, value, onChange, onUpdateProperty }) {
       return <TextCell value={value} onChange={onChange} placeholder="email" />;
     case 'phone':
       return <TextCell value={value} onChange={onChange} placeholder="phone" />;
+    case 'person':
+      return <PersonCell value={value} onChange={onChange} />;
     case 'select':
       return (
         <SelectCell
@@ -671,6 +700,103 @@ function UrlCell({ value, onChange }) {
     >
       {value}
     </a>
+  );
+}
+
+function PersonCell({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [staff, setStaff] = useState(_staffCache || []);
+
+  useEffect(() => {
+    if (!_staffCache) {
+      getStaffList().then(setStaff);
+    }
+  }, []);
+
+  const selected = staff.find(s => s.id === value);
+  const initials = (name) => (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        onClick={() => setOpen(true)}
+        style={{ padding: '6px 10px', cursor: 'pointer', minHeight: '28px', display: 'flex', alignItems: 'center', gap: '8px' }}
+      >
+        {selected ? (
+          <>
+            <span style={{
+              width: '22px', height: '22px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #D4A853, #C49040)',
+              color: '#fff', fontSize: '10px', fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              {initials(selected.name)}
+            </span>
+            <span style={{ fontSize: '12px', color: N.text, fontWeight: 500 }}>{selected.name}</span>
+          </>
+        ) : (
+          <span style={{ color: N.textFaint, fontSize: '12px' }}>—</span>
+        )}
+      </div>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, zIndex: 21,
+            minWidth: '220px', background: 'white',
+            border: `1px solid ${N.border}`, borderRadius: '8px',
+            boxShadow: '0 14px 34px rgba(15,23,42,0.14)',
+            padding: '6px', marginTop: '4px',
+          }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: N.textFaint, textTransform: 'uppercase', padding: '4px 8px' }}>
+              Assign to
+            </div>
+            {staff.length === 0 && (
+              <div style={{ padding: '8px', fontSize: '12px', color: N.textFaint }}>No staff found</div>
+            )}
+            {staff.map(s => (
+              <div
+                key={s.id}
+                onClick={() => { onChange(s.id); setOpen(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '6px 8px', borderRadius: '4px', cursor: 'pointer',
+                  background: s.id === value ? N.hover : 'transparent',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = N.hover}
+                onMouseLeave={e => e.currentTarget.style.background = s.id === value ? N.hover : 'transparent'}
+              >
+                <span style={{
+                  width: '24px', height: '24px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #D4A853, #C49040)',
+                  color: '#fff', fontSize: '10px', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {initials(s.name)}
+                </span>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: N.text }}>{s.name}</div>
+                  <div style={{ fontSize: '10px', color: N.textFaint }}>{s.role}</div>
+                </div>
+              </div>
+            ))}
+            {value && (
+              <div
+                onClick={() => { onChange(null); setOpen(false); }}
+                style={{
+                  padding: '6px 8px', borderTop: `1px solid ${N.border}`,
+                  marginTop: '6px', fontSize: '12px', color: N.textMuted,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear assignee
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -821,6 +947,22 @@ function CardPropertyChip({ prop, value }) {
     const opt = prop.options?.find(o => o.id === value);
     if (!opt) return null;
     return <Chip color={opt.color}>{opt.name}</Chip>;
+  }
+  if (prop.type === 'person') {
+    const person = (_staffCache || []).find(s => s.id === value);
+    if (!person) return null;
+    const initials = (person.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: N.textMuted }}>
+        <span style={{
+          width: '16px', height: '16px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #D4A853, #C49040)',
+          color: '#fff', fontSize: '8px', fontWeight: 700,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>{initials}</span>
+        {person.name}
+      </span>
+    );
   }
   if (prop.type === 'checkbox') {
     return (
