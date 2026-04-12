@@ -65,9 +65,11 @@ const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 const CustomerOrders        = React.lazy(() => import('./pages/CustomerOrders'));
 const SiteContent           = React.lazy(() => import('./pages/SiteContent'));
 
-// ── Lazy-loaded pages (New - Phase 6: Productivity) ─────────────────────────
+// ── Lazy-loaded pages (New - Phase 6: Productivity + Marketing) ─────────────
 const Tasks                 = React.lazy(() => import('./pages/Tasks'));
 const MarketingTools        = React.lazy(() => import('./pages/MarketingTools'));
+const PromoCodes            = React.lazy(() => import('./pages/PromoCodes'));
+const MarketingHub          = React.lazy(() => import('./pages/MarketingHub'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -186,10 +188,17 @@ const NAV_CONFIG = [
     ],
   },
   {
+    icon: '📣', label: 'Marketing', key: 'marketing',
+    children: [
+      { to: '/promo-codes',    icon: '🏷️', label: 'Promo Codes' },
+      { to: '/marketing-hub',  icon: '⚡', label: 'Marketing Hub' },
+      { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
+    ],
+  },
+  {
     icon: '✨', label: 'Productivity', key: 'productivity',
     children: [
       { to: '/tasks',     icon: '📒', label: 'Tasks & Notes' },
-      { to: '/marketing', icon: '📣', label: 'Marketing Tools' },
     ],
   },
   {
@@ -471,9 +480,13 @@ function DashboardShell() {
             <Route path="/store/orders"                       element={<CustomerOrders />} />
             <Route path="/store/content"                      element={<SiteContent />} />
 
+            {/* Marketing */}
+            <Route path="/promo-codes"                        element={<PromoCodes />} />
+            <Route path="/marketing-hub"                      element={<MarketingHub />} />
+            <Route path="/marketing"                          element={<MarketingTools />} />
+
             {/* Productivity */}
             <Route path="/tasks"                              element={<Tasks />} />
-            <Route path="/marketing"                          element={<MarketingTools />} />
 
             {/* Public & Kiosk */}
             <Route path="/catalog"                            element={<PublicCatalog />} />
