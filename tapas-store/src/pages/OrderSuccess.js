@@ -4,9 +4,8 @@ import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
 
 // =====================================================================
-// /order/:id — 2025-2026 redesign
-// Celebration card with rounded corners, dark-mode aware, modern status
-// block, CTAs using tps-btn system.
+// /order/:id — Modern Heritage redesign
+// Celebration card, tonal layering, Newsreader headings, teal chips.
 // =====================================================================
 
 export default function OrderSuccess() {
@@ -60,24 +59,41 @@ export default function OrderSuccess() {
   }, [id, authLoading, member]);
 
   if (authLoading) return null;
+
   if (loading) {
     return (
-      <div className="tps-container-narrow" style={{ padding:'80px 20px', textAlign:'center' }}>
-        <div style={{ fontSize:'56px', marginBottom:'16px', animation:'tps-bookSpin 1s ease-in-out infinite' }}>⏳</div>
-        <p className="tps-subtle">Confirming your order…</p>
+      <div style={{
+        maxWidth: '720px', margin: '0 auto',
+        padding: '80px 20px', textAlign: 'center',
+        fontFamily: 'var(--font-body)',
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.6 }}>...</div>
+        <p style={{ fontSize: '15px', color: 'var(--text-muted, #5c4a3a)' }}>Confirming your order...</p>
       </div>
     );
   }
+
   if (!order) {
     return (
-      <div className="tps-container-narrow" style={{ padding:'80px 20px', textAlign:'center' }}>
-        <div style={{ fontSize:'56px', marginBottom:'16px' }}>⚠️</div>
-        <h1 className="tps-h3">Order not found</h1>
-        <p className="tps-subtle" style={{ marginTop:'10px', marginBottom:'20px' }}>
+      <div style={{
+        maxWidth: '720px', margin: '0 auto',
+        padding: '80px 20px', textAlign: 'center',
+        fontFamily: 'var(--font-body)',
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>?</div>
+        <h1 style={{
+          fontFamily: 'var(--font-display, Newsreader, serif)',
+          fontSize: '28px', fontWeight: 500, color: 'var(--text, #26170c)',
+          marginBottom: '10px',
+        }}>Order not found</h1>
+        <p style={{
+          fontSize: '15px', color: 'var(--text-muted, #5c4a3a)',
+          marginBottom: '24px',
+        }}>
           We couldn't find that order. Check your profile for order history.
         </p>
-        <Link to="/profile?tab=orders" className="tps-btn tps-btn-primary">
-          View my orders →
+        <Link to="/profile?tab=orders" className="tps-btn tps-btn-teal">
+          View my orders
         </Link>
       </div>
     );
@@ -86,71 +102,147 @@ export default function OrderSuccess() {
   const isPaid = order.status !== 'pending' && order.status !== 'cancelled';
 
   return (
-    <div className="tps-container-narrow" style={{ padding:'72px 20px', maxWidth:'720px' }}>
-      <div className="tps-card tps-animate-pop" style={{
-        padding:'48px 40px',
-        textAlign:'center',
-        boxShadow:'var(--shadow-xl)',
-        borderRadius:'var(--radius-2xl)',
+    <div style={{
+      maxWidth: '720px', margin: '0 auto',
+      padding: '72px 20px',
+      fontFamily: 'var(--font-body)',
+    }}>
+      {/* Celebration card */}
+      <div className="tps-card" style={{
+        background: 'var(--bg-card, #ede8d0)',
+        borderRadius: 'var(--radius-2xl, 20px)',
+        boxShadow: 'var(--shadow-ambient, 0 1px 4px rgba(0,0,0,.06))',
+        padding: '48px 40px',
+        textAlign: 'center',
+        border: 'none',
       }}>
-        <div style={{ fontSize:'80px', marginBottom:'16px' }}>
-          {isPaid ? '🎉' : '⏳'}
+        {/* Icon */}
+        <div style={{
+          width: '72px', height: '72px', borderRadius: '50%',
+          background: isPaid ? 'rgba(0,106,106,0.1)' : 'var(--bg-section, #f5f5dc)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px', fontSize: '32px',
+        }}>
+          {isPaid ? '✓' : '...'}
         </div>
-        <h1 className="tps-h2" style={{ marginBottom:'10px' }}>
-          {isPaid ? 'Order Confirmed!' : 'Processing Payment…'}
+
+        {/* Title */}
+        <h1 style={{
+          fontFamily: 'var(--font-display, Newsreader, serif)',
+          fontSize: '32px', fontWeight: 500, color: 'var(--text, #26170c)',
+          margin: '0 0 10px',
+        }}>
+          {isPaid ? 'Order Confirmed!' : 'Processing Payment...'}
         </h1>
-        <p className="tps-subtle" style={{ fontSize:'16px', marginBottom:'28px', maxWidth:'480px', margin:'0 auto 28px' }}>
+
+        <p style={{
+          fontSize: '16px', color: 'var(--text-muted, #5c4a3a)',
+          maxWidth: '480px', margin: '0 auto 32px', lineHeight: 1.6,
+        }}>
           {isPaid
             ? "Thank you for your purchase. We'll notify you when it's ready for pickup."
             : "We're verifying your payment. This usually takes a few seconds."}
         </p>
 
+        {/* Order details */}
         <div style={{
-          background:'var(--bg-subtle)',
-          borderRadius:'var(--radius-lg)',
-          padding:'24px 28px',
-          marginBottom:'28px',
-          textAlign:'left',
-          border:'1px solid var(--border)',
+          background: 'var(--bg-section, #f5f5dc)',
+          borderRadius: 'var(--radius-lg, 14px)',
+          padding: '24px 28px', marginBottom: '32px', textAlign: 'left',
         }}>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'12px' }}>
-            <span className="tps-subtle" style={{ fontSize:'13px' }}>Order number</span>
-            <span style={{ fontWeight:'800', color:'var(--text)', fontFamily:'var(--font-heading)' }}>#{order.order_number}</span>
+          {/* Metadata rows */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '14px',
+          }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-subtle, #8b7355)' }}>Order number</span>
+            <span style={{
+              fontFamily: 'var(--font-display, Newsreader, serif)',
+              fontWeight: 600, color: 'var(--text, #26170c)', fontSize: '15px',
+            }}>#{order.order_number}</span>
           </div>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'12px' }}>
-            <span className="tps-subtle" style={{ fontSize:'13px' }}>Status</span>
-            <span className={isPaid ? 'tps-badge tps-badge-success' : 'tps-badge tps-badge-accent'}>
+
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '14px',
+          }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-subtle, #8b7355)' }}>Status</span>
+            <span className="tps-chip tps-chip-teal" style={{
+              fontSize: '12px', padding: '3px 12px',
+              background: isPaid ? 'rgba(0,106,106,0.12)' : 'var(--bg-inset, #e6e1c8)',
+              color: isPaid ? 'var(--secondary, #006a6a)' : 'var(--text-subtle, #8b7355)',
+              fontWeight: 700, borderRadius: 'var(--radius-pill, 999px)',
+            }}>
               {order.status.replace(/_/g, ' ')}
             </span>
           </div>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'12px' }}>
-            <span className="tps-subtle" style={{ fontSize:'13px' }}>Fulfillment</span>
-            <span style={{ fontWeight:'700', color:'var(--text)', fontSize:'13px' }}>
-              {order.fulfillment_type === 'pickup' ? '🏪 In-store pickup' : '🚚 Home delivery'}
+
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '18px',
+          }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-subtle, #8b7355)' }}>Fulfillment</span>
+            <span style={{ fontWeight: 600, color: 'var(--text, #26170c)', fontSize: '13px' }}>
+              {order.fulfillment_type === 'pickup' ? 'In-store pickup' : 'Home delivery'}
             </span>
           </div>
 
-          <div style={{ borderTop:'1px solid var(--border)', paddingTop:'14px', marginTop:'14px' }}>
+          {/* Line items */}
+          <div style={{
+            background: 'var(--bg-card, #ede8d0)',
+            borderRadius: 'var(--radius-md, 10px)',
+            padding: '14px 16px',
+          }}>
             {items.map(it => (
-              <div key={it.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'var(--text-muted)', padding:'5px 0' }}>
-                <span>{it.item_name} × {it.quantity}</span>
-                <span style={{ fontWeight:'600' }}>₹{Number(it.total_price).toFixed(2)}</span>
+              <div key={it.id} style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: '13px', color: 'var(--text-muted, #5c4a3a)',
+                padding: '5px 0',
+              }}>
+                <span>{it.item_name} x {it.quantity}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text, #26170c)' }}>
+                  ₹{Number(it.total_price).toFixed(2)}
+                </span>
               </div>
             ))}
           </div>
-          <div style={{ borderTop:'1px solid var(--border)', paddingTop:'14px', marginTop:'14px', display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
-            <span style={{ fontWeight:'700', color:'var(--text)', fontSize:'15px' }}>Total</span>
-            <span style={{ fontFamily:'var(--font-heading)', fontSize:'28px', fontWeight:'800', color:'var(--text)' }}>
+
+          {/* Total */}
+          <div style={{
+            marginTop: '18px', paddingTop: '16px',
+            background: 'var(--bg-inset, #e6e1c8)',
+            borderRadius: 'var(--radius-md, 10px)',
+            padding: '14px 16px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-display, Newsreader, serif)',
+              fontWeight: 500, color: 'var(--text, #26170c)', fontSize: '16px',
+            }}>Total</span>
+            <span style={{
+              fontFamily: 'var(--font-display, Newsreader, serif)',
+              fontSize: '28px', fontWeight: 500, color: 'var(--accent, #c49040)',
+            }}>
               ₹{Number(order.total).toFixed(2)}
             </span>
           </div>
         </div>
 
-        <div style={{ display:'flex', gap:'12px', justifyContent:'center', flexWrap:'wrap' }}>
-          <Link to="/profile?tab=orders" className="tps-btn tps-btn-primary">
-            📋 View My Orders
+        {/* CTAs */}
+        <div style={{
+          display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap',
+        }}>
+          <Link to="/profile?tab=orders" className="tps-btn tps-btn-teal" style={{
+            fontSize: '14px', padding: '10px 24px',
+          }}>
+            View My Orders
           </Link>
-          <Link to="/books" className="tps-btn tps-btn-secondary">
+          <Link to="/books" className="tps-btn" style={{
+            background: 'transparent',
+            color: 'var(--secondary, #006a6a)',
+            border: '1.5px solid var(--secondary, #006a6a)',
+            fontWeight: 600, fontSize: '14px', padding: '10px 24px',
+          }}>
             Continue Shopping
           </Link>
         </div>

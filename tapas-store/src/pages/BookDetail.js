@@ -5,20 +5,20 @@ import { useApp } from '../App';
 import { useCart } from '../context/CartContext';
 
 // =====================================================================
-// BookDetail — 2025-2026 redesign
-// Two-column editorial layout, rounded cards, scale hover on similar
-// titles, micro-interactions on action buttons, dark-mode aware.
+// BookDetail — Modern Heritage design system
+// Parchment bg, Newsreader headings, ambient shadows, teal CTAs,
+// gold accent prices, no hard borders, extreme white space.
 // =====================================================================
 
 function StarRating({ rating, interactive, onRate, size = 18 }) {
   const [hover, setHover] = useState(0);
   return (
     <span>
-      {[1,2,3,4,5].map(i => (
+      {[1, 2, 3, 4, 5].map(i => (
         <span
           key={i}
           style={{
-            color: i <= (hover || rating) ? 'var(--brand-accent)' : 'var(--border)',
+            color: i <= (hover || rating) ? 'var(--accent)' : 'var(--bg-card)',
             fontSize: interactive ? 28 : size,
             cursor: interactive ? 'pointer' : 'default',
             marginRight: '2px',
@@ -27,7 +27,7 @@ function StarRating({ rating, interactive, onRate, size = 18 }) {
           onMouseEnter={() => interactive && setHover(i)}
           onMouseLeave={() => interactive && setHover(0)}
           onClick={() => interactive && onRate && onRate(i)}
-        >★</span>
+        >\u2605</span>
       ))}
     </span>
   );
@@ -36,27 +36,35 @@ function StarRating({ rating, interactive, onRate, size = 18 }) {
 function SimilarTile({ book }) {
   const src = book.book_image || book.cover_image;
   return (
-    <Link to={`/books/${book.id}`} className="tps-card-interactive" style={{
-      textDecoration:'none', color:'inherit',
-      display:'flex', flexDirection:'column', gap:'10px',
-      cursor:'pointer', padding:'10px', borderRadius:'var(--radius-md)',
+    <Link to={`/books/${book.id}`} className="tps-card tps-card-interactive" style={{
+      textDecoration: 'none', color: 'inherit',
+      display: 'flex', flexDirection: 'column', gap: '12px',
+      cursor: 'pointer', padding: '16px', borderRadius: 'var(--radius-lg)',
+      background: 'var(--bg-card)', border: 'none',
+      boxShadow: 'var(--shadow-ambient)',
     }}>
       <div style={{
-        width:'100%', aspectRatio:'3/4',
-        borderRadius:'var(--radius-sm)', overflow:'hidden',
-        background:'linear-gradient(145deg, #F5DEB3, #D4A853)',
-        boxShadow:'0 10px 24px rgba(44,24,16,0.16)',
-        display:'flex', alignItems:'center', justifyContent:'center',
+        width: '100%', aspectRatio: '3/4',
+        borderRadius: 'var(--radius-md)', overflow: 'hidden',
+        background: 'linear-gradient(160deg, #ede8d0, #d4c9a8)',
+        boxShadow: '0 16px 48px rgba(38,23,12,0.18)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {src
-          ? <img src={src} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-          : <span style={{ fontSize:'36px' }}>📖</span>}
+          ? <img src={src} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <span style={{ fontSize: '36px' }}>📖</span>}
       </div>
       <div>
-        <h4 style={{ fontFamily:'var(--font-heading)', fontSize:'14px', color:'var(--text)', marginBottom:'2px', lineHeight:'1.3', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+        <h4 style={{
+          fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--text)',
+          marginBottom: '4px', lineHeight: 1.3, fontWeight: '600',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
           {book.title}
         </h4>
-        <p className="tps-subtle" style={{ fontSize:'12px', fontStyle:'italic' }}>{book.author}</p>
+        <p style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--text-muted)', fontFamily: 'var(--font-body)', margin: 0 }}>
+          {book.author}
+        </p>
       </div>
     </Link>
   );
@@ -88,7 +96,7 @@ export default function BookDetail() {
     try {
       const [bookRes, reviewsRes] = await Promise.all([
         supabase.from('books').select('*').eq('id', id).single(),
-        supabase.from('reviews').select('*, members(name)').eq('book_id', id).order('created_at', { ascending:false }).limit(10),
+        supabase.from('reviews').select('*, members(name)').eq('book_id', id).order('created_at', { ascending: false }).limit(10),
       ]);
 
       if (bookRes.error || !bookRes.data) { navigate('/books'); return; }
@@ -135,9 +143,9 @@ export default function BookDetail() {
         status: 'pending',
       }]);
       if (error) throw error;
-      setActionMsg('✅ Reserved! We\'ll notify you when your copy is ready to pick up.');
+      setActionMsg('Reserved! We\'ll notify you when your copy is ready to pick up.');
     } catch (err) {
-      setActionMsg('❌ ' + (err.message || 'Could not reserve this book.'));
+      setActionMsg(err.message || 'Could not reserve this book.');
     } finally {
       setReserving(false);
     }
@@ -161,11 +169,16 @@ export default function BookDetail() {
     }
   };
 
+  /* Loading state */
   if (loading) {
     return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'70vh', flexDirection:'column', gap:'16px' }}>
-        <div style={{ fontSize:'56px', animation:'tps-bookSpin 1s ease-in-out infinite' }}>📖</div>
-        <p className="tps-subtle">Loading book…</p>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '70vh', flexDirection: 'column', gap: '16px',
+        background: 'var(--bg)', fontFamily: 'var(--font-body)',
+      }}>
+        <div className="tps-skeleton" style={{ width: '240px', height: '320px', borderRadius: 'var(--radius-xl)' }} />
+        <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontStyle: 'italic' }}>Loading book\u2026</p>
       </div>
     );
   }
@@ -180,81 +193,100 @@ export default function BookDetail() {
     : null;
 
   return (
-    <div style={{ background:'var(--bg)', fontFamily:'var(--font-body)', minHeight:'90vh' }}>
-      <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'40px 20px 80px' }}>
+    <div style={{ background: 'var(--bg)', fontFamily: 'var(--font-body)', minHeight: '90vh' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px 96px' }}>
 
         {/* Breadcrumb */}
-        <nav style={{ marginBottom:'32px', fontSize:'13px', color:'var(--text-subtle)', display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
-          <Link to="/" style={{ color:'var(--text-subtle)', textDecoration:'none' }}>Home</Link>
-          <span>/</span>
-          <Link to="/books" style={{ color:'var(--text-subtle)', textDecoration:'none' }}>Books</Link>
+        <nav style={{
+          marginBottom: '48px', fontSize: '13px', color: 'var(--text-subtle)',
+          display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap',
+          fontFamily: 'var(--font-body)',
+        }}>
+          <Link to="/" style={{ color: 'var(--text-subtle)', textDecoration: 'none' }}>Home</Link>
+          <span style={{ color: 'var(--text-subtle)' }}>/</span>
+          <Link to="/books" style={{ color: 'var(--text-subtle)', textDecoration: 'none' }}>Books</Link>
           {book.genre && <>
-            <span>/</span>
-            <Link to={`/books?genre=${encodeURIComponent(book.genre)}`} style={{ color:'var(--text-subtle)', textDecoration:'none' }}>{book.genre}</Link>
+            <span style={{ color: 'var(--text-subtle)' }}>/</span>
+            <Link to={`/books?genre=${encodeURIComponent(book.genre)}`} style={{ color: 'var(--text-subtle)', textDecoration: 'none' }}>{book.genre}</Link>
           </>}
-          <span>/</span>
-          <span style={{ color:'var(--text)', fontWeight:'600' }}>{book.title}</span>
+          <span style={{ color: 'var(--text-subtle)' }}>/</span>
+          <span style={{ color: 'var(--text)', fontWeight: '600' }}>{book.title}</span>
         </nav>
 
         {/* Main two-column layout */}
         <div style={{
-          display:'grid',
-          gridTemplateColumns:'minmax(260px, 380px) 1fr',
-          gap:'64px', marginBottom:'80px',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(260px, 400px) 1fr',
+          gap: '72px', marginBottom: '96px',
         }} className="detail-grid">
 
           {/* LEFT — cover + actions */}
-          <div style={{ position:'sticky', top:'90px', alignSelf:'start' }}>
+          <div style={{ position: 'sticky', top: '96px', alignSelf: 'start' }}>
+            {/* Cover */}
             <div style={{
-              width:'100%', aspectRatio:'3/4',
-              borderRadius:'var(--radius-lg)', overflow:'hidden',
-              background:'linear-gradient(145deg, #F5DEB3, #D4A853)',
-              boxShadow:'0 30px 70px rgba(15,23,42,0.22), 0 0 0 1px var(--border)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              marginBottom:'24px',
+              width: '100%', aspectRatio: '3/4',
+              borderRadius: 'var(--radius-xl)', overflow: 'hidden',
+              background: 'linear-gradient(160deg, #ede8d0, #d4c9a8)',
+              boxShadow: '0 30px 70px rgba(38,23,12,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: '28px',
             }}>
               {src ? (
-                <img src={src} alt={book.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                <img src={src} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <div style={{ textAlign:'center', padding:'30px' }}>
-                  <div style={{ fontSize:'80px', marginBottom:'16px' }}>📖</div>
-                  <div style={{ color:'#8B6914', fontSize:'14px', fontWeight:'600', fontFamily:'var(--font-heading)' }}>{book.genre || 'Book'}</div>
+                <div style={{ textAlign: 'center', padding: '30px' }}>
+                  <div style={{ fontSize: '80px', marginBottom: '16px' }}>📖</div>
+                  <div style={{
+                    color: 'var(--text-subtle)', fontSize: '14px', fontWeight: '600',
+                    fontFamily: 'var(--font-display)',
+                  }}>
+                    {book.genre || 'Book'}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Stock pill */}
-            <div className={inStock ? 'tps-badge tps-badge-success' : 'tps-badge tps-badge-danger'} style={{
-              display:'flex', justifyContent:'center', width:'100%',
-              padding:'10px 16px', fontSize:'12px', marginBottom:'16px',
-            }}>
-              {inStock ? `In stock · ${book.quantity_available} available` : 'Currently sold out'}
+            {/* Stock chip */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+              <span className={inStock ? 'tps-chip tps-chip-teal' : 'tps-chip'} style={{
+                padding: '8px 20px', fontSize: '12px', fontWeight: '700',
+                fontFamily: 'var(--font-body)',
+                ...(!inStock ? { background: '#d44', color: '#fff' } : {}),
+              }}>
+                {inStock ? `In stock \u00b7 ${book.quantity_available} available` : 'Currently sold out'}
+              </span>
             </div>
 
             {/* CTAs */}
-            <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {forSale && inStock && (
-                <button onClick={handleAddToCart} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block">
-                  {addedToCart ? '✓ Added to Cart' : '🛒 Add to Cart'}
+                <button onClick={handleAddToCart} className="tps-btn tps-btn-teal tps-btn-lg tps-btn-block" style={{
+                  fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: '700',
+                }}>
+                  {addedToCart ? '\u2713 Added to Cart' : 'Add to Cart'}
                 </button>
               )}
               {borrowable && (
-                <button onClick={handleReserve} disabled={reserving} className={forSale ? 'tps-btn tps-btn-secondary tps-btn-lg tps-btn-block' : 'tps-btn tps-btn-primary tps-btn-lg tps-btn-block'}>
-                  {reserving ? 'Reserving…' : '🔖 Reserve to Borrow'}
+                <button onClick={handleReserve} disabled={reserving} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block" style={{
+                  fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: '700',
+                }}>
+                  {reserving ? 'Reserving\u2026' : 'Reserve to Borrow'}
                 </button>
               )}
-              <button onClick={handleWishlist} disabled={wishlisting} className="tps-btn tps-btn-outline tps-btn-block" style={{
-                color: inWishlist ? 'var(--danger)' : 'var(--text-subtle)',
+              <button onClick={handleWishlist} disabled={wishlisting} className="tps-btn tps-btn-ghost tps-btn-block" style={{
+                fontFamily: 'var(--font-body)', fontSize: '14px',
+                color: inWishlist ? '#c44' : 'var(--text-muted)',
               }}>
-                {wishlisting ? '…' : inWishlist ? '💔 Remove from Wishlist' : '❤️ Save to Wishlist'}
+                {wishlisting ? '\u2026' : inWishlist ? 'Remove from Wishlist' : 'Save to Wishlist'}
               </button>
             </div>
 
             {actionMsg && (
-              <div className={actionMsg.startsWith('✅') ? 'tps-badge tps-badge-success' : 'tps-badge tps-badge-danger'} style={{
-                marginTop:'14px', padding:'12px 14px', fontSize:'12px',
-                display:'block', width:'100%', textAlign:'center',
-                textTransform:'none', letterSpacing:'0', lineHeight:'1.5',
+              <div style={{
+                marginTop: '16px', padding: '14px 18px', fontSize: '13px',
+                background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
+                color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5,
+                fontFamily: 'var(--font-body)',
               }}>
                 {actionMsg}
               </div>
@@ -263,103 +295,151 @@ export default function BookDetail() {
 
           {/* RIGHT — editorial copy */}
           <div>
+            {/* Genre eyebrow */}
             {book.genre && (
-              <div className="tps-eyebrow" style={{ marginBottom:'18px' }}>
+              <div style={{
+                marginBottom: '20px', fontFamily: 'var(--font-body)',
+                fontSize: '12px', fontWeight: '700', textTransform: 'uppercase',
+                letterSpacing: '2.5px', color: 'var(--text-subtle)',
+              }}>
                 {book.genre}
               </div>
             )}
 
+            {/* Title */}
             <h1 style={{
-              fontFamily:'var(--font-heading)',
-              fontSize:'clamp(32px, 5vw, 56px)',
-              fontWeight:'800',
-              color:'var(--text)',
-              lineHeight:'1.05',
-              marginBottom:'16px',
-              letterSpacing:'-0.02em',
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(32px, 5vw, 56px)',
+              fontWeight: '700',
+              color: 'var(--text)',
+              lineHeight: 1.05,
+              marginBottom: '16px',
+              letterSpacing: '-0.02em',
             }}>
               {book.title}
             </h1>
 
-            <p style={{ fontSize:'20px', color:'var(--text-subtle)', marginBottom:'24px', fontStyle:'italic' }}>
-              by <span style={{ fontWeight:'700', color:'var(--text-muted)', fontStyle:'normal' }}>{book.author}</span>
+            {/* Author */}
+            <p style={{
+              fontSize: '20px', color: 'var(--text-subtle)', marginBottom: '28px',
+              fontStyle: 'italic', fontFamily: 'var(--font-body)',
+            }}>
+              by <span style={{ fontWeight: '700', color: 'var(--text-muted)', fontStyle: 'normal' }}>{book.author}</span>
             </p>
 
+            {/* Rating */}
             {avgRating && (
-              <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
                 <StarRating rating={Math.round(parseFloat(avgRating))} />
-                <span className="tps-subtle" style={{ fontSize:'14px' }}>
-                  {avgRating} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
+                  {avgRating} \u00b7 {reviews.length} review{reviews.length === 1 ? '' : 's'}
                 </span>
               </div>
             )}
 
+            {/* Price */}
             {forSale && (
-              <div style={{ marginBottom:'32px', paddingBottom:'28px', borderBottom:'1px solid var(--border)' }}>
-                <span style={{ fontSize:'48px', fontWeight:'800', color:'var(--brand-accent)', fontFamily:'var(--font-heading)' }}>
-                  ₹{book.sales_price}
+              <div style={{ marginBottom: '40px', paddingBottom: '32px' }}>
+                <span style={{
+                  fontSize: '48px', fontWeight: '700', color: 'var(--accent)',
+                  fontFamily: 'var(--font-display)',
+                }}>
+                  \u20b9{book.sales_price}
                 </span>
                 {book.mrp && Number(book.mrp) > Number(book.sales_price) && (
                   <>
-                    <span className="tps-subtle" style={{ fontSize:'18px', marginLeft:'14px', textDecoration:'line-through' }}>
-                      ₹{book.mrp}
+                    <span style={{
+                      fontSize: '18px', marginLeft: '14px', textDecoration: 'line-through',
+                      color: 'var(--text-subtle)',
+                    }}>
+                      \u20b9{book.mrp}
                     </span>
-                    <span className="tps-badge tps-badge-success" style={{ marginLeft:'12px' }}>
-                      Save ₹{Number(book.mrp) - Number(book.sales_price)}
+                    <span className="tps-chip tps-chip-teal" style={{ marginLeft: '12px', fontSize: '11px' }}>
+                      Save \u20b9{Number(book.mrp) - Number(book.sales_price)}
                     </span>
                   </>
                 )}
-                <div className="tps-subtle" style={{ fontSize:'13px', marginTop:'8px' }}>Purchase price · In-store pickup</div>
+                <div style={{
+                  fontSize: '13px', marginTop: '10px', color: 'var(--text-subtle)',
+                  fontFamily: 'var(--font-body)',
+                }}>
+                  Purchase price \u00b7 In-store pickup
+                </div>
               </div>
             )}
 
             {/* Staff pick callout */}
             {book.is_staff_pick && book.staff_pick_blurb && (
               <div style={{
-                background:'var(--bg-subtle)',
-                borderLeft:'4px solid var(--brand-accent)',
-                padding:'22px 26px',
-                marginBottom:'28px',
-                borderRadius:'var(--radius-md)',
+                background: 'var(--bg-card)',
+                borderLeft: '4px solid var(--secondary)',
+                padding: '24px 28px',
+                marginBottom: '36px',
+                borderRadius: 'var(--radius-md)',
               }}>
-                <div className="tps-eyebrow" style={{ marginBottom:'10px' }}>
-                  ★ Staff pick
+                <div style={{
+                  fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: '700',
+                  textTransform: 'uppercase', letterSpacing: '2px',
+                  color: 'var(--secondary)', marginBottom: '10px',
+                }}>
+                  Staff pick
                 </div>
-                <p style={{ color:'var(--text-muted)', fontSize:'15px', lineHeight:'1.7', fontStyle:'italic', margin:0 }}>
+                <p style={{
+                  color: 'var(--text-muted)', fontSize: '15px', lineHeight: 1.8,
+                  fontStyle: 'italic', margin: 0, fontFamily: 'var(--font-display)',
+                }}>
                   "{book.staff_pick_blurb}"
                 </p>
               </div>
             )}
 
+            {/* Description */}
             {book.description && (
-              <div style={{ marginBottom:'36px' }}>
-                <h3 className="tps-h4" style={{ marginBottom:'14px' }}>
+              <div style={{ marginBottom: '48px' }}>
+                <h3 style={{
+                  fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: '600',
+                  color: 'var(--text)', marginBottom: '16px',
+                }}>
                   About this book
                 </h3>
-                <p style={{ color:'var(--text-muted)', lineHeight:'1.9', fontSize:'16px', whiteSpace:'pre-line' }}>
+                <p style={{
+                  color: 'var(--text-muted)', lineHeight: 1.9, fontSize: '16px',
+                  whiteSpace: 'pre-line', fontFamily: 'var(--font-body)',
+                }}>
                   {book.description}
                 </p>
               </div>
             )}
 
-            {/* Meta footer */}
+            {/* Meta grid */}
             <div style={{
-              display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',
-              gap:'20px', padding:'24px 0', borderTop:'1px solid var(--border)',
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '24px',
+              background: 'var(--bg-section)', borderRadius: 'var(--radius-lg)',
+              padding: '28px 24px',
             }}>
               {[
-                { label:'ISBN', value: book.isbn || '—' },
-                { label:'Publisher', value: book.publisher || '—' },
-                { label:'Year', value: book.publication_year || '—' },
-                { label:'Language', value: book.language || 'English' },
-                { label:'Condition', value: book.condition || '—' },
-                { label:'Total copies', value: book.quantity_total || 1 },
+                { label: 'ISBN',       value: book.isbn || '\u2014' },
+                { label: 'Publisher',   value: book.publisher || '\u2014' },
+                { label: 'Year',        value: book.publication_year || '\u2014' },
+                { label: 'Language',    value: book.language || 'English' },
+                { label: 'Condition',   value: book.condition || '\u2014' },
+                { label: 'Total copies', value: book.quantity_total || 1 },
               ].map(d => (
                 <div key={d.label}>
-                  <div style={{ fontSize:'10px', fontWeight:'800', color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'1.5px', marginBottom:'4px' }}>
+                  <div style={{
+                    fontSize: '12px', fontWeight: '600', color: 'var(--text-subtle)',
+                    fontFamily: 'var(--font-display)', fontStyle: 'italic',
+                    marginBottom: '6px',
+                  }}>
                     {d.label}
                   </div>
-                  <div style={{ fontSize:'14px', color:'var(--text)', fontWeight:'600' }}>{d.value}</div>
+                  <div style={{
+                    fontSize: '15px', color: 'var(--text)', fontWeight: '600',
+                    fontFamily: 'var(--font-body)',
+                  }}>
+                    {d.value}
+                  </div>
                 </div>
               ))}
             </div>
@@ -368,25 +448,44 @@ export default function BookDetail() {
 
         {/* Reviews */}
         {reviews.length > 0 && (
-          <section style={{ marginBottom:'80px' }}>
-            <h2 className="tps-h3" style={{ marginBottom:'28px' }}>
+          <section style={{ marginBottom: '96px' }}>
+            <h2 style={{
+              fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: '700',
+              color: 'var(--text)', marginBottom: '36px',
+            }}>
               Member reviews
             </h2>
-            <div className="tps-grid" style={{ gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '24px',
+            }}>
               {reviews.map(review => (
                 <div key={review.id} className="tps-card" style={{
-                  padding:'24px',
-                  borderLeft:'3px solid var(--brand-accent)',
+                  padding: '28px',
+                  background: 'var(--bg-card)',
+                  borderRadius: 'var(--radius-md)',
+                  borderLeft: '3px solid var(--secondary)',
+                  boxShadow: 'var(--shadow-ambient)',
                 }}>
                   <StarRating rating={review.rating || 5} size={14} />
                   {review.review_text && (
-                    <p style={{ color:'var(--text-muted)', lineHeight:'1.7', fontStyle:'italic', margin:'12px 0', fontSize:'14px' }}>
+                    <p style={{
+                      color: 'var(--text-muted)', lineHeight: 1.8, fontStyle: 'italic',
+                      margin: '14px 0', fontSize: '14px', fontFamily: 'var(--font-body)',
+                    }}>
                       "{review.review_text}"
                     </p>
                   )}
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'12px', color:'var(--text-subtle)', marginTop:'10px' }}>
-                    <span style={{ fontWeight:'700', color:'var(--text)' }}>— {review.members?.name || 'Anonymous'}</span>
-                    <span>{review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : ''}</span>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    fontSize: '12px', color: 'var(--text-subtle)', marginTop: '12px',
+                    fontFamily: 'var(--font-body)',
+                  }}>
+                    <span style={{ fontWeight: '700', color: 'var(--text)' }}>
+                      \u2014 {review.members?.name || 'Anonymous'}
+                    </span>
+                    <span>{review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
                   </div>
                 </div>
               ))}
@@ -396,11 +495,18 @@ export default function BookDetail() {
 
         {/* Similar books */}
         {similar.length > 0 && (
-          <section>
-            <h2 className="tps-h3" style={{ marginBottom:'28px' }}>
+          <section style={{ marginBottom: '48px' }}>
+            <h2 style={{
+              fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: '700',
+              color: 'var(--text)', marginBottom: '36px',
+            }}>
               You might also like
             </h2>
-            <div className="tps-grid" style={{ gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:'20px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: '24px',
+            }}>
               {similar.map(b => <SimilarTile key={b.id} book={b} />)}
             </div>
           </section>
@@ -411,7 +517,7 @@ export default function BookDetail() {
         @media (max-width: 820px) {
           .detail-grid {
             grid-template-columns: 1fr !important;
-            gap: 40px !important;
+            gap: 48px !important;
           }
           .detail-grid > div:first-child {
             position: static !important;
