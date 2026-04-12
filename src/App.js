@@ -282,7 +282,9 @@ function App() {
   }
 
   if (!user || !staff || staff._not_staff || staff._deactivated || staff._error) {
-    return <Login staffStatus={staff} />;
+    // Debug: show what the gate sees so the user can report it
+    const debugInfo = `user: ${user ? 'yes' : 'no'} | staff: ${staff ? (staff._not_staff ? 'NOT_STAFF' : staff._deactivated ? 'DEACTIVATED' : staff._error ? 'ERROR: ' + staff._error : staff.name || 'loaded') : 'null'}`;
+    return <Login staffStatus={staff} debugInfo={debugInfo} />;
   }
 
   return <DashboardShell />;

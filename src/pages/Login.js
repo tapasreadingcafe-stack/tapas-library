@@ -14,7 +14,7 @@ import { supabase } from '../utils/supabase';
 // session was created but rejected by the staff-table check.
 // =====================================================================
 
-export default function Login({ staffStatus }) {
+export default function Login({ staffStatus, debugInfo }) {
   const { login, sessionExpired } = useAuth();
 
   const [email, setEmail]       = useState('');
@@ -283,6 +283,11 @@ export default function Login({ staffStatus }) {
           color: '#64748b',
         }}>
           🔒 Staff access only · Tapas Reading Cafe
+          {debugInfo && (
+            <span style={{ display: 'block', marginTop: '8px', fontSize: '10px', color: '#64748b', fontFamily: 'ui-monospace, monospace' }}>
+              {debugInfo}
+            </span>
+          )}
         </p>
       </div>
 
