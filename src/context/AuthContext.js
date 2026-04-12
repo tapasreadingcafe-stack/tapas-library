@@ -5,8 +5,6 @@ const AuthContext = createContext(null);
 
 const INACTIVITY_MS = 8 * 60 * 60 * 1000; // 8 hours
 const LAST_ACTIVITY_KEY = 'tapas_last_activity';
-// Cache the staff profile in sessionStorage so we can show the dashboard
-// instantly on refresh without waiting for a Supabase round-trip.
 const STAFF_CACHE_KEY = 'tapas_staff_cache';
 
 function readCachedStaff() {
@@ -28,19 +26,12 @@ function writeCachedStaff(staff) {
 }
 
 export function AuthProvider({ children }) {
-  // Optimistic initialisation from cache — lets us skip the loading
-  // spinner entirely when the user refreshes with a valid session.
-  // We cache both the staff row AND the user email so the auth gate
-  // can pass immediately without waiting for INITIAL_SESSION.
   const cached = readCachedStaff();
-  // Create a temporary user-like object from cache so !user doesn't
-  // trip the gate before INITIAL_SESSION fires.
   const [user, setUser]               = useState(cached ? { email: cached.email, _cached: true } : null);
   const [staff, setStaff]             = useState(cached);
-  const [loading, setLoading]         = useState(!cached); // skip loading if cached
+  const [loading, setLoading]         = useState(!cached);
   const [sessionExpired, setSessionExpired] = useState(false);
   const inactivityTimer               = useRef(null);
-  const staffLoadedRef                = useRef(!!cached); // if cached, don't re-load until INITIAL_SESSION confirms
 
   // ─── logout ───────────────────────────────────────────────────────────
   const logout = useCallback(async (reason) => {
@@ -50,7 +41,6 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
     setUser(null);
     setStaff(null);
-    staffLoadedRef.current = false;
     if (reason === 'inactivity') setSessionExpired(true);
   }, []);
 
@@ -63,10 +53,6 @@ export function AuthProvider({ children }) {
 
   // ─── load staff profile from DB ──────────────────────────────────────
   const loadStaffProfile = useCallback(async (authUser) => {
-    // Prevent duplicate loads from init() + onAuthStateChange racing.
-    if (staffLoadedRef.current) return;
-    staffLoadedRef.current = true;
-
     setUser(authUser);
     try {
       const { data, error } = await supabase
@@ -80,8 +66,7 @@ export function AuthProvider({ children }) {
       if (!data) {
         await supabase.auth.signOut();
         setUser(null);
-        const sentinel = { _not_staff: true };
-        setStaff(sentinel);
+        setStaff({ _not_staff: true });
         writeCachedStaff(null);
         return;
       }
@@ -89,15 +74,13 @@ export function AuthProvider({ children }) {
       if (!data.is_active) {
         await supabase.auth.signOut();
         setUser(null);
-        const sentinel = { _deactivated: true };
-        setStaff(sentinel);
+        setStaff({ _deactivated: true });
         writeCachedStaff(null);
         return;
       }
 
       setStaff(data);
       writeCachedStaff(data);
-      // Track last login (fire-and-forget)
       supabase.from('staff')
         .update({ last_login: new Date().toISOString() })
         .eq('id', data.id)
@@ -106,8 +89,7 @@ export function AuthProvider({ children }) {
       console.error('Failed to load staff profile:', err);
       try { await supabase.auth.signOut(); } catch (_) {}
       setUser(null);
-      const sentinel = { _error: err.message || String(err) };
-      setStaff(sentinel);
+      setStaff({ _error: err.message || String(err) });
       writeCachedStaff(null);
     }
   }, []);
@@ -115,25 +97,16 @@ export function AuthProvider({ children }) {
   // ─── initialise on mount ─────────────────────────────────────────────
   useEffect(() => {
     if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
-      console.error('[Auth] Missing env vars.');
       setLoading(false);
       return;
     }
 
-    // Timeout fallback: never stay stuck on loading more than 4s
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 4000);
+    const timeout = setTimeout(() => setLoading(false), 4000);
+    let profileLoaded = false; // local flag to deduplicate within this effect
 
-    // We rely on onAuthStateChange as the single source of truth.
-    // Supabase v2 fires INITIAL_SESSION on mount (with the stored
-    // session if any), then SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED
-    // as the session changes. Handling INITIAL_SESSION the same way
-    // as SIGNED_IN prevents the "refresh = auto-logout" bug.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
         if (session?.user) {
-          // Check inactivity BEFORE loading the profile.
           const last = localStorage.getItem(LAST_ACTIVITY_KEY);
           if (last && Date.now() - parseInt(last, 10) > INACTIVITY_MS) {
             await supabase.auth.signOut();
@@ -147,20 +120,15 @@ export function AuthProvider({ children }) {
           }
 
           setSessionExpired(false);
-          // Always set the real user object from the session.
           setUser(session.user);
-          // If we already loaded staff from cache, only do a background
-          // refresh (don't block the UI). If no cache, load now.
-          if (cached && staffLoadedRef.current) {
-            // Background refresh — update cache silently.
-            staffLoadedRef.current = false;
-            loadStaffProfile(session.user);
-          } else {
-            staffLoadedRef.current = true;
+
+          // Load staff profile — skip only if we JUST loaded it in
+          // this same effect cycle (dedup INITIAL_SESSION + SIGNED_IN).
+          if (!profileLoaded) {
+            profileLoaded = true;
             await loadStaffProfile(session.user);
           }
         } else if (event === 'INITIAL_SESSION' && !session) {
-          // No stored session — clear any stale cache.
           sessionStorage.removeItem(STAFF_CACHE_KEY);
           setUser(null);
           setStaff(null);
@@ -168,9 +136,9 @@ export function AuthProvider({ children }) {
         setLoading(false);
         clearTimeout(timeout);
       } else if (event === 'SIGNED_OUT') {
+        profileLoaded = false;
         setUser(null);
         setStaff(null);
-        staffLoadedRef.current = false;
         sessionStorage.removeItem(STAFF_CACHE_KEY);
         setLoading(false);
         clearTimeout(timeout);
@@ -199,7 +167,6 @@ export function AuthProvider({ children }) {
 
   // ─── public API ───────────────────────────────────────────────────────
   const login = async (email, password) => {
-    staffLoadedRef.current = false; // allow fresh profile load
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
