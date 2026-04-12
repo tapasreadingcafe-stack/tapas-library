@@ -175,19 +175,16 @@ const NAV_CONFIG = [
 ];
 
 // ── App ───────────────────────────────────────────────────────────────────────
+//
+// Top-level component is a *thin* auth gate. All dashboard state/hooks live
+// inside <DashboardShell /> so we never hit the React "different number of
+// hooks between renders" error when the auth state flips. When the gate
+// returns Login, DashboardShell is unmounted and ALL its hooks go with it —
+// that's the only safe way to mix conditional returns with stateful children.
 
 function App() {
-  const isMobile = () => window.innerWidth <= 768;
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
-  const location = useLocation();
-  const { dark, toggleTheme } = useTheme();
-  const { devMode, getLabel } = useDevMode();
   const { user, staff, loading: authLoading } = useAuth();
 
-  // ── Auth gate ────────────────────────────────────────────────────────────
-  // Show a spinner while AuthProvider is checking the Supabase session on
-  // mount. This prevents a flash of the Login page for users who are
-  // already signed in.
   if (authLoading) {
     return (
       <div style={{
@@ -206,13 +203,21 @@ function App() {
     );
   }
 
-  // If not signed in, show only the Login page. No routes, no sidebar.
-  // `staff` is set to a sentinel object ({_not_staff: true}, {_deactivated: true},
-  // {_error: ...}) after a failed staff check, so an error banner can be
-  // surfaced in the Login component.
   if (!user || !staff || staff._not_staff || staff._deactivated || staff._error) {
     return <Login staffStatus={staff} />;
   }
+
+  return <DashboardShell />;
+}
+
+// ── DashboardShell — the real app UI once the staff member is signed in ────
+
+function DashboardShell() {
+  const isMobile = () => window.innerWidth <= 768;
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
+  const location = useLocation();
+  const { dark, toggleTheme } = useTheme();
+  const { devMode, getLabel } = useDevMode();
 
   // Determine which groups should start expanded (based on active route)
   const getInitialOpenGroups = () => {
