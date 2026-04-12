@@ -62,6 +62,7 @@ function quickLinks(header) {
     [header.nav_home   || 'Home',   '/'],
     [header.nav_books  || 'Books',  '/books'],
     [header.nav_offers || 'Offers', '/offers'],
+    [header.nav_blog   || 'Journal', '/blog'],
     [header.nav_about  || 'About',  '/about'],
     [header.login_label || 'Login', '/login'],
   ];

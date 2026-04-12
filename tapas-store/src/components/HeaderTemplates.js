@@ -90,6 +90,7 @@ function useHeaderState() {
     { to: '/',       label: header.nav_home   || 'Home' },
     { to: '/books',  label: header.nav_books  || 'Books' },
     { to: '/offers', label: header.nav_offers || 'Offers' },
+    { to: '/blog',   label: header.nav_blog   || 'Journal' },
     { to: '/about',  label: header.nav_about  || 'About' },
   ];
 

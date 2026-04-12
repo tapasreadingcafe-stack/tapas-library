@@ -19,6 +19,8 @@ const Profile         = React.lazy(() => import('./pages/Profile'));
 const Cart            = React.lazy(() => import('./pages/Cart'));
 const Checkout        = React.lazy(() => import('./pages/Checkout'));
 const OrderSuccess    = React.lazy(() => import('./pages/OrderSuccess'));
+const Blog            = React.lazy(() => import('./pages/Blog'));
+const BlogPost        = React.lazy(() => import('./pages/BlogPost'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -61,6 +63,8 @@ function AppShell() {
             <Route path="/books/:id"     element={<BookDetail />} />
             <Route path="/offers"        element={<Offers />} />
             <Route path="/about"         element={<About />} />
+            <Route path="/blog"          element={<Blog />} />
+            <Route path="/blog/:slug"    element={<BlogPost />} />
             <Route path="/login"         element={<CustomerLogin />} />
             <Route path="/profile"       element={<Profile />} />
             {/* Backward-compat: /member now redirects to /profile */}
