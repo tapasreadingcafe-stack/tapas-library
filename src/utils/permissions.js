@@ -45,8 +45,9 @@ export const STAFF_DEFAULT_PERMISSIONS = {
 export function getPermissionForPath(pathname) {
   // Exact match first
   if (ROUTE_PERMISSION_MAP[pathname]) return ROUTE_PERMISSION_MAP[pathname];
-  // Prefix match
+  // Prefix match (skip '/' — it would match everything)
   for (const [prefix, perm] of Object.entries(ROUTE_PERMISSION_MAP)) {
+    if (prefix === '/') continue;
     if (prefix.endsWith('/') && pathname.startsWith(prefix)) return perm;
     if (pathname.startsWith(prefix + '/')) return perm;
   }
