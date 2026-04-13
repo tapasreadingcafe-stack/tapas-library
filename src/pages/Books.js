@@ -32,7 +32,7 @@ export default function Books() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canDeleteBooks, canExportData } = usePermission();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -409,7 +409,7 @@ export default function Books() {
           >
             ➕ Add Book
           </button>}
-          {!isReadOnly && <div style={{ position: 'relative' }}>
+          {!isReadOnly && canExportData && <div style={{ position: 'relative' }}>
             <button onClick={() => setShowImportExport(!showImportExport)}
               style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}>
               📁 Import / Export ▾
@@ -881,7 +881,7 @@ export default function Books() {
                       title="Manage copies">
                       📦
                     </button>
-                    {!isReadOnly && <button onClick={() => handleDeleteBook(book.id)}
+                    {!isReadOnly && canDeleteBooks && <button onClick={() => handleDeleteBook(book.id)}
                       style={{ width: '36px', height: '36px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Delete book">
                       🗑️
@@ -944,7 +944,7 @@ export default function Books() {
                             title="Manage copies & print barcodes">
                             📦
                           </button>
-                          {!isReadOnly && <button onClick={() => handleDeleteBook(book.id)}
+                          {!isReadOnly && canDeleteBooks && <button onClick={() => handleDeleteBook(book.id)}
                             style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                             title="Delete book">
                             🗑️

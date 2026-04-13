@@ -6,7 +6,7 @@ import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 export default function EventAttendance() {
   const toast = useToast();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageEvents } = usePermission();
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [registrations, setRegistrations] = useState([]);
@@ -163,8 +163,8 @@ export default function EventAttendance() {
                     <span style={{ fontSize: '12px', color: '#999' }}>{reg.ticket_count} ticket{reg.ticket_count > 1 ? 's' : ''}</span>
                     <button
                       className={`attendance-checkin-btn ${isCheckedIn ? 'attendance-checked' : 'attendance-pending'}`}
-                      onClick={() => !isCheckedIn && !isReadOnly && checkIn(reg)}
-                      disabled={isCheckedIn || isReadOnly}
+                      onClick={() => !isCheckedIn && !isReadOnly && canManageEvents && checkIn(reg)}
+                      disabled={isCheckedIn || isReadOnly || !canManageEvents}
                       style={isReadOnly && !isCheckedIn ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                     >
                       {isCheckedIn ? '✓ Checked In' : 'Check In'}

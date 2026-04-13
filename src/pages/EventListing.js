@@ -61,7 +61,7 @@ CREATE POLICY "open" ON event_attendance FOR ALL USING (true) WITH CHECK (true);
 export default function EventListing() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageEvents } = usePermission();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -201,7 +201,7 @@ export default function EventListing() {
 
       <div className="events-header">
         <h1>🎉 Events</h1>
-        {!isReadOnly && <a href="/events/create" style={{ padding: '8px 16px', background: '#667eea', color: 'white', borderRadius: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>+ Create Event</a>}
+        {!isReadOnly && canManageEvents && <a href="/events/create" style={{ padding: '8px 16px', background: '#667eea', color: 'white', borderRadius: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>+ Create Event</a>}
       </div>
 
       <div className="events-tabs">
@@ -268,10 +268,10 @@ export default function EventListing() {
 
             {/* Registration actions */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              {!isReadOnly && <button onClick={() => setShowRegModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+              {!isReadOnly && canManageEvents && <button onClick={() => setShowRegModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
                 + Register Member
               </button>}
-              {!isReadOnly && selectedEvent.status !== 'cancelled' && (
+              {!isReadOnly && canManageEvents && selectedEvent.status !== 'cancelled' && (
                 <button onClick={() => cancelEvent(selectedEvent.id)} style={{ padding: '8px 16px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
                   Cancel Event
                 </button>

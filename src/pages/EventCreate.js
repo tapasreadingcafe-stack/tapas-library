@@ -8,7 +8,7 @@ import ViewOnlyBanner from '../components/ViewOnlyBanner';
 export default function EventCreate() {
   const toast = useToast();
   const navigate = useNavigate();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageEvents } = usePermission();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
   const [saving, setSaving] = useState(false);
@@ -181,7 +181,7 @@ export default function EventCreate() {
         </div>
 
         <div className="event-form-actions">
-          <button type="submit" disabled={saving || isReadOnly} style={{ background: isReadOnly ? '#ccc' : '#667eea', color: 'white', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
+          <button type="submit" disabled={saving || isReadOnly || !canManageEvents} style={{ background: (isReadOnly || !canManageEvents) ? '#ccc' : '#667eea', color: 'white', cursor: (isReadOnly || !canManageEvents) ? 'not-allowed' : 'pointer' }}>
             {saving ? 'Saving...' : editId ? 'Update Event' : 'Create Event'}
           </button>
           <button type="button" onClick={() => navigate('/events')} style={{ background: '#e0e0e0', color: '#333' }}>Cancel</button>

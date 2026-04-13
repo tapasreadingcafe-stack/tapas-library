@@ -22,7 +22,7 @@ export default function Reservations() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [hasExpiresAt, setHasExpiresAt] = useState(false);
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageReservations } = usePermission();
 
   useEffect(() => {
     probeSchema().then(fetchAll);
@@ -204,7 +204,7 @@ export default function Reservations() {
           <button onClick={() => probeSchema().then(fetchAll)} style={{ padding: '8px 16px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
             🔄 Refresh
           </button>
-          {!isReadOnly && (
+          {!isReadOnly && canManageReservations && (
             <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
               + New Reservation
             </button>
@@ -318,12 +318,12 @@ export default function Reservations() {
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {r.status === 'available' && (
-                          <button onClick={() => markFulfilled(r.id)} disabled={isReadOnly} style={{ padding: '4px 10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>
+                          <button onClick={() => markFulfilled(r.id)} disabled={isReadOnly || !canManageReservations} style={{ padding: '4px 10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageReservations) ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: (isReadOnly || !canManageReservations) ? 0.5 : 1 }}>
                             ✓ Fulfilled
                           </button>
                         )}
                         {(r.status === 'pending' || r.status === 'available') && (
-                          <button onClick={() => cancelReservation(r.id)} disabled={isReadOnly} style={{ padding: '4px 10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>
+                          <button onClick={() => cancelReservation(r.id)} disabled={isReadOnly || !canManageReservations} style={{ padding: '4px 10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageReservations) ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: (isReadOnly || !canManageReservations) ? 0.5 : 1 }}>
                             ✕ Cancel
                           </button>
                         )}

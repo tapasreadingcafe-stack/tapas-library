@@ -24,7 +24,7 @@ CREATE POLICY "open" ON purchase_order_items FOR ALL USING (true) WITH CHECK (tr
 
 export default function PurchaseOrders() {
   const toast = useToast();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageVendors } = usePermission();
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +109,7 @@ export default function PurchaseOrders() {
       {isReadOnly && <ViewOnlyBanner />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h1 style={{ fontSize: '28px', margin: 0 }}>📦 Purchase Orders</h1>
-        {!isReadOnly && <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ New PO</button>}
+        {!isReadOnly && canManageVendors && <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ New PO</button>}
       </div>
 
       {loading ? <p style={{ color: '#999' }}>Loading...</p> : (
@@ -137,8 +137,8 @@ export default function PurchaseOrders() {
                   <td style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       <button onClick={() => viewPO(po)} style={{ padding: '3px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>View</button>
-                      {po.status === 'draft' && <button onClick={() => updateStatus(po.id, 'ordered')} disabled={isReadOnly} style={{ padding: '3px 8px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Order</button>}
-                      {po.status === 'ordered' && <button onClick={() => updateStatus(po.id, 'received')} disabled={isReadOnly} style={{ padding: '3px 8px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Received</button>}
+                      {po.status === 'draft' && <button onClick={() => updateStatus(po.id, 'ordered')} disabled={isReadOnly || !canManageVendors} style={{ padding: '3px 8px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageVendors) ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: (isReadOnly || !canManageVendors) ? 0.5 : 1 }}>Order</button>}
+                      {po.status === 'ordered' && <button onClick={() => updateStatus(po.id, 'received')} disabled={isReadOnly || !canManageVendors} style={{ padding: '3px 8px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageVendors) ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: (isReadOnly || !canManageVendors) ? 0.5 : 1 }}>Received</button>}
                     </div>
                   </td>
                 </tr>

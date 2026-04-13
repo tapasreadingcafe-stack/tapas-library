@@ -111,7 +111,7 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
 // ── Main POS component ────────────────────────────────────────────────────────
 export default function POS() {
   const { devMode } = useDevMode();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canProcessOrders } = usePermission();
 
   // Catalog
   const [allBooks, setAllBooks]         = useState([]);
@@ -131,6 +131,12 @@ export default function POS() {
   const [cart, setCart]                 = useState([]);
   const [discountType, setDiscountType] = useState('pct');
   const [discountVal, setDiscountVal]   = useState(0);
+
+  // Promo code
+  const [promoInput, setPromoInput]     = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoError, setPromoError]     = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
 
   // Payment
   const [payMethod, setPayMethod]       = useState('cash');
@@ -489,6 +495,42 @@ export default function POS() {
   const resetCart = () => {
     setCart([]); setSelectedMember(null); setMemberSearch('');
     setMemberFines([]); setDiscountVal(0); setCashReceived(''); setPayMethod('cash');
+    setPromoInput(''); setAppliedPromo(null); setPromoError('');
+  };
+
+  // ── Promo code ────────────────────────────────────────────────────────────────
+  const applyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoError(''); setPromoLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('promo_codes')
+        .select('*')
+        .ilike('code', code)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) { setPromoError('Invalid promo code'); setAppliedPromo(null); return; }
+      if (data.expires_at && new Date(data.expires_at) < new Date()) { setPromoError('Code expired'); setAppliedPromo(null); return; }
+      if (data.max_uses && data.used_count >= data.max_uses) { setPromoError('Code usage limit reached'); setAppliedPromo(null); return; }
+      if (data.min_order && subtotal < parseFloat(data.min_order)) { setPromoError(`Min order ₹${data.min_order}`); setAppliedPromo(null); return; }
+      // Apply the promo discount
+      setAppliedPromo(data);
+      setDiscountType(data.discount_type === 'percentage' ? 'pct' : 'fixed');
+      setDiscountVal(parseFloat(data.discount_value));
+      setPromoError('');
+    } catch (e) {
+      setPromoError('Failed to validate code');
+      console.error(e);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const clearPromo = () => {
+    setAppliedPromo(null); setPromoInput(''); setPromoError('');
+    setDiscountVal(0);
   };
 
   // ── Computed values ───────────────────────────────────────────────────────────
@@ -517,6 +559,7 @@ export default function POS() {
             member_id: selectedMember?.id || null,
             total_amount: total,
             discount_amount: discountAmount,
+            promo_code: appliedPromo?.code || null,
             payment_method: payMethod,
             cash_received: payMethod === 'cash' ? (cashNum || total) : null,
             change_given:  payMethod === 'cash' ? change : null,
@@ -578,6 +621,18 @@ export default function POS() {
         }
       }
 
+      // Record promo code usage
+      if (appliedPromo) {
+        try {
+          await supabase.from('promo_codes').update({ used_count: (appliedPromo.used_count || 0) + 1 }).eq('id', appliedPromo.id);
+          await supabase.from('promo_code_uses').insert({
+            promo_id: appliedPromo.id,
+            member_id: selectedMember?.id || null,
+            discount_applied: discountAmount,
+          }).select();
+        } catch (e) { console.error('Promo usage tracking:', e); }
+      }
+
       setLastTxn({
         id: txnId,
         txnRef: `TXN${Date.now().toString().slice(-6)}`,
@@ -585,6 +640,7 @@ export default function POS() {
         member: selectedMember,
         items: [...cart],
         subtotal, discount: discountAmount, total,
+        promoCode: appliedPromo?.code || null,
         payMethod, cashReceived: cashNum || total, change,
       });
       setShowReceipt(true);
@@ -779,7 +835,7 @@ export default function POS() {
                     <ServiceCard key={svc.id} svc={svc} fmt={fmt}
                       onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
                       onClick={() => {
-                        if (isReadOnly) return;
+                        if (isReadOnly || !canProcessOrders) return;
                         if (svc.custom) {
                           setCustomAmtModal(svc);
                           setCustomAmtVal('');
@@ -847,8 +903,8 @@ export default function POS() {
                               </div>
                               <button
                                 onClick={() => handleAddBookToCart(book)}
-                                disabled={!inStock || isReadOnly}
-                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: (inStock && !isReadOnly) ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: (inStock && !isReadOnly) ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
+                                disabled={!inStock || isReadOnly || !canProcessOrders}
+                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: (inStock && !isReadOnly && canProcessOrders) ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: (inStock && !isReadOnly && canProcessOrders) ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
                               >+</button>
                             </div>
                           </div>
@@ -1075,18 +1131,56 @@ export default function POS() {
           {/* ── CHECKOUT SECTION ── */}
           <div style={{ borderTop: '2px solid #f0f0f0', padding: '12px 16px 14px', background: '#fafafa', flexShrink: 0 }}>
 
+            {/* Promo Code */}
+            {cart.length > 0 && (
+              <div style={{ marginBottom: '10px' }}>
+                {appliedPromo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '6px' }}>
+                    <span style={{ fontSize: '14px' }}>🏷️</span>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#059669' }}>{appliedPromo.code}</span>
+                      <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '6px' }}>
+                        {appliedPromo.discount_type === 'percentage' ? `${appliedPromo.discount_value}% off` : `₹${appliedPromo.discount_value} off`}
+                      </span>
+                    </div>
+                    <button onClick={clearPromo} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', padding: '0 2px' }}>✕</button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '14px' }}>🏷️</span>
+                      <input
+                        value={promoInput}
+                        onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && applyPromo()}
+                        placeholder="Promo code"
+                        style={{ flex: 1, padding: '5px 8px', border: `1px solid ${promoError ? '#fca5a5' : '#e0e0e0'}`, borderRadius: '5px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}
+                      />
+                      <button onClick={applyPromo} disabled={promoLoading || !promoInput.trim()}
+                        style={{ padding: '5px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: '700', cursor: promoInput.trim() ? 'pointer' : 'not-allowed', opacity: promoInput.trim() ? 1 : 0.5 }}>
+                        {promoLoading ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError && <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', paddingLeft: '22px' }}>{promoError}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Discount */}
             {cart.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', whiteSpace: 'nowrap' }}>Discount</span>
-                <select value={discountType} onChange={e => setDiscountType(e.target.value)}
-                  style={{ padding: '4px 6px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '12px', background: 'white', fontWeight: '700' }}>
+                <select value={discountType} onChange={e => { if (!appliedPromo) setDiscountType(e.target.value); }}
+                  disabled={!!appliedPromo}
+                  style={{ padding: '4px 6px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '12px', background: appliedPromo ? '#f3f4f6' : 'white', fontWeight: '700' }}>
                   <option value="pct">%</option>
                   <option value="fixed">₹</option>
                 </select>
                 <input type="number" value={discountVal} min="0" placeholder="0"
-                  onChange={e => setDiscountVal(parseFloat(e.target.value) || 0)}
-                  style={{ flex: 1, padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '13px' }} />
+                  onChange={e => { if (!appliedPromo) setDiscountVal(parseFloat(e.target.value) || 0); }}
+                  disabled={!!appliedPromo}
+                  style={{ flex: 1, padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '13px', background: appliedPromo ? '#f3f4f6' : 'white' }} />
               </div>
             )}
 
@@ -1189,11 +1283,11 @@ export default function POS() {
             )}
 
             {/* CHECKOUT button */}
-            <button onClick={handleCheckout} disabled={cart.length === 0 || checkingOut || isReadOnly} style={{
+            <button onClick={handleCheckout} disabled={cart.length === 0 || checkingOut || isReadOnly || !canProcessOrders} style={{
               width: '100%', padding: '14px',
-              background: (cart.length > 0 && !isReadOnly) ? 'linear-gradient(135deg, #059669, #047857)' : '#d1d5db',
+              background: (cart.length > 0 && !isReadOnly && canProcessOrders) ? 'linear-gradient(135deg, #059669, #047857)' : '#d1d5db',
               color: 'white', border: 'none', borderRadius: '9px',
-              cursor: (cart.length > 0 && !isReadOnly) ? 'pointer' : 'not-allowed',
+              cursor: (cart.length > 0 && !isReadOnly && canProcessOrders) ? 'pointer' : 'not-allowed',
               fontSize: '16px', fontWeight: '900', letterSpacing: '0.5px',
               boxShadow: cart.length > 0 ? '0 4px 14px rgba(5,150,105,0.35)' : 'none',
               transition: 'all 0.2s',

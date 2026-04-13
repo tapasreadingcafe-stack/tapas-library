@@ -24,14 +24,18 @@ const PAGE_PERMISSIONS = [
 ];
 
 const FEATURE_TOGGLES = [
-  { key: 'can_delete_books',     label: 'Can delete books',          icon: '🗑️' },
-  { key: 'can_export_data',      label: 'Can export data (CSV)',     icon: '📤' },
-  { key: 'can_manage_members',   label: 'Can add/edit members',      icon: '✏️' },
-  { key: 'can_process_fines',    label: 'Can waive/collect fines',   icon: '💸' },
-  { key: 'can_manage_inventory', label: 'Can manage inventory',      icon: '📦' },
-  { key: 'can_manage_staff',     label: 'Can manage staff',          icon: '👤' },
-  { key: 'can_access_reports',   label: 'Can view reports',          icon: '📊' },
-  { key: 'can_manage_events',    label: 'Can manage events',         icon: '🎉' },
+  { key: 'can_delete_books',       label: 'Can delete books',          icon: '🗑️' },
+  { key: 'can_export_data',        label: 'Can export data (CSV)',     icon: '📤' },
+  { key: 'can_manage_members',     label: 'Can add/edit members',      icon: '✏️' },
+  { key: 'can_process_fines',      label: 'Can waive/collect fines',   icon: '💸' },
+  { key: 'can_manage_inventory',   label: 'Can manage inventory',      icon: '📦' },
+  { key: 'can_manage_staff',       label: 'Can manage staff',          icon: '👤' },
+  { key: 'can_access_reports',     label: 'Can view reports',          icon: '📊' },
+  { key: 'can_manage_events',      label: 'Can manage events',         icon: '🎉' },
+  { key: 'can_manage_cafe_menu',   label: 'Can manage cafe menu',      icon: '☕' },
+  { key: 'can_manage_vendors',     label: 'Can manage vendors',        icon: '🏪' },
+  { key: 'can_manage_reservations',label: 'Can manage reservations',   icon: '📋' },
+  { key: 'can_process_orders',     label: 'Can process POS orders',    icon: '🛒' },
 ];
 
 const ACCESS_LEVELS = ['none', 'view', 'full'];

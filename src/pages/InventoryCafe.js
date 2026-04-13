@@ -22,7 +22,7 @@ CREATE POLICY "open" ON cafe_inventory FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function InventoryCafe() {
   const toast = useToast();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageInventory } = usePermission();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -100,7 +100,7 @@ export default function InventoryCafe() {
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h1 style={{ fontSize: '28px', margin: 0 }}>☕ Cafe Stock</h1>
-        {!isReadOnly && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Item</button>}
+        {!isReadOnly && canManageInventory && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Item</button>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '20px' }}>
@@ -154,9 +154,9 @@ export default function InventoryCafe() {
                     <td style={{ padding: '10px 12px', fontSize: '13px' }}>₹{item.cost_per_unit}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {!isReadOnly && <button onClick={() => restock(item, 10)} style={{ padding: '3px 8px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>+10</button>}
-                        {!isReadOnly && <button onClick={() => openEdit(item)} style={{ padding: '3px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Edit</button>}
-                        {!isReadOnly && <button onClick={() => deleteItem(item.id)} style={{ padding: '3px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Del</button>}
+                        {!isReadOnly && canManageInventory && <button onClick={() => restock(item, 10)} style={{ padding: '3px 8px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>+10</button>}
+                        {!isReadOnly && canManageInventory && <button onClick={() => openEdit(item)} style={{ padding: '3px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Edit</button>}
+                        {!isReadOnly && canManageInventory && <button onClick={() => deleteItem(item.id)} style={{ padding: '3px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Del</button>}
                       </div>
                     </td>
                   </tr>

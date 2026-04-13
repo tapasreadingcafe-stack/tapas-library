@@ -11,7 +11,7 @@ const CAT_ICONS = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🍰', s
 export default function CafeMenu() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageCafeMenu } = usePermission();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -132,7 +132,7 @@ export default function CafeMenu() {
 
       <div className="cafe-menu-header">
         <h1>📝 Manage Cafe Menu</h1>
-        {!isReadOnly && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+        {!isReadOnly && canManageCafeMenu && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
           + Add Item
         </button>}
       </div>
@@ -173,14 +173,14 @@ export default function CafeMenu() {
                   <td style={{ fontWeight: '600', color: '#667eea' }}>₹{item.price}</td>
                   <td style={{ color: '#999' }}>₹{item.cost_price || 0}</td>
                   <td>
-                    <button className={`cafe-avail-badge ${item.is_available ? 'available' : 'unavailable'}`} onClick={() => toggleAvail(item)} disabled={isReadOnly}>
+                    <button className={`cafe-avail-badge ${item.is_available ? 'available' : 'unavailable'}`} onClick={() => toggleAvail(item)} disabled={isReadOnly || !canManageCafeMenu}>
                       {item.is_available ? 'Available' : 'Unavailable'}
                     </button>
                   </td>
                   <td>
                     <div className="cafe-menu-actions">
-                      <button onClick={() => openEdit(item)} style={{ background: '#667eea', color: 'white' }} disabled={isReadOnly}>Edit</button>
-                      {!isReadOnly && <button onClick={() => deleteItem(item.id)} style={{ background: '#ff6b6b', color: 'white' }}>Delete</button>}
+                      <button onClick={() => openEdit(item)} style={{ background: '#667eea', color: 'white' }} disabled={isReadOnly || !canManageCafeMenu}>Edit</button>
+                      {!isReadOnly && canManageCafeMenu && <button onClick={() => deleteItem(item.id)} style={{ background: '#ff6b6b', color: 'white' }}>Delete</button>}
                     </div>
                   </td>
                 </tr>

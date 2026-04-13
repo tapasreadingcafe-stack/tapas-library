@@ -28,7 +28,7 @@ function Members() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageMembers } = usePermission();
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -393,7 +393,7 @@ function Members() {
       <div className="page-header">
         <h1>👥 Members Management</h1>
         <div className="header-actions">
-          {!isReadOnly && (
+          {!isReadOnly && canManageMembers && (
             <button className="btn btn-primary" onClick={handleAddMember}>
               + Add Member
             </button>
@@ -472,9 +472,9 @@ function Members() {
                   <td className="text-center">{member.borrow_limit || 0}</td>
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
-                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly}>✏️</button>
+                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly || !canManageMembers}>✏️</button>
                     <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile">👁️</button>
-                    {!isReadOnly && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>}
+                    {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>}
                   </td>
                 </tr>
               ))

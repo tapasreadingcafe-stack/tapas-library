@@ -15,7 +15,7 @@ CREATE POLICY "open" ON vendors FOR ALL USING (true) WITH CHECK (true);`;
 
 export default function VendorList() {
   const toast = useToast();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canManageVendors } = usePermission();
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -74,7 +74,7 @@ export default function VendorList() {
       <style>{`@media(max-width:768px){.vendor-page h1{font-size:22px!important}}`}</style>
       <div className="vendor-page" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h1 style={{ fontSize: '28px', margin: 0 }}>🏪 Vendors</h1>
-        {!isReadOnly && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Vendor</button>}
+        {!isReadOnly && canManageVendors && <button onClick={openAdd} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Vendor</button>}
       </div>
       <input placeholder="Search vendors..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', maxWidth: '400px', padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', marginBottom: '16px' }} />
 
@@ -91,8 +91,8 @@ export default function VendorList() {
               {v.email && <p style={{ fontSize: '13px', color: '#666', margin: '2px 0' }}>📧 {v.email}</p>}
               <p style={{ fontSize: '11px', color: '#999', marginTop: '6px', textTransform: 'capitalize' }}>Type: {v.vendor_type}</p>
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                <button onClick={() => openEdit(v)} disabled={isReadOnly} style={{ padding: '4px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: isReadOnly ? 0.5 : 1 }}>Edit</button>
-                {!isReadOnly && <button onClick={() => deleteVendor(v.id)} style={{ padding: '4px 12px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                <button onClick={() => openEdit(v)} disabled={isReadOnly || !canManageVendors} style={{ padding: '4px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageVendors) ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: (isReadOnly || !canManageVendors) ? 0.5 : 1 }}>Edit</button>
+                {!isReadOnly && canManageVendors && <button onClick={() => deleteVendor(v.id)} style={{ padding: '4px 12px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
               </div>
             </div>
           ))}
