@@ -59,6 +59,8 @@ const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
 const StaffDetail           = React.lazy(() => import('./pages/StaffDetail'));
 const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
 const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
+const BarcodeManager        = React.lazy(() => import('./pages/BarcodeManager'));
+const BarcodeEditor         = React.lazy(() => import('./pages/BarcodeEditor'));
 const DeviceManager         = React.lazy(() => import('./pages/DeviceManager'));
 const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 
@@ -158,6 +160,7 @@ const NAV_CONFIG = [
       { to: '/reviews',         icon: '⭐', label: 'Reviews' },
       { to: '/reservations',    icon: '🔖', label: 'Reservations' },
       { to: '/pos',             icon: '🛒', label: 'POS' },
+      { to: '/barcodes',         icon: '🏷️', label: 'Barcodes' },
     ],
   },
   {
@@ -586,6 +589,8 @@ function DashboardShell() {
             {/* Library */}
             <Route path="/books"                              element={<Books />} />
             <Route path="/books/:bookId/copies"                 element={<BookCopies />} />
+            <Route path="/barcodes"                              element={<BarcodeManager />} />
+            <Route path="/barcodes/editor"                       element={<BarcodeEditor />} />
             <Route path="/Borrow"                             element={<Borrow />} />
             <Route path="/overdue"                            element={<OverdueBooks />} />
             <Route path="/availability"                       element={<BookAvailability />} />

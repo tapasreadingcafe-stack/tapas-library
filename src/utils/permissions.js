@@ -7,6 +7,7 @@ export const ROUTE_PERMISSION_MAP = {
   '/Borrow': 'borrow', '/overdue': 'borrow', '/availability': 'books', '/statistics': 'books',
   '/recommendations': 'books', '/wishlist': 'books', '/reviews': 'books', '/reservations': 'borrow',
   '/pos': 'pos',
+  '/barcodes': 'books',
   '/cafe': 'cafe',
   '/members': 'members', '/fines': 'fines', '/member/': 'members',
   '/inventory': 'inventory',
