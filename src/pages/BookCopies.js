@@ -116,14 +116,15 @@ export default function BookCopies() {
     if (selected.length === 0) { toast.warning('No copies to print'); return; }
     setDirectPrinting(true);
     try {
-      const mrp = book?.mrp || 0;
-      const selling = book?.sales_price || mrp;
+      const mrp = Number(book?.mrp) || 0;
+      const selling = Number(book?.sales_price) || 0;
+      const displayPrice = selling > 0 ? selling : mrp;
       const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
       const labels = selected.map(c => ({
         brand: 'TAPAS READING CAFE',
         copyCode: c.copy_code,
         title: book?.title || 'Unknown',
-        price: selling > 0 ? `Rs.${selling}` : (mrp > 0 ? `Rs.${mrp}` : ''),
+        price: displayPrice > 0 ? `Rs.${displayPrice}` : '',
         mrpStrike: hasDiscount ? `Rs.${mrp}` : '',
       }));
       // Load saved template from localStorage selection

@@ -233,15 +233,16 @@ export default function BarcodeManager() {
     setDirectPrinting(true);
     try {
       const labels = selected.map(c => {
-        const mrp = c.books?.mrp || 0;
-        const selling = c.books?.sales_price || mrp;
+        const mrp = Number(c.books?.mrp) || 0;
+        const selling = Number(c.books?.sales_price) || 0;
+        const displayPrice = selling > 0 ? selling : mrp;
         const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
         return {
           brand: 'TAPAS READING CAFE',
           copyCode: c.copy_code,
           title: c.books?.title || 'Unknown',
-          price: selling > 0 ? `Rs.${selling}` : (mrp > 0 ? `Rs.${mrp}` : ''),
-          mrpStrike: hasDiscount ? `Rs.${mrp}` : '',  // only when MRP > selling
+          price: displayPrice > 0 ? `Rs.${displayPrice}` : '',
+          mrpStrike: hasDiscount ? `Rs.${mrp}` : '',
         };
       });
 
