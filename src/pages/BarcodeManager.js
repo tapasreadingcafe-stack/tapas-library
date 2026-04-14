@@ -60,7 +60,7 @@ export default function BarcodeManager() {
     try {
       const { data, error } = await supabase
         .from('book_copies')
-        .select('*, books(title, category, price, mrp, author)')
+        .select('*, books(title, category, price, mrp, sales_price, author)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setCopies(data || []);
