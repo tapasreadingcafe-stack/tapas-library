@@ -103,7 +103,7 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
 
   // Build ZPL for one label from template elements + actual data
   const buildLabel = (label, xOffset) => {
-    const { brand = 'TAPAS READING CAFE', copyCode = '', title = '', price = '' } = label;
+    const { brand = 'TAPAS READING CAFE', copyCode = '', title = '', price = '', mrpStrike = '' } = label;
     const lines = [];
 
     // Helper: get ZPL font command respecting fontWeight from template
@@ -153,7 +153,21 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
         }
         case 'price': {
           if (price) {
+            // Show selling price
             lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${price}^FS`);
+
+            // If MRP is higher, show it with strikethrough next to selling price
+            if (mrpStrike) {
+              const priceWidth = price.length * Math.round(fs * 0.6);
+              const mrpX = x + priceWidth + 8;
+              const mrpFs = Math.round(fs * 0.85);  // slightly smaller
+              // MRP text
+              lines.push(`^FO${mrpX},${y}^A0N,${mrpFs},${mrpFs}^FD${mrpStrike}^FS`);
+              // Strikethrough line over MRP text
+              const mrpTextWidth = mrpStrike.length * Math.round(mrpFs * 0.6);
+              const lineY = y + Math.round(mrpFs / 2);
+              lines.push(`^FO${mrpX},${lineY}^GB${mrpTextWidth},0,2^FS`);
+            }
           }
           break;
         }
