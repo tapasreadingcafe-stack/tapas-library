@@ -167,7 +167,7 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
               const mrpFs = Math.round(fs * 0.85);
               lines.push(`^FO${x},${y}^A0N,${mrpFs},${mrpFs}^FD${mrpStrike}^FS`);
               const mrpTextWidth = mrpStrike.length * Math.round(mrpFs * 0.6);
-              const lineY = y + Math.round(mrpFs / 2);
+              const lineY = y + Math.round(mrpFs * 0.4);
               lines.push(`^FO${x},${lineY}^GB${mrpTextWidth},0,2^FS`);
               // Selling price after
               const sellingX = x + mrpTextWidth + 8;
