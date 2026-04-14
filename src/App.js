@@ -111,9 +111,30 @@ class ChunkErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    // Only treat chunk load failures as version errors
+    const isChunkError = error?.name === 'ChunkLoadError' ||
+      error?.message?.includes('Loading chunk') ||
+      error?.message?.includes('dynamically imported module');
+    return { hasError: isChunkError };
   }
+  handleRefresh = () => {
+    // Mark that we already tried refreshing to prevent infinite loop
+    const key = 'tapas_chunk_refresh';
+    const lastRefresh = sessionStorage.getItem(key);
+    const now = Date.now();
+    // If we refreshed less than 10 seconds ago, don't loop
+    if (lastRefresh && now - parseInt(lastRefresh, 10) < 10000) {
+      // Force clear caches and do a full navigation instead of reload
+      if ('caches' in window) {
+        caches.keys().then(names => names.forEach(n => caches.delete(n)));
+      }
+      window.location.href = window.location.pathname + '?v=' + now;
+      return;
+    }
+    sessionStorage.setItem(key, now.toString());
+    window.location.reload();
+  };
   render() {
     if (this.state.hasError) {
       return (
@@ -127,7 +148,7 @@ class ChunkErrorBoundary extends React.Component {
             The dashboard was updated. Please refresh to load the latest version.
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={this.handleRefresh}
             style={{
               padding: '10px 24px', background: 'linear-gradient(135deg, #667eea, #764ba2)',
               color: 'white', border: 'none', borderRadius: '8px',
