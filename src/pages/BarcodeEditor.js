@@ -201,7 +201,7 @@ export default function BarcodeEditor() {
       } else if (el.type === 'copyCode') {
         inner = `<span style="font-size:${el.fontSize}pt;font-family:monospace;color:${el.color};white-space:nowrap">B-FIC-0001</span>`;
       } else if (el.type === 'price') {
-        inner = `<span style="font-size:${el.fontSize}pt;font-weight:bold;color:${el.color}">\u20B9299</span>`;
+        inner = `<span style="font-size:${el.fontSize}pt;font-weight:bold;color:${el.color}">MRP / Sell</span>`;
       } else if (el.type === 'brand') {
         inner = `<span style="font-size:${el.fontSize}pt;font-weight:${el.fontWeight};color:${el.color}">${el.text || 'Tapas Reading Cafe'}</span>`;
       } else if (el.type === 'customText') {
@@ -249,7 +249,8 @@ export default function BarcodeEditor() {
         brand: brandEl?.text || 'TAPAS READING CAFE',
         copyCode: 'B-FIC-0001',
         title: 'Book Title',
-        price: 'Rs.299',
+        price: 'Rs.200',
+        mrpStrike: 'Rs.300',
       };
 
       // Use current editor layout as the template
@@ -377,7 +378,7 @@ export default function BarcodeEditor() {
                   {el.type === 'barcode' && generateBarcodeSVG('BFIC0001', { height: el.height * SCALE * 0.8 })}
                   {el.type === 'title' && <span style={{ fontSize: el.fontSize, fontWeight: el.fontWeight, color: el.color }}>Book Title</span>}
                   {el.type === 'copyCode' && <span style={{ fontSize: el.fontSize, fontFamily: 'monospace', color: el.color }}>B-FIC-0001</span>}
-                  {el.type === 'price' && <span style={{ fontSize: el.fontSize, fontWeight: 'bold', color: el.color }}>{'\u20B9'}299</span>}
+                  {el.type === 'price' && <span style={{ fontSize: el.fontSize, fontWeight: 'bold', color: el.color }}>MRP / Sell</span>}
                   {el.type === 'brand' && <span style={{ fontSize: el.fontSize, fontWeight: el.fontWeight, color: el.color }}>{el.text || 'Tapas Reading Cafe'}</span>}
                   {el.type === 'customText' && <span style={{ fontSize: el.fontSize, color: el.color }}>{el.text || 'Custom Text'}</span>}
                   {el.type === 'rectangle' && <div style={{ width: '100%', height: '100%', border: `${el.borderWidth || 1}px solid ${el.borderColor}`, boxSizing: 'border-box' }} />}
