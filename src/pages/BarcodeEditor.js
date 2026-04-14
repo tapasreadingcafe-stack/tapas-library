@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
-import { generateBarcodeSVG, generateBarcodeSVGString } from '../utils/barcodeUtils';
+import { generateBarcodeSVG, generateBarcodeSVGString, generateZPL } from '../utils/barcodeUtils';
 
 const SCALE = 5; // 1mm = 5px on screen for comfortable editing
 const DEFAULT_CANVAS = { width: 50, height: 25 }; // mm
@@ -45,7 +45,8 @@ function makeElement(type, canvasSize) {
 }
 
 export default function BarcodeEditor() {
-  const { showToast } = useToast();
+  const toast = useToast();
+  const showToast = (msg, type) => toast[type]?.(msg) || toast.info(msg);
   const [elements, setElements] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [canvasSize, setCanvasSize] = useState({ ...DEFAULT_CANVAS });
@@ -125,7 +126,7 @@ export default function BarcodeEditor() {
   useEffect(() => {
     const onKey = (e) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && document.activeElement === document.body) {
-        setElements(prev => prev.filter(el => el.id !== selectedId));
+        setElements(prev => prev.filter(el => el && el.id !== selectedId));
         setSelectedId(null);
       }
     };
@@ -188,11 +189,9 @@ export default function BarcodeEditor() {
     showToast('Template deleted', 'success');
   };
 
-  // ---- Print preview ----
-  const printPreview = () => {
-    const w = window.open('', '_blank');
-    if (!w) { showToast('Popup blocked', 'error'); return; }
-    const elHtml = elements.map(el => {
+  // ---- Build label HTML (shared by print preview + direct print) ----
+  const buildLabelHtml = () => {
+    return (elements || []).filter(Boolean).map(el => {
       const base = `position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.width}mm;height:${el.height}mm;display:flex;align-items:center;justify-content:center;overflow:hidden;background:${el.bgColor || 'transparent'};`;
       let inner = '';
       if (el.type === 'barcode') {
@@ -200,7 +199,7 @@ export default function BarcodeEditor() {
       } else if (el.type === 'title') {
         inner = `<span style="font-size:${el.fontSize}pt;font-weight:${el.fontWeight};color:${el.color}">Book Title</span>`;
       } else if (el.type === 'copyCode') {
-        inner = `<span style="font-size:${el.fontSize}pt;font-family:monospace;color:${el.color}">B-FIC-0001</span>`;
+        inner = `<span style="font-size:${el.fontSize}pt;font-family:monospace;color:${el.color};white-space:nowrap">B-FIC-0001</span>`;
       } else if (el.type === 'price') {
         inner = `<span style="font-size:${el.fontSize}pt;font-weight:bold;color:${el.color}">\u20B9299</span>`;
       } else if (el.type === 'brand') {
@@ -216,11 +215,61 @@ export default function BarcodeEditor() {
       }
       return `<div style="${base}">${inner}</div>`;
     }).join('\n');
+  };
 
-    w.document.write(`<!DOCTYPE html><html><head><style>@page{size:${canvasSize.width}mm ${canvasSize.height}mm;margin:0;}body{margin:0;padding:0;}</style></head><body><div style="position:relative;width:${canvasSize.width}mm;height:${canvasSize.height}mm;">${elHtml}</div></body></html>`);
+  // ---- Print preview (opens in new window for viewing) ----
+  const printPreview = () => {
+    const elHtml = buildLabelHtml();
+    const w = window.open('', '_blank');
+    if (!w) { showToast('Popup blocked', 'error'); return; }
+    w.document.write(`<!DOCTYPE html><html><head><title>Print Barcodes</title>
+      <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f0f0; }
+        .label-container { position: relative; width: ${canvasSize.width}mm; height: ${canvasSize.height}mm; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        @media print {
+          @page { margin: 0; }
+          body { margin: 0; padding: 0; background: none; display: block; }
+          .label-container { box-shadow: none; }
+        }
+      </style></head>
+      <body><div class="label-container">${elHtml}</div></body></html>`);
     w.document.close();
-    w.focus();
-    w.print();
+  };
+
+  // ---- Direct print: generate raw ZPL and send to Zebra via Flask API (port 5050) ----
+  const PRINT_API = 'http://127.0.0.1:5050';
+  const [directPrinting, setDirectPrinting] = useState(false);
+
+  const directPrint = async () => {
+    setDirectPrinting(true);
+    try {
+      // Build test label from editor elements
+      const brandEl = elements.find(el => el.type === 'brand');
+      const testLabel = {
+        brand: brandEl?.text || 'TAPAS READING CAFE',
+        copyCode: 'B-FIC-0001',
+        title: 'Book Title',
+        price: 'Rs.299',
+      };
+
+      // Use current editor layout as the template
+      const zpl = generateZPL([testLabel], { elements, canvasSize });
+
+      const res = await fetch(`${PRINT_API}/api/print`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zpl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Test label sent to printer!', 'success');
+      } else {
+        showToast('Print failed: ' + (data.message || data.error || 'Unknown error'), 'error');
+      }
+    } catch (err) {
+      showToast('Cannot reach label printer service. Is it running on port 5050?', 'error');
+    }
+    setDirectPrinting(false);
   };
 
   // ---- Image upload handler ----
@@ -304,7 +353,7 @@ export default function BarcodeEditor() {
                 flexShrink: 0,
               }}
             >
-              {elements.map(el => (
+              {(elements || []).filter(Boolean).map(el => (
                 <div
                   key={el.id}
                   onMouseDown={(e) => startDrag(el.id, e)}
@@ -348,9 +397,12 @@ export default function BarcodeEditor() {
           </div>
 
           {/* Print button */}
-          <div style={{ marginTop: '16px', textAlign: 'center' }}>
+          <div style={{ marginTop: '16px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '12px' }}>
             <button onClick={printPreview} style={{ ...btnPrimary, padding: '10px 24px', fontSize: '14px' }}>
               {'\uD83D\uDDA8\uFE0F'} Print Preview
+            </button>
+            <button onClick={directPrint} disabled={directPrinting} style={{ ...btnPrimary, padding: '10px 24px', fontSize: '14px', background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
+              {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : 'Direct Print'}
             </button>
           </div>
         </div>
@@ -468,7 +520,7 @@ export default function BarcodeEditor() {
                 )}
 
                 <button
-                  onClick={() => { setElements(prev => prev.filter(el => el.id !== selectedId)); setSelectedId(null); }}
+                  onClick={() => { setElements(prev => prev.filter(el => el && el.id !== selectedId)); setSelectedId(null); }}
                   style={{ ...btnPrimary, background: '#e53e3e', marginTop: '8px' }}
                 >
                   {'\uD83D\uDDD1\uFE0F'} Delete Element

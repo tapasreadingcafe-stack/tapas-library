@@ -72,3 +72,125 @@ export function generateBarcodeSVGString(text, options = {}) {
   }
   return `<svg viewBox="0 0 ${totalW} ${height}" style="width:${width};height:${height}px">${rects}</svg>`;
 }
+
+// ---- ZPL generation for Zebra thermal printers ----
+// Template-driven: uses BarcodeEditor templates to control layout
+// Paper: 100mm wide (2 labels across, 50mm × 25mm each)
+// Zebra ZD230 at 203 DPI
+
+const DPI = 203;
+const mmToDots = (mm) => Math.round((mm / 25.4) * DPI);
+const ptToDots = (pt) => Math.round(pt * 2.5); // approximate pt → ZPL font size
+
+// Default template used when no saved template is selected
+const DEFAULT_TEMPLATE = {
+  canvasSize: { width: 50, height: 25 },
+  elements: [
+    { type: 'brand',    x: 12, y: 1,  width: 26, height: 4, fontSize: 8,  text: '' },
+    { type: 'barcode',  x: 10, y: 4,  width: 30, height: 10 },
+    { type: 'title',    x: 10, y: 16, width: 24, height: 5, fontSize: 8 },
+    { type: 'price',    x: 10, y: 20, width: 12, height: 5, fontSize: 9 },
+  ],
+};
+
+export function generateZPL(labels, template = null, paperConfig = {}) {
+  const tmpl = template || DEFAULT_TEMPLATE;
+  const {
+    paperWidth = 800,
+    colWidth = 400,
+    labelHeight = mmToDots(tmpl.canvasSize?.height || 25),
+  } = paperConfig;
+
+  // Build ZPL for one label from template elements + actual data
+  const buildLabel = (label, xOffset) => {
+    const { brand = 'TAPAS READING CAFE', copyCode = '', title = '', price = '' } = label;
+    const lines = [];
+
+    for (const el of (tmpl.elements || [])) {
+      const x = xOffset + mmToDots(el.x || 0);
+      const y = mmToDots(el.y || 0);
+      const w = mmToDots(el.width || 10);
+      const h = mmToDots(el.height || 5);
+      const fs = ptToDots(el.fontSize || 9);
+
+      switch (el.type) {
+        case 'brand': {
+          const text = brand || el.text || 'TAPAS READING CAFE';
+          lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${text}^FS`);
+          break;
+        }
+        case 'barcode': {
+          if (copyCode) {
+            // Calculate module width (^BY) to fill the element width
+            // Code128: each char ~11 modules + start(11) + checksum(11) + stop(13)
+            const totalModules = 11 + (copyCode.length * 11) + 11 + 13;
+            const moduleWidth = Math.max(1, Math.min(10, Math.floor(w / totalModules)));
+            lines.push(`^FO${x},${y}^BY${moduleWidth}^BCN,${h},Y,N,N^FD${copyCode}^FS`);
+          }
+          break;
+        }
+        case 'title': {
+          if (title) {
+            const maxChars = Math.max(10, Math.floor(w / (fs * 0.5)));
+            const truncated = title.length > maxChars ? title.slice(0, maxChars - 2) + '..' : title;
+            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${truncated}^FS`);
+          }
+          break;
+        }
+        case 'copyCode': {
+          if (copyCode) {
+            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${copyCode}^FS`);
+          }
+          break;
+        }
+        case 'price': {
+          if (price) {
+            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${price}^FS`);
+          }
+          break;
+        }
+        case 'customText': {
+          const text = el.text || '';
+          if (text) {
+            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${text}^FS`);
+          }
+          break;
+        }
+        case 'line': {
+          const bw = el.borderWidth || 1;
+          lines.push(`^FO${x},${y}^GB${w},0,${bw}^FS`);
+          break;
+        }
+        case 'rectangle': {
+          const bw = el.borderWidth || 1;
+          lines.push(`^FO${x},${y}^GB${w},${h},${bw}^FS`);
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return lines.join('\n');
+  };
+
+  const zplBlocks = [];
+
+  // Pair labels 2-across
+  for (let i = 0; i < labels.length; i += 2) {
+    const page = [];
+    page.push('^XA');
+    page.push(`^PW${paperWidth}`);
+    page.push(`^LL${labelHeight}`);
+
+    page.push(buildLabel(labels[i], 0));
+
+    if (i + 1 < labels.length) {
+      page.push(buildLabel(labels[i + 1], colWidth));
+    }
+
+    page.push('^XZ');
+    zplBlocks.push(page.join('\n'));
+  }
+
+  return zplBlocks.join('\n');
+}

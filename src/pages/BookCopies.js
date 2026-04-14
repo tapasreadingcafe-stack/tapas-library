@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { getBookCopies, createBookCopies, updateCopyStatus, BOOK_COPIES_SQL } from '../utils/bookCopies';
-import { encodeCode128B, generateBarcodeSVG } from '../utils/barcodeUtils';
+import { encodeCode128B, generateBarcodeSVG, generateZPL } from '../utils/barcodeUtils';
 
 export default function BookCopies() {
   const { bookId } = useParams();
@@ -19,6 +19,8 @@ export default function BookCopies() {
   const [selectedCopies, setSelectedCopies] = useState([]);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [showPriceOnLabel, setShowPriceOnLabel] = useState(true);
+  const [directPrinting, setDirectPrinting] = useState(false);
+  const PRINT_API = 'http://127.0.0.1:5050';
 
   useEffect(() => { checkAndFetch(); }, [bookId]);
 
@@ -104,6 +106,46 @@ export default function BookCopies() {
     `);
     win.document.close();
     setTimeout(() => { win.print(); win.close(); }, 300);
+  };
+
+  // Direct print: generate raw ZPL and send to Zebra via Flask API
+  const handleDirectPrint = async () => {
+    const selected = selectedCopies.length > 0
+      ? copies.filter(c => selectedCopies.includes(c.id))
+      : copies;
+    if (selected.length === 0) { toast.warning('No copies to print'); return; }
+    setDirectPrinting(true);
+    try {
+      const labels = selected.map(c => ({
+        brand: 'TAPAS READING CAFE',
+        copyCode: c.copy_code,
+        title: book?.title || 'Unknown',
+        price: book?.price ? `Rs.${book.price}` : (book?.mrp ? `Rs.${book.mrp}` : ''),
+      }));
+      // Load saved template from localStorage selection
+      let template = null;
+      const tmplKey = localStorage.getItem('barcode_template_key');
+      if (tmplKey) {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', tmplKey).single();
+        if (data) { try { template = JSON.parse(data.value); } catch {} }
+      }
+
+      const zpl = generateZPL(labels, template);
+      const res = await fetch(`${PRINT_API}/api/print`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zpl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Printed ${selected.length} label(s)!`);
+      } else {
+        toast.error('Print failed: ' + (data.message || data.error || 'Unknown'));
+      }
+    } catch (err) {
+      toast.error('Cannot reach printer service. Is it running on port 5050?');
+    }
+    setDirectPrinting(false);
   };
 
   const statusColors = { available: '#1dd1a1', issued: '#667eea', sold: '#f39c12', lost: '#e74c3c', damaged: '#ff6b6b' };
@@ -269,9 +311,13 @@ export default function BookCopies() {
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={handleDirectPrint} disabled={directPrinting}
+                style={{ flex: 1, padding: '12px', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', fontSize: '14px', opacity: directPrinting ? 0.6 : 1 }}>
+                🖨️ {directPrinting ? 'Printing...' : 'Direct Print (Zebra)'}
+              </button>
               <button onClick={doPrint}
                 style={{ flex: 1, padding: '12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', fontSize: '14px' }}>
-                🖨️ Print Labels
+                🖨️ Print Preview
               </button>
               <button onClick={() => setShowPrintPreview(false)}
                 style={{ padding: '12px 20px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>

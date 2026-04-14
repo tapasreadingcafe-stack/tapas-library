@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
-import { generateBarcodeSVG, generateBarcodeSVGString, encodeCode128B } from '../utils/barcodeUtils';
+import { generateBarcodeSVG, generateBarcodeSVGString, encodeCode128B, generateZPL } from '../utils/barcodeUtils';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
@@ -52,6 +52,8 @@ export default function BarcodeManager() {
   const [customTo, setCustomTo] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
 
   const fetchCopies = useCallback(async () => {
     setLoading(true);
@@ -69,6 +71,20 @@ export default function BarcodeManager() {
   }, []);
 
   useEffect(() => { fetchCopies(); }, [fetchCopies]);
+
+  // Fetch saved label templates, auto-select first if none chosen
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('app_settings').select('*').like('key', 'barcode_template_%');
+      if (data) {
+        setTemplates(data);
+        if (!selectedTemplate && data.length > 0) {
+          setSelectedTemplate(data[0].key);
+          localStorage.setItem('barcode_template_key', data[0].key);
+        }
+      }
+    })();
+  }, []);
 
   // --- Filtering ---
   const filtered = React.useMemo(() => {
@@ -160,9 +176,15 @@ export default function BarcodeManager() {
   const clearSelection = () => setSelectedIds(new Set());
 
   // --- Print ---
-  const handlePrintSelected = () => {
+  const getSelectedForPrint = () => {
     const selected = copies.filter(c => selectedIds.has(c.id));
-    if (selected.length === 0) { toast.warning('No copies selected'); return; }
+    if (selected.length === 0) { toast.warning('No copies selected'); return null; }
+    return selected;
+  };
+
+  const handlePrintSelected = () => {
+    const selected = getSelectedForPrint();
+    if (!selected) return;
 
     const win = window.open('', '_blank');
     const labels = selected.map(c => {
@@ -183,7 +205,6 @@ export default function BarcodeManager() {
     win.document.write(`
       <html><head><title>Print Barcodes</title>
       <style>
-        @page { size: 50mm 25mm; margin: 0; }
         body { margin: 0; font-family: Arial, sans-serif; }
         .label {
           width: 50mm; height: 25mm; padding: 1mm 2mm;
@@ -195,12 +216,55 @@ export default function BarcodeManager() {
         .copy-code { font-size: 10px; font-family: monospace; font-weight: 600; letter-spacing: 0.5px; }
         .book-title { font-size: 9px; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .price { font-size: 9px; font-weight: 700; }
-        @media print { .label { border: none; } }
+        @media print { @page { margin: 0; } .label { border: none; } }
       </style>
       </head><body>${labels}</body></html>
     `);
     win.document.close();
-    setTimeout(() => win.print(), 300);
+  };
+
+  // Direct print: generate raw ZPL and send to Zebra via Flask API (port 5050)
+  const PRINT_API = 'http://127.0.0.1:5050';
+  const [directPrinting, setDirectPrinting] = useState(false);
+
+  const handleDirectPrint = async () => {
+    const selected = getSelectedForPrint();
+    if (!selected) return;
+    setDirectPrinting(true);
+    try {
+      const labels = selected.map(c => ({
+        brand: 'TAPAS READING CAFE',
+        copyCode: c.copy_code,
+        title: c.books?.title || 'Unknown',
+        price: c.books?.price ? `Rs.${c.books.price}` : '',
+      }));
+
+      // Load selected template or use default
+      let template = null;
+      if (selectedTemplate) {
+        const t = templates.find(t => t.key === selectedTemplate);
+        if (t) {
+          try { template = JSON.parse(t.value); } catch {}
+        }
+      }
+
+      const zpl = generateZPL(labels, template);
+
+      const res = await fetch(`${PRINT_API}/api/print`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zpl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Printed ${selected.length} label(s)!`);
+      } else {
+        toast.error('Print failed: ' + (data.message || data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      toast.error('Cannot reach label printer service. Is it running on port 5050?');
+    }
+    setDirectPrinting(false);
   };
 
   // --- Styles ---
@@ -235,9 +299,24 @@ export default function BarcodeManager() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1 style={{ margin: 0, fontSize: '24px' }}>Barcodes</h1>
-        <Link to="/barcodes/editor" style={buttonStyle}>
-          Template Editor
-        </Link>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <select
+            value={selectedTemplate}
+            onChange={e => { setSelectedTemplate(e.target.value); localStorage.setItem('barcode_template_key', e.target.value); }}
+            style={{ ...inputStyle, width: 'auto', minWidth: '140px' }}
+          >
+            <option value="">Default Template</option>
+            {templates.map(t => (
+              <option key={t.key} value={t.key}>{t.key.replace('barcode_template_', '')}</option>
+            ))}
+          </select>
+          <button onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
+            {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : `Direct Print${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+          </button>
+          <Link to="/barcodes/editor" style={buttonStyle}>
+            Template Editor
+          </Link>
+        </div>
       </div>
 
       {/* Filter Row */}
@@ -327,8 +406,11 @@ export default function BarcodeManager() {
           <span style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
             {selectedIds.size} selected
           </span>
+          <button onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
+            {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : 'Direct Print'}
+          </button>
           <button onClick={handlePrintSelected} style={buttonStyle}>
-            Print Selected
+            Print Preview
           </button>
           <button
             onClick={clearSelection}
