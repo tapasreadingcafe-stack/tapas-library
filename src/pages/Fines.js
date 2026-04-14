@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
-
-const FINE_RATE = 10; // ₹10 per day
+import { getFineSettings, calculateFine } from '../utils/fineUtils';
 
 export default function Fines() {
   const { isReadOnly, canProcessFines } = usePermission();
@@ -18,12 +17,14 @@ export default function Fines() {
   const [dateTo, setDateTo] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
   const [modalMode, setModalMode] = useState('pay'); // 'pay' | 'waive'
   const [customAmount, setCustomAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchAll();
+    getFineSettings().then(setFineSettings);
   }, []);
 
   const fetchAll = async () => {
@@ -52,8 +53,7 @@ export default function Fines() {
       ]);
 
       const calcFine = (dueDate) => {
-        const days = Math.max(0, Math.floor((today - new Date(dueDate)) / 86400000));
-        return days * FINE_RATE;
+        return calculateFine(dueDate, fineSettings).fineAmount;
       };
 
       const withFines = (overdueData || []).map(item => ({
@@ -189,7 +189,7 @@ export default function Fines() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>💰 Fine & Payment Management</h1>
-          <p style={{ color: '#999', fontSize: '14px' }}>Auto-calculated at ₹{FINE_RATE}/day. Track, collect, or waive overdue fines.</p>
+          <p style={{ color: '#999', fontSize: '14px' }}>Auto-calculated at ₹{fineSettings.ratePerDay}/day{fineSettings.gracePeriod > 0 ? ` (${fineSettings.gracePeriod}-day grace period)` : ''}. Track, collect, or waive overdue fines.</p>
         </div>
         <button onClick={fetchAll} disabled={loading}
           style={{ padding: '8px 16px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
@@ -204,7 +204,7 @@ export default function Fines() {
           { label: 'Books Overdue', value: outstanding.length, color: '#f39c12', icon: '📚' },
           { label: 'Fines Collected', value: `₹${totalCollected.toLocaleString('en-IN')}`, color: '#27ae60', icon: '✅' },
           { label: 'Fines Waived', value: totalWaived, color: '#3498db', icon: '🤝' },
-          { label: 'Rate per Day', value: `₹${FINE_RATE}`, color: '#9b59b6', icon: '📅' },
+          { label: 'Rate per Day', value: `₹${fineSettings.ratePerDay}`, color: '#9b59b6', icon: '📅' },
         ].map(s => (
           <div key={s.label} style={{ background: 'white', borderRadius: '8px', padding: '16px', borderTop: `3px solid ${s.color}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>

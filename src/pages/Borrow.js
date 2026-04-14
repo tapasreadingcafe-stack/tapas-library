@@ -5,8 +5,7 @@ import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
-
-const FINE_PER_DAY = 10;
+import { getFineSettings, calculateFine, daysOverdue as calcDaysOverdue } from '../utils/fineUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
@@ -21,6 +20,7 @@ function getLoanDays(m) {
   return TIER_DAYS[getTier(m)] || 14;
 }
 
+// kept for backward compat — use calcFine() for actual fine amounts
 function daysOverdue(dueDate) {
   const diff = Math.floor((new Date() - new Date(dueDate)) / 86400000);
   return diff > 0 ? diff : 0;
@@ -57,6 +57,7 @@ export default function Borrow() {
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState('checkout');
+  const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
   const [members, setMembers] = useState([]);
   const [books, setBooks] = useState([]);
   const [circulationData, setCirculationData] = useState([]);
@@ -131,6 +132,7 @@ export default function Borrow() {
     fetchData();
     probeChildIdColumn();
     probeBookCopiesTable();
+    getFineSettings().then(setFineSettings);
   }, []);
 
   // Pre-select parent + child if navigated from ChildProfile
@@ -291,7 +293,7 @@ export default function Borrow() {
   const getMemberFines = (memberId) =>
     circulationData
       .filter(c => c.member_id === memberId && isOverdue(c.due_date))
-      .reduce((sum, c) => sum + daysOverdue(c.due_date) * FINE_PER_DAY, 0);
+      .reduce((sum, c) => sum + calculateFine(c.due_date, fineSettings).fineAmount, 0);
 
   const handleCheckout = async () => {
     if (!selectedMember || !selectedBook || !dueDate) {
@@ -371,7 +373,7 @@ export default function Borrow() {
 
   const handleReturn = async () => {
     if (!returnModal) return;
-    const fine = daysOverdue(returnModal.due_date) * FINE_PER_DAY;
+    const fine = calculateFine(returnModal.due_date, fineSettings).fineAmount;
     const today = new Date().toISOString().split('T')[0];
     try {
       const updates = {
@@ -890,7 +892,7 @@ export default function Borrow() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
                   {filteredCirculation.map(item => {
                     const badge = getStatusBadge(item.due_date);
-                    const fine = daysOverdue(item.due_date) * FINE_PER_DAY;
+                    const fine = calculateFine(item.due_date, fineSettings).fineAmount;
                     return (
                       <div key={item.id} style={{ background: getRowBg(item.due_date), borderRadius: '10px', padding: '12px', border: '1px solid #f0f0f0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -937,7 +939,7 @@ export default function Borrow() {
                 <tbody>
                   {filteredCirculation.map(item => {
                     const badge = getStatusBadge(item.due_date);
-                    const fine = daysOverdue(item.due_date) * FINE_PER_DAY;
+                    const fine = calculateFine(item.due_date, fineSettings).fineAmount;
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0', background: getRowBg(item.due_date) }}>
                         <td style={{ padding: '11px 14px', fontSize: '14px', fontWeight: '500' }}>
@@ -1055,7 +1057,7 @@ export default function Borrow() {
               </div>
             </div>
             <div style={{ borderTop: '2px dashed #ddd', marginTop: '16px', paddingTop: '14px', textAlign: 'center', fontSize: '12px', color: '#888' }}>
-              Late fine: ₹{FINE_PER_DAY}/day after due date
+              Late fine: ₹{fineSettings.ratePerDay}/day after due date{fineSettings.gracePeriod > 0 ? ` (${fineSettings.gracePeriod}-day grace)` : ''}
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
@@ -1082,7 +1084,7 @@ export default function Borrow() {
               <div><strong>Due Date:</strong> {new Date(returnModal.due_date).toLocaleDateString('en-IN')}</div>
               {isOverdue(returnModal.due_date) ? (
                 <div style={{ marginTop: '8px', background: '#f8d7da', borderRadius: '6px', padding: '8px 12px', color: '#721c24', fontWeight: '700' }}>
-                  ⚠️ {daysOverdue(returnModal.due_date)} days overdue &nbsp;·&nbsp; Fine: ₹{daysOverdue(returnModal.due_date) * FINE_PER_DAY}
+                  ⚠️ {daysOverdue(returnModal.due_date)} days overdue &nbsp;·&nbsp; Fine: ₹{calculateFine(returnModal.due_date, fineSettings).fineAmount}
                 </div>
               ) : (
                 <div style={{ marginTop: '8px', color: '#27ae60', fontWeight: '600' }}>✓ Returned on time — no fine</div>
@@ -1110,7 +1112,7 @@ export default function Borrow() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
                   <input type="checkbox" checked={collectFine} onChange={e => setCollectFine(e.target.checked)}
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                  Collect fine of ₹{daysOverdue(returnModal.due_date) * FINE_PER_DAY} now
+                  Collect fine of ₹{calculateFine(returnModal.due_date, fineSettings).fineAmount} now
                 </label>
               </div>
             )}

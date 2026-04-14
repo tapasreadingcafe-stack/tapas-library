@@ -167,6 +167,26 @@ export default function CafePOS() {
       }));
       await supabase.from('cafe_order_items').insert(items);
 
+      // Deduct from cafe inventory for each item sold
+      for (const c of cart) {
+        const { data: inv } = await supabase
+          .from('cafe_inventory')
+          .select('id, current_stock, min_stock_level, item_name')
+          .ilike('item_name', c.name)
+          .limit(1)
+          .single();
+        if (inv) {
+          const newStock = (Number(inv.current_stock) || 0) - c.qty;
+          await supabase.from('cafe_inventory').update({
+            current_stock: newStock,
+            updated_at: new Date().toISOString(),
+          }).eq('id', inv.id);
+          if (newStock <= (Number(inv.min_stock_level) || 0)) {
+            toast.warning(`Low stock: ${inv.item_name} (${newStock} left)`);
+          }
+        }
+      }
+
       setLastOrder({ ...order, items: cart, customerName: orderData.customer_name });
       toast.success(`Order placed - ₹${total.toLocaleString('en-IN')}`);
       logActivity(ACTIONS.ORDER_PLACED, `Cafe order: ₹${total} for ${orderData.customer_name}`, { amount: total, customer: orderData.customer_name, items: cart.length });

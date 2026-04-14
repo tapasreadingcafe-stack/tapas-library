@@ -43,6 +43,10 @@ const SETTINGS_CONFIG = [
   { key: 'fine_rate_student', label: 'Fine Rate - Student (₹/day)', type: 'number' },
   { key: 'fine_rate_premium', label: 'Fine Rate - Premium (₹/day)', type: 'number' },
   { key: 'fine_rate_family', label: 'Fine Rate - Family (₹/day)', type: 'number' },
+  { key: '_divider_email', label: '📧 Email Notifications', type: 'divider' },
+  { key: 'email_notifications_enabled', label: 'Email Notifications Enabled', type: 'toggle' },
+  { key: 'smtp_email', label: 'Gmail Address (sender)', type: 'text' },
+  { key: 'smtp_password', label: 'Gmail App Password', type: 'password' },
 ];
 
 // Quick tour steps
@@ -141,7 +145,13 @@ export default function SettingsApp() {
 
       {loading ? <p style={{ color: '#999' }}>Loading...</p> : (
         <div className="settings-form" style={{ background: 'white', borderRadius: '10px', padding: '24px' }}>
-          {SETTINGS_CONFIG.map(cfg => (
+          {SETTINGS_CONFIG.map(cfg => {
+            if (cfg.type === 'divider') return (
+              <div key={cfg.key} style={{ padding: '18px 0 8px', borderBottom: '2px solid #667eea', marginTop: '12px' }}>
+                <label style={{ fontSize: '15px', fontWeight: '700', color: '#333' }}>{cfg.label}</label>
+              </div>
+            );
+            return (
             <div key={cfg.key} className="settings-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #f0f0f0', gap: '16px' }}>
               <label style={{ fontSize: '14px', fontWeight: '500', color: '#333', flex: 1 }}>{cfg.label}</label>
               {cfg.type === 'toggle' ? (
@@ -162,11 +172,12 @@ export default function SettingsApp() {
               ) : (
                 <input
                   type={cfg.type} value={settings[cfg.key] ?? ''} onChange={e => updateSetting(cfg.key, cfg.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+                  placeholder={cfg.type === 'password' ? '••••••••' : ''}
                   style={{ width: cfg.type === 'time' ? '130px' : cfg.type === 'number' ? '100px' : '250px', padding: '8px 10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', textAlign: cfg.type === 'number' ? 'center' : 'left' }}
                 />
               )}
             </div>
-          ))}
+          );})}
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
 import { useDevMode } from '../components/DevMode';
 import { useToast } from '../components/Toast';
+import { getFineSettings, calculateFine } from '../utils/fineUtils';
 import { useConfirm } from '../components/ConfirmModal';
 import BarcodeScanner from '../BarcodeScanner';
 import { usePermission } from '../hooks/usePermission';
@@ -35,7 +36,7 @@ const loadServices = () => {
 const saveServices = (svcs) => localStorage.setItem('pos_services', JSON.stringify(svcs));
 
 const CATS = ['All', 'Books', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
-const FINE_RATE = 10; // ₹ per day
+// Fine rate loaded dynamically from settings
 
 const SQL_SETUP = `-- Run in Supabase SQL Editor to enable full POS features:
 
@@ -112,6 +113,8 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
 export default function POS() {
   const { devMode } = useDevMode();
   const { isReadOnly, canProcessOrders } = usePermission();
+
+  const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
 
   // Catalog
   const [allBooks, setAllBooks]         = useState([]);
@@ -214,6 +217,7 @@ export default function POS() {
     fetchBooks();
     fetchMembers();
     probeTables();
+    getFineSettings().then(setFineSettings);
   }, []);
 
   useEffect(() => {
@@ -265,8 +269,8 @@ export default function POS() {
           id: r.id,
           bookTitle: r.books?.title || 'Unknown Book',
           dueDate: r.due_date,
-          daysOverdue: Math.floor((now - new Date(r.due_date)) / 86400000),
-          amount: Math.floor((now - new Date(r.due_date)) / 86400000) * FINE_RATE,
+          daysOverdue: calculateFine(r.due_date, fineSettings).daysOverdue,
+          amount: calculateFine(r.due_date, fineSettings).fineAmount,
         }))
       );
     } catch (e) { console.error(e); setMemberFines([]); }

@@ -2,22 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { formatDate, formatCurrency } from '../utils/membershipUtils';
 import { useConfirm } from '../components/ConfirmModal';
+import { useToast } from '../components/Toast';
+import { getFineSettings, calculateFine, daysOverdue } from '../utils/fineUtils';
+import { sendEmail, overdueEmailHtml } from '../utils/emailUtils';
 
 export default function OverdueBooks() {
   const confirm = useConfirm();
+  const toast = useToast();
   const [overdueBooks, setOverdueBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [fineRate, setFineRate] = useState(10); // ₹10 per day
+  const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
   const [showFineModal, setShowFineModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [fineAmount, setFineAmount] = useState(0);
   const [finePaid, setFinePaid] = useState(false);
 
-  const FINE_RATE_PER_DAY = 10; // ₹10 per day (you can change this)
-
   useEffect(() => {
     fetchOverdueBooks();
+    getFineSettings().then(setFineSettings);
   }, []);
 
   const fetchOverdueBooks = async () => {
@@ -38,7 +41,11 @@ export default function OverdueBooks() {
       const overdue = (circulationData || []).map(item => ({
         ...item,
         daysOverdue: Math.floor((now - new Date(item.due_date)) / (1000 * 60 * 60 * 24)),
-        fineAmount: Math.floor((now - new Date(item.due_date)) / (1000 * 60 * 60 * 24)) * FINE_RATE_PER_DAY,
+        fineAmount: calculateFine(item.due_date, fineSettings).fineAmount,
+        memberName: item.members?.name || 'Unknown',
+        memberEmail: item.members?.email || '',
+        bookTitle: item.books?.title || 'Unknown',
+        dueDate: item.due_date,
       }));
 
       setOverdueBooks(overdue);
@@ -182,7 +189,7 @@ export default function OverdueBooks() {
         }}>
           <p style={{ margin: '0 0 10px 0', color: '#999', fontSize: '14px' }}>Fine Rate</p>
           <h2 style={{ margin: '0', color: '#667eea', fontSize: '32px' }}>
-            ₹{FINE_RATE_PER_DAY}/day
+            ₹{fineSettings.ratePerDay}/day{fineSettings.gracePeriod > 0 ? ` (${fineSettings.gracePeriod}-day grace)` : ''}
           </h2>
         </div>
       </div>
@@ -275,6 +282,33 @@ export default function OverdueBooks() {
                     >
                       ✓ Return
                     </button>
+                    {item.memberEmail && (
+                      <button
+                        onClick={async () => {
+                          const result = await sendEmail({
+                            to: item.memberEmail,
+                            subject: `Overdue Book Reminder - ${item.bookTitle}`,
+                            html: overdueEmailHtml({
+                              memberName: item.memberName,
+                              bookTitle: item.bookTitle,
+                              dueDate: new Date(item.dueDate).toLocaleDateString('en-IN'),
+                              daysOverdue: item.daysOverdue,
+                              fineAmount: item.fineAmount,
+                            }),
+                            type: 'overdue_reminder',
+                          });
+                          if (result.success) toast.success(`Reminder sent to ${item.memberEmail}`);
+                          else toast.error(result.error || 'Failed to send email');
+                        }}
+                        style={{
+                          padding: '6px 12px', background: '#ff9800', color: 'white',
+                          border: 'none', borderRadius: '4px', cursor: 'pointer',
+                          fontSize: '12px', marginLeft: '5px'
+                        }}
+                      >
+                        📧 Remind
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
