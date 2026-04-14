@@ -79,8 +79,11 @@ export default function BarcodeManager() {
       if (data) {
         setTemplates(data);
         if (!selectedTemplate && data.length > 0) {
-          setSelectedTemplate(data[0].key);
-          localStorage.setItem('barcode_template_key', data[0].key);
+          // Default to "main" template if it exists, otherwise first
+          const mainTmpl = data.find(t => t.key === 'barcode_template_main');
+          const defaultKey = mainTmpl ? mainTmpl.key : data[0].key;
+          setSelectedTemplate(defaultKey);
+          localStorage.setItem('barcode_template_key', defaultKey);
         }
       }
     })();
