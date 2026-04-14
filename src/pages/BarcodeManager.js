@@ -201,7 +201,7 @@ export default function BarcodeManager() {
       let priceHtml = '';
       if (displayPrice > 0) {
         if (hasDiscount) {
-          priceHtml = `<span class="mrp-strike">Rs.${mrp}</span> <span class="sell-price">Rs.${selling}</span>`;
+          priceHtml = `<span class="sell-price">Rs.${selling}</span> <span class="mrp-strike">Rs.${mrp}</span>`;
         } else {
           priceHtml = `<span class="sell-price">Rs.${displayPrice}</span>`;
         }
