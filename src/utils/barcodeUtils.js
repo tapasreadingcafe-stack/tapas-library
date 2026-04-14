@@ -153,20 +153,19 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
         }
         case 'price': {
           if (price) {
-            // Show selling price
-            lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${price}^FS`);
-
-            // If MRP is higher, show it with strikethrough next to selling price
             if (mrpStrike) {
-              const priceWidth = price.length * Math.round(fs * 0.6);
-              const mrpX = x + priceWidth + 8;
-              const mrpFs = Math.round(fs * 0.85);  // slightly smaller
-              // MRP text
-              lines.push(`^FO${mrpX},${y}^A0N,${mrpFs},${mrpFs}^FD${mrpStrike}^FS`);
-              // Strikethrough line over MRP text
+              // MRP first with strikethrough
+              const mrpFs = Math.round(fs * 0.85);
+              lines.push(`^FO${x},${y}^A0N,${mrpFs},${mrpFs}^FD${mrpStrike}^FS`);
               const mrpTextWidth = mrpStrike.length * Math.round(mrpFs * 0.6);
               const lineY = y + Math.round(mrpFs / 2);
-              lines.push(`^FO${mrpX},${lineY}^GB${mrpTextWidth},0,2^FS`);
+              lines.push(`^FO${x},${lineY}^GB${mrpTextWidth},0,2^FS`);
+              // Selling price after MRP
+              const sellingX = x + mrpTextWidth + 8;
+              lines.push(`^FO${sellingX},${y}${fontCmd(el, fs)}^FD${price}^FS`);
+            } else {
+              // Just MRP/selling price (same value)
+              lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${price}^FS`);
             }
           }
           break;
