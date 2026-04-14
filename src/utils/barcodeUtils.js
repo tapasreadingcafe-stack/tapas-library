@@ -152,19 +152,27 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
           break;
         }
         case 'price': {
-          if (price) {
-            if (mrpStrike) {
-              // MRP first with strikethrough
+          const mode = el.priceDisplayMode || 'both';
+          if (mode === 'mrp') {
+            // MRP only
+            const mrpText = mrpStrike || price;
+            if (mrpText) lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${mrpText}^FS`);
+          } else if (mode === 'selling') {
+            // Selling price only
+            if (price) lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${price}^FS`);
+          } else {
+            // Both: MRP (strikethrough) + Selling
+            if (price && mrpStrike) {
+              // MRP with strikethrough
               const mrpFs = Math.round(fs * 0.85);
               lines.push(`^FO${x},${y}^A0N,${mrpFs},${mrpFs}^FD${mrpStrike}^FS`);
               const mrpTextWidth = mrpStrike.length * Math.round(mrpFs * 0.6);
               const lineY = y + Math.round(mrpFs / 2);
               lines.push(`^FO${x},${lineY}^GB${mrpTextWidth},0,2^FS`);
-              // Selling price after MRP
+              // Selling price after
               const sellingX = x + mrpTextWidth + 8;
               lines.push(`^FO${sellingX},${y}${fontCmd(el, fs)}^FD${price}^FS`);
-            } else {
-              // Just MRP/selling price (same value)
+            } else if (price) {
               lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${price}^FS`);
             }
           }

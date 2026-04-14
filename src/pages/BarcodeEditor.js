@@ -41,6 +41,7 @@ function makeElement(type, canvasSize) {
     borderWidth: 1,
     borderColor: '#000000',
     imageDataUrl: '',
+    priceDisplayMode: 'both', // 'both' = MRP+Selling, 'selling' = Selling only, 'mrp' = MRP only
   };
 }
 
@@ -59,11 +60,51 @@ export default function BarcodeEditor() {
   const dragRef = useRef(null);
   const resizeRef = useRef(null);
 
-  // ---- Load templates on mount ----
+  // ---- Load templates on mount + seed defaults ----
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('app_settings').select('*').like('key', 'barcode_template_%');
       if (data) setTemplates(data);
+
+      // Seed 5 default templates if none exist
+      if (!data || data.length === 0) {
+        const defaults = [
+          { key: 'barcode_template_Standard', value: JSON.stringify({ canvasSize: { width: 50, height: 25 }, elements: [
+            { id: 't1-brand', type: 'brand', x: 2, y: 1, width: 46, height: 3, fontSize: 7, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't1-barcode', type: 'barcode', x: 2, y: 5, width: 46, height: 9, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't1-title', type: 'title', x: 2, y: 17, width: 28, height: 4, fontSize: 8, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't1-price', type: 'price', x: 30, y: 17, width: 18, height: 4, fontSize: 9, fontWeight: 'bold', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't1-rect', type: 'rectangle', x: 0, y: 0, width: 50, height: 25, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+          ]})},
+          { key: 'barcode_template_Minimal', value: JSON.stringify({ canvasSize: { width: 50, height: 25 }, elements: [
+            { id: 't2-barcode', type: 'barcode', x: 3, y: 3, width: 44, height: 12, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't2-code', type: 'copyCode', x: 14, y: 18, width: 22, height: 4, fontSize: 9, fontWeight: 'bold', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+          ]})},
+          { key: 'barcode_template_Price Tag', value: JSON.stringify({ canvasSize: { width: 50, height: 25 }, elements: [
+            { id: 't3-brand', type: 'brand', x: 2, y: 1, width: 46, height: 3, fontSize: 7, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't3-price', type: 'price', x: 2, y: 5, width: 46, height: 7, fontSize: 14, fontWeight: 'bold', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'selling' },
+            { id: 't3-title', type: 'title', x: 2, y: 13, width: 46, height: 3, fontSize: 7, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't3-barcode', type: 'barcode', x: 8, y: 17, width: 34, height: 7, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+          ]})},
+          { key: 'barcode_template_Full Info', value: JSON.stringify({ canvasSize: { width: 50, height: 25 }, elements: [
+            { id: 't4-rect', type: 'rectangle', x: 0, y: 0, width: 50, height: 25, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't4-brand', type: 'brand', x: 2, y: 1, width: 46, height: 3, fontSize: 6, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't4-line', type: 'line', x: 2, y: 4, width: 46, height: 1, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't4-barcode', type: 'barcode', x: 2, y: 5, width: 46, height: 7, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't4-code', type: 'copyCode', x: 2, y: 14, width: 20, height: 3, fontSize: 7, fontWeight: 'bold', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't4-title', type: 'title', x: 2, y: 18, width: 28, height: 3, fontSize: 7, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+            { id: 't4-price', type: 'price', x: 30, y: 18, width: 18, height: 5, fontSize: 8, fontWeight: 'bold', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+          ]})},
+          { key: 'barcode_template_Barcode Only', value: JSON.stringify({ canvasSize: { width: 50, height: 25 }, elements: [
+            { id: 't5-barcode', type: 'barcode', x: 1, y: 2, width: 48, height: 20, fontSize: 10, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
+          ]})},
+        ];
+        for (const t of defaults) {
+          await supabase.from('app_settings').upsert({ ...t, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        }
+        const { data: fresh } = await supabase.from('app_settings').select('*').like('key', 'barcode_template_%');
+        if (fresh) setTemplates(fresh);
+      }
     })();
   }, []);
 
@@ -201,7 +242,7 @@ export default function BarcodeEditor() {
       } else if (el.type === 'copyCode') {
         inner = `<span style="font-size:${el.fontSize}pt;font-family:monospace;color:${el.color};white-space:nowrap">B-FIC-0001</span>`;
       } else if (el.type === 'price') {
-        inner = `<span style="font-size:${el.fontSize}pt;font-weight:bold;color:${el.color}">MRP / Sell</span>`;
+        inner = `<span style="font-size:${el.fontSize}pt;font-weight:bold;color:${el.color}">${el.priceDisplayMode === 'mrp' ? 'MRP ₹299' : el.priceDisplayMode === 'selling' ? '₹199' : '₹299 ₹199'}</span>`;
       } else if (el.type === 'brand') {
         inner = `<span style="font-size:${el.fontSize}pt;font-weight:${el.fontWeight};color:${el.color}">${el.text || 'Tapas Reading Cafe'}</span>`;
       } else if (el.type === 'customText') {
@@ -378,7 +419,7 @@ export default function BarcodeEditor() {
                   {el.type === 'barcode' && generateBarcodeSVG('BFIC0001', { height: el.height * SCALE * 0.8 })}
                   {el.type === 'title' && <span style={{ fontSize: el.fontSize, fontWeight: el.fontWeight, color: el.color }}>Book Title</span>}
                   {el.type === 'copyCode' && <span style={{ fontSize: el.fontSize, fontFamily: 'monospace', color: el.color }}>B-FIC-0001</span>}
-                  {el.type === 'price' && <span style={{ fontSize: el.fontSize, fontWeight: 'bold', color: el.color }}>MRP / Sell</span>}
+                  {el.type === 'price' && <span style={{ fontSize: el.fontSize, fontWeight: 'bold', color: el.color }}>{el.priceDisplayMode === 'mrp' ? 'MRP ₹299' : el.priceDisplayMode === 'selling' ? '₹199' : '₹299 ₹199'}</span>}
                   {el.type === 'brand' && <span style={{ fontSize: el.fontSize, fontWeight: el.fontWeight, color: el.color }}>{el.text || 'Tapas Reading Cafe'}</span>}
                   {el.type === 'customText' && <span style={{ fontSize: el.fontSize, color: el.color }}>{el.text || 'Custom Text'}</span>}
                   {el.type === 'rectangle' && <div style={{ width: '100%', height: '100%', border: `${el.borderWidth || 1}px solid ${el.borderColor}`, boxSizing: 'border-box' }} />}
@@ -480,6 +521,17 @@ export default function BarcodeEditor() {
                       </button>
                     </div>
                   </>
+                )}
+
+                {selectedEl && selectedEl.type === 'price' && (
+                  <div>
+                    <label style={labelStyle}>Price Display</label>
+                    <select value={selectedEl.priceDisplayMode || 'both'} onChange={e => updateEl('priceDisplayMode', e.target.value)} style={inputStyle}>
+                      <option value="both">MRP + Selling (strikethrough)</option>
+                      <option value="selling">Selling Price Only</option>
+                      <option value="mrp">MRP Only</option>
+                    </select>
+                  </div>
                 )}
 
                 {hasText && (
