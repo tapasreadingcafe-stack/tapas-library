@@ -66,8 +66,9 @@ export default function BarcodeEditor() {
       const { data } = await supabase.from('app_settings').select('*').like('key', 'barcode_template_%');
       if (data) setTemplates(data);
 
-      // Seed 5 default templates if none exist
-      if (!data || data.length === 0) {
+      // Seed 5 default templates if they don't exist yet
+      const hasDefaults = data?.some(t => t.key === 'barcode_template_Standard');
+      if (!hasDefaults) {
         const defaults = [
           { key: 'barcode_template_Standard', value: JSON.stringify({ canvasSize: { width: 50, height: 25 }, elements: [
             { id: 't1-brand', type: 'brand', x: 2, y: 1, width: 46, height: 3, fontSize: 7, fontWeight: 'normal', text: '', color: '#000000', bgColor: 'transparent', borderWidth: 1, borderColor: '#000000', priceDisplayMode: 'both' },
