@@ -191,16 +191,31 @@ export default function BarcodeManager() {
 
     const win = window.open('', '_blank');
     const labels = selected.map(c => {
-      const barcode = generateBarcodeSVGString(c.copy_code, { height: 40, width: '44mm' });
+      const barcode = generateBarcodeSVGString(c.copy_code, { height: 50, width: '44mm' });
       const title = c.books?.title || 'Unknown';
-      const price = c.books?.price;
+      const mrp = Number(c.books?.mrp) || 0;
+      const selling = Number(c.books?.sales_price) || 0;
+      const displayPrice = selling > 0 ? selling : mrp;
+      const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
+
+      let priceHtml = '';
+      if (displayPrice > 0) {
+        if (hasDiscount) {
+          priceHtml = `<span class="mrp-strike">Rs.${mrp}</span> <span class="sell-price">Rs.${selling}</span>`;
+        } else {
+          priceHtml = `<span class="sell-price">Rs.${displayPrice}</span>`;
+        }
+      }
+
       return `
         <div class="label">
           <div class="brand">TAPAS READING CAFE</div>
           <div class="barcode-area">${barcode}</div>
           <div class="copy-code">${c.copy_code}</div>
-          <div class="book-title">${title}</div>
-          ${price ? `<div class="price">Rs. ${price}</div>` : ''}
+          <div class="label-bottom">
+            <div class="book-title">${title}</div>
+            <div class="price">${priceHtml}</div>
+          </div>
         </div>
       `;
     }).join('');
@@ -210,15 +225,20 @@ export default function BarcodeManager() {
       <style>
         body { margin: 0; font-family: Arial, sans-serif; }
         .label {
-          width: 50mm; height: 25mm; padding: 1mm 2mm;
+          width: 50mm; height: 25mm; padding: 1.5mm 2mm;
           box-sizing: border-box; text-align: center;
           page-break-after: always; overflow: hidden;
+          border: 0.5px solid #ccc;
+          display: flex; flex-direction: column; justify-content: space-between;
         }
-        .brand { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+        .brand { font-size: 8px; font-weight: 700; letter-spacing: 0.5px; }
         .barcode-area { margin: 1mm 0; }
-        .copy-code { font-size: 10px; font-family: monospace; font-weight: 600; letter-spacing: 0.5px; }
-        .book-title { font-size: 9px; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .price { font-size: 9px; font-weight: 700; }
+        .copy-code { font-size: 9px; font-family: monospace; font-weight: 600; letter-spacing: 0.5px; }
+        .label-bottom { display: flex; justify-content: space-between; align-items: center; }
+        .book-title { font-size: 8px; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+        .price { font-size: 9px; font-weight: 700; white-space: nowrap; }
+        .mrp-strike { text-decoration: line-through; color: #888; font-weight: 400; margin-right: 3px; }
+        .sell-price { font-weight: 700; }
         @media print { @page { margin: 0; } .label { border: none; } }
       </style>
       </head><body>${labels}</body></html>
