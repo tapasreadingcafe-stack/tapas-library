@@ -901,7 +901,9 @@ export default function Books() {
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Category</th>
                   {hasCondition && <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Condition</th>}
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Available</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Price</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Buying</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>MRP</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Selling</th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Actions</th>
                 </tr>
               </thead>
@@ -931,7 +933,9 @@ export default function Books() {
                           {book.quantity_available}/{book.quantity_total}
                         </span>
                       </td>
-                      <td style={{ padding: '12px' }}>₹{book.price?.toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '12px', color: '#666' }}>{book.price ? `₹${book.price.toLocaleString('en-IN')}` : '—'}</td>
+                      <td style={{ padding: '12px' }}>{book.mrp ? `₹${book.mrp.toLocaleString('en-IN')}` : '—'}</td>
+                      <td style={{ padding: '12px', fontWeight: '600', color: '#155724' }}>{book.sales_price ? `₹${book.sales_price.toLocaleString('en-IN')}` : book.mrp ? `₹${book.mrp.toLocaleString('en-IN')}` : '—'}</td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <button onClick={() => handleEditBook(book)} disabled={isReadOnly}
