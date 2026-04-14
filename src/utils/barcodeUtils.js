@@ -106,6 +106,14 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
     const { brand = 'TAPAS READING CAFE', copyCode = '', title = '', price = '' } = label;
     const lines = [];
 
+    // Helper: get ZPL font command respecting fontWeight from template
+    const fontCmd = (el, size) => {
+      // ZPL ^A0 uses built-in font. For bold, increase font size slightly
+      const bold = el.fontWeight === 'bold';
+      const s = bold ? Math.round(size * 1.15) : size;
+      return `^A0N,${s},${s}`;
+    };
+
     for (const el of (tmpl.elements || [])) {
       const x = xOffset + mmToDots(el.x || 0);
       const y = mmToDots(el.y || 0);
@@ -116,43 +124,43 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
       switch (el.type) {
         case 'brand': {
           const text = brand || el.text || 'TAPAS READING CAFE';
-          lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${text}^FS`);
+          lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${text}^FS`);
           break;
         }
         case 'barcode': {
           if (copyCode) {
             // Calculate module width (^BY) to fill the element width
-            // Code128: each char ~11 modules + start(11) + checksum(11) + stop(13)
-            const totalModules = 11 + (copyCode.length * 11) + 11 + 13;
-            const moduleWidth = Math.max(1, Math.min(10, Math.floor(w / totalModules)));
+            // Code128: each char ~11 modules + start(11) + checksum(11) + stop(13) + quiet zones(~20)
+            const totalModules = 11 + (copyCode.length * 11) + 11 + 13 + 20;
+            const moduleWidth = Math.max(1, Math.min(10, Math.round(w / totalModules)));
             lines.push(`^FO${x},${y}^BY${moduleWidth}^BCN,${h},Y,N,N^FD${copyCode}^FS`);
           }
           break;
         }
         case 'title': {
           if (title) {
-            const maxChars = Math.max(10, Math.floor(w / (fs * 0.5)));
+            const maxChars = Math.max(10, Math.floor(w / (fs * 0.6)));
             const truncated = title.length > maxChars ? title.slice(0, maxChars - 2) + '..' : title;
-            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${truncated}^FS`);
+            lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${truncated}^FS`);
           }
           break;
         }
         case 'copyCode': {
           if (copyCode) {
-            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${copyCode}^FS`);
+            lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${copyCode}^FS`);
           }
           break;
         }
         case 'price': {
           if (price) {
-            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${price}^FS`);
+            lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${price}^FS`);
           }
           break;
         }
         case 'customText': {
           const text = el.text || '';
           if (text) {
-            lines.push(`^FO${x},${y}^A0N,${fs},${fs}^FD${text}^FS`);
+            lines.push(`^FO${x},${y}${fontCmd(el, fs)}^FD${text}^FS`);
           }
           break;
         }
@@ -179,6 +187,7 @@ export function generateZPL(labels, template = null, paperConfig = {}) {
   for (let i = 0; i < labels.length; i += 2) {
     const page = [];
     page.push('^XA');
+    page.push('^POI');
     page.push(`^PW${paperWidth}`);
     page.push(`^LL${labelHeight}`);
 
