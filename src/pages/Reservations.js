@@ -4,6 +4,7 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useToast } from '../components/Toast';
 import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
+import { sendWhatsApp, reservationReadyWhatsAppMsg } from '../utils/whatsappUtils';
 
 const STATUS_COLORS = {
   pending:   { bg: '#fff3cd', text: '#856404', label: 'Waiting' },
@@ -338,6 +339,15 @@ export default function Reservations() {
                                 else toast.error(result.error || 'Failed to send');
                               }} style={{ padding: '4px 10px', background: '#ff9800', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
                                 📧 Notify
+                              </button>
+                            )}
+                            {r.members?.phone && (
+                              <button onClick={async () => {
+                                const result = await sendWhatsApp(r.members.phone, reservationReadyWhatsAppMsg({ memberName: r.members.name, bookTitle: r.books?.title || 'Reserved Book' }));
+                                if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');
+                                else toast.error(result.error || 'Failed');
+                              }} style={{ padding: '4px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                📱 WhatsApp
                               </button>
                             )}
                           </>

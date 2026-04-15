@@ -253,9 +253,22 @@ export default function Dashboard() {
           <h1>📊 Dashboard</h1>
           <p>Welcome back! Here's your library overview.</p>
         </div>
-        <button onClick={() => fetchDashboardData(true)} disabled={loading} className="db-refresh">
-          {loading ? '⏳' : '🔄 Refresh'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={async () => {
+            try {
+              const { data, error } = await supabase.functions.invoke('daily-report');
+              if (error) throw error;
+              if (data?.success) { const toast = document.createElement('div'); toast.textContent = '📊 Report sent!'; toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#38a169;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-weight:600;'; document.body.appendChild(toast); setTimeout(() => toast.remove(), 3000); }
+              else if (data?.skipped) { alert('Daily report is disabled. Enable it in Settings.'); }
+              else { alert(data?.error || 'Failed to send report'); }
+            } catch (err) { alert('Failed: ' + err.message); }
+          }} className="db-refresh" style={{ background: '#667eea', color: 'white' }}>
+            📊 Send Report
+          </button>
+          <button onClick={() => fetchDashboardData(true)} disabled={loading} className="db-refresh">
+            {loading ? '⏳' : '🔄 Refresh'}
+          </button>
+        </div>
       </div>
 
       {/* Quick Actions — mobile only */}

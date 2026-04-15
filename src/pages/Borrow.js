@@ -7,6 +7,7 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { getFineSettings, calculateFine } from '../utils/fineUtils';
 import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
+import { sendWhatsApp, reservationReadyWhatsAppMsg } from '../utils/whatsappUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
@@ -433,7 +434,7 @@ export default function Borrow() {
       // Notify next reservation + send email
       const { data: nextRes } = await supabase
         .from('reservations')
-        .select('id, member_id, members(name, email)')
+        .select('id, member_id, members(name, email, phone)')
         .eq('book_id', returnModal.book_id)
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
@@ -452,21 +453,24 @@ export default function Borrow() {
 
         // Send email notification to the member
         const resMember = nextRes[0].members;
+        const bookTitle = returnModal.books?.title || returnModal.title || 'Reserved Book';
+        // Send email
         if (resMember?.email) {
-          const bookTitle = returnModal.books?.title || returnModal.title || 'Reserved Book';
           sendEmail({
             to: resMember.email,
             subject: `Your reserved book "${bookTitle}" is ready for pickup!`,
-            html: reservationReadyEmailHtml({
-              memberName: resMember.name,
-              bookTitle,
-              expiryDate: expires.toLocaleDateString('en-IN'),
-            }),
+            html: reservationReadyEmailHtml({ memberName: resMember.name, bookTitle, expiryDate: expires.toLocaleDateString('en-IN') }),
             type: 'reservation_ready',
           }).then(r => {
-            if (r.success) showToast(`Pickup email sent to ${resMember.name}`, 'info');
-            else showToast(`Email failed: ${r.error}`, 'warning');
-          }).catch(err => showToast(`Email error: ${err.message}`, 'error'));
+            if (r.success) showToast(`Email sent to ${resMember.name}`, 'info');
+          }).catch(() => {});
+        }
+        // Send WhatsApp
+        if (resMember?.phone) {
+          sendWhatsApp(resMember.phone, reservationReadyWhatsAppMsg({ memberName: resMember.name, bookTitle }))
+            .then(r => {
+              if (r.success && r.mode === 'api') showToast(`WhatsApp sent to ${resMember.name}`, 'info');
+            }).catch(() => {});
         }
 
         showToast('Book returned! A reservation is now available (48h window).', 'success');

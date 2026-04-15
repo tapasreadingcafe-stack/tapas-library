@@ -96,6 +96,24 @@ export function fineAlertEmailHtml({ memberName, bookTitle, fineAmount, libraryN
   `;
 }
 
+export function dailyReportEmailHtml({ date, dueTodayCount, overdueCount, outstandingFines, yesterdayRevenue, expiringMembers, activeCheckouts, libraryName }) {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+      <h2 style="color:#333;">📊 Daily Report — ${date}</h2>
+      <p style="color:#666;">Good morning! Here's your library summary:</p>
+      <table style="width:100%;border-collapse:collapse;margin:15px 0;">
+        <tr style="background:#f8f9fa;"><td style="padding:12px;border:1px solid #eee;font-weight:600;">📅 Books Due Today</td><td style="padding:12px;border:1px solid #eee;font-size:20px;font-weight:700;color:#3498db;">${dueTodayCount}</td></tr>
+        <tr><td style="padding:12px;border:1px solid #eee;font-weight:600;">⚠️ Overdue Books</td><td style="padding:12px;border:1px solid #eee;font-size:20px;font-weight:700;color:${overdueCount > 0 ? '#e74c3c' : '#27ae60'};">${overdueCount}</td></tr>
+        <tr style="background:#f8f9fa;"><td style="padding:12px;border:1px solid #eee;font-weight:600;">💰 Outstanding Fines</td><td style="padding:12px;border:1px solid #eee;font-size:20px;font-weight:700;color:#e74c3c;">₹${outstandingFines}</td></tr>
+        <tr><td style="padding:12px;border:1px solid #eee;font-weight:600;">📖 Active Checkouts</td><td style="padding:12px;border:1px solid #eee;font-size:20px;font-weight:700;">${activeCheckouts}</td></tr>
+        <tr style="background:#f8f9fa;"><td style="padding:12px;border:1px solid #eee;font-weight:600;">💵 Yesterday's Revenue</td><td style="padding:12px;border:1px solid #eee;font-size:20px;font-weight:700;color:#27ae60;">₹${yesterdayRevenue}</td></tr>
+        <tr><td style="padding:12px;border:1px solid #eee;font-weight:600;">🔔 Memberships Expiring This Week</td><td style="padding:12px;border:1px solid #eee;font-size:20px;font-weight:700;color:#f39c12;">${expiringMembers}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px;margin-top:20px;">— ${libraryName || 'Tapas Reading Cafe'}</p>
+    </div>
+  `;
+}
+
 export function reservationReadyEmailHtml({ memberName, bookTitle, expiryDate, libraryName }) {
   return `
     <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;">

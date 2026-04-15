@@ -49,6 +49,13 @@ const SETTINGS_CONFIG = [
   { key: 'email_notifications_enabled', label: 'Email Notifications Enabled', type: 'toggle' },
   { key: 'smtp_email', label: 'Gmail Address (sender)', type: 'text' },
   { key: 'smtp_password', label: 'Gmail App Password', type: 'password' },
+  { key: '_divider_whatsapp', label: '📱 WhatsApp Notifications', type: 'divider' },
+  { key: 'whatsapp_mode', label: 'WhatsApp Mode', type: 'select', options: [{ value: 'link', label: 'wa.me Link (free)' }, { value: 'api', label: 'Business API (automated)' }] },
+  { key: 'whatsapp_api_key', label: 'WhatsApp API Token (Business API only)', type: 'password' },
+  { key: 'whatsapp_phone_id', label: 'WhatsApp Phone Number ID', type: 'text' },
+  { key: '_divider_report', label: '📊 Daily Report', type: 'divider' },
+  { key: 'daily_report_enabled', label: 'Daily Morning Report', type: 'toggle' },
+  { key: 'daily_report_email', label: 'Report Recipient Email', type: 'text' },
 ];
 
 // Quick tour steps
@@ -171,9 +178,14 @@ export default function SettingsApp() {
                     }} />
                   </span>
                 </label>
+              ) : cfg.type === 'select' ? (
+                <select value={settings[cfg.key] ?? ''} onChange={e => updateSetting(cfg.key, e.target.value)}
+                  style={{ width: '250px', padding: '8px 10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }}>
+                  {(cfg.options || []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
               ) : (
                 <input
-                  type={cfg.type} value={settings[cfg.key] ?? ''} onChange={e => updateSetting(cfg.key, cfg.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+                  type={cfg.type === 'select' ? 'text' : cfg.type} value={settings[cfg.key] ?? ''} onChange={e => updateSetting(cfg.key, cfg.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
                   placeholder={cfg.type === 'password' ? '••••••••' : ''}
                   style={{ width: cfg.type === 'time' ? '130px' : cfg.type === 'number' ? '100px' : '250px', padding: '8px 10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', textAlign: cfg.type === 'number' ? 'center' : 'left' }}
                 />

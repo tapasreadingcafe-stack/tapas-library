@@ -5,6 +5,7 @@ import { useConfirm } from '../components/ConfirmModal';
 import { useToast } from '../components/Toast';
 import { getFineSettings, calculateFine, daysOverdue } from '../utils/fineUtils';
 import { sendEmail, overdueEmailHtml } from '../utils/emailUtils';
+import { sendWhatsApp, overdueWhatsAppMsg } from '../utils/whatsappUtils';
 
 export default function OverdueBooks() {
   const confirm = useConfirm();
@@ -308,6 +309,24 @@ export default function OverdueBooks() {
                         }}
                       >
                         📧 Remind
+                      </button>
+                    )}
+                    {item.members?.phone && (
+                      <button
+                        onClick={async () => {
+                          const result = await sendWhatsApp(item.members.phone, overdueWhatsAppMsg({
+                            memberName: item.memberName,
+                            bookTitle: item.bookTitle,
+                            dueDate: new Date(item.dueDate).toLocaleDateString('en-IN'),
+                            daysOverdue: item.daysOverdue,
+                            fineAmount: item.fineAmount,
+                          }));
+                          if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');
+                          else toast.error(result.error || 'Failed');
+                        }}
+                        style={{ padding: '6px 12px', background: '#25D366', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginLeft: '5px' }}
+                      >
+                        📱 WhatsApp
                       </button>
                     )}
                   </td>

@@ -8,6 +8,7 @@ import { logActivity, ACTIONS } from '../utils/activityLog';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { sendEmail, membershipExpiryEmailHtml } from '../utils/emailUtils';
+import { sendWhatsApp, membershipExpiryWhatsAppMsg } from '../utils/whatsappUtils';
 
 import {
   calculateStatusColor,
@@ -558,7 +559,12 @@ function Members() {
                     <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly || !canManageMembers}>✏️</button>
                     <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile">👁️</button>
                     {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew" style={{ color: '#38a169' }}>🔄</button>}
-                    {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Send Renewal Reminder">📧</button>}
+                    {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Email Renewal Reminder">📧</button>}
+                    {member.phone && member.subscription_end && <button className="btn-icon" onClick={async () => {
+                      const result = await sendWhatsApp(member.phone, membershipExpiryWhatsAppMsg({ memberName: member.name, plan: member.plan || 'Standard', expiryDate: formatDate(member.subscription_end) }));
+                      if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');
+                      else toast.error(result.error || 'Failed');
+                    }} title="WhatsApp Renewal Reminder" style={{ color: '#25D366' }}>📱</button>}
                     {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>}
                   </td>
                 </tr>
