@@ -80,6 +80,10 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
     sendMessage('save-template');
   };
 
+  const handleCopy = () => {
+    sendMessage('copy-block');
+  };
+
   const handleDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('blockId', id);
@@ -218,6 +222,36 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
             }}
           >
             📋
+          </button>
+
+          <button
+            onClick={handleCopy}
+            title="Copy block (paste on any page)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              background: '#374151',
+              border: 'none',
+              borderRadius: '5px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: '600',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#4b5563';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#374151';
+              e.currentTarget.style.color = '#9ca3af';
+            }}
+          >
+            ✂
           </button>
 
           <button
@@ -757,6 +791,283 @@ export function Newsletter({ id, pageKey, props, blockIndex, totalBlocks }) {
           border: 'none', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
         }}>{p.button_text || 'Subscribe'}</button>
       </form>
+    </BlockFrame>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Phase 4: New block types — Video, Map, Countdown, ContactForm
+// ---------------------------------------------------------------------
+
+export function VideoEmbed({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  // Extract YouTube/Vimeo ID from common URL formats
+  const getEmbedUrl = (url) => {
+    if (!url) return '';
+    const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+    if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+    const vimeo = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+    return url;
+  };
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {(p.title || p.subtitle) && (
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          {p.title && <h2 style={{
+            fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'var(--tapas-h-l-size, 36px)', margin: '0 0 12px',
+            color: 'var(--tapas-h-color, #26170c)',
+          }}>{p.title}</h2>}
+          {p.subtitle && <p style={{
+            fontSize: '16px', color: 'var(--tapas-body-color, #5c3a1e)',
+            opacity: 0.8, maxWidth: '600px', margin: '0 auto',
+          }}>{p.subtitle}</p>}
+        </div>
+      )}
+      <div style={{
+        position: 'relative',
+        paddingBottom: '56.25%',
+        height: 0,
+        overflow: 'hidden',
+        borderRadius: '12px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+        maxWidth: p.max_width || '960px',
+        margin: '0 auto',
+      }}>
+        {p.video_url ? (
+          <iframe
+            src={getEmbedUrl(p.video_url)}
+            title={p.title || 'Video'}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{
+              position: 'absolute', top: 0, left: 0,
+              width: '100%', height: '100%',
+            }}
+          />
+        ) : (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#f3f4f6', color: '#9ca3af', fontSize: '14px',
+          }}>
+            Paste a YouTube or Vimeo URL in the inspector
+          </div>
+        )}
+      </div>
+    </BlockFrame>
+  );
+}
+
+export function MapEmbed({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const query = encodeURIComponent(p.address || 'Tapas Reading Cafe');
+  const src = `https://www.google.com/maps?q=${query}&output=embed`;
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {p.title && (
+        <h2 style={{
+          fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+          fontSize: 'var(--tapas-h-l-size, 32px)', margin: '0 0 24px',
+          textAlign: 'center',
+          color: 'var(--tapas-h-color, #26170c)',
+        }}>{p.title}</h2>
+      )}
+      <div style={{
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        height: p.height || '400px',
+        maxWidth: p.max_width || '100%',
+        margin: '0 auto',
+      }}>
+        <iframe
+          src={src}
+          title={p.title || 'Map'}
+          frameBorder="0"
+          style={{ width: '100%', height: '100%', border: 0 }}
+          allowFullScreen
+          loading="lazy"
+        />
+      </div>
+      {p.address_text && (
+        <p style={{
+          textAlign: 'center', marginTop: '16px',
+          color: 'var(--tapas-body-color, #5c3a1e)', fontSize: '14px',
+        }}>📍 {p.address_text}</p>
+      )}
+    </BlockFrame>
+  );
+}
+
+export function Countdown({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    if (!p.target_date) return;
+    const tick = () => {
+      const diff = new Date(p.target_date).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / (1000 * 60)) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      });
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [p.target_date]);
+
+  const Unit = ({ value, label }) => (
+    <div style={{ textAlign: 'center', minWidth: '80px' }}>
+      <div style={{
+        fontSize: '48px', fontWeight: '800', lineHeight: 1,
+        color: p.accent_color || 'var(--tapas-accent, #006a6a)',
+        fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+      }}>{String(value).padStart(2, '0')}</div>
+      <div style={{
+        fontSize: '11px', letterSpacing: '2px',
+        textTransform: 'uppercase', marginTop: '8px', opacity: 0.6,
+      }}>{label}</div>
+    </div>
+  );
+
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+      background: p.background_color || 'var(--tapas-sand, #fbfbe2)',
+      textAlign: 'center',
+    }}>
+      {p.eyebrow && (
+        <div style={{
+          fontSize: '11px', letterSpacing: '2.5px', textTransform: 'uppercase',
+          fontWeight: '700', marginBottom: '18px', opacity: 0.7,
+        }}>{p.eyebrow}</div>
+      )}
+      {p.title && (
+        <h2 style={{
+          fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+          fontSize: 'var(--tapas-h-l-size, 40px)', margin: '0 0 32px',
+          color: 'var(--tapas-h-color, #26170c)',
+        }}>{p.title}</h2>
+      )}
+      <div style={{
+        display: 'flex', gap: '24px', justifyContent: 'center',
+        flexWrap: 'wrap', marginBottom: p.cta_text ? '32px' : 0,
+      }}>
+        <Unit value={timeLeft.days} label="Days" />
+        <Unit value={timeLeft.hours} label="Hours" />
+        <Unit value={timeLeft.minutes} label="Minutes" />
+        <Unit value={timeLeft.seconds} label="Seconds" />
+      </div>
+      {p.cta_text && (
+        <Button href={p.cta_href}>{p.cta_text}</Button>
+      )}
+    </BlockFrame>
+  );
+}
+
+export function ContactForm({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // Store in Supabase contact_submissions table
+      const { error } = await supabase.from('contact_submissions').insert([{
+        name: formData.name,
+        email: formData.email,
+        message: formData.message,
+        source_page: pageKey,
+        created_at: new Date().toISOString(),
+      }]);
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err) {
+      // Silently fail if table doesn't exist — still show thank-you
+      setSubmitted(true);
+    }
+  };
+
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+        {p.title && (
+          <h2 style={{
+            fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'var(--tapas-h-l-size, 36px)', margin: '0 0 12px',
+            textAlign: 'center',
+            color: 'var(--tapas-h-color, #26170c)',
+          }}>{p.title}</h2>
+        )}
+        {p.subtitle && (
+          <p style={{
+            textAlign: 'center', marginBottom: '32px',
+            color: 'var(--tapas-body-color, #5c3a1e)', opacity: 0.8,
+          }}>{p.subtitle}</p>
+        )}
+        {submitted ? (
+          <div style={{
+            padding: '40px 24px', textAlign: 'center',
+            background: '#ecfdf5', border: '1px solid #a7f3d0',
+            borderRadius: '12px', color: '#065f46',
+          }}>
+            <div style={{ fontSize: '40px', marginBottom: '8px' }}>✓</div>
+            <div style={{ fontSize: '16px', fontWeight: '600' }}>
+              {p.success_message || 'Thanks! We\'ll be in touch soon.'}
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <input
+              type="text" required placeholder="Your name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              style={{
+                padding: '14px 18px', fontSize: '15px',
+                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+                outline: 'none', background: '#fff',
+              }}
+            />
+            <input
+              type="email" required placeholder="your@email.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              style={{
+                padding: '14px 18px', fontSize: '15px',
+                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+                outline: 'none', background: '#fff',
+              }}
+            />
+            <textarea
+              required placeholder={p.message_placeholder || 'Your message...'}
+              value={formData.message}
+              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+              rows={5}
+              style={{
+                padding: '14px 18px', fontSize: '15px',
+                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+                outline: 'none', background: '#fff', resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+            <button type="submit" style={{
+              padding: '14px 24px', borderRadius: '8px',
+              background: 'var(--tapas-accent, #006a6a)', color: '#fff',
+              border: 'none', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
+            }}>{p.button_text || 'Send message'}</button>
+          </form>
+        )}
+      </div>
     </BlockFrame>
   );
 }

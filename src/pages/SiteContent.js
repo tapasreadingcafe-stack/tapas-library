@@ -1065,6 +1065,10 @@ export default function SiteContent() {
   const [sidebarTab, setSidebarTab] = useState('layers');
   const [editingPage, setEditingPage] = useState('home');
   const [selectedBlockId, setSelectedBlockId] = useState(null);
+  // Phase 4: clipboard for cross-page copy/paste
+  const [copiedBlock, setCopiedBlock] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('blockClipboard') || 'null'); } catch { return null; }
+  });
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   // Hamburger-style collapse for both sidebars. Each panel is either
   // at its full fixed width or fully hidden (width 0 with a CSS
@@ -1613,6 +1617,15 @@ export default function SiteContent() {
         });
         return;
       }
+      if (msg.type === 'tapas:copy-block' && msg.blockId && msg.pageKey) {
+        const page = draftContent?.pages?.[msg.pageKey];
+        const block = page?.blocks?.find(b => b.id === msg.blockId);
+        if (!block) return;
+        const clipboard = { type: block.type, props: block.props };
+        setCopiedBlock(clipboard);
+        try { localStorage.setItem('blockClipboard', JSON.stringify(clipboard)); } catch {}
+        return;
+      }
       if (msg.type === 'tapas:save-template' && msg.blockId && msg.pageKey) {
         const page = draftContent?.pages?.[msg.pageKey];
         const block = page?.blocks?.find(b => b.id === msg.blockId);
@@ -1969,11 +1982,11 @@ export default function SiteContent() {
               </div>
 
               {/* Add section button */}
-              <div style={{ padding: '12px 14px', display: 'flex', gap: '8px' }}>
+              <div style={{ padding: '12px 14px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setAddPickerOpen(true)}
                   style={{
-                    flex: 1, padding: '10px 12px',
+                    flex: 1, minWidth: '120px', padding: '10px 12px',
                     background: S.accent, color: '#fff',
                     border: 'none', borderRadius: '4px',
                     fontSize: '12px', fontWeight: '700',
@@ -1982,6 +1995,36 @@ export default function SiteContent() {
                     boxShadow: '0 1px 3px rgba(13,153,255,0.3)',
                   }}
                 >+ Add section</button>
+                {copiedBlock && (
+                  <button
+                    onClick={() => {
+                      setDraftContent(prev => {
+                        const page = prev.pages?.[editingPage];
+                        if (!page || !Array.isArray(page.blocks)) return prev;
+                        const newBlock = {
+                          id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                          type: copiedBlock.type,
+                          props: copiedBlock.props,
+                        };
+                        return {
+                          ...prev,
+                          pages: {
+                            ...prev.pages,
+                            [editingPage]: { ...page, blocks: [...page.blocks, newBlock] },
+                          },
+                        };
+                      });
+                    }}
+                    title={`Paste: ${copiedBlock.type}`}
+                    style={{
+                      padding: '10px 12px',
+                      background: '#10b981', color: '#fff',
+                      border: 'none', borderRadius: '4px',
+                      fontSize: '12px', fontWeight: '700',
+                      cursor: 'pointer',
+                    }}
+                  >📋 Paste</button>
+                )}
                 <button
                   onClick={() => {
                     const templates = JSON.parse(localStorage.getItem('blockTemplates') || '[]');

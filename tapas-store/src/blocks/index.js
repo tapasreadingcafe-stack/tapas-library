@@ -24,6 +24,7 @@
 import {
   Hero, CTA, FeatureGrid, Footer,
   TextImage, Testimonials, Pricing, FAQ, Gallery, Newsletter,
+  VideoEmbed, MapEmbed, Countdown, ContactForm,
   BookList, BlogList, EventList,
 } from './BlockLibrary';
 
@@ -222,6 +223,89 @@ export const BLOCK_REGISTRY = {
       { key: 'description', label: 'Description', type: 'textarea' },
       { key: 'placeholder', label: 'Placeholder', type: 'text' },
       { key: 'button_text', label: 'Button text', type: 'text' },
+    ],
+  },
+
+  // ---- Phase 4: Video, Map, Countdown, Contact form ------------------
+
+  video_embed: {
+    label: 'Video embed',
+    category: 'Media',
+    Renderer: VideoEmbed,
+    defaultProps: {
+      title: '',
+      subtitle: '',
+      video_url: '',
+      max_width: '960px',
+    },
+    schema: [
+      { key: 'title',     label: 'Title',     type: 'text' },
+      { key: 'subtitle',  label: 'Subtitle',  type: 'text' },
+      { key: 'video_url', label: 'Video URL', type: 'text', hint: 'YouTube or Vimeo URL' },
+      { key: 'max_width', label: 'Max width', type: 'text', hint: 'e.g. 960px' },
+    ],
+  },
+
+  map_embed: {
+    label: 'Map',
+    category: 'Media',
+    Renderer: MapEmbed,
+    defaultProps: {
+      title: 'Find us',
+      address: 'Tapas Reading Cafe',
+      address_text: '',
+      height: '400px',
+      max_width: '100%',
+    },
+    schema: [
+      { key: 'title',         label: 'Title',           type: 'text' },
+      { key: 'address',       label: 'Address (query)', type: 'text', hint: 'Street address for map pin' },
+      { key: 'address_text',  label: 'Display text',    type: 'text', hint: 'Optional caption under map' },
+      { key: 'height',        label: 'Height',          type: 'text' },
+    ],
+  },
+
+  countdown: {
+    label: 'Countdown',
+    category: 'Content',
+    Renderer: Countdown,
+    defaultProps: {
+      eyebrow: 'Limited time',
+      title: 'Our next event starts in',
+      target_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      accent_color: '',
+      background_color: '',
+      cta_text: '',
+      cta_href: '/',
+    },
+    schema: [
+      { key: 'eyebrow',          label: 'Eyebrow',        type: 'text' },
+      { key: 'title',            label: 'Title',          type: 'text' },
+      { key: 'target_date',      label: 'Target date',    type: 'text', hint: 'ISO datetime, e.g. 2026-12-31T23:59' },
+      { key: 'accent_color',     label: 'Accent color',   type: 'color' },
+      { key: 'background_color', label: 'Background',     type: 'color' },
+      { key: 'cta_text',         label: 'Button text',    type: 'text' },
+      { key: 'cta_href',         label: 'Button link',    type: 'text' },
+    ],
+  },
+
+  contact_form: {
+    label: 'Contact form',
+    category: 'Content',
+    Renderer: ContactForm,
+    defaultProps: {
+      title: 'Get in touch',
+      subtitle: 'We usually reply within a day.',
+      message_placeholder: 'Your message...',
+      button_text: 'Send message',
+      success_message: 'Thanks! We\'ll be in touch soon.',
+    },
+    schema: [
+      { key: 'title',              label: 'Title',             type: 'text' },
+      { key: 'subtitle',           label: 'Subtitle',          type: 'text' },
+      { key: 'message_placeholder',label: 'Message placeholder', type: 'text' },
+      { key: 'button_text',        label: 'Button text',       type: 'text' },
+      { key: 'success_message',    label: 'Success message',   type: 'text' },
     ],
   },
 
