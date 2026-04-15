@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../utils/supabase';
 import { DEFAULT_CONTENT, CONTENT_SCHEMA, sectionForFieldPath } from '../utils/siteContentSchema';
+import {
+  BLOCK_REGISTRY_META, BLOCK_CATEGORIES, EDITABLE_PAGES, makeBlock,
+} from '../utils/blockRegistryMeta';
 
 // =====================================================================
 // SiteContent — Figma-style three-panel visual editor.
@@ -738,6 +741,86 @@ const CSS_RENDERERS = {
   'css-color':  CssColorField,
 };
 
+// =====================================================================
+// BlockInspector (Phase 2)
+//
+// Rendered on the right panel when the user has selected a block in
+// the Layers tree or on the canvas. Shows the block's metadata
+// (label + icon), a back button, a delete button, and the block's
+// own schema fields rendered through the existing FIELD_RENDERERS
+// so dark-theme styling and inline validation all come along for
+// free.
+// =====================================================================
+function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplicate }) {
+  if (!block || !meta) return null;
+  return (
+    <>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '12px 14px',
+        borderBottom: `1px solid ${D.border}`,
+        background: D.panel, flexShrink: 0,
+      }}>
+        <button onClick={onBack} title="Deselect block"
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: D.textDim, fontSize: '14px', padding: '2px 6px', borderRadius: '2px' }}>
+          ←
+        </button>
+        <span style={{ fontSize: '14px' }}>{meta.icon || '▫'}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '9px', color: D.textFaint, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            Block
+          </div>
+          <div style={{ fontSize: '12px', color: D.text, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+            {meta.label}
+          </div>
+        </div>
+        <button
+          onClick={onDuplicate}
+          title="Duplicate block"
+          style={{ background: 'transparent', border: 'none', color: D.textDim, fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '2px' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = D.text; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = D.textDim; }}
+        >⎘</button>
+        <button
+          onClick={onDelete}
+          title="Delete block"
+          style={{ background: 'transparent', border: 'none', color: D.textDim, fontSize: '14px', cursor: 'pointer', padding: '4px 6px', borderRadius: '2px' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = D.danger; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = D.textDim; }}
+        >✕</button>
+      </div>
+
+      {/* Fields — rendered via the same FIELD_RENDERERS the schema
+          sections use, so dark theme + inline validation flow through
+          automatically. Missing props fall back to defaultProps so the
+          user sees a useful starting value. */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingTop: '12px', paddingBottom: '40px', background: D.panel }}>
+        {(!meta.schema || meta.schema.length === 0) ? (
+          <div style={{ padding: '24px 16px', color: D.textFaint, fontSize: '11px', lineHeight: 1.55, textAlign: 'center' }}>
+            This block has no editable fields yet.
+          </div>
+        ) : (
+          meta.schema.map(field => {
+            const Renderer = FIELD_RENDERERS[field.type] || TextField;
+            const value = (block.props && field.key in block.props)
+              ? block.props[field.key]
+              : (meta.defaultProps ? meta.defaultProps[field.key] : undefined);
+            return (
+              <Renderer
+                key={field.key}
+                field={field}
+                value={value}
+                onChange={(v) => onChangeProp(field.key, v)}
+              />
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+}
+
 function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup }) {
   const shortPath = path.split('.').slice(-1)[0].replace(/_/g, ' ');
   return (
@@ -974,6 +1057,15 @@ export default function SiteContent() {
   const [viewport, setViewport]   = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [iframePath, setIframePath] = useState('/');
+  // Webflow-style block editor state (Phase 2).
+  //   sidebarTab     — which left-sidebar tab is active: 'layers' | 'design'
+  //   editingPage    — which page's block tree we're manipulating
+  //   selectedBlockId — which block is selected (drives right-panel mode)
+  //   addPickerOpen  — visibility of the Add-section modal
+  const [sidebarTab, setSidebarTab] = useState('layers');
+  const [editingPage, setEditingPage] = useState('home');
+  const [selectedBlockId, setSelectedBlockId] = useState(null);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
   // Hamburger-style collapse for both sidebars. Each panel is either
   // at its full fixed width or fully hidden (width 0 with a CSS
   // transition for a smooth slide). State persists across sessions so
@@ -1096,6 +1188,91 @@ export default function SiteContent() {
       [storageKey]: { ...(prev[storageKey] || {}), [fieldKey]: value },
     }));
   };
+
+  // ---- Block CRUD (Phase 2) -----------------------------------------
+  // Helpers that mutate draftContent.pages[pageKey].blocks immutably.
+  // Every operation produces a fresh object graph so React re-renders
+  // and the debounced apply-content push sends the change to the
+  // preview iframe.
+
+  const getBlocks = useCallback((pageKey) => {
+    const p = draftContent?.pages?.[pageKey];
+    return Array.isArray(p?.blocks) ? p.blocks : [];
+  }, [draftContent]);
+
+  const mutateBlocks = useCallback((pageKey, mapFn) => {
+    setDraftContent(prev => {
+      const pages = prev.pages || {};
+      const page = pages[pageKey] || { meta: {}, blocks: [] };
+      const nextBlocks = mapFn(Array.isArray(page.blocks) ? page.blocks : []);
+      return {
+        ...prev,
+        pages: {
+          ...pages,
+          [pageKey]: { ...page, blocks: nextBlocks },
+        },
+      };
+    });
+  }, []);
+
+  const addBlockToPage = useCallback((pageKey, type, atIndex) => {
+    const fresh = makeBlock(type);
+    mutateBlocks(pageKey, (blocks) => {
+      const idx = typeof atIndex === 'number' ? atIndex : blocks.length;
+      const next = [...blocks];
+      next.splice(idx, 0, fresh);
+      return next;
+    });
+    setSelectedBlockId(fresh.id);
+    return fresh.id;
+  }, [mutateBlocks]);
+
+  const deleteBlock = useCallback((pageKey, blockId) => {
+    mutateBlocks(pageKey, (blocks) => blocks.filter(b => b.id !== blockId));
+    setSelectedBlockId(prev => prev === blockId ? null : prev);
+  }, [mutateBlocks]);
+
+  const duplicateBlock = useCallback((pageKey, blockId) => {
+    mutateBlocks(pageKey, (blocks) => {
+      const idx = blocks.findIndex(b => b.id === blockId);
+      if (idx < 0) return blocks;
+      const src = blocks[idx];
+      const clone = {
+        ...JSON.parse(JSON.stringify(src)),
+        id: `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e5).toString(36)}`,
+      };
+      const next = [...blocks];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+  }, [mutateBlocks]);
+
+  const moveBlock = useCallback((pageKey, blockId, delta) => {
+    mutateBlocks(pageKey, (blocks) => {
+      const idx = blocks.findIndex(b => b.id === blockId);
+      if (idx < 0) return blocks;
+      const target = idx + delta;
+      if (target < 0 || target >= blocks.length) return blocks;
+      const next = [...blocks];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  }, [mutateBlocks]);
+
+  const updateBlockProp = useCallback((pageKey, blockId, propKey, value) => {
+    mutateBlocks(pageKey, (blocks) => blocks.map(b => (
+      b.id === blockId
+        ? { ...b, props: { ...(b.props || {}), [propKey]: value } }
+        : b
+    )));
+  }, [mutateBlocks]);
+
+  // Find a block by id across the current editingPage's tree.
+  const selectedBlock = useMemo(() => {
+    if (!selectedBlockId) return null;
+    const blocks = getBlocks(editingPage);
+    return blocks.find(b => b.id === selectedBlockId) || null;
+  }, [selectedBlockId, editingPage, getBlocks]);
 
   // Update a single CSS property on the currently selected element.
   // Empty string clears the override.
@@ -1307,11 +1484,24 @@ export default function SiteContent() {
         }
       }
       if (msg.type === 'tapas:select' && typeof msg.fieldPath === 'string') {
-        setSelectedElement(msg.fieldPath);
+        // Block path: "pages.{pageKey}.blocks.{blockId}"
+        //   → switch to the Layers tab, set editingPage + selectedBlockId.
+        // Anything else: fall back to the legacy element-CSS inspector.
+        const m = /^pages\.([^.]+)\.blocks\.([^.]+)$/.exec(msg.fieldPath);
+        if (m) {
+          setEditingPage(m[1]);
+          setSelectedBlockId(m[2]);
+          setSidebarTab('layers');
+          setSelectedElement(null);
+        } else {
+          setSelectedElement(msg.fieldPath);
+          setSelectedBlockId(null);
+        }
         return;
       }
       if (msg.type === 'tapas:deselect') {
         setSelectedElement(null);
+        setSelectedBlockId(null);
         return;
       }
       // Inline edit committed from the canvas: iframe has already shown
@@ -1368,6 +1558,114 @@ export default function SiteContent() {
       background: S.bg,
       fontFamily: '-apple-system, system-ui, sans-serif',
     }}>
+      {/* ==================== Add section picker modal ==================== */}
+      {addPickerOpen && (
+        <div
+          onClick={() => setAddPickerOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '720px', maxHeight: '80vh',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: `1px solid ${S.border}`,
+              display: 'flex', alignItems: 'center', gap: '12px',
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
+                  Add section to <span style={{ color: S.accent }}>{EDITABLE_PAGES.find(p => p.key === editingPage)?.label || editingPage}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
+                  Pick a block type to append to the page.
+                </div>
+              </div>
+              <button
+                onClick={() => setAddPickerOpen(false)}
+                style={{
+                  width: '28px', height: '28px',
+                  background: 'transparent', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', cursor: 'pointer',
+                  color: S.textDim, fontSize: '14px',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = S.text; e.currentTarget.style.background = S.bg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = 'transparent'; }}
+              >✕</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
+              {BLOCK_CATEGORIES.map(cat => {
+                const types = Object.entries(BLOCK_REGISTRY_META).filter(([, m]) => m.category === cat);
+                if (types.length === 0) return null;
+                return (
+                  <div key={cat} style={{ marginBottom: '24px' }}>
+                    <div style={{
+                      fontSize: '10px', fontWeight: '700', color: S.textDim,
+                      textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px',
+                    }}>{cat}</div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                      gap: '10px',
+                    }}>
+                      {types.map(([type, meta]) => (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            addBlockToPage(editingPage, type);
+                            setAddPickerOpen(false);
+                          }}
+                          style={{
+                            display: 'flex', flexDirection: 'column',
+                            alignItems: 'flex-start', gap: '6px',
+                            padding: '14px 14px',
+                            background: '#fff',
+                            border: `1px solid ${S.border}`,
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.12s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = S.accent;
+                            e.currentTarget.style.background = S.accentLight;
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(13,153,255,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = S.border;
+                            e.currentTarget.style.background = '#fff';
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <span style={{ fontSize: '22px' }}>{meta.icon || '▫'}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: S.text }}>
+                            {meta.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== Top toolbar ==================== */}
       <div style={{
         height: '52px',
@@ -1497,8 +1795,187 @@ export default function SiteContent() {
           position: 'relative',
           overflow: 'hidden',
           transition: 'width 0.22s ease',
-          overflowY: 'auto',
         }}>
+          {/* Tab bar — Layers (block tree) vs Design (brand schema) */}
+          <div style={{
+            display: 'flex', flexShrink: 0,
+            borderBottom: `1px solid ${S.border}`,
+          }}>
+            {[
+              { key: 'layers', label: '☰ Layers' },
+              { key: 'design', label: '✦ Design' },
+            ].map(t => {
+              const active = sidebarTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setSidebarTab(t.key)}
+                  style={{
+                    flex: 1, padding: '10px 8px',
+                    background: 'transparent', border: 'none',
+                    borderBottom: active ? `2px solid ${S.accent}` : '2px solid transparent',
+                    marginBottom: '-1px',
+                    color: active ? S.text : S.textDim,
+                    fontSize: '11px', fontWeight: active ? '700' : '500',
+                    cursor: 'pointer',
+                    transition: 'color 150ms',
+                  }}
+                >{t.label}</button>
+              );
+            })}
+          </div>
+
+          {/* === LAYERS TAB ============================================= */}
+          {sidebarTab === 'layers' && (
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              {/* Page picker — which page's block tree we're editing. */}
+              <div style={{ padding: '12px 14px 8px', borderBottom: `1px solid ${S.border}` }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  Editing page
+                </div>
+                <select
+                  value={editingPage}
+                  onChange={(e) => {
+                    setEditingPage(e.target.value);
+                    setSelectedBlockId(null);
+                    // Navigate the preview iframe to match so staff sees
+                    // the page they're editing.
+                    const p = EDITABLE_PAGES.find(x => x.key === e.target.value);
+                    if (p) setIframePath(p.path);
+                  }}
+                  style={{
+                    width: '100%', padding: '7px 10px',
+                    background: '#fff', border: `1px solid ${S.border}`,
+                    borderRadius: '4px', fontSize: '12px', color: S.text,
+                    cursor: 'pointer', outline: 'none',
+                  }}
+                >
+                  {EDITABLE_PAGES.map(p => (
+                    <option key={p.key} value={p.key}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Add section button */}
+              <div style={{ padding: '12px 14px' }}>
+                <button
+                  onClick={() => setAddPickerOpen(true)}
+                  style={{
+                    width: '100%', padding: '10px 12px',
+                    background: S.accent, color: '#fff',
+                    border: 'none', borderRadius: '4px',
+                    fontSize: '12px', fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    boxShadow: '0 1px 3px rgba(13,153,255,0.3)',
+                  }}
+                >+ Add section</button>
+              </div>
+
+              {/* Block tree for the current editing page */}
+              <div style={{ padding: '0 8px 12px', flex: 1 }}>
+                {(() => {
+                  const blocks = getBlocks(editingPage);
+                  if (blocks.length === 0) {
+                    return (
+                      <div style={{
+                        padding: '32px 14px', textAlign: 'center',
+                        color: S.textFaint, fontSize: '11px', lineHeight: 1.55,
+                      }}>
+                        No blocks yet on this page.<br />
+                        This page is rendering its legacy layout. Click <b>+ Add section</b> above to start building with blocks.
+                      </div>
+                    );
+                  }
+                  return blocks.map((b, idx) => {
+                    const meta = BLOCK_REGISTRY_META[b.type];
+                    const isSelected = selectedBlockId === b.id;
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={() => setSelectedBlockId(b.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '7px 8px', marginBottom: '2px',
+                          background: isSelected ? S.accentLight : 'transparent',
+                          border: `1px solid ${isSelected ? S.accent + '55' : 'transparent'}`,
+                          borderRadius: '4px', cursor: 'pointer',
+                          fontSize: '11.5px',
+                        }}
+                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = S.bg; }}
+                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <span style={{ fontSize: '13px', flexShrink: 0, width: '16px', textAlign: 'center' }}>
+                          {meta?.icon || '▫'}
+                        </span>
+                        <span style={{
+                          flex: 1, minWidth: 0, overflow: 'hidden',
+                          textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          color: isSelected ? S.accent : S.text,
+                          fontWeight: isSelected ? '600' : '500',
+                        }}>
+                          {meta?.label || b.type}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveBlock(editingPage, b.id, -1); }}
+                          disabled={idx === 0}
+                          title="Move up"
+                          style={{
+                            width: '18px', height: '18px', padding: 0,
+                            background: 'transparent', border: 'none',
+                            color: idx === 0 ? S.textFaint : S.textDim,
+                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                            fontSize: '11px', borderRadius: '2px',
+                          }}
+                        >↑</button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveBlock(editingPage, b.id, 1); }}
+                          disabled={idx === blocks.length - 1}
+                          title="Move down"
+                          style={{
+                            width: '18px', height: '18px', padding: 0,
+                            background: 'transparent', border: 'none',
+                            color: idx === blocks.length - 1 ? S.textFaint : S.textDim,
+                            cursor: idx === blocks.length - 1 ? 'not-allowed' : 'pointer',
+                            fontSize: '11px', borderRadius: '2px',
+                          }}
+                        >↓</button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); duplicateBlock(editingPage, b.id); }}
+                          title="Duplicate"
+                          style={{
+                            width: '18px', height: '18px', padding: 0,
+                            background: 'transparent', border: 'none',
+                            color: S.textDim, cursor: 'pointer',
+                            fontSize: '11px', borderRadius: '2px',
+                          }}
+                        >⎘</button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete ${meta?.label || b.type}?`)) deleteBlock(editingPage, b.id);
+                          }}
+                          title="Delete"
+                          style={{
+                            width: '18px', height: '18px', padding: 0,
+                            background: 'transparent', border: 'none',
+                            color: S.textDim, cursor: 'pointer',
+                            fontSize: '12px', borderRadius: '2px',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = S.danger; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; }}
+                        >✕</button>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* === DESIGN TAB — legacy brand/typography/etc schema sections */}
+          {sidebarTab === 'design' && (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ padding: '14px 14px 6px' }}>
             <div style={{ fontSize: '10px', fontWeight: '700', color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
               Pages
@@ -1668,6 +2145,8 @@ export default function SiteContent() {
               + Add element
             </button>
           </div>
+          </div>
+          )}
         </aside>
 
         {/* CENTER: preview */}
@@ -1797,6 +2276,20 @@ export default function SiteContent() {
               onChangeStyle={(cssProp, value) => updateElementStyle(selectedElement, cssProp, value)}
               onClear={() => clearElementStyles(selectedElement)}
               onBack={clearSelection}
+            />
+          ) : selectedBlock ? (
+            <BlockInspector
+              block={selectedBlock}
+              meta={BLOCK_REGISTRY_META[selectedBlock.type]}
+              onChangeProp={(key, value) => updateBlockProp(editingPage, selectedBlock.id, key, value)}
+              onBack={() => setSelectedBlockId(null)}
+              onDuplicate={() => duplicateBlock(editingPage, selectedBlock.id)}
+              onDelete={() => {
+                const meta = BLOCK_REGISTRY_META[selectedBlock.type];
+                if (window.confirm(`Delete ${meta?.label || selectedBlock.type}?`)) {
+                  deleteBlock(editingPage, selectedBlock.id);
+                }
+              }}
             />
           ) : (
           <>
