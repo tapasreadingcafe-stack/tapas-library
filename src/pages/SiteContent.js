@@ -816,6 +816,46 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
             );
           })
         )}
+
+        {/* Phase 4: Responsive visibility — available on every block
+            without needing to edit each schema. Toggles apply CSS
+            classes that hide the block at the matching breakpoint. */}
+        <div style={{
+          marginTop: '20px', padding: '14px 16px 16px',
+          borderTop: `1px solid ${D.border}`,
+          background: D.panelAlt || D.panel,
+        }}>
+          <div style={{
+            fontSize: '9px', color: D.textFaint, fontWeight: '600',
+            textTransform: 'uppercase', letterSpacing: '0.8px',
+            marginBottom: '10px',
+          }}>
+            Responsive visibility
+          </div>
+          {[
+            { key: 'hide_mobile',  label: 'Hide on mobile',  hint: '< 640px' },
+            { key: 'hide_tablet',  label: 'Hide on tablet',  hint: '640–1023px' },
+            { key: 'hide_desktop', label: 'Hide on desktop', hint: '≥ 1024px' },
+          ].map(({ key, label, hint }) => {
+            const checked = !!block.props?.[key];
+            return (
+              <label key={key} style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '6px 0', cursor: 'pointer', fontSize: '11px',
+                color: D.text,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => onChangeProp(key, e.target.checked)}
+                  style={{ cursor: 'pointer', margin: 0 }}
+                />
+                <span style={{ flex: 1 }}>{label}</span>
+                <span style={{ color: D.textFaint, fontSize: '10px' }}>{hint}</span>
+              </label>
+            );
+          })}
+        </div>
       </div>
     </>
   );

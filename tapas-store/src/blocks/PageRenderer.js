@@ -65,12 +65,38 @@ export function BlockView({ block, pageKey, blockIndex, totalBlocks }) {
     return null;
   }
   const Renderer = entry.Renderer;
+  // Phase 4: responsive visibility — wrap each block in a div that
+  // gets CSS classes based on props.hide_mobile/tablet/desktop. The
+  // actual hiding is done by global media queries injected once in
+  // PageRenderer. The wrapper is display:contents so it doesn't affect
+  // layout when visible.
+  const p = block.props || {};
+  const classes = [];
+  if (p.hide_mobile)  classes.push('tapas-hide-mobile');
+  if (p.hide_tablet)  classes.push('tapas-hide-tablet');
+  if (p.hide_desktop) classes.push('tapas-hide-desktop');
   return (
     <BlockErrorBoundary blockType={block.type}>
-      <Renderer id={block.id} pageKey={pageKey} props={block.props || {}} blockIndex={blockIndex} totalBlocks={totalBlocks} />
+      <div className={classes.join(' ') || undefined} style={{ display: 'contents' }}>
+        <Renderer id={block.id} pageKey={pageKey} props={p} blockIndex={blockIndex} totalBlocks={totalBlocks} />
+      </div>
     </BlockErrorBoundary>
   );
 }
+
+// Global CSS for responsive visibility classes — injected once per
+// page by PageRenderer so it's always present when blocks render.
+const RESPONSIVE_CSS = `
+@media (max-width: 639px) {
+  .tapas-hide-mobile > * { display: none !important; }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .tapas-hide-tablet > * { display: none !important; }
+}
+@media (min-width: 1024px) {
+  .tapas-hide-desktop > * { display: none !important; }
+}
+`;
 
 export default function PageRenderer({ pageKey, fallback = null }) {
   const content = useSiteContent();
@@ -85,6 +111,7 @@ export default function PageRenderer({ pageKey, fallback = null }) {
 
   return (
     <>
+      <style>{RESPONSIVE_CSS}</style>
       {blocks.map((b, idx) => (
         <BlockView key={b.id} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={blocks.length} />
       ))}
