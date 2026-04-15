@@ -29,9 +29,9 @@ INSERT INTO app_settings (key, value) VALUES
 ON CONFLICT (key) DO NOTHING;`;
 
 const SETTINGS_CONFIG = [
-  { key: 'library_name', label: 'Library / Cafe Name', type: 'text' },
-  { key: 'fine_rate_per_day', label: 'Fine Rate Per Day (₹)', type: 'number' },
-  { key: 'default_loan_days', label: 'Default Loan Period (Days)', type: 'number' },
+  { key: 'library_name', label: 'Library / Cafe Name', type: 'text', tourId: 'setting-library-name' },
+  { key: 'fine_rate_per_day', label: 'Fine Rate Per Day (₹)', type: 'number', tourId: 'setting-fine-rate' },
+  { key: 'default_loan_days', label: 'Default Loan Period (Days)', type: 'number', tourId: 'setting-loan-days' },
   { key: 'max_books_basic', label: 'Max Books (Basic Plan)', type: 'number' },
   { key: 'max_books_premium', label: 'Max Books (Premium Plan)', type: 'number' },
   { key: 'library_open_time', label: 'Opening Time', type: 'time' },
@@ -40,13 +40,13 @@ const SETTINGS_CONFIG = [
   { key: 'events_enabled', label: 'Events Module Enabled', type: 'toggle' },
   { key: 'marketing_enabled', label: 'Marketing Module Enabled', type: 'toggle' },
   { key: 'store_enabled', label: 'Online Store Enabled', type: 'toggle' },
-  { key: 'fine_grace_period_days', label: 'Fine Grace Period (Days)', type: 'number' },
+  { key: 'fine_grace_period_days', label: 'Fine Grace Period (Days)', type: 'number', tourId: 'setting-grace-period' },
   { key: 'fine_max_cap', label: 'Max Fine Cap Per Book (₹)', type: 'number' },
   { key: 'fine_rate_student', label: 'Fine Rate - Student (₹/day)', type: 'number' },
   { key: 'fine_rate_premium', label: 'Fine Rate - Premium (₹/day)', type: 'number' },
   { key: 'fine_rate_family', label: 'Fine Rate - Family (₹/day)', type: 'number' },
   { key: '_divider_email', label: '📧 Email Notifications', type: 'divider' },
-  { key: 'email_notifications_enabled', label: 'Email Notifications Enabled', type: 'toggle' },
+  { key: 'email_notifications_enabled', label: 'Email Notifications Enabled', type: 'toggle', tourId: 'setting-email-toggle' },
   { key: 'smtp_email', label: 'Gmail Address (sender)', type: 'text' },
   { key: 'smtp_password', label: 'Gmail App Password', type: 'password' },
   { key: '_divider_whatsapp', label: '📱 WhatsApp Notifications', type: 'divider' },

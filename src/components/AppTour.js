@@ -167,21 +167,44 @@ export default function AppTour({ active, onClose }) {
     if (!active || !current.target) { setRect(null); return; }
     const el = document.querySelector(current.target);
     if (el) {
-      const r = el.getBoundingClientRect();
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-      const tooltipW = 380, tooltipH = 260;
-      let top, left;
-      const pos = current.position || 'bottom';
-      if (pos === 'bottom') { top = r.bottom + PAD + 8; left = Math.max(16, Math.min(r.left, window.innerWidth - tooltipW - 16)); }
-      else if (pos === 'top') { top = r.top - PAD - tooltipH - 8; left = Math.max(16, Math.min(r.left, window.innerWidth - tooltipW - 16)); }
-      else if (pos === 'left') { top = r.top; left = r.left - tooltipW - PAD - 8; if (left < 16) left = r.right + PAD + 8; }
-      else { top = r.top; left = r.right + PAD + 8; }
-      if (top < 16) top = 16;
-      if (top + tooltipH > window.innerHeight - 16) top = window.innerHeight - tooltipH - 16;
-      if (left < 16) left = 16;
-      if (left + tooltipW > window.innerWidth - 16) left = window.innerWidth - tooltipW - 16;
-      setTooltipPos({ top, left });
+      // Scroll element into view first — push to bottom so tooltip has room above
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Wait for scroll to settle, then measure
+      setTimeout(() => {
+        const r = el.getBoundingClientRect();
+        setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+        const tooltipW = 380, tooltipH = 280;
+        let top, left;
+
+        // Smart positioning: try above first, then below, then right
+        const spaceAbove = r.top - PAD;
+        const spaceBelow = window.innerHeight - r.bottom - PAD;
+
+        if (spaceAbove >= tooltipH + 16) {
+          // Place ABOVE the target
+          top = r.top - PAD - tooltipH - 8;
+          left = Math.max(16, Math.min(r.left, window.innerWidth - tooltipW - 16));
+        } else if (spaceBelow >= tooltipH + 16) {
+          // Place BELOW the target
+          top = r.bottom + PAD + 8;
+          left = Math.max(16, Math.min(r.left, window.innerWidth - tooltipW - 16));
+        } else {
+          // Place to the RIGHT (or left if no room)
+          top = Math.max(16, Math.min(r.top, window.innerHeight - tooltipH - 16));
+          left = r.right + PAD + 8;
+          if (left + tooltipW > window.innerWidth - 16) {
+            left = r.left - tooltipW - PAD - 8;
+          }
+        }
+
+        // Final bounds check
+        if (top < 16) top = 16;
+        if (left < 16) left = 16;
+        if (left + tooltipW > window.innerWidth - 16) left = window.innerWidth - tooltipW - 16;
+
+        setTooltipPos({ top, left });
+      }, 300);
     } else {
       setRect(null);
     }
