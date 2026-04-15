@@ -1036,6 +1036,10 @@ export default function SiteContent() {
   // Two separate content states — draft is what you're editing, live is
   // what's pushed to production. The dashboard always edits draft.
   const [draftContent, setDraftContent] = useState(DEFAULT_CONTENT);
+  // Ref that always points at the latest draftContent — used inside the
+  // message listener so we don't have to re-attach on every state change.
+  const draftContentRef = useRef(draftContent);
+  useEffect(() => { draftContentRef.current = draftContent; }, [draftContent]);
   const [liveContent,  setLiveContent]  = useState(DEFAULT_CONTENT);
   const [loading, setLoading]   = useState(true);
   const [saving,  setSaving]    = useState(false);
@@ -1069,6 +1073,8 @@ export default function SiteContent() {
   const [copiedBlock, setCopiedBlock] = useState(() => {
     try { return JSON.parse(localStorage.getItem('blockClipboard') || 'null'); } catch { return null; }
   });
+  // Phase 4: multi-select support (Set of block IDs selected beyond the primary one)
+  const [multiSelectedIds, setMultiSelectedIds] = useState(() => new Set());
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   // Hamburger-style collapse for both sidebars. Each panel is either
   // at its full fixed width or fully hidden (width 0 with a CSS
@@ -1618,7 +1624,7 @@ export default function SiteContent() {
         return;
       }
       if (msg.type === 'tapas:copy-block' && msg.blockId && msg.pageKey) {
-        const page = draftContent?.pages?.[msg.pageKey];
+        const page = draftContentRef.current?.pages?.[msg.pageKey];
         const block = page?.blocks?.find(b => b.id === msg.blockId);
         if (!block) return;
         const clipboard = { type: block.type, props: block.props };
@@ -1627,7 +1633,7 @@ export default function SiteContent() {
         return;
       }
       if (msg.type === 'tapas:save-template' && msg.blockId && msg.pageKey) {
-        const page = draftContent?.pages?.[msg.pageKey];
+        const page = draftContentRef.current?.pages?.[msg.pageKey];
         const block = page?.blocks?.find(b => b.id === msg.blockId);
         if (!block) return;
         const templateName = window.prompt('Template name:', block.type);
@@ -1669,7 +1675,7 @@ export default function SiteContent() {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [draftContent]);
+  }, []);
 
   const vp = VIEWPORTS.find(v => v.key === viewport) || VIEWPORTS[0];
   const currentSection = CONTENT_SCHEMA.find(s => s.key === activeSection) || CONTENT_SCHEMA[0];
@@ -2068,6 +2074,88 @@ export default function SiteContent() {
                 >⭐ Templates</button>
               </div>
 
+              {/* Phase 4: batch action bar (only visible when multi-selected) */}
+              {multiSelectedIds.size > 0 && (
+                <div style={{
+                  margin: '0 14px 8px', padding: '8px 10px',
+                  background: S.accentLight || '#DBEAFE',
+                  border: `1px solid ${S.accent}44`,
+                  borderRadius: '4px',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  fontSize: '11px',
+                }}>
+                  <span style={{ flex: 1, fontWeight: '600', color: S.accent }}>
+                    {multiSelectedIds.size + 1} selected
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (!window.confirm(`Delete ${multiSelectedIds.size + 1} blocks?`)) return;
+                      const idsToDelete = new Set([selectedBlockId, ...multiSelectedIds]);
+                      setDraftContent(prev => {
+                        const page = prev.pages?.[editingPage];
+                        if (!page || !Array.isArray(page.blocks)) return prev;
+                        return {
+                          ...prev,
+                          pages: {
+                            ...prev.pages,
+                            [editingPage]: {
+                              ...page,
+                              blocks: page.blocks.filter(b => !idsToDelete.has(b.id)),
+                            },
+                          },
+                        };
+                      });
+                      setSelectedBlockId(null);
+                      setMultiSelectedIds(new Set());
+                    }}
+                    style={{
+                      padding: '5px 10px', background: S.danger || '#dc2626', color: '#fff',
+                      border: 'none', borderRadius: '3px', fontSize: '11px',
+                      fontWeight: '600', cursor: 'pointer',
+                    }}
+                  >🗑 Delete all</button>
+                  <button
+                    onClick={() => {
+                      const idsToDuplicate = [selectedBlockId, ...multiSelectedIds];
+                      setDraftContent(prev => {
+                        const page = prev.pages?.[editingPage];
+                        if (!page || !Array.isArray(page.blocks)) return prev;
+                        const newBlocks = [...page.blocks];
+                        idsToDuplicate.forEach(id => {
+                          const original = page.blocks.find(x => x.id === id);
+                          if (original) {
+                            newBlocks.push({
+                              ...original,
+                              id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                            });
+                          }
+                        });
+                        return {
+                          ...prev,
+                          pages: {
+                            ...prev.pages,
+                            [editingPage]: { ...page, blocks: newBlocks },
+                          },
+                        };
+                      });
+                    }}
+                    style={{
+                      padding: '5px 10px', background: S.accent, color: '#fff',
+                      border: 'none', borderRadius: '3px', fontSize: '11px',
+                      fontWeight: '600', cursor: 'pointer',
+                    }}
+                  >📋 Duplicate</button>
+                  <button
+                    onClick={() => setMultiSelectedIds(new Set())}
+                    style={{
+                      padding: '5px 8px', background: 'transparent', color: S.textDim,
+                      border: `1px solid ${S.borderStrong}`, borderRadius: '3px',
+                      fontSize: '11px', cursor: 'pointer',
+                    }}
+                  >Clear</button>
+                </div>
+              )}
+
               {/* Block tree for the current editing page */}
               <div style={{ padding: '0 8px 12px', flex: 1 }}>
                 {(() => {
@@ -2085,15 +2173,44 @@ export default function SiteContent() {
                   }
                   return blocks.map((b, idx) => {
                     const meta = BLOCK_REGISTRY_META[b.type];
-                    const isSelected = selectedBlockId === b.id;
+                    const isPrimary = selectedBlockId === b.id;
+                    const isMulti = multiSelectedIds.has(b.id);
+                    const isSelected = isPrimary || isMulti;
                     return (
                       <div
                         key={b.id}
-                        onClick={() => setSelectedBlockId(b.id)}
+                        onClick={(e) => {
+                          if (e.shiftKey && selectedBlockId) {
+                            // Range select: include all blocks between anchor and clicked block
+                            const anchorIdx = blocks.findIndex(x => x.id === selectedBlockId);
+                            if (anchorIdx !== -1) {
+                              const [start, end] = anchorIdx < idx ? [anchorIdx, idx] : [idx, anchorIdx];
+                              const range = new Set();
+                              for (let i = start; i <= end; i++) {
+                                if (blocks[i].id !== selectedBlockId) range.add(blocks[i].id);
+                              }
+                              setMultiSelectedIds(range);
+                              return;
+                            }
+                          }
+                          if (e.metaKey || e.ctrlKey) {
+                            // Toggle select: add/remove this block from multi-selection
+                            setMultiSelectedIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(b.id)) next.delete(b.id);
+                              else next.add(b.id);
+                              return next;
+                            });
+                            return;
+                          }
+                          // Normal click: select one block, clear multi-selection
+                          setSelectedBlockId(b.id);
+                          setMultiSelectedIds(new Set());
+                        }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '6px',
                           padding: '7px 8px', marginBottom: '2px',
-                          background: isSelected ? S.accentLight : 'transparent',
+                          background: isPrimary ? S.accentLight : isMulti ? (S.accentLight || '#DBEAFE') + '88' : 'transparent',
                           border: `1px solid ${isSelected ? S.accent + '55' : 'transparent'}`,
                           borderRadius: '4px', cursor: 'pointer',
                           fontSize: '11.5px',

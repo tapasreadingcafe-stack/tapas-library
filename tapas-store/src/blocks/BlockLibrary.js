@@ -46,43 +46,28 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
     setIsHovered(false);
   };
 
-  const sendMessage = (action) => {
+  const sendMessage = (action, extra = {}) => {
     const msg = {
       type: `tapas:${action}`,
       fieldPath: selector,
       blockId: id,
       pageKey,
+      ...extra,
     };
-    if (action === 'move-block') msg.direction = (window.lastClickedAction === 'move-up') ? 'up' : 'down';
-    window.parent?.postMessage(msg, '*');
+    try {
+      window.parent?.postMessage(msg, '*');
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[BlockFrame] postMessage failed', err);
+    }
   };
 
-  const handleDelete = () => {
-    // Send delete request to parent editor (which handles confirmation)
-    sendMessage('delete-block');
-  };
-
-  const handleDuplicate = () => {
-    sendMessage('duplicate-block');
-  };
-
-  const handleMoveUp = () => {
-    window.lastClickedAction = 'move-up';
-    sendMessage('move-block');
-  };
-
-  const handleMoveDown = () => {
-    window.lastClickedAction = 'move-down';
-    sendMessage('move-block');
-  };
-
-  const handleSaveTemplate = () => {
-    sendMessage('save-template');
-  };
-
-  const handleCopy = () => {
-    sendMessage('copy-block');
-  };
+  const handleDelete = (e) => { e?.stopPropagation?.(); sendMessage('delete-block'); };
+  const handleDuplicate = (e) => { e?.stopPropagation?.(); sendMessage('duplicate-block'); };
+  const handleMoveUp = (e) => { e?.stopPropagation?.(); sendMessage('move-block', { direction: 'up' }); };
+  const handleMoveDown = (e) => { e?.stopPropagation?.(); sendMessage('move-block', { direction: 'down' }); };
+  const handleSaveTemplate = (e) => { e?.stopPropagation?.(); sendMessage('save-template'); };
+  const handleCopy = (e) => { e?.stopPropagation?.(); sendMessage('copy-block'); };
 
   const handleDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move';
