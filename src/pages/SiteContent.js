@@ -1613,10 +1613,50 @@ export default function SiteContent() {
         });
         return;
       }
+      if (msg.type === 'tapas:save-template' && msg.blockId && msg.pageKey) {
+        const page = draftContent?.pages?.[msg.pageKey];
+        const block = page?.blocks?.find(b => b.id === msg.blockId);
+        if (!block) return;
+        const templateName = window.prompt('Template name:', block.type);
+        if (templateName) {
+          const templates = JSON.parse(localStorage.getItem('blockTemplates') || '[]');
+          templates.push({
+            name: templateName,
+            type: block.type,
+            props: block.props,
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem('blockTemplates', JSON.stringify(templates));
+          alert(`Saved template: ${templateName}`);
+        }
+        return;
+      }
+      if (msg.type === 'tapas:reorder-blocks' && msg.blockId && msg.pageKey && msg.targetIndex !== undefined) {
+        setDraftContent(prev => {
+          const page = prev.pages?.[msg.pageKey];
+          if (!page || !Array.isArray(page.blocks)) return prev;
+          const blockIdx = page.blocks.findIndex(b => b.id === msg.blockId);
+          if (blockIdx === -1) return prev;
+          const newBlocks = [...page.blocks];
+          const [block] = newBlocks.splice(blockIdx, 1);
+          newBlocks.splice(msg.targetIndex, 0, block);
+          return {
+            ...prev,
+            pages: {
+              ...prev.pages,
+              [msg.pageKey]: {
+                ...page,
+                blocks: newBlocks,
+              },
+            },
+          };
+        });
+        return;
+      }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, []);
+  }, [draftContent]);
 
   const vp = VIEWPORTS.find(v => v.key === viewport) || VIEWPORTS[0];
   const currentSection = CONTENT_SCHEMA.find(s => s.key === activeSection) || CONTENT_SCHEMA[0];
@@ -1929,11 +1969,11 @@ export default function SiteContent() {
               </div>
 
               {/* Add section button */}
-              <div style={{ padding: '12px 14px' }}>
+              <div style={{ padding: '12px 14px', display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => setAddPickerOpen(true)}
                   style={{
-                    width: '100%', padding: '10px 12px',
+                    flex: 1, padding: '10px 12px',
                     background: S.accent, color: '#fff',
                     border: 'none', borderRadius: '4px',
                     fontSize: '12px', fontWeight: '700',
@@ -1942,6 +1982,47 @@ export default function SiteContent() {
                     boxShadow: '0 1px 3px rgba(13,153,255,0.3)',
                   }}
                 >+ Add section</button>
+                <button
+                  onClick={() => {
+                    const templates = JSON.parse(localStorage.getItem('blockTemplates') || '[]');
+                    if (templates.length === 0) {
+                      alert('No templates saved yet. Save a block as a template from the canvas toolbar (⭐ button).');
+                      return;
+                    }
+                    const names = templates.map(t => `${t.name} (${t.type})`).join('\n');
+                    const idx = parseInt(window.prompt(`Load template:\n\n${names}\n\nEnter number (0-${templates.length-1}):`, '0'));
+                    if (idx >= 0 && idx < templates.length) {
+                      const template = templates[idx];
+                      setDraftContent(prev => {
+                        const page = prev.pages?.[editingPage];
+                        if (!page || !Array.isArray(page.blocks)) return prev;
+                        const newBlock = {
+                          id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                          type: template.type,
+                          props: template.props,
+                        };
+                        return {
+                          ...prev,
+                          pages: {
+                            ...prev.pages,
+                            [editingPage]: {
+                              ...page,
+                              blocks: [...page.blocks, newBlock],
+                            },
+                          },
+                        };
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    background: S.borderStrong, color: S.text,
+                    border: 'none', borderRadius: '4px',
+                    fontSize: '12px', fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                  title="Load a saved template"
+                >⭐ Templates</button>
               </div>
 
               {/* Block tree for the current editing page */}

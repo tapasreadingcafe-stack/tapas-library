@@ -76,10 +76,22 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
     sendMessage('move-block');
   };
 
+  const handleSaveTemplate = () => {
+    sendMessage('save-template');
+  };
+
+  const handleDragStart = (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('blockId', id);
+    e.dataTransfer.setData('pageKey', pageKey);
+  };
+
   return (
     <section
       ref={sectionRef}
       data-editable={selector}
+      draggable
+      onDragStart={handleDragStart}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{
@@ -87,6 +99,7 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
         padding: full ? 0 : 'clamp(48px, 8vw, 96px) clamp(20px, 5vw, 64px)',
         boxSizing: 'border-box',
         position: 'relative',
+        cursor: 'grab',
         ...(style || {}),
       }}
     >
@@ -116,56 +129,64 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
           {blockIndex > 0 && (
             <button
               onClick={handleMoveUp}
-              title="Move up"
+              title="Move up (or drag to reorder)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '28px',
-                height: '28px',
+                width: '32px',
+                height: '32px',
                 background: '#374151',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '5px',
                 color: '#9ca3af',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
+                fontSize: '16px',
+                fontWeight: '600',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.background = '#4b5563';
-                e.currentTarget.color = '#fff';
+                e.currentTarget.style.background = '#4b5563';
+                e.currentTarget.style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#374151';
+                e.currentTarget.style.color = '#9ca3af';
               }}
             >
-              ↑
+              ⬆
             </button>
           )}
 
           {blockIndex < totalBlocks - 1 && (
             <button
               onClick={handleMoveDown}
-              title="Move down"
+              title="Move down (or drag to reorder)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '28px',
-                height: '28px',
+                width: '32px',
+                height: '32px',
                 background: '#374151',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '5px',
                 color: '#9ca3af',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
+                fontSize: '16px',
+                fontWeight: '600',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.background = '#4b5563';
-                e.currentTarget.color = '#fff';
+                e.currentTarget.style.background = '#4b5563';
+                e.currentTarget.style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#374151';
+                e.currentTarget.style.color = '#9ca3af';
               }}
             >
-              ↓
+              ⬇
             </button>
           )}
 
@@ -176,22 +197,57 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: '28px',
-              height: '28px',
+              width: '32px',
+              height: '32px',
               background: '#374151',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '5px',
               color: '#9ca3af',
               cursor: 'pointer',
-              fontSize: '14px',
+              fontSize: '16px',
+              fontWeight: '600',
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.background = '#4b5563';
-              e.currentTarget.color = '#fff';
+              e.currentTarget.style.background = '#4b5563';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#374151';
+              e.currentTarget.style.color = '#9ca3af';
             }}
           >
-            ⎘
+            📋
+          </button>
+
+          <button
+            onClick={handleSaveTemplate}
+            title="Save as template"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              background: '#374151',
+              border: 'none',
+              borderRadius: '5px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: '600',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#4b5563';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#374151';
+              e.currentTarget.style.color = '#9ca3af';
+            }}
+          >
+            ⭐
           </button>
 
           <button
@@ -201,23 +257,27 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: '28px',
-              height: '28px',
+              width: '32px',
+              height: '32px',
               background: '#374151',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '5px',
               color: '#f87171',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold',
+              fontSize: '16px',
+              fontWeight: '600',
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.background = '#7f1d1d';
-              e.currentTarget.color = '#fca5a5';
+              e.currentTarget.style.background = '#7f1d1d';
+              e.currentTarget.style.color = '#fca5a5';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#374151';
+              e.currentTarget.style.color = '#f87171';
             }}
           >
-            ✕
+            🗑
           </button>
         </div>
       )}
@@ -265,7 +325,7 @@ function Button({ href, children, variant = 'primary' }) {
 export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: p.background_image
         ? `linear-gradient(rgba(0,0,0,${p.overlay_opacity ?? 0.4}), rgba(0,0,0,${p.overlay_opacity ?? 0.4})), url("${p.background_image}") center/cover`
         : 'linear-gradient(135deg, var(--tapas-primary, #26170c), var(--tapas-primary-dark, #1a0f08))',
