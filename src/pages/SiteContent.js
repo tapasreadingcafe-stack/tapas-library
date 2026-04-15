@@ -974,6 +974,64 @@ export default function SiteContent() {
   const [viewport, setViewport]   = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [iframePath, setIframePath] = useState('/');
+  // Resizable sidebars. Widths persist in localStorage so they stick
+  // across sessions; bounds keep the panels usable without hiding them.
+  const LEFT_MIN = 180, LEFT_MAX = 480;
+  const RIGHT_MIN = 260, RIGHT_MAX = 560;
+  const [leftWidth, setLeftWidth] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem('tapas_editor_left_w'));
+      if (Number.isFinite(n) && n >= LEFT_MIN && n <= LEFT_MAX) return n;
+    } catch {}
+    return 240;
+  });
+  const [rightWidth, setRightWidth] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem('tapas_editor_right_w'));
+      if (Number.isFinite(n) && n >= RIGHT_MIN && n <= RIGHT_MAX) return n;
+    } catch {}
+    return 320;
+  });
+  useEffect(() => {
+    try { localStorage.setItem('tapas_editor_left_w', String(leftWidth)); } catch {}
+  }, [leftWidth]);
+  useEffect(() => {
+    try { localStorage.setItem('tapas_editor_right_w', String(rightWidth)); } catch {}
+  }, [rightWidth]);
+  // Which handle is being dragged. Stored in a ref so the global mouse
+  // listeners don't need to be re-attached on every render.
+  const draggingRef = useRef(null); // 'left' | 'right' | null
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!draggingRef.current) return;
+      if (draggingRef.current === 'left') {
+        const w = Math.max(LEFT_MIN, Math.min(LEFT_MAX, e.clientX));
+        setLeftWidth(w);
+      } else {
+        const w = Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, window.innerWidth - e.clientX));
+        setRightWidth(w);
+      }
+    };
+    const onUp = () => {
+      if (draggingRef.current) {
+        draggingRef.current = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+  const startResize = (side) => (e) => {
+    e.preventDefault();
+    draggingRef.current = side;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
   const [iframeReady, setIframeReady] = useState(false);
   const iframeRef = useRef(null);
   const fieldRefs = useRef({});
@@ -1472,12 +1530,13 @@ export default function SiteContent() {
 
         {/* LEFT: pages + sections */}
         <aside style={{
-          width: '240px',
+          width: `${leftWidth}px`,
           flexShrink: 0,
           background: S.panel,
           borderRight: `1px solid ${S.border}`,
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
           overflowY: 'auto',
         }}>
           <div style={{ padding: '14px 14px 6px' }}>
@@ -1649,6 +1708,27 @@ export default function SiteContent() {
               + Add element
             </button>
           </div>
+
+          {/* Resize handle — invisible 6px strip on the right edge.
+              Hovering shows a 2px accent bar (Figma-style), dragging
+              resizes the panel within [LEFT_MIN, LEFT_MAX]. */}
+          <div
+            onMouseDown={startResize('left')}
+            title="Drag to resize"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: '-3px',
+              width: '6px',
+              height: '100%',
+              cursor: 'col-resize',
+              zIndex: 20,
+              background: 'transparent',
+              transition: 'background 0.12s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.opacity = '0.5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '1'; }}
+          />
         </aside>
 
         {/* CENTER: preview */}
@@ -1722,13 +1802,32 @@ export default function SiteContent() {
 
         {/* RIGHT: property inspector — Figma-style, one active section */}
         <aside style={{
-          width: '320px',
+          width: `${rightWidth}px`,
           flexShrink: 0,
           background: D.panel,
           borderLeft: `1px solid ${D.border}`,
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
         }}>
+          {/* Resize handle — left edge, mirrors the left aside's handle. */}
+          <div
+            onMouseDown={startResize('right')}
+            title="Drag to resize"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '-3px',
+              width: '6px',
+              height: '100%',
+              cursor: 'col-resize',
+              zIndex: 20,
+              background: 'transparent',
+              transition: 'background 0.12s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.opacity = '0.5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '1'; }}
+          />
           {selectedElement ? (
             <ElementInspector
               path={selectedElement}
