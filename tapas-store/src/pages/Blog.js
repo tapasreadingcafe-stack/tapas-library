@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { useSiteContent } from '../context/SiteContent';
+import PageRenderer from '../blocks/PageRenderer';
 
 // =====================================================================
 // Blog listing — reads from public.blog_posts (managed in dashboard
@@ -9,6 +11,15 @@ import { supabase } from '../utils/supabase';
 // =====================================================================
 
 export default function Blog() {
+  const content = useSiteContent();
+  const blocks = content?.pages?.blog?.blocks;
+  if (Array.isArray(blocks) && blocks.length > 0) {
+    return <PageRenderer pageKey="blog" />;
+  }
+  return <LegacyBlog />;
+}
+
+function LegacyBlog() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 

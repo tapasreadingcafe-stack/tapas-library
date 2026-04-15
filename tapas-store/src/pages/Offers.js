@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContent';
+import PageRenderer from '../blocks/PageRenderer';
 
 // =====================================================================
 // Offers / Memberships — all text now editable from the dashboard.
@@ -44,7 +45,16 @@ function buildPlans(plans) {
 
 export default function Offers() {
   const content = useSiteContent();
-  
+  const blocks = content?.pages?.offers?.blocks;
+  if (Array.isArray(blocks) && blocks.length > 0) {
+    return <PageRenderer pageKey="offers" />;
+  }
+  return <LegacyOffers />;
+}
+
+function LegacyOffers() {
+  const content = useSiteContent();
+
   const offers = content.offers;
   const plans = content.plans || {};
   const visibility = content.visibility || {};

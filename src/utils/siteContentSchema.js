@@ -216,6 +216,20 @@ export const DEFAULT_CONTENT = {
     home_newsletter_bg_color:   '',
     home_newsletter_text_align: 'center',
   },
+
+  // Webflow-style page builder (Phase 1). Mirrors the shape in
+  // tapas-store/src/utils/defaultContent.js. The editor will surface
+  // this in Phase 2; for now it just needs to round-trip through the
+  // schema's deep-merge unchanged.
+  pages: {
+    home:    { meta: { title: 'Home — Tapas Library',    description: '' }, blocks: [] },
+    about:   { meta: { title: 'About — Tapas Library',   description: '' }, blocks: [] },
+    catalog: { meta: { title: 'Books — Tapas Library',   description: '' }, blocks: [] },
+    offers:  { meta: { title: 'Offers — Tapas Library',  description: '' }, blocks: [] },
+    blog:    { meta: { title: 'Journal — Tapas Library', description: '' }, blocks: [] },
+    events:  { meta: { title: 'Events — Tapas Library',  description: '' }, blocks: [] },
+  },
+  block_templates: [],
 };
 
 export const CONTENT_SCHEMA = [
