@@ -58,19 +58,6 @@ const SETTINGS_CONFIG = [
   { key: 'daily_report_email', label: 'Report Recipient Email', type: 'text' },
 ];
 
-// Quick tour steps
-const TOUR_STEPS = [
-  { path: '/', title: 'Dashboard', desc: 'Your library overview — metrics, charts, and activity at a glance.' },
-  { path: '/books', title: 'Books', desc: 'Manage your entire book catalog — add, edit, search, and track stock.' },
-  { path: '/Borrow', title: 'Borrow', desc: 'Check out and return books. Track active borrows and overdue items.' },
-  { path: '/cafe/menu', title: 'Cafe POS', desc: 'Take cafe orders — tea, coffee, bakery items with cart and payment.' },
-  { path: '/members', title: 'Members', desc: 'Manage members, plans, and subscriptions.' },
-  { path: '/events', title: 'Events', desc: 'Create events, manage registrations, and track attendance.' },
-  { path: '/pos', title: 'Library POS', desc: 'Process payments for memberships, fines, printing, and services.' },
-  { path: '/reports', title: 'Reports', desc: 'Revenue, top books, overdue tracking, and expiring subscriptions.' },
-  { path: '/settings/app', title: 'Settings', desc: 'Configure fine rates, loan periods, hours, and app preferences.' },
-];
-
 export default function SettingsApp({ onStartTour }) {
   const toast = useToast();
   const navigate = useNavigate();
@@ -81,8 +68,6 @@ export default function SettingsApp({ onStartTour }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hintsOn, setHintsOn] = useState(isHintsEnabled());
-  const [showTour, setShowTour] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
   const [showEditHints, setShowEditHints] = useState(false);
   const [editingHints, setEditingHints] = useState({});
   const [hintSearch, setHintSearch] = useState('');
@@ -242,7 +227,7 @@ export default function SettingsApp({ onStartTour }) {
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>🚀 Quick Tour</div>
             <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>Step-by-step walkthrough of all features</div>
           </div>
-          <button onClick={() => { if (onStartTour) onStartTour(); else { setShowTour(true); setTourStep(0); } }}
+          <button onClick={() => { if (onStartTour) onStartTour(); else toast.error('Tour unavailable. Please refresh the page.'); }}
             style={{ padding: '8px 18px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
             🚀 Start Interactive Tour
           </button>
@@ -327,65 +312,6 @@ export default function SettingsApp({ onStartTour }) {
         </div>
       )}
 
-      {/* ── QUICK TOUR MODAL ── */}
-      {showTour && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
-          onClick={() => setShowTour(false)}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '0', maxWidth: '480px', width: '90%', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            {/* Progress */}
-            <div style={{ height: '4px', background: '#f0f0f0' }}>
-              <div style={{ height: '100%', background: 'linear-gradient(135deg, #667eea, #764ba2)', width: `${((tourStep + 1) / TOUR_STEPS.length) * 100}%`, transition: 'width 0.3s', borderRadius: '4px' }} />
-            </div>
-
-            <div style={{ padding: '28px 24px 20px' }}>
-              <div style={{ fontSize: '12px', color: '#667eea', fontWeight: '700', marginBottom: '6px' }}>
-                STEP {tourStep + 1} OF {TOUR_STEPS.length}
-              </div>
-              <h3 style={{ margin: '0 0 8px', fontSize: '22px', color: '#333' }}>
-                {TOUR_STEPS[tourStep].title}
-              </h3>
-              <p style={{ color: '#666', fontSize: '14px', lineHeight: '1.5', margin: '0 0 20px' }}>
-                {TOUR_STEPS[tourStep].desc}
-              </p>
-
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
-                <button onClick={() => setTourStep(Math.max(0, tourStep - 1))} disabled={tourStep === 0}
-                  style={{ padding: '8px 18px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', opacity: tourStep === 0 ? 0.4 : 1 }}>
-                  ← Back
-                </button>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => { setShowTour(false); navigate(TOUR_STEPS[tourStep].path); }}
-                    style={{ padding: '8px 18px', background: '#f0f3ff', border: '1px solid #667eea', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', color: '#667eea' }}>
-                    Go There →
-                  </button>
-                  {tourStep < TOUR_STEPS.length - 1 ? (
-                    <button onClick={() => setTourStep(tourStep + 1)}
-                      style={{ padding: '8px 18px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-                      Next →
-                    </button>
-                  ) : (
-                    <button onClick={() => { setShowTour(false); toast.success('Tour complete! You\'re all set.'); }}
-                      style={{ padding: '8px 18px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-                      ✓ Finish
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Step dots */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '12px', background: '#f8f9fa' }}>
-              {TOUR_STEPS.map((_, i) => (
-                <div key={i} onClick={() => setTourStep(i)} style={{
-                  width: i === tourStep ? '20px' : '8px', height: '8px',
-                  borderRadius: '4px', cursor: 'pointer', transition: 'all 0.2s',
-                  background: i === tourStep ? '#667eea' : i < tourStep ? '#1dd1a1' : '#ddd',
-                }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
