@@ -44,6 +44,12 @@ function isInIframe() {
 // Hover + selection state as module-level closures — one instance only.
 let hoverEl = null;
 let selectedEl = null;
+// Inline edit state: the element currently in contentEditable mode, the
+// text we captured before editing started (for cancel/Escape), and the
+// field path the element represents.
+let editingEl = null;
+let editingOriginal = '';
+let editingPath = '';
 
 function cleanOutline(el) {
   if (!el) return;
@@ -90,6 +96,86 @@ function setSelected(el, _path) {
 function clearSelection() {
   if (selectedEl) cleanOutline(selectedEl);
   selectedEl = null;
+}
+
+// An element is safely inline-editable if every child is a text node —
+// i.e. no nested <span>, <img>, etc. We don't want contentEditable to
+// let the user clobber structured markup like an icon button.
+function isPlainTextEditable(el) {
+  if (!el) return false;
+  for (const node of el.childNodes) {
+    if (node.nodeType !== Node.TEXT_NODE) return false;
+  }
+  return el.textContent.trim().length > 0;
+}
+
+function commitInlineEdit(send) {
+  if (!editingEl) return;
+  const next = editingEl.textContent;
+  const path = editingPath;
+  const changed = next !== editingOriginal;
+  editingEl.contentEditable = 'false';
+  editingEl.style.cursor = '';
+  editingEl.style.caretColor = '';
+  editingEl = null;
+  editingOriginal = '';
+  editingPath = '';
+  // Clear the pause flag so the SiteContent context resumes applying
+  // incoming content updates on the next keystroke-from-elsewhere.
+  window.__tapasInlineEditing = false;
+  if (changed && path && send) {
+    try {
+      window.parent.postMessage(
+        { type: 'tapas:set-field-value', fieldPath: path, value: next }, '*'
+      );
+    } catch {}
+  }
+}
+
+function cancelInlineEdit() {
+  if (!editingEl) return;
+  // Revert visible text and tell the parent to roll back draftContent.
+  const path = editingPath;
+  editingEl.textContent = editingOriginal;
+  editingEl.contentEditable = 'false';
+  editingEl.style.cursor = '';
+  editingEl.style.caretColor = '';
+  const original = editingOriginal;
+  editingEl = null;
+  editingOriginal = '';
+  editingPath = '';
+  window.__tapasInlineEditing = false;
+  if (path) {
+    try {
+      window.parent.postMessage(
+        { type: 'tapas:set-field-value', fieldPath: path, value: original }, '*'
+      );
+    } catch {}
+  }
+}
+
+function startInlineEdit(el) {
+  if (!el || editingEl === el) return;
+  if (editingEl) commitInlineEdit(true);
+  editingEl = el;
+  editingOriginal = el.textContent;
+  editingPath = el.dataset.editable || '';
+  el.contentEditable = 'true';
+  el.style.caretColor = HOVER_COLOR;
+  el.style.cursor = 'text';
+  // Pause incoming apply-content merges while we edit — otherwise React
+  // will re-render this very element on every keystroke round-trip and
+  // clobber the caret position.
+  window.__tapasInlineEditing = true;
+  // Select all text so typing replaces it by default (Figma-like).
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    el.focus();
+  } catch {}
 }
 
 export default function StoreEditorSync() {
@@ -173,6 +259,17 @@ export default function StoreEditorSync() {
       if (!e.relatedTarget) setHover(null);
     };
     const onClick = (e) => {
+      // If we're already editing and the user clicked outside the
+      // editing element, commit and let the new click proceed normally.
+      if (editingEl && !editingEl.contains(e.target)) {
+        commitInlineEdit(true);
+        // fall through to normal click handling
+      } else if (editingEl && editingEl.contains(e.target)) {
+        // Click inside an actively editing element → just position caret,
+        // don't re-select or navigate.
+        e.stopPropagation();
+        return;
+      }
       // Ignore clicks on real controls.
       if (e.target.closest('a, button, input, textarea, select, label')) {
         const el = e.target.closest('[data-editable]');
@@ -203,17 +300,66 @@ export default function StoreEditorSync() {
           { type: 'tapas:select', fieldPath: el.dataset.editable }, '*'
         );
       } catch {}
+      // If the element is simple text, immediately enter inline edit
+      // mode — this is the "select text and change there only" flow.
+      if (isPlainTextEditable(el)) {
+        startInlineEdit(el);
+      }
     };
     const onKeyDown = (e) => {
+      if (editingEl) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          cancelInlineEdit();
+          return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          commitInlineEdit(true);
+          return;
+        }
+        // Any other key keeps the contentEditable in edit mode.
+        // Live-push every keystroke so the right panel / footer stay
+        // in sync while the user is still typing.
+        try {
+          window.parent.postMessage(
+            { type: 'tapas:set-field-value', fieldPath: editingPath, value: editingEl.textContent },
+            '*'
+          );
+        } catch {}
+        return;
+      }
       if (e.key === 'Escape') {
         clearSelection();
         try { window.parent.postMessage({ type: 'tapas:deselect' }, '*'); } catch {}
       }
     };
+    const onBlur = (e) => {
+      if (editingEl && e.target === editingEl) {
+        // contentEditable lost focus → commit whatever is there now.
+        commitInlineEdit(true);
+      }
+    };
+    const onInput = (e) => {
+      if (editingEl && e.target === editingEl) {
+        // Mirror every keystroke so the parent's draftContent updates
+        // live — the preview re-render is triggered on the parent side
+        // via apply-content, but because the contentEditable IS the
+        // element being re-rendered, we don't want React to clobber it.
+        try {
+          window.parent.postMessage(
+            { type: 'tapas:set-field-value', fieldPath: editingPath, value: editingEl.textContent },
+            '*'
+          );
+        } catch {}
+      }
+    };
 
     // Small legend bottom-right.
     const legend = document.createElement('div');
-    legend.textContent = '✏️ Click any element to select';
+    legend.textContent = '✏️ Click text to edit · Esc to cancel';
     Object.assign(legend.style, {
       position: 'fixed',
       bottom: '14px',
@@ -236,12 +382,17 @@ export default function StoreEditorSync() {
     document.addEventListener('mouseout',  onMouseOut);
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('blur',  onBlur, true);
+    document.addEventListener('input', onInput, true);
 
     return () => {
       document.removeEventListener('mouseover', onMouseOver);
       document.removeEventListener('mouseout',  onMouseOut);
       document.removeEventListener('click', onClick, true);
       document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('blur',  onBlur, true);
+      document.removeEventListener('input', onInput, true);
+      cancelInlineEdit();
       setHover(null);
       clearSelection();
       if (legend.parentNode) legend.parentNode.removeChild(legend);
