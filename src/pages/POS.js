@@ -843,7 +843,7 @@ export default function POS() {
                 {activeCat === 'All' && (
                   <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px', marginBottom: '10px' }}>SERVICES & CHARGES</div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(148px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
+                <div data-tour="pos-services" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(148px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
                   {visibleServices.map(svc => (
                     <ServiceCard key={svc.id} svc={svc} fmt={fmt}
                       onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}

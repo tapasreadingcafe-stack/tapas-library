@@ -354,7 +354,7 @@ export default function Dashboard() {
         </div>
 
         {/* Shift Handoff Notes */}
-        <div className="db-panel">
+        <div className="db-panel" data-tour="shift-notes">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>📝 Shift Notes</h3>
             <button onClick={() => setShowNoteInput(!showNoteInput)} style={{ padding: '4px 10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>

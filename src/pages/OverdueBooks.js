@@ -220,7 +220,7 @@ export default function OverdueBooks() {
             {totalOverdueBooks === 0 ? '🎉 No overdue books! Your members are keeping up.' : 'No results matching your search'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table data-tour="overdue-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: '#f5f5f5', borderBottom: '2px solid #e0e0e0' }}>
               <tr>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>Member</th>

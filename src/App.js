@@ -3,6 +3,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { HintBubble } from './components/HintTooltip';
 import { supabase } from './utils/supabase';
 import GlobalTooltip from './components/GlobalTooltip';
+import AppTour from './components/AppTour';
 import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
 import { useAuth } from './context/AuthContext';
@@ -521,6 +522,7 @@ function SidebarNav({ sidebarOpen, openGroups, toggleGroup, isActive, isGroupAct
 function DashboardShell() {
   const isMobile = () => window.innerWidth <= 768;
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
+  const [tourActive, setTourActive] = useState(false);
   const location = useLocation();
   const { dark, toggleTheme } = useTheme();
   const { staff } = useAuth();
@@ -686,7 +688,7 @@ function DashboardShell() {
 
             {/* Settings */}
             <Route path="/settings/health"                    element={<SettingsHealth />} />
-            <Route path="/settings/app"                       element={<SettingsApp />} />
+            <Route path="/settings/app"                       element={<SettingsApp onStartTour={() => setTourActive(true)} />} />
             <Route path="/settings/profile"                   element={<SettingsProfile />} />
             <Route path="/settings/activity"                  element={<ActivityLog />} />
             <Route path="/settings/devices"                  element={<DeviceManager />} />
@@ -723,6 +725,7 @@ function DashboardShell() {
         </ChunkErrorBoundary>
       </main>
       <GlobalTooltip />
+      <AppTour active={tourActive} onClose={() => setTourActive(false)} />
     </div>
   );
 }

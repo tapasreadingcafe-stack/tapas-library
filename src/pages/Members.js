@@ -455,7 +455,7 @@ function Members() {
         <h1>👥 Members Management</h1>
         <div className="header-actions">
           {!isReadOnly && canManageMembers && (
-            <button className="btn btn-primary" onClick={handleAddMember}>
+            <button className="btn btn-primary" data-tour="add-member" onClick={handleAddMember}>
               + Add Member
             </button>
           )}
@@ -480,7 +480,7 @@ function Members() {
       </div>
 
       {/* Expiry quick filter + bulk actions */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+      <div data-tour="expiry-filter" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '13px', fontWeight: '600', color: '#666' }}>Quick:</span>
         {['all', 'expiring', 'expired'].map(f => (
           <button key={f} onClick={() => setExpiryFilter(f)}

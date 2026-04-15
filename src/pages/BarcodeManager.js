@@ -331,6 +331,7 @@ export default function BarcodeManager() {
         <h1 style={{ margin: 0, fontSize: '24px' }}>Barcodes</h1>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <select
+            data-tour="template-select"
             value={selectedTemplate}
             onChange={e => { setSelectedTemplate(e.target.value); localStorage.setItem('barcode_template_key', e.target.value); }}
             style={{ ...inputStyle, width: 'auto', minWidth: '140px' }}
@@ -340,7 +341,7 @@ export default function BarcodeManager() {
               <option key={t.key} value={t.key}>{t.key.replace('barcode_template_', '')}</option>
             ))}
           </select>
-          <button onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
+          <button data-tour="direct-print" onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
             {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : `Direct Print${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
           </button>
           <Link to="/barcodes/editor" style={buttonStyle}>

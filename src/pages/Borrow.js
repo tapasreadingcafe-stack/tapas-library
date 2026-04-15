@@ -597,7 +597,7 @@ export default function Borrow() {
       {/* Tabs */}
       <div style={{ background: 'white', borderRadius: '8px', padding: '6px', width: 'fit-content', marginBottom: '20px', display: 'flex', gap: '4px' }}>
         {[['checkout', '➕ New Checkout'], ['active', `📚 Active (${circulationData.length})`]].map(([tab, label]) => (
-          <button key={tab} onClick={() => setActiveTab(tab)} style={{
+          <button key={tab} data-tour={tab === 'checkout' ? 'checkout-tab' : tab === 'active' ? 'active-tab' : undefined} onClick={() => setActiveTab(tab)} style={{
             padding: '8px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px',
             background: activeTab === tab ? '#667eea' : 'transparent',
             color: activeTab === tab ? 'white' : '#666',

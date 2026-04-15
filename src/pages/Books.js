@@ -405,11 +405,12 @@ export default function Books() {
               setImagePreview('');
               setFormData(emptyForm);
             }}
+            data-tour="add-book"
             style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
           >
             ➕ Add Book
           </button>}
-          {!isReadOnly && canExportData && <div style={{ position: 'relative' }}>
+          {!isReadOnly && canExportData && <div style={{ position: 'relative' }} data-tour="import-export">
             <button onClick={() => setShowImportExport(!showImportExport)}
               style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}>
               📁 Import / Export ▾

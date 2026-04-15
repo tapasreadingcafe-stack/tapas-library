@@ -36,7 +36,7 @@ const SETTINGS_CONFIG = [
   { key: 'max_books_premium', label: 'Max Books (Premium Plan)', type: 'number' },
   { key: 'library_open_time', label: 'Opening Time', type: 'time' },
   { key: 'library_close_time', label: 'Closing Time', type: 'time' },
-  { key: 'cafe_enabled', label: 'Cafe Module Enabled', type: 'toggle' },
+  { key: 'cafe_enabled', label: 'Cafe Module Enabled', type: 'toggle', tourId: 'module-toggles' },
   { key: 'events_enabled', label: 'Events Module Enabled', type: 'toggle' },
   { key: 'marketing_enabled', label: 'Marketing Module Enabled', type: 'toggle' },
   { key: 'store_enabled', label: 'Online Store Enabled', type: 'toggle' },
@@ -71,7 +71,7 @@ const TOUR_STEPS = [
   { path: '/settings/app', title: 'Settings', desc: 'Configure fine rates, loan periods, hours, and app preferences.' },
 ];
 
-export default function SettingsApp() {
+export default function SettingsApp({ onStartTour }) {
   const toast = useToast();
   const navigate = useNavigate();
   const devModeCtx = useDevMode();
@@ -156,12 +156,12 @@ export default function SettingsApp() {
         <div className="settings-form" style={{ background: 'white', borderRadius: '10px', padding: '24px' }}>
           {SETTINGS_CONFIG.map(cfg => {
             if (cfg.type === 'divider') return (
-              <div key={cfg.key} style={{ padding: '18px 0 8px', borderBottom: '2px solid #667eea', marginTop: '12px' }}>
+              <div key={cfg.key} data-tour={cfg.key === '_divider_email' ? 'email-settings' : cfg.key === '_divider_whatsapp' ? 'whatsapp-settings' : undefined} style={{ padding: '18px 0 8px', borderBottom: '2px solid #667eea', marginTop: '12px' }}>
                 <label style={{ fontSize: '15px', fontWeight: '700', color: '#333' }}>{cfg.label}</label>
               </div>
             );
             return (
-            <div key={cfg.key} className="settings-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #f0f0f0', gap: '16px' }}>
+            <div key={cfg.key} data-tour={cfg.tourId} className="settings-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #f0f0f0', gap: '16px' }}>
               <label style={{ fontSize: '14px', fontWeight: '500', color: '#333', flex: 1 }}>{cfg.label}</label>
               {cfg.type === 'toggle' ? (
                 <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '26px', cursor: 'pointer' }}>
@@ -242,9 +242,9 @@ export default function SettingsApp() {
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>🚀 Quick Tour</div>
             <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>Step-by-step walkthrough of all features</div>
           </div>
-          <button onClick={() => { setShowTour(true); setTourStep(0); }}
+          <button onClick={() => { if (onStartTour) onStartTour(); else { setShowTour(true); setTourStep(0); } }}
             style={{ padding: '8px 18px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-            Start Tour
+            🚀 Start Interactive Tour
           </button>
         </div>
 
