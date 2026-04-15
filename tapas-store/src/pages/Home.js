@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useSiteContent } from '../context/SiteContent';
 import HeroCarousel from '../components/HeroCarousel';
+import PageRenderer from '../blocks/PageRenderer';
 
 // =====================================================================
 // Home — "The Digital Curator's Study"
@@ -109,7 +110,20 @@ function GridBookCard({ book }) {
   );
 }
 
+// Webflow-style block system shim. When `content.pages.home.blocks`
+// has entries, the storefront renders via <PageRenderer>. Otherwise
+// we fall through to the legacy hardcoded Home page below so nothing
+// breaks during Phase 1 rollout.
 export default function Home() {
+  const content = useSiteContent();
+  const blocks = content?.pages?.home?.blocks;
+  if (Array.isArray(blocks) && blocks.length > 0) {
+    return <PageRenderer pageKey="home" />;
+  }
+  return <LegacyHome />;
+}
+
+function LegacyHome() {
   const content = useSiteContent();
   const home = content.home;
   const newsletter = content.newsletter;

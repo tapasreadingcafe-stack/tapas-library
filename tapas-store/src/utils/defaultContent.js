@@ -258,6 +258,33 @@ export const DEFAULT_CONTENT = {
     home_newsletter_bg_color:   '',
     home_newsletter_text_align: 'center',
   },
+
+  // =====================================================================
+  // Webflow-style page builder (Phase 1)
+  //
+  // Each entry in `pages` is a page's block tree. Blocks are rendered
+  // in order by <PageRenderer pageKey="..."/>. When a page has NO
+  // blocks (empty array), the storefront falls back to the legacy
+  // hardcoded JSX of that page. This lets us migrate one page at a
+  // time without breaking anything.
+  //
+  // Block shape: { id, type, props }
+  //   - `type` must match a key in tapas-store/src/blocks/index.js
+  //   - `props` is a free-form object; its shape is defined by the
+  //     matching entry's `schema` and `defaultProps`
+  // =====================================================================
+  pages: {
+    home:    { meta: { title: 'Home — Tapas Library',    description: '' }, blocks: [] },
+    about:   { meta: { title: 'About — Tapas Library',   description: '' }, blocks: [] },
+    catalog: { meta: { title: 'Books — Tapas Library',   description: '' }, blocks: [] },
+    offers:  { meta: { title: 'Offers — Tapas Library',  description: '' }, blocks: [] },
+    blog:    { meta: { title: 'Journal — Tapas Library', description: '' }, blocks: [] },
+    events:  { meta: { title: 'Events — Tapas Library',  description: '' }, blocks: [] },
+  },
+
+  // Reusable block trees the user saves from the editor. Each entry:
+  // { id, name, blocks: [...] }. See Phase 3 in the plan.
+  block_templates: [],
 };
 
 // =====================================================================

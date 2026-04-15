@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useCart } from '../context/CartContext';
 import { useSiteContent } from '../context/SiteContent';
+import PageRenderer from '../blocks/PageRenderer';
 
 // =====================================================================
 // Catalog — Modern Heritage design system
@@ -134,6 +135,15 @@ function BookTileSkeleton() {
 }
 
 export default function Catalog() {
+  const content = useSiteContent();
+  const blocks = content?.pages?.catalog?.blocks;
+  if (Array.isArray(blocks) && blocks.length > 0) {
+    return <PageRenderer pageKey="catalog" />;
+  }
+  return <LegacyCatalog />;
+}
+
+function LegacyCatalog() {
   const content = useSiteContent();
   const catalog = content.catalog || {};
   const [searchParams, setSearchParams] = useSearchParams();

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContent';
+import PageRenderer from '../blocks/PageRenderer';
 
 // =====================================================================
 // About — editorial story + visit info + contact.
@@ -11,7 +12,16 @@ import { useSiteContent } from '../context/SiteContent';
 
 export default function About() {
   const content = useSiteContent();
-  
+  const blocks = content?.pages?.about?.blocks;
+  if (Array.isArray(blocks) && blocks.length > 0) {
+    return <PageRenderer pageKey="about" />;
+  }
+  return <LegacyAbout />;
+}
+
+function LegacyAbout() {
+  const content = useSiteContent();
+
   const about = content.about;
   const contact = content.contact;
   const visibility = content.visibility || {};
