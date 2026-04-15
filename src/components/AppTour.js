@@ -1,128 +1,103 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-// ── Tour organized by SECTIONS — ordered by daily usage importance ──
-// Sidebar auto-scrolls to highlight the matching nav item
+// ── Tour follows exact NAV sidebar order ──
 const TOUR_SECTIONS = [
-  {
-    section: 'Dashboard', icon: '📊', navLabel: 'Dashboard',
-    steps: [
-      { path: '/', target: '.db-metrics', title: 'Your Daily Overview', desc: 'See everything at a glance — total books, members, active checkouts, overdue count, fines outstanding, and monthly revenue. Drag cards to reorder.', position: 'bottom' },
-      { path: '/', target: '[data-tour="shift-notes"]', title: 'Shift Handoff Notes', desc: 'Leave notes for the next shift. Click "+ Add Note" to write a message. All staff see the latest 5 notes when they open the dashboard.', position: 'left' },
-    ],
-  },
-  {
-    section: 'Books', icon: '📚', navLabel: 'Books',
-    steps: [
-      { path: '/books', target: '[data-tour="add-book"]', title: 'Add a New Book', desc: 'Click here to add books. Enter ISBN and it auto-fills title, author, and cover image from Google Books & Open Library. Or enter details manually.', position: 'bottom' },
-      { path: '/books', target: '[data-tour="import-export"]', title: 'Import / Export Books', desc: 'Bulk import hundreds of books from a CSV file. Or export your entire catalog as a backup. Great for initial library setup.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Borrow & Return', icon: '🔄', navLabel: 'Borrow',
-    steps: [
-      { path: '/Borrow', target: '[data-tour="checkout-tab"]', title: 'Checkout a Book', desc: 'The main daily workflow — search for a member by name/phone, select a book, and check it out. Supports barcode scanning for fast operation.', position: 'bottom' },
-      { path: '/Borrow', target: '[data-tour="active-tab"]', title: 'View Active Borrows', desc: 'See all currently checked-out books. Filter by: All, Overdue, Due Today, This Week, or Due in 3 Days. Click any row to return or renew.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Overdue & Fines', icon: '⚠️', navLabel: 'Overdue',
-    steps: [
-      { path: '/overdue', target: '[data-tour="overdue-table"]', title: 'Track Overdue Books', desc: 'All overdue books listed with member name, days overdue, and fine amount. Fine respects your configured rate and grace period from Settings.', position: 'top' },
-      { path: '/overdue', target: null, title: 'Collect Fines & Send Reminders', desc: 'Click "💰 Collect Fine" to record payment (Cash/Card/UPI/Waive). Click "📧 Remind" for email or "📱 WhatsApp" to send reminder directly.', position: 'bottom' },
-      { path: '/fines', target: null, title: 'Fines Dashboard', desc: 'Full view of all outstanding, collected, and waived fines. Export as CSV for follow-up. Rate and grace period are configurable in Settings.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Members', icon: '👥', navLabel: 'Members',
-    steps: [
-      { path: '/members', target: '[data-tour="add-member"]', title: 'Add New Member', desc: 'Create member profiles with name, phone, email, date of birth. Assign plans (Basic, Premium, Family, Student) with borrow limits and discounts.', position: 'bottom' },
-      { path: '/members', target: '[data-tour="expiry-filter"]', title: 'Manage Renewals', desc: 'Quick filters: "Expiring This Week" and "Expired". Select multiple members → click "Bulk Renew". Send email or WhatsApp renewal reminders individually.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Barcodes & Printing', icon: '🏷️', navLabel: 'Barcodes',
-    steps: [
-      { path: '/barcodes', target: '[data-tour="template-select"]', title: 'Choose Label Template', desc: 'Select a saved template from the dropdown. Templates control the layout — brand name, barcode size, title position, and price display mode.', position: 'bottom' },
-      { path: '/barcodes', target: '[data-tour="direct-print"]', title: 'Print Barcode Labels', desc: 'Select book copies with checkboxes, then click "Direct Print" to send labels to your Zebra thermal printer. No browser print dialog needed.', position: 'bottom' },
-      { path: '/barcodes/editor', target: null, title: 'Template Editor', desc: 'Design custom label templates by dragging elements — brand, barcode, title, price, copy code, lines, and rectangles. Save and use across the app.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Library POS', icon: '🛒', navLabel: 'POS',
-    steps: [
-      { path: '/pos', target: '[data-tour="pos-services"]', title: 'Library Services POS', desc: 'Process memberships, fines, printing charges, lamination, stationery, and custom services. Prices are synced across all devices via database.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Cafe', icon: '☕', navLabel: 'Cafe',
-    steps: [
-      { path: '/cafe/menu', target: '.cafe-item-grid', title: 'Cafe POS — Take Orders', desc: 'Tap menu items to add to cart. Use "🚶 Walk-in" for quick orders without member lookup. Choose Cash/Card/UPI and print receipt.', position: 'right' },
-      { path: '/cafe/manage', target: null, title: 'Manage Cafe Menu', desc: 'Add, edit, or remove menu items. Set prices, cost prices (for profit tracking), categories, and toggle availability.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Reservations', icon: '🔖', navLabel: 'Reservations',
-    steps: [
-      { path: '/reservations', target: null, title: 'Book Reservations', desc: 'Members can reserve books that are currently checked out. When the book is returned, the next person is auto-notified via email and WhatsApp with a 48-hour pickup window.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Events', icon: '🎉', navLabel: 'Events',
-    steps: [
-      { path: '/events', target: null, title: 'Library Events', desc: 'Manage all events — story time, book clubs, author visits. Track registrations, capacity, and ticket sales. Supports recurring events (weekly/monthly).', position: 'bottom' },
-      { path: '/events/create', target: null, title: 'Create New Event', desc: 'Set title, dates, location, capacity, and ticket pricing. Enable waitlist for popular events. Choose one-time or recurring schedule.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Inventory', icon: '📦', navLabel: 'Inventory',
-    steps: [
-      { path: '/inventory/library', target: null, title: 'Library Book Stock', desc: 'Monitor physical inventory — total titles, low stock items, and out-of-stock books. Quick view of what needs restocking.', position: 'bottom' },
-      { path: '/inventory/cafe', target: null, title: 'Cafe Inventory', desc: 'Track cafe ingredients and supplies. Stock auto-deducts when POS orders are placed. Low stock warnings appear in the Cafe POS.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Reports', icon: '📑', navLabel: 'Reports',
-    steps: [
-      { path: '/reports', target: null, title: 'Reports & Analytics', desc: 'Revenue trends, top borrowed books, member activity, overdue tracking, and expiring memberships — all in one visual dashboard.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Accounts', icon: '💳', navLabel: 'Accounts',
-    steps: [
-      { path: '/accounts/overview', target: null, title: 'Financial Overview', desc: 'Total revenue (library + cafe + memberships + fines), expenses, and net profit. Covers all income streams in one view.', position: 'bottom' },
-      { path: '/accounts/pnl', target: null, title: 'Profit & Loss Statement', desc: 'Detailed P&L with income breakdown, expense categories, GST calculations, and cafe cost of goods sold. Compare with previous periods.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Staff', icon: '👤', navLabel: 'Staff',
-    steps: [
-      { path: '/staff', target: null, title: 'Staff Management', desc: 'Add staff accounts (email + password). Set roles (Admin/Staff). Admins have full access. Staff permissions are granular — per module and per feature.', position: 'bottom' },
-    ],
-  },
-  {
-    section: 'Settings', icon: '⚙️', navLabel: 'Settings',
-    steps: [
-      { path: '/settings/app', target: '[data-tour="module-toggles"]', title: 'Module Toggles', desc: 'Enable or disable entire sections: Cafe, Events, Marketing, Online Store. Disabled modules disappear from the navigation for all staff.', position: 'top' },
-      { path: '/settings/app', target: null, title: 'Fine Rates & Loan Period', desc: 'Set fine rate per day (₹), grace period (days before fine starts), max fine cap, and default loan period. Different rates for Student/Premium/Family plans.', position: 'bottom' },
-      { path: '/settings/app', target: '[data-tour="email-settings"]', title: 'Email Notifications', desc: 'Configure Gmail SMTP: enter your Gmail address and App Password. Enable to send overdue reminders, membership expiry alerts, and fine notifications.', position: 'top' },
-      { path: '/settings/app', target: '[data-tour="whatsapp-settings"]', title: 'WhatsApp Notifications', desc: 'Two modes: "wa.me Link" (free — opens WhatsApp with pre-filled message) or "Business API" (automated — requires Meta Business account and API token).', position: 'top' },
-      { path: '/settings/app', target: null, title: 'Daily Morning Report', desc: 'Enable daily auto-report sent to your email at 8:30 AM. Shows: books due today, overdue count, outstanding fines, yesterday\'s revenue, expiring memberships.', position: 'bottom' },
-      { path: '/settings/devices', target: null, title: 'Device Setup', desc: 'Connect barcode scanners (USB/Bluetooth), receipt printers, and Zebra label printers. Test each device to verify connectivity.', position: 'bottom' },
-      { path: '/kiosk', target: null, title: 'Kiosk Mode (Self-Service)', desc: 'Put a tablet at the counter for self-service. Members search themselves by name/phone, view their borrowed books, and can return books — no staff needed.', position: 'bottom' },
-      { path: '/settings/app', target: null, title: '🎉 Tour Complete!', desc: 'You\'ve seen all the features! Remember: you can always restart this tour from Settings → "Start Interactive Tour". Happy managing!', position: 'bottom' },
-    ],
-  },
+  { section: 'Dashboard', icon: '📊', steps: [
+    { path: '/', target: '.db-metrics', title: 'Key Metrics', desc: 'Total books, members, checkouts, overdue, fines, and revenue at a glance. Drag cards to reorder.' },
+    { path: '/', target: '[data-tour="shift-notes"]', title: 'Shift Notes', desc: 'Leave notes for next shift staff. Click "+ Add Note". Latest 5 notes visible to everyone.' },
+  ]},
+  { section: 'Library', icon: '📖', steps: [
+    { path: '/books', target: '[data-tour="add-book"]', title: 'Add Books', desc: 'Add by ISBN scan (auto-fills from Google Books) or manual entry. Supports bulk CSV import.' },
+    { path: '/books', target: '[data-tour="import-export"]', title: 'Import / Export', desc: 'Bulk import books from CSV. Export catalog as backup. Great for initial setup.' },
+    { path: '/Borrow', target: '[data-tour="checkout-tab"]', title: 'Checkout', desc: 'Search member → select book → confirm. Supports barcode scanning.' },
+    { path: '/Borrow', target: '[data-tour="active-tab"]', title: 'Active Borrows', desc: 'All checked-out books. Filter: Overdue, Due Today, This Week, Due in 3 Days.' },
+    { path: '/overdue', target: '[data-tour="overdue-table"]', title: 'Overdue Books', desc: 'Track overdue with fine amounts. Collect fines (Cash/Card/UPI/Waive). Send email or WhatsApp reminders.' },
+    { path: '/availability', target: null, title: 'Availability Search', desc: 'Quick search to check if a specific book is available and see all copy statuses.' },
+    { path: '/statistics', target: null, title: 'Statistics', desc: 'Visual charts — borrowing trends, popular categories, peak hours, reading patterns.' },
+    { path: '/recommendations', target: null, title: 'Recommendations', desc: 'AI-powered book recommendations based on member borrowing history and preferences.' },
+    { path: '/wishlist', target: null, title: 'Wishlist', desc: 'Track books members have requested. Helps with purchasing decisions.' },
+    { path: '/reviews', target: null, title: 'Reviews', desc: 'Member book reviews and ratings. Helps other members discover great reads.' },
+    { path: '/reservations', target: null, title: 'Reservations', desc: 'Reserve checked-out books. Auto-notifies next person via email & WhatsApp when returned (48h pickup).' },
+    { path: '/pos', target: '[data-tour="pos-services"]', title: 'Library POS', desc: 'Memberships, fines, printing, stationery. Prices synced across all devices.' },
+    { path: '/barcodes', target: '[data-tour="direct-print"]', title: 'Barcode Print', desc: 'Select copies → choose template → Direct Print to Zebra thermal printer.' },
+    { path: '/barcodes', target: '[data-tour="template-select"]', title: 'Label Templates', desc: 'Choose saved templates. Design custom ones in Template Editor with drag & drop.' },
+  ]},
+  { section: 'Cafe', icon: '☕', steps: [
+    { path: '/cafe/menu', target: '.cafe-item-grid', title: 'Cafe POS', desc: 'Tap items → add to cart → Walk-in or member → Cash/Card/UPI → print receipt.' },
+    { path: '/cafe/manage', target: null, title: 'Manage Menu', desc: 'Add/edit menu items, prices, cost prices (for profit tracking), categories, availability.' },
+    { path: '/cafe/orders', target: null, title: 'Order History', desc: 'View all cafe orders. Filter by date, search by customer.' },
+    { path: '/cafe/reports', target: null, title: 'Cafe Reports', desc: 'Daily/weekly/monthly cafe revenue, top items, peak hours.' },
+  ]},
+  { section: 'Members', icon: '👥', steps: [
+    { path: '/members', target: '[data-tour="add-member"]', title: 'Add Member', desc: 'Create profiles with plans (Basic/Premium/Family/Student), borrow limits, discounts.' },
+    { path: '/members', target: '[data-tour="expiry-filter"]', title: 'Renewals', desc: 'Filter expiring/expired → Bulk Renew. Send email or WhatsApp renewal reminders.' },
+    { path: '/fines', target: null, title: 'Fines Dashboard', desc: 'Outstanding, collected, waived fines. Export as CSV. Configure rate & grace in Settings.' },
+  ]},
+  { section: 'Inventory', icon: '📦', steps: [
+    { path: '/inventory/library', target: null, title: 'Library Stock', desc: 'Physical book inventory — total, low stock, out-of-stock. What needs restocking.' },
+    { path: '/inventory/cafe', target: null, title: 'Cafe Stock', desc: 'Ingredients & supplies. Auto-deducts on POS orders. Low stock warnings.' },
+  ]},
+  { section: 'Events', icon: '🎉', steps: [
+    { path: '/events', target: null, title: 'All Events', desc: 'Story time, book clubs, author visits. Registrations, capacity, tickets.' },
+    { path: '/events/create', target: null, title: 'Create Event', desc: 'One-time or recurring. Set capacity, pricing, waitlist, location.' },
+    { path: '/events/attendance', target: null, title: 'Attendance', desc: 'Track event check-ins. See who showed up vs registered.' },
+  ]},
+  { section: 'Reports', icon: '📑', steps: [
+    { path: '/reports', target: null, title: 'Reports', desc: 'Revenue trends, top books, member activity, overdue tracking, expiring memberships.' },
+  ]},
+  { section: 'Online Store', icon: '🛒', steps: [
+    { path: '/store/orders', target: null, title: 'Online Orders', desc: 'View and manage orders placed through your online store. Track order status and fulfillment.' },
+    { path: '/store/content', target: null, title: 'Edit Website', desc: 'Design your public-facing website content. Control what visitors see on your library site.' },
+  ]},
+  { section: 'Marketing', icon: '📣', steps: [
+    { path: '/marketing-dashboard', target: null, title: 'Marketing Overview', desc: 'Dashboard showing campaign performance, member engagement, promo code usage, and growth metrics.' },
+    { path: '/promo-codes', target: null, title: 'Promo Codes', desc: 'Create discount codes for memberships and services. Set usage limits and expiry dates.' },
+    { path: '/loyalty', target: null, title: 'Loyalty & Rewards', desc: 'Points-based loyalty system. Members earn points on borrows and purchases, redeem for rewards.' },
+    { path: '/campaigns', target: null, title: 'Campaigns', desc: 'Create email/WhatsApp campaigns to engage members. Schedule and track performance.' },
+    { path: '/automations', target: null, title: 'Automations', desc: 'Set up automated triggers — welcome emails, birthday wishes, inactivity follow-ups.' },
+    { path: '/newsletter', target: null, title: 'Newsletter', desc: 'Send newsletters to all members. New arrivals, events, reading recommendations.' },
+  ]},
+  { section: 'Tasks', icon: '📒', steps: [
+    { path: '/tasks', target: null, title: 'Tasks & Notes', desc: 'Personal and team notes. Kanban-style task board for library operations and planning.' },
+  ]},
+  { section: 'Accounts', icon: '💳', steps: [
+    { path: '/accounts/overview', target: null, title: 'Financial Overview', desc: 'Total revenue, expenses, profit. All income streams in one view.' },
+    { path: '/accounts/pnl', target: null, title: 'P&L Statement', desc: 'Income breakdown, expense categories, GST, cafe COGS. Compare periods.' },
+    { path: '/accounts/transactions', target: null, title: 'Transactions', desc: 'All financial transactions — sales, fines, memberships, cafe orders.' },
+    { path: '/accounts/invoices', target: null, title: 'Invoices', desc: 'Generate and manage invoices for members and vendors.' },
+    { path: '/accounts/expenses', target: null, title: 'Expenses', desc: 'Track all business expenses — rent, utilities, supplies, salaries.' },
+  ]},
+  { section: 'Staff', icon: '👤', steps: [
+    { path: '/staff', target: null, title: 'Staff Management', desc: 'Add accounts, set roles (Admin/Staff), granular per-module permissions.' },
+  ]},
+  { section: 'Vendors', icon: '🏪', steps: [
+    { path: '/vendors', target: null, title: 'Vendor List', desc: 'Manage book suppliers and cafe vendors. Track contact details and purchase history.' },
+    { path: '/vendors/orders', target: null, title: 'Purchase Orders', desc: 'Create and track purchase orders to vendors for restocking books and supplies.' },
+  ]},
+  { section: 'Settings', icon: '⚙️', steps: [
+    { path: '/settings/health', target: null, title: 'System Health', desc: 'Check database status, table health, and run setup migrations if needed.' },
+    { path: '/settings/app', target: '[data-tour="setting-library-name"]', title: 'Library Name', desc: 'Set your library/cafe name. Used in emails, receipts, and barcode labels.' },
+    { path: '/settings/app', target: '[data-tour="setting-fine-rate"]', title: 'Fine Rate', desc: 'Set fine per day (₹). This is charged for each day a book is overdue (after grace period).' },
+    { path: '/settings/app', target: '[data-tour="setting-grace-period"]', title: 'Grace Period', desc: 'Days before fines start. Set to 3 = member gets 3 free days after due date before fine kicks in.' },
+    { path: '/settings/app', target: '[data-tour="setting-loan-days"]', title: 'Loan Period', desc: 'Default number of days a book can be borrowed. Can be overridden per membership plan.' },
+    { path: '/settings/app', target: '[data-tour="module-toggles"]', title: 'Module Toggles', desc: 'Enable/disable Cafe, Events, Marketing, Store. Disabled = hidden from nav for all staff.' },
+    { path: '/settings/app', target: '[data-tour="setting-email-toggle"]', title: 'Email Setup', desc: 'Toggle email notifications ON. Enter Gmail address and App Password to send reminders and alerts.' },
+    { path: '/settings/app', target: '[data-tour="whatsapp-settings"]', title: 'WhatsApp Setup', desc: '"wa.me Link" = free, opens WhatsApp. "Business API" = automated, needs Meta Business account.' },
+    { path: '/settings/profile', target: null, title: 'Your Profile', desc: 'Update your name, avatar, and change password. Personal settings for your account.' },
+    { path: '/settings/activity', target: null, title: 'Activity Log', desc: 'Full audit trail of all actions — who did what, when. Track checkouts, returns, fines, changes.' },
+    { path: '/settings/devices', target: null, title: 'Devices', desc: 'Connect barcode scanners, receipt printers, and label printers. Test connectivity.' },
+    { path: '/catalog', target: null, title: 'Public Catalog', desc: 'Your public-facing book catalog. Members can browse and search books online.' },
+    { path: '/kiosk', target: null, title: 'Kiosk Mode', desc: 'Self-service tablet mode. Members search by name, view borrows, return books — no staff needed.' },
+    { path: '/settings/app', target: null, title: '🎉 Tour Complete!', desc: 'You\'ve seen everything! Restart anytime from Settings → "Start Interactive Tour". Happy managing!' },
+  ]},
 ];
 
-// Flatten steps with section info
 const ALL_STEPS = [];
 const SECTION_INDICES = [];
 TOUR_SECTIONS.forEach(sec => {
   SECTION_INDICES.push(ALL_STEPS.length);
-  sec.steps.forEach(step => {
-    ALL_STEPS.push({ ...step, sectionName: sec.section, sectionIcon: sec.icon, navLabel: sec.navLabel });
-  });
+  sec.steps.forEach(s => ALL_STEPS.push({ ...s, sectionName: sec.section, sectionIcon: sec.icon }));
 });
 
 const PAD = 10;
@@ -132,83 +107,48 @@ export default function AppTour({ active, onClose }) {
   const location = useLocation();
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
-  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const [tooltipPos, setTooltipPos] = useState({ top: 100, left: 100 });
+  const [dragging, setDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
   const timerRef = useRef(null);
 
   const current = ALL_STEPS[step] || {};
-  const currentSectionIdx = SECTION_INDICES.findIndex((startIdx, i) => {
-    const nextStart = SECTION_INDICES[i + 1] ?? ALL_STEPS.length;
-    return step >= startIdx && step < nextStart;
-  });
+  const secIdx = SECTION_INDICES.findIndex((si, i) => step >= si && step < (SECTION_INDICES[i + 1] ?? ALL_STEPS.length));
+  const secStart = SECTION_INDICES[secIdx] || 0;
+  const secEnd = SECTION_INDICES[secIdx + 1] ?? ALL_STEPS.length;
 
-  // Highlight sidebar nav item matching current step
+  // Sidebar highlight
   useEffect(() => {
     if (!active) return;
-    // Remove previous highlights
     document.querySelectorAll('.tour-nav-highlight').forEach(el => el.classList.remove('tour-nav-highlight'));
-
-    // Find sidebar link matching current path and highlight it
-    const sidebarLinks = document.querySelectorAll('.sidebar-nav a, .sidebar-nav button');
-    sidebarLinks.forEach(link => {
-      const href = link.getAttribute('href');
-      if (href === current.path) {
+    document.querySelectorAll('.sidebar-nav a, .sidebar-nav button').forEach(link => {
+      if (link.getAttribute('href') === current.path) {
         link.classList.add('tour-nav-highlight');
         link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
-
-    return () => {
-      document.querySelectorAll('.tour-nav-highlight').forEach(el => el.classList.remove('tour-nav-highlight'));
-    };
+    return () => document.querySelectorAll('.tour-nav-highlight').forEach(el => el.classList.remove('tour-nav-highlight'));
   }, [active, step, current.path]);
 
-  // Find and position the target element
+  // Find target & position tooltip
   const findTarget = useCallback(() => {
     if (!active || !current.target) { setRect(null); return; }
     const el = document.querySelector(current.target);
-    if (el) {
-      // Scroll element into view first — push to bottom so tooltip has room above
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-      // Wait for scroll to settle, then measure
-      setTimeout(() => {
-        const r = el.getBoundingClientRect();
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-        const tooltipW = 380, tooltipH = 280;
-        let top, left;
-
-        // Smart positioning: try above first, then below, then right
-        const spaceAbove = r.top - PAD;
-        const spaceBelow = window.innerHeight - r.bottom - PAD;
-
-        if (spaceAbove >= tooltipH + 16) {
-          // Place ABOVE the target
-          top = r.top - PAD - tooltipH - 8;
-          left = Math.max(16, Math.min(r.left, window.innerWidth - tooltipW - 16));
-        } else if (spaceBelow >= tooltipH + 16) {
-          // Place BELOW the target
-          top = r.bottom + PAD + 8;
-          left = Math.max(16, Math.min(r.left, window.innerWidth - tooltipW - 16));
-        } else {
-          // Place to the RIGHT (or left if no room)
-          top = Math.max(16, Math.min(r.top, window.innerHeight - tooltipH - 16));
-          left = r.right + PAD + 8;
-          if (left + tooltipW > window.innerWidth - 16) {
-            left = r.left - tooltipW - PAD - 8;
-          }
-        }
-
-        // Final bounds check
-        if (top < 16) top = 16;
-        if (left < 16) left = 16;
-        if (left + tooltipW > window.innerWidth - 16) left = window.innerWidth - tooltipW - 16;
-
-        setTooltipPos({ top, left });
-      }, 300);
-    } else {
-      setRect(null);
-    }
-  }, [active, current.target, current.position]);
+    if (!el) { setRect(null); return; }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+      if (dragging) return; // don't reposition if user is dragging
+      const tw = 370, th = 260;
+      let t, l;
+      if (r.top - PAD > th + 20) { t = r.top - PAD - th - 12; l = Math.max(16, Math.min(r.left, window.innerWidth - tw - 16)); }
+      else if (window.innerHeight - r.bottom - PAD > th + 20) { t = r.bottom + PAD + 12; l = Math.max(16, Math.min(r.left, window.innerWidth - tw - 16)); }
+      else { t = Math.max(16, r.top); l = r.right + PAD + 12; if (l + tw > window.innerWidth - 16) l = r.left - tw - PAD - 12; }
+      if (t < 16) t = 16; if (l < 16) l = 16;
+      setTooltipPos({ top: t, left: l });
+    }, 300);
+  }, [active, current.target, dragging]);
 
   useEffect(() => {
     if (!active) return;
@@ -220,147 +160,112 @@ export default function AppTour({ active, onClose }) {
 
   useEffect(() => {
     if (!active) return;
-    const handler = () => findTarget();
-    window.addEventListener('resize', handler);
-    window.addEventListener('scroll', handler, true);
-    return () => { window.removeEventListener('resize', handler); window.removeEventListener('scroll', handler, true); };
+    const h = () => findTarget();
+    window.addEventListener('resize', h);
+    window.addEventListener('scroll', h, true);
+    return () => { window.removeEventListener('resize', h); window.removeEventListener('scroll', h, true); };
   }, [active, findTarget]);
 
+  // Keyboard
   useEffect(() => {
     if (!active) return;
-    const handler = (e) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight' || e.key === 'Enter') goNext();
-      if (e.key === 'ArrowLeft') goBack();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    const h = (e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight' || e.key === 'Enter') goNext(); if (e.key === 'ArrowLeft') goBack(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
   });
+
+  // Drag handlers
+  const onDragStart = (e) => {
+    setDragging(true);
+    dragOffset.current = { x: e.clientX - tooltipPos.left, y: e.clientY - tooltipPos.top };
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => setTooltipPos({ top: e.clientY - dragOffset.current.y, left: e.clientX - dragOffset.current.x });
+    const onUp = () => setDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [dragging]);
 
   const goNext = () => { if (step < ALL_STEPS.length - 1) setStep(step + 1); else onClose(); };
   const goBack = () => { if (step > 0) setStep(step - 1); };
-  const goSkip = () => {
-    const nextSec = SECTION_INDICES.find(idx => idx > step);
-    if (nextSec !== undefined) setStep(nextSec);
-    else onClose();
-  };
+  const goSkip = () => { const n = SECTION_INDICES.find(i => i > step); if (n !== undefined) setStep(n); else onClose(); };
 
   if (!active) return null;
-
   const progress = ((step + 1) / ALL_STEPS.length) * 100;
-
-  // Steps within current section
-  const secStart = SECTION_INDICES[currentSectionIdx] || 0;
-  const secEnd = SECTION_INDICES[currentSectionIdx + 1] ?? ALL_STEPS.length;
-  const stepInSection = step - secStart + 1;
-  const totalInSection = secEnd - secStart;
 
   return (
     <>
-      {/* Overlay + spotlight */}
+      {/* Overlay */}
       {rect ? (
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, pointerEvents: 'none' }}>
-          <div style={{
-            position: 'fixed', top: rect.top - PAD, left: rect.left - PAD,
-            width: rect.width + PAD * 2, height: rect.height + PAD * 2,
-            borderRadius: '10px', boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
-            transition: 'all 0.35s ease', zIndex: 10001, pointerEvents: 'none',
-          }} />
-          <div style={{
-            position: 'fixed', top: rect.top - PAD, left: rect.left - PAD,
-            width: rect.width + PAD * 2, height: rect.height + PAD * 2,
-            borderRadius: '10px', border: '2px solid #667eea',
-            animation: 'tour-pulse 2s ease-in-out infinite',
-            zIndex: 10002, pointerEvents: 'none',
-          }} />
+          <div style={{ position: 'fixed', top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2, borderRadius: '10px', boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)', transition: 'all 0.3s', zIndex: 10001, pointerEvents: 'none' }} />
+          <div style={{ position: 'fixed', top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2, borderRadius: '10px', border: '2px solid #667eea', animation: 'tour-pulse 2s infinite', zIndex: 10002, pointerEvents: 'none' }} />
         </div>
       ) : (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10000 }} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000 }} />
       )}
 
       <div onClick={goNext} style={{ position: 'fixed', inset: 0, zIndex: 10003, cursor: 'pointer' }} />
 
-      {/* Tooltip card */}
+      {/* Tooltip — draggable */}
       <div onClick={e => e.stopPropagation()} style={{
-        position: 'fixed',
-        top: rect ? tooltipPos.top : '50%',
-        left: rect ? tooltipPos.left : '50%',
-        transform: rect ? 'none' : 'translate(-50%, -50%)',
-        width: '380px', background: '#fff', borderRadius: '16px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', zIndex: 10004,
-        overflow: 'hidden', transition: 'top 0.35s, left 0.35s',
+        position: 'fixed', top: tooltipPos.top, left: tooltipPos.left,
+        width: '370px', background: '#fff', borderRadius: '14px',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.3)', zIndex: 10004,
+        overflow: 'hidden', transition: dragging ? 'none' : 'top 0.3s, left 0.3s',
+        userSelect: 'none',
       }}>
+        {/* Drag handle + close button */}
+        <div onMouseDown={onDragStart} style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '8px 14px 4px', cursor: 'grab', background: '#fafafa', borderBottom: '1px solid #f0f0f0',
+        }}>
+          <span style={{ fontSize: '10px', color: '#ccc', letterSpacing: '2px' }}>⠿⠿ DRAG TO MOVE</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#999', padding: '0 2px', lineHeight: 1 }} title="End tour">✕</button>
+        </div>
+
         {/* Progress bar */}
-        <div style={{ height: '4px', background: '#e8e8e8' }}>
+        <div style={{ height: '3px', background: '#e8e8e8' }}>
           <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #667eea, #764ba2)', transition: 'width 0.3s' }} />
         </div>
 
-        <div style={{ padding: '20px 24px' }}>
-          {/* Section badge + step counter */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: '#667eea', background: '#f0f3ff', padding: '4px 12px', borderRadius: '12px' }}>
-              {current.sectionIcon} {current.sectionName} ({stepInSection}/{totalInSection})
+        <div style={{ padding: '16px 20px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#667eea', background: '#f0f3ff', padding: '3px 10px', borderRadius: '10px' }}>
+              {current.sectionIcon} {current.sectionName} ({step - secStart + 1}/{secEnd - secStart})
             </span>
-            <span style={{ fontSize: '11px', fontWeight: '600', color: '#bbb' }}>
-              {step + 1} / {ALL_STEPS.length}
-            </span>
+            <span style={{ fontSize: '10px', color: '#bbb' }}>{step + 1}/{ALL_STEPS.length}</span>
           </div>
 
-          <h3 style={{ margin: '0 0 10px', fontSize: '18px', fontWeight: '700', color: '#222' }}>{current.title}</h3>
-          <p style={{ margin: '0 0 22px', fontSize: '14px', color: '#555', lineHeight: 1.7 }}>{current.desc}</p>
+          <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: '700', color: '#222' }}>{current.title}</h3>
+          <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#555', lineHeight: 1.65 }}>{current.desc}</p>
 
-          {/* Buttons */}
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
-            <button onClick={goBack} disabled={step === 0} style={{
-              padding: '9px 16px', border: '1px solid #e0e0e0', borderRadius: '8px',
-              background: '#fafafa', cursor: step === 0 ? 'default' : 'pointer',
-              fontSize: '13px', fontWeight: '600', color: step === 0 ? '#ccc' : '#666',
-              opacity: step === 0 ? 0.5 : 1,
-            }}>← Back</button>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={goSkip} style={{
-                padding: '9px 16px', border: 'none', borderRadius: '8px',
-                background: '#f5f5f5', cursor: 'pointer', fontSize: '13px',
-                fontWeight: '600', color: '#999',
-              }}>Skip →</button>
-              <button onClick={goNext} style={{
-                padding: '9px 22px', border: 'none', borderRadius: '8px',
-                background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700',
-              }}>{step === ALL_STEPS.length - 1 ? '✓ Finish' : 'Next →'}</button>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'space-between' }}>
+            <button onClick={goBack} disabled={step === 0} style={{ padding: '7px 14px', border: '1px solid #e0e0e0', borderRadius: '7px', background: '#fafafa', cursor: step === 0 ? 'default' : 'pointer', fontSize: '12px', fontWeight: '600', color: step === 0 ? '#ccc' : '#666', opacity: step === 0 ? 0.5 : 1 }}>← Back</button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={goSkip} style={{ padding: '7px 14px', border: 'none', borderRadius: '7px', background: '#f0f0f0', cursor: 'pointer', fontSize: '12px', fontWeight: '600', color: '#999' }}>Skip →</button>
+              <button onClick={goNext} style={{ padding: '7px 18px', border: 'none', borderRadius: '7px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>{step === ALL_STEPS.length - 1 ? '✓ Finish' : 'Next →'}</button>
             </div>
           </div>
 
-          {/* Section pills */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', marginTop: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '3px', marginTop: '12px', flexWrap: 'wrap' }}>
             {TOUR_SECTIONS.map((sec, i) => (
-              <button key={sec.section} onClick={() => setStep(SECTION_INDICES[i])}
-                title={sec.section}
-                style={{
-                  padding: '2px 7px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  fontSize: '10px', fontWeight: '600', transition: 'all 0.2s',
-                  background: i === currentSectionIdx ? '#667eea' : i < currentSectionIdx ? '#d4edda' : '#f0f0f0',
-                  color: i === currentSectionIdx ? 'white' : i < currentSectionIdx ? '#155724' : '#aaa',
-                }}>
-                {sec.icon}
-              </button>
+              <button key={sec.section} onClick={() => setStep(SECTION_INDICES[i])} title={sec.section} style={{
+                padding: '2px 5px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                fontSize: '9px', transition: 'all 0.2s',
+                background: i === secIdx ? '#667eea' : i < secIdx ? '#d4edda' : '#f0f0f0',
+                color: i === secIdx ? 'white' : i < secIdx ? '#155724' : '#aaa',
+              }}>{sec.icon}</button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* CSS for sidebar highlight + pulse animation */}
       <style>{`
-        @keyframes tour-pulse {
-          0%, 100% { border-color: rgba(102, 126, 234, 0.5); }
-          50% { border-color: rgba(102, 126, 234, 1); box-shadow: 0 0 16px rgba(102, 126, 234, 0.3); }
-        }
-        .tour-nav-highlight {
-          background: rgba(102, 126, 234, 0.15) !important;
-          border-left: 3px solid #667eea !important;
-          font-weight: 700 !important;
-          transition: all 0.3s;
-        }
+        @keyframes tour-pulse { 0%,100%{border-color:rgba(102,126,234,0.5)} 50%{border-color:rgba(102,126,234,1);box-shadow:0 0 16px rgba(102,126,234,0.3)} }
+        .tour-nav-highlight { background: rgba(102,126,234,0.15) !important; border-left: 3px solid #667eea !important; font-weight: 700 !important; }
       `}</style>
     </>
   );
