@@ -17,11 +17,11 @@ export const ROUTE_PERMISSION_MAP = {
   '/staff': 'staff',
   '/vendors': 'vendors',
   '/settings': 'settings',
-  '/store': 'dashboard', '/marketing': 'dashboard', '/promo-codes': 'dashboard',
-  '/loyalty': 'dashboard', '/growth': 'dashboard', '/campaigns': 'dashboard',
-  '/automations': 'dashboard', '/engagement': 'dashboard', '/newsletter': 'dashboard',
-  '/communications': 'dashboard', '/community': 'dashboard', '/advanced-tools': 'dashboard',
-  '/integrations': 'dashboard', '/marketing-hub': 'dashboard', '/marketing-dashboard': 'dashboard',
+  '/store': 'store', '/marketing': 'marketing', '/promo-codes': 'marketing',
+  '/loyalty': 'marketing', '/growth': 'marketing', '/campaigns': 'marketing',
+  '/automations': 'marketing', '/engagement': 'marketing', '/newsletter': 'marketing',
+  '/communications': 'marketing', '/community': 'marketing', '/advanced-tools': 'marketing',
+  '/integrations': 'marketing', '/marketing-hub': 'marketing', '/marketing-dashboard': 'marketing',
   '/tasks': 'dashboard',
 };
 
@@ -41,6 +41,8 @@ export const STAFF_DEFAULT_PERMISSIONS = {
   vendors: 'none',
   settings: 'none',
   staff: 'none',
+  marketing: 'none',
+  store: 'none',
 };
 
 export function getPermissionForPath(pathname) {

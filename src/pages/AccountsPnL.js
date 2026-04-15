@@ -100,6 +100,10 @@ async function fetchPeriodData(startDate, endDate) {
     supabase.from('circulation').select('fine_amount').eq('fine_paid', true).gte('return_date', startDate).lte('return_date', endDate),
     // Expenses
     supabase.from('cafe_expenses').select('category, amount').gte('expense_date', startDate).lte('expense_date', endDate),
+    // Cafe COGS: order items with menu item cost_price
+    supabase.from('cafe_order_items').select('quantity, unit_price, menu_item_id, cafe_orders!inner(created_at, status)').gte('cafe_orders.created_at', startDate + 'T00:00:00').lte('cafe_orders.created_at', endDate + 'T23:59:59').eq('cafe_orders.status', 'completed'),
+    // Menu items for cost lookup
+    supabase.from('cafe_menu_items').select('id, cost_price'),
   ]);
 
   // Library sales: use pos_transactions if available, otherwise sales
@@ -133,6 +137,22 @@ async function fetchPeriodData(startDate, endDate) {
       const cat = EXP_CATEGORIES.includes(e.category) ? e.category : 'other';
       expenses[cat] += (e.amount || 0);
     });
+  }
+
+  // Cafe COGS: calculate cost of goods sold from order items × menu cost_price
+  if (results[7]?.status === 'fulfilled' && results[8]?.status === 'fulfilled') {
+    const orderItems = results[7].value.data || [];
+    const menuItems = results[8].value.data || [];
+    const costMap = {};
+    menuItems.forEach(m => { if (m.cost_price) costMap[m.id] = Number(m.cost_price) || 0; });
+    let cafeCOGS = 0;
+    orderItems.forEach(item => {
+      const costPerUnit = costMap[item.menu_item_id] || 0;
+      cafeCOGS += costPerUnit * (item.quantity || 1);
+    });
+    if (cafeCOGS > 0) {
+      expenses['ingredients'] = (expenses['ingredients'] || 0) + cafeCOGS;
+    }
   }
 
   return { income, expenses };

@@ -38,6 +38,8 @@ const SETTINGS_CONFIG = [
   { key: 'library_close_time', label: 'Closing Time', type: 'time' },
   { key: 'cafe_enabled', label: 'Cafe Module Enabled', type: 'toggle' },
   { key: 'events_enabled', label: 'Events Module Enabled', type: 'toggle' },
+  { key: 'marketing_enabled', label: 'Marketing Module Enabled', type: 'toggle' },
+  { key: 'store_enabled', label: 'Online Store Enabled', type: 'toggle' },
   { key: 'fine_grace_period_days', label: 'Fine Grace Period (Days)', type: 'number' },
   { key: 'fine_max_cap', label: 'Max Fine Cap Per Book (₹)', type: 'number' },
   { key: 'fine_rate_student', label: 'Fine Rate - Student (₹/day)', type: 'number' },

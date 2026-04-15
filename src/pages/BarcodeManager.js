@@ -442,6 +442,22 @@ export default function BarcodeManager() {
           <button onClick={handlePrintSelected} style={buttonStyle}>
             Print Preview
           </button>
+          <button onClick={async () => {
+            if (!window.confirm(`Mark ${selectedIds.size} copies as LOST?`)) return;
+            for (const id of selectedIds) { await supabase.from('book_copies').update({ status: 'lost' }).eq('id', id); }
+            toast.success(`${selectedIds.size} copies marked as lost`);
+            setSelectedIds(new Set()); fetchCopies();
+          }} style={{ ...buttonStyle, background: '#e74c3c' }}>
+            Mark Lost
+          </button>
+          <button onClick={async () => {
+            if (!window.confirm(`Mark ${selectedIds.size} copies as DAMAGED?`)) return;
+            for (const id of selectedIds) { await supabase.from('book_copies').update({ status: 'damaged' }).eq('id', id); }
+            toast.success(`${selectedIds.size} copies marked as damaged`);
+            setSelectedIds(new Set()); fetchCopies();
+          }} style={{ ...buttonStyle, background: '#f39c12' }}>
+            Mark Damaged
+          </button>
           <button
             onClick={clearSelection}
             style={{ ...buttonStyle, background: '#999' }}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { HintBubble } from './components/HintTooltip';
+import { supabase } from './utils/supabase';
 import GlobalTooltip from './components/GlobalTooltip';
 import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
@@ -436,14 +437,34 @@ function PermissionGate({ children }) {
 function SidebarNav({ sidebarOpen, openGroups, toggleGroup, isActive, isGroupActive }) {
   const { staff } = useAuth();
   const { devMode, getLabel } = useDevMode();
+  const [moduleToggles, setModuleToggles] = useState({});
 
-  // Filter nav items: hide pages where permission = 'none'
+  // Load module toggles from app_settings (marketing_enabled, store_enabled, etc.)
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('app_settings').select('key, value')
+        .in('key', ['cafe_enabled', 'events_enabled', 'marketing_enabled', 'store_enabled']);
+      const toggles = {};
+      (data || []).forEach(r => { toggles[r.key] = r.value === 'true' || r.value === true; });
+      setModuleToggles(toggles);
+    })();
+  }, []);
+
+  // Map nav group keys to module toggle keys
+  const MODULE_TOGGLE_MAP = { cafe: 'cafe_enabled', events: 'events_enabled', marketing: 'marketing_enabled', store: 'store_enabled' };
+
+  // Filter nav items: hide pages where permission = 'none' or module disabled
   const canSee = (routePath) => {
     const permKey = getPermissionForPath(routePath);
     return getStaffPermission(staff, permKey) !== 'none';
   };
 
   const filteredNav = NAV_CONFIG.map(item => {
+    // Hide entire groups if module is disabled in settings
+    if (item.key && MODULE_TOGGLE_MAP[item.key]) {
+      const toggleKey = MODULE_TOGGLE_MAP[item.key];
+      if (toggleKey in moduleToggles && !moduleToggles[toggleKey]) return null;
+    }
     if (item.children) {
       const visibleChildren = item.children.filter(child => canSee(child.to));
       if (visibleChildren.length === 0) return null;
