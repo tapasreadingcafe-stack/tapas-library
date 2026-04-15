@@ -165,7 +165,10 @@ function LegacyHome() {
       let picks = flaggedRes.data || [];
       const newest = newRes.data || [];
       if (picks.length === 0) {
-        const { data } = await supabase.from('books').select('*').eq('store_visible', true).gt('quantity_available', 0).order('rating', { ascending: false, nullsFirst: false }).limit(5);
+        // Fallback: no staff picks flagged yet — show newest in-stock books.
+        // (Was ordering by `rating` which doesn't exist on books; rating
+        // lives in the reviews table.)
+        const { data } = await supabase.from('books').select('*').eq('store_visible', true).gt('quantity_available', 0).order('created_at', { ascending: false }).limit(5);
         picks = data || [];
       }
       setStaffPicks(picks.slice(0, 4));
