@@ -2699,6 +2699,7 @@ tbody tr:hover {
 
 [data-theme="dark"] .nav-group-header:hover,
 [data-theme="dark"] .nav-group-header.has-active {
+  background: rgba(102, 126, 234, 0.2);
   color: #667eea;
 }
 

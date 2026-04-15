@@ -9,11 +9,11 @@ import ViewOnlyBanner from '../components/ViewOnlyBanner';
 const PER_PAGE = 25;
 
 const STATUS_COLORS = {
-  available: { bg: '#d4edda', color: '#155724' },
-  issued:    { bg: '#cce5ff', color: '#004085' },
-  sold:      { bg: '#f8d7da', color: '#721c24' },
-  lost:      { bg: '#fff3cd', color: '#856404' },
-  damaged:   { bg: '#f5c6cb', color: '#721c24' },
+  available: { bg: '#10b981', color: '#ffffff', border: '#059669' },
+  issued:    { bg: '#3b82f6', color: '#ffffff', border: '#2563eb' },
+  sold:      { bg: '#ef4444', color: '#ffffff', border: '#dc2626' },
+  lost:      { bg: '#f59e0b', color: '#ffffff', border: '#d97706' },
+  damaged:   { bg: '#ec4899', color: '#ffffff', border: '#db2777' },
 };
 
 const STATUS_OPTIONS = ['all', 'available', 'issued', 'sold', 'lost', 'damaged'];
@@ -406,21 +406,24 @@ export default function BarcodeManager() {
           <div
             key={status}
             style={{
-              background: STATUS_COLORS[status]?.bg || '#eee',
-              color: STATUS_COLORS[status]?.color || '#333',
-              padding: '4px 12px',
+              background: STATUS_COLORS[status]?.bg || '#6b7280',
+              color: STATUS_COLORS[status]?.color || '#ffffff',
+              border: `1px solid ${STATUS_COLORS[status]?.border || '#4b5563'}`,
+              padding: '5px 14px',
               borderRadius: '20px',
               fontSize: '12px',
-              fontWeight: '600',
+              fontWeight: '700',
+              boxShadow: `0 2px 6px ${STATUS_COLORS[status]?.bg || '#6b7280'}33`,
             }}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
           </div>
         ))}
         <div style={{
-          background: '#f0f0f0', color: '#333',
-          padding: '4px 12px', borderRadius: '20px',
-          fontSize: '12px', fontWeight: '600',
+          background: '#6b7280', color: '#ffffff',
+          border: '1px solid #4b5563',
+          padding: '5px 14px', borderRadius: '20px',
+          fontSize: '12px', fontWeight: '700',
         }}>
           Total: {filtered.length}
         </div>
@@ -523,12 +526,15 @@ export default function BarcodeManager() {
                   </td>
                   <td style={{ padding: '10px 8px' }}>
                     <span style={{
-                      background: STATUS_COLORS[copy.status]?.bg || '#eee',
-                      color: STATUS_COLORS[copy.status]?.color || '#333',
-                      padding: '3px 10px',
+                      background: STATUS_COLORS[copy.status]?.bg || '#6b7280',
+                      color: STATUS_COLORS[copy.status]?.color || '#ffffff',
+                      border: `1px solid ${STATUS_COLORS[copy.status]?.border || '#4b5563'}`,
+                      padding: '4px 12px',
                       borderRadius: '20px',
                       fontSize: '11px',
-                      fontWeight: '600',
+                      fontWeight: '700',
+                      display: 'inline-block',
+                      boxShadow: `0 2px 4px ${STATUS_COLORS[copy.status]?.bg || '#6b7280'}33`,
                     }}>
                       {copy.status ? copy.status.charAt(0).toUpperCase() + copy.status.slice(1) : '—'}
                     </span>
