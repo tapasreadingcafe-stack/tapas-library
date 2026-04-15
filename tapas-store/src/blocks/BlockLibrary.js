@@ -58,9 +58,8 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
   };
 
   const handleDelete = () => {
-    if (window.confirm('Delete this block?')) {
-      sendMessage('delete-block');
-    }
+    // Send delete request to parent editor (which handles confirmation)
+    sendMessage('delete-block');
   };
 
   const handleDuplicate = () => {

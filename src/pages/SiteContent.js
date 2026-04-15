@@ -1543,6 +1543,8 @@ export default function SiteContent() {
       }
       // Phase 3: On-canvas toolbar actions (delete, duplicate, move)
       if (msg.type === 'tapas:delete-block' && msg.blockId && msg.pageKey) {
+        // Ask for confirmation in the editor (avoids popup blocker issues)
+        if (!window.confirm(`Delete this block?`)) return;
         setDraftContent(prev => {
           const page = prev.pages?.[msg.pageKey];
           if (!page || !Array.isArray(page.blocks)) return prev;
