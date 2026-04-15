@@ -17,6 +17,7 @@ export default function OverdueBooks() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [fineAmount, setFineAmount] = useState(0);
   const [finePaid, setFinePaid] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
   useEffect(() => {
     fetchOverdueBooks();
@@ -266,7 +267,7 @@ export default function OverdueBooks() {
                         marginRight: '5px'
                       }}
                     >
-                      💰 Fine Paid
+                      💰 Collect Fine
                     </button>
                     <button
                       onClick={() => handleReturnOverdueBook(item)}
@@ -339,7 +340,7 @@ export default function OverdueBooks() {
             width: '90%',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
           }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>💰 Mark Fine as Paid</h2>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>💰 Collect Fine</h2>
 
             <div style={{ marginBottom: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '4px' }}>
               <p style={{ margin: '0 0 8px 0', color: '#666', fontSize: '12px' }}>Member</p>
@@ -363,48 +364,38 @@ export default function OverdueBooks() {
               </p>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={finePaid}
-                  onChange={(e) => setFinePaid(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span>Confirm fine has been paid</span>
-              </label>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '8px', letterSpacing: '0.5px' }}>PAYMENT METHOD</label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {['cash', 'card', 'upi', 'waive'].map(m => (
+                  <button key={m} onClick={() => { setPaymentMethod(m); setFinePaid(true); }}
+                    style={{
+                      padding: '8px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px',
+                      background: paymentMethod === m ? (m === 'waive' ? '#e74c3c' : '#38a169') : '#f0f0f0',
+                      color: paymentMethod === m ? 'white' : '#555',
+                      fontWeight: paymentMethod === m ? '600' : '400',
+                    }}>
+                    {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : m === 'upi' ? '📱 UPI' : '🚫 Waive'}
+                  </button>
+                ))}
+              </div>
+              {paymentMethod === 'waive' && (
+                <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#e74c3c', fontWeight: '600' }}>Fine will be waived — no payment collected</p>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={() => setShowFineModal(false)}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: '#f5f5f5',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
+                style={{ flex: 1, padding: '10px', background: '#f5f5f5', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmFinePaid}
-                disabled={!finePaid}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: finePaid ? '#4CAF50' : '#ccc',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: finePaid ? 'pointer' : 'not-allowed',
-                  fontWeight: 'bold'
-                }}
+                style={{ flex: 1, padding: '10px', background: paymentMethod === 'waive' ? '#e74c3c' : '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
               >
-                ✓ Confirm & Save
+                {paymentMethod === 'waive' ? '🚫 Waive Fine' : '✓ Collect Fine'}
               </button>
             </div>
           </div>

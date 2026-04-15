@@ -95,3 +95,19 @@ export function fineAlertEmailHtml({ memberName, bookTitle, fineAmount, libraryN
     </div>
   `;
 }
+
+export function reservationReadyEmailHtml({ memberName, bookTitle, expiryDate, libraryName }) {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;">
+      <h2 style="color:#2196F3;">📖 Your Reserved Book is Ready!</h2>
+      <p>Dear <strong>${memberName}</strong>,</p>
+      <p>Great news! The book you reserved is now available for pickup:</p>
+      <div style="background:#e3f2fd;padding:15px;border-radius:8px;margin:15px 0;">
+        <p style="margin:5px 0;"><strong>Book:</strong> ${bookTitle}</p>
+        <p style="margin:5px 0;"><strong>Pickup Deadline:</strong> ${expiryDate}</p>
+      </div>
+      <p>Please pick it up within <strong>48 hours</strong> before it becomes available to the next person in queue.</p>
+      <p style="color:#888;font-size:12px;margin-top:20px;">— ${libraryName || 'Tapas Reading Cafe'}</p>
+    </div>
+  `;
+}

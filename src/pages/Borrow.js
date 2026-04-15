@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { getFineSettings, calculateFine, daysOverdue as calcDaysOverdue } from '../utils/fineUtils';
+import { sendEmail, reservationReadyEmailHtml, fineAlertEmailHtml } from '../utils/emailUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
@@ -92,6 +93,7 @@ export default function Borrow() {
   const [returnModal, setReturnModal] = useState(null);
   const [returnCondition, setReturnCondition] = useState('Good');
   const [collectFine, setCollectFine] = useState(false);
+  const [finePaymentMethod, setFinePaymentMethod] = useState('cash');
   const [receiptModal, setReceiptModal] = useState(null);
   const [renewalModal, setRenewalModal] = useState(null);
   const [renewalDueDate, setRenewalDueDate] = useState('');
@@ -386,6 +388,22 @@ export default function Borrow() {
       const { error } = await supabase.from('circulation').update(updates).eq('id', returnModal.id);
       if (error) throw error;
 
+      // Create transaction record if fine collected
+      if (collectFine && fine > 0) {
+        const bookTitle = returnModal.books?.title || returnModal.title || 'Unknown';
+        await supabase.from('transactions').insert({
+          member_id: returnModal.member_id,
+          transaction_type: 'fine',
+          item_name: `Fine for overdue book: ${bookTitle}`,
+          item_type: 'fine',
+          quantity: 1,
+          amount: fine,
+          payment_method: finePaymentMethod,
+          transaction_date: today,
+          status: 'completed',
+        });
+      }
+
       const book = books.find(b => b.id === returnModal.book_id);
       if (book) {
         await supabase
@@ -412,10 +430,10 @@ export default function Borrow() {
         } catch {} // book_copies table might not have all columns
       }
 
-      // Notify next reservation
+      // Notify next reservation + send email
       const { data: nextRes } = await supabase
         .from('reservations')
-        .select('id')
+        .select('id, member_id, members(name, email)')
         .eq('book_id', returnModal.book_id)
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
@@ -431,6 +449,25 @@ export default function Borrow() {
         if (re) {
           await supabase.from('reservations').update({ status: 'available' }).eq('id', nextRes[0].id);
         }
+
+        // Send email notification to the member
+        const resMember = nextRes[0].members;
+        if (resMember?.email) {
+          const bookTitle = returnModal.books?.title || returnModal.title || 'Reserved Book';
+          sendEmail({
+            to: resMember.email,
+            subject: `Your reserved book "${bookTitle}" is ready for pickup!`,
+            html: reservationReadyEmailHtml({
+              memberName: resMember.name,
+              bookTitle,
+              expiryDate: expires.toLocaleDateString('en-IN'),
+            }),
+            type: 'reservation_ready',
+          }).then(r => {
+            if (r.success) showToast(`Pickup email sent to ${resMember.name}`, 'info');
+          });
+        }
+
         showToast('Book returned! A reservation is now available (48h window).', 'success');
       } else {
         showToast('Book returned successfully!', 'success');
@@ -1108,12 +1145,26 @@ export default function Borrow() {
             </div>
 
             {isOverdue(returnModal.due_date) && (
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
-                  <input type="checkbox" checked={collectFine} onChange={e => setCollectFine(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                  Collect fine of ₹{calculateFine(returnModal.due_date, fineSettings).fineAmount} now
+              <div style={{ marginBottom: '16px', background: '#fff8e1', borderRadius: '8px', padding: '12px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                  FINE COLLECTION
                 </label>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  {['cash', 'card', 'upi', 'later', 'waive'].map(m => (
+                    <button key={m} onClick={() => { setFinePaymentMethod(m); setCollectFine(m !== 'later'); }}
+                      style={{
+                        padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+                        background: finePaymentMethod === m ? (m === 'waive' ? '#e74c3c' : m === 'later' ? '#999' : '#38a169') : '#f0f0f0',
+                        color: finePaymentMethod === m ? 'white' : '#555',
+                        fontWeight: finePaymentMethod === m ? '600' : '400',
+                      }}>
+                      {m === 'cash' ? '💵 Cash' : m === 'card' ? '💳 Card' : m === 'upi' ? '📱 UPI' : m === 'later' ? '⏰ Later' : '🚫 Waive'}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: finePaymentMethod === 'waive' ? '#e74c3c' : '#333' }}>
+                  {finePaymentMethod === 'waive' ? 'Fine will be waived' : finePaymentMethod === 'later' ? `Fine of ₹${calculateFine(returnModal.due_date, fineSettings).fineAmount} — collect later` : `Collect ₹${calculateFine(returnModal.due_date, fineSettings).fineAmount} via ${finePaymentMethod.toUpperCase()}`}
+                </div>
               </div>
             )}
 

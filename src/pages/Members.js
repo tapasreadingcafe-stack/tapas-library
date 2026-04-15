@@ -7,6 +7,7 @@ import { useConfirm } from '../components/ConfirmModal';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { sendEmail, membershipExpiryEmailHtml } from '../utils/emailUtils';
 
 import {
   calculateStatusColor,
@@ -45,6 +46,9 @@ function Members() {
     sortBy: 'expiry_date',
     sortOrder: 'asc'
   });
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkRenewing, setBulkRenewing] = useState(false);
+  const [expiryFilter, setExpiryFilter] = useState('all'); // 'all', 'expiring', 'expired'
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -193,6 +197,62 @@ function Members() {
     });
     setShowModal(true);
   };
+
+  // Bulk renew selected members
+  const handleBulkRenew = async () => {
+    const selected = members.filter(m => selectedIds.has(m.id) && m.plan);
+    if (selected.length === 0) { toast.warning('No members with plans selected'); return; }
+    const ok = await confirm(`Renew ${selected.length} member(s) for their current plan duration?`);
+    if (!ok) return;
+    setBulkRenewing(true);
+    let count = 0;
+    for (const member of selected) {
+      try {
+        const renewed = renewMembership(member, {});
+        await supabase.from('members').update(renewed).eq('id', member.id);
+        count++;
+      } catch (err) { console.error('Failed to renew', member.name, err); }
+    }
+    toast.success(`Renewed ${count} member(s)!`);
+    setSelectedIds(new Set());
+    setBulkRenewing(false);
+    fetchMembers();
+  };
+
+  // Send renewal reminder email
+  const handleSendRenewalReminder = async (member) => {
+    if (!member.email) { toast.error('No email for this member'); return; }
+    const result = await sendEmail({
+      to: member.email,
+      subject: 'Membership Expiring Soon',
+      html: membershipExpiryEmailHtml({
+        memberName: member.name,
+        plan: member.plan || 'Standard',
+        expiryDate: formatDate(member.subscription_end),
+      }),
+      type: 'membership_expiry',
+    });
+    if (result.success) toast.success(`Reminder sent to ${member.email}`);
+    else toast.error(result.error || 'Failed to send email');
+  };
+
+  // Toggle member selection
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  // Expiry-filtered members
+  const getExpiryFiltered = () => {
+    if (expiryFilter === 'all') return filteredMembers;
+    const today = new Date();
+    const weekLater = new Date(); weekLater.setDate(today.getDate() + 7);
+    if (expiryFilter === 'expiring') return filteredMembers.filter(m => m.subscription_end && new Date(m.subscription_end) >= today && new Date(m.subscription_end) <= weekLater);
+    if (expiryFilter === 'expired') return filteredMembers.filter(m => m.subscription_end && new Date(m.subscription_end) < today);
+    return filteredMembers;
+  };
+  const displayMembers = getExpiryFiltered();
 
   const handleDateChange = (date) => {
     const age = calculateAge(date);
@@ -418,10 +478,32 @@ function Members() {
         </div>
       </div>
 
+      {/* Expiry quick filter + bulk actions */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '13px', fontWeight: '600', color: '#666' }}>Quick:</span>
+        {['all', 'expiring', 'expired'].map(f => (
+          <button key={f} onClick={() => setExpiryFilter(f)}
+            style={{ padding: '4px 12px', borderRadius: '20px', border: expiryFilter === f ? '2px solid #667eea' : '1px solid #ddd', background: expiryFilter === f ? '#eef' : '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: '600', color: expiryFilter === f ? '#667eea' : '#666' }}>
+            {f === 'all' ? 'All' : f === 'expiring' ? '⚠️ Expiring This Week' : '🔴 Expired'}
+          </button>
+        ))}
+        {selectedIds.size > 0 && (
+          <>
+            <span style={{ marginLeft: '16px', fontSize: '13px', fontWeight: '600' }}>{selectedIds.size} selected</span>
+            <button onClick={handleBulkRenew} disabled={bulkRenewing}
+              style={{ padding: '6px 14px', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', opacity: bulkRenewing ? 0.6 : 1 }}>
+              {bulkRenewing ? 'Renewing...' : '🔄 Bulk Renew'}
+            </button>
+            <button onClick={() => setSelectedIds(new Set())} style={{ padding: '6px 10px', background: '#999', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Clear</button>
+          </>
+        )}
+      </div>
+
       <div className="members-table-wrapper">
         <table className="members-table">
           <thead>
             <tr>
+              <th style={{ width: '30px' }}><input type="checkbox" onChange={e => { if (e.target.checked) setSelectedIds(new Set(displayMembers.map(m => m.id))); else setSelectedIds(new Set()); }} checked={selectedIds.size > 0 && selectedIds.size === displayMembers.length} /></th>
               <th>Customer ID</th>
               <th>Name</th>
               <th>Age</th>
@@ -435,13 +517,14 @@ function Members() {
             </tr>
           </thead>
           <tbody>
-            {filteredMembers.length === 0 ? (
+            {displayMembers.length === 0 ? (
               <tr>
-                <td colSpan="10" className="text-center">No members found</td>
+                <td colSpan="11" className="text-center">No members found</td>
               </tr>
             ) : (
-              filteredMembers.map(member => (
+              displayMembers.map(member => (
                 <tr key={member.id} className={`member-row ${member.plan ? 'member-row-gold' : 'guest-row'}`}>
+                  <td style={{ width: '30px' }}><input type="checkbox" checked={selectedIds.has(member.id)} onChange={() => toggleSelect(member.id)} /></td>
                   <td className="customer-id">{getGeneratedCustomerID(member)}</td>
                   <td className="font-bold" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {member.profile_photo ? (
@@ -474,6 +557,8 @@ function Members() {
                   <td className="actions-cell">
                     <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly || !canManageMembers}>✏️</button>
                     <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile">👁️</button>
+                    {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew" style={{ color: '#38a169' }}>🔄</button>}
+                    {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Send Renewal Reminder">📧</button>}
                     {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>}
                   </td>
                 </tr>

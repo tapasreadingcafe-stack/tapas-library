@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { useToast } from '../components/Toast';
+import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
 
 const STATUS_COLORS = {
   pending:   { bg: '#fff3cd', text: '#856404', label: 'Waiting' },
@@ -23,6 +25,7 @@ export default function Reservations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [hasExpiresAt, setHasExpiresAt] = useState(false);
   const { isReadOnly, canManageReservations } = usePermission();
+  const toast = useToast();
 
   useEffect(() => {
     probeSchema().then(fetchAll);
@@ -42,8 +45,8 @@ export default function Reservations() {
     setLoading(true);
     try {
       const selectCols = expiresAtExists
-        ? '*, members(name, phone), books(title, author)'
-        : 'id, book_id, member_id, status, queue_position, created_at, members(name, phone), books(title, author)';
+        ? '*, members(name, phone, email), books(title, author)'
+        : 'id, book_id, member_id, status, queue_position, created_at, members(name, phone, email), books(title, author)';
 
       const [{ data: resData }, { data: circData }, { data: membersData }] = await Promise.all([
         supabase
@@ -318,9 +321,26 @@ export default function Reservations() {
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {r.status === 'available' && (
-                          <button onClick={() => markFulfilled(r.id)} disabled={isReadOnly || !canManageReservations} style={{ padding: '4px 10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageReservations) ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: (isReadOnly || !canManageReservations) ? 0.5 : 1 }}>
-                            ✓ Fulfilled
-                          </button>
+                          <>
+                            <button onClick={() => markFulfilled(r.id)} disabled={isReadOnly || !canManageReservations} style={{ padding: '4px 10px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageReservations) ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: (isReadOnly || !canManageReservations) ? 0.5 : 1 }}>
+                              ✓ Fulfilled
+                            </button>
+                            {r.members?.email && (
+                              <button onClick={async () => {
+                                const expires = r.expires_at ? new Date(r.expires_at).toLocaleDateString('en-IN') : '48 hours from now';
+                                const result = await sendEmail({
+                                  to: r.members.email,
+                                  subject: `Your reserved book "${r.books?.title}" is ready!`,
+                                  html: reservationReadyEmailHtml({ memberName: r.members.name, bookTitle: r.books?.title || 'Reserved Book', expiryDate: expires }),
+                                  type: 'reservation_ready',
+                                });
+                                if (result.success) toast.success(`Notified ${r.members.name}`);
+                                else toast.error(result.error || 'Failed to send');
+                              }} style={{ padding: '4px 10px', background: '#ff9800', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                📧 Notify
+                              </button>
+                            )}
+                          </>
                         )}
                         {(r.status === 'pending' || r.status === 'available') && (
                           <button onClick={() => cancelReservation(r.id)} disabled={isReadOnly || !canManageReservations} style={{ padding: '4px 10px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: (isReadOnly || !canManageReservations) ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: (isReadOnly || !canManageReservations) ? 0.5 : 1 }}>
