@@ -974,64 +974,22 @@ export default function SiteContent() {
   const [viewport, setViewport]   = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [iframePath, setIframePath] = useState('/');
-  // Resizable sidebars. Widths persist in localStorage so they stick
-  // across sessions; bounds keep the panels usable without hiding them.
-  const LEFT_MIN = 180, LEFT_MAX = 480;
-  const RIGHT_MIN = 260, RIGHT_MAX = 560;
-  const [leftWidth, setLeftWidth] = useState(() => {
-    try {
-      const n = Number(localStorage.getItem('tapas_editor_left_w'));
-      if (Number.isFinite(n) && n >= LEFT_MIN && n <= LEFT_MAX) return n;
-    } catch {}
-    return 240;
+  // Hamburger-style collapse for both sidebars. Each panel is either
+  // at its full fixed width or fully hidden (width 0 with a CSS
+  // transition for a smooth slide). State persists across sessions so
+  // the user's last layout sticks.
+  const [leftCollapsed, setLeftCollapsed] = useState(() => {
+    try { return localStorage.getItem('tapas_editor_left_collapsed') === '1'; } catch { return false; }
   });
-  const [rightWidth, setRightWidth] = useState(() => {
-    try {
-      const n = Number(localStorage.getItem('tapas_editor_right_w'));
-      if (Number.isFinite(n) && n >= RIGHT_MIN && n <= RIGHT_MAX) return n;
-    } catch {}
-    return 320;
+  const [rightCollapsed, setRightCollapsed] = useState(() => {
+    try { return localStorage.getItem('tapas_editor_right_collapsed') === '1'; } catch { return false; }
   });
   useEffect(() => {
-    try { localStorage.setItem('tapas_editor_left_w', String(leftWidth)); } catch {}
-  }, [leftWidth]);
+    try { localStorage.setItem('tapas_editor_left_collapsed', leftCollapsed ? '1' : '0'); } catch {}
+  }, [leftCollapsed]);
   useEffect(() => {
-    try { localStorage.setItem('tapas_editor_right_w', String(rightWidth)); } catch {}
-  }, [rightWidth]);
-  // Which handle is being dragged. Stored in a ref so the global mouse
-  // listeners don't need to be re-attached on every render.
-  const draggingRef = useRef(null); // 'left' | 'right' | null
-  useEffect(() => {
-    const onMove = (e) => {
-      if (!draggingRef.current) return;
-      if (draggingRef.current === 'left') {
-        const w = Math.max(LEFT_MIN, Math.min(LEFT_MAX, e.clientX));
-        setLeftWidth(w);
-      } else {
-        const w = Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, window.innerWidth - e.clientX));
-        setRightWidth(w);
-      }
-    };
-    const onUp = () => {
-      if (draggingRef.current) {
-        draggingRef.current = null;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, []);
-  const startResize = (side) => (e) => {
-    e.preventDefault();
-    draggingRef.current = side;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
+    try { localStorage.setItem('tapas_editor_right_collapsed', rightCollapsed ? '1' : '0'); } catch {}
+  }, [rightCollapsed]);
   const [iframeReady, setIframeReady] = useState(false);
   const iframeRef = useRef(null);
   const fieldRefs = useRef({});
@@ -1528,15 +1486,17 @@ export default function SiteContent() {
       {/* ==================== Body: 3 panels ==================== */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
-        {/* LEFT: pages + sections */}
+        {/* LEFT: pages + sections — hamburger-collapsible */}
         <aside style={{
-          width: `${leftWidth}px`,
+          width: leftCollapsed ? '0px' : '240px',
           flexShrink: 0,
           background: S.panel,
-          borderRight: `1px solid ${S.border}`,
+          borderRight: leftCollapsed ? 'none' : `1px solid ${S.border}`,
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
+          overflow: 'hidden',
+          transition: 'width 0.22s ease',
           overflowY: 'auto',
         }}>
           <div style={{ padding: '14px 14px 6px' }}>
@@ -1708,27 +1668,6 @@ export default function SiteContent() {
               + Add element
             </button>
           </div>
-
-          {/* Resize handle — invisible 6px strip on the right edge.
-              Hovering shows a 2px accent bar (Figma-style), dragging
-              resizes the panel within [LEFT_MIN, LEFT_MAX]. */}
-          <div
-            onMouseDown={startResize('left')}
-            title="Drag to resize"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: '-3px',
-              width: '6px',
-              height: '100%',
-              cursor: 'col-resize',
-              zIndex: 20,
-              background: 'transparent',
-              transition: 'background 0.12s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.opacity = '0.5'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '1'; }}
-          />
         </aside>
 
         {/* CENTER: preview */}
@@ -1742,13 +1681,33 @@ export default function SiteContent() {
             alignItems: 'center',
             gap: '10px',
           }}>
-            <div style={{ fontSize: '11px', color: S.textDim }}>
-              Previewing <span style={{ color: S.text, fontFamily: 'ui-monospace, monospace', fontWeight: '600' }}>{STORE_URL + iframePath}</span>
-              <span style={{
-                marginLeft: '8px', padding: '2px 8px',
-                background: '#EEF2FF', color: S.accent,
-                borderRadius: '10px', fontSize: '10px', fontWeight: '700',
-              }}>DRAFT</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              {/* Hamburger toggle for the left sidebar — mirrors the
+                  outer dashboard's collapsible nav pattern. */}
+              <button
+                onClick={() => setLeftCollapsed(c => !c)}
+                title={leftCollapsed ? 'Show pages panel' : 'Hide pages panel'}
+                style={{
+                  width: '28px', height: '28px', padding: 0,
+                  background: leftCollapsed ? S.accentLight : 'white',
+                  border: `1px solid ${leftCollapsed ? S.accent + '55' : S.border}`,
+                  borderRadius: '4px', cursor: 'pointer',
+                  color: leftCollapsed ? S.accent : S.textDim,
+                  fontSize: '14px',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => { if (!leftCollapsed) { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; } }}
+                onMouseLeave={(e) => { if (!leftCollapsed) { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = S.textDim; } }}
+              >☰</button>
+              <div style={{ fontSize: '11px', color: S.textDim, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Previewing <span style={{ color: S.text, fontFamily: 'ui-monospace, monospace', fontWeight: '600' }}>{STORE_URL + iframePath}</span>
+                <span style={{
+                  marginLeft: '8px', padding: '2px 8px',
+                  background: '#EEF2FF', color: S.accent,
+                  borderRadius: '10px', fontSize: '10px', fontWeight: '700',
+                }}>DRAFT</span>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: '2px', background: S.bg, padding: '2px', borderRadius: '6px' }}>
@@ -1775,6 +1734,23 @@ export default function SiteContent() {
                 style={{ padding: '6px 10px', background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px', color: S.textDim, fontSize: '11px', textDecoration: 'none', fontWeight: '600' }}>
                 ↗ Open live
               </a>
+              {/* Hamburger toggle for the right inspector panel. */}
+              <button
+                onClick={() => setRightCollapsed(c => !c)}
+                title={rightCollapsed ? 'Show inspector' : 'Hide inspector'}
+                style={{
+                  width: '28px', height: '28px', padding: 0,
+                  background: rightCollapsed ? S.accentLight : 'white',
+                  border: `1px solid ${rightCollapsed ? S.accent + '55' : S.border}`,
+                  borderRadius: '4px', cursor: 'pointer',
+                  color: rightCollapsed ? S.accent : S.textDim,
+                  fontSize: '14px',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => { if (!rightCollapsed) { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; } }}
+                onMouseLeave={(e) => { if (!rightCollapsed) { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = S.textDim; } }}
+              >☰</button>
             </div>
           </div>
 
@@ -1800,34 +1776,18 @@ export default function SiteContent() {
           </div>
         </main>
 
-        {/* RIGHT: property inspector — Figma-style, one active section */}
+        {/* RIGHT: property inspector — hamburger-collapsible */}
         <aside style={{
-          width: `${rightWidth}px`,
+          width: rightCollapsed ? '0px' : '320px',
           flexShrink: 0,
           background: D.panel,
-          borderLeft: `1px solid ${D.border}`,
+          borderLeft: rightCollapsed ? 'none' : `1px solid ${D.border}`,
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
+          overflow: 'hidden',
+          transition: 'width 0.22s ease',
         }}>
-          {/* Resize handle — left edge, mirrors the left aside's handle. */}
-          <div
-            onMouseDown={startResize('right')}
-            title="Drag to resize"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: '-3px',
-              width: '6px',
-              height: '100%',
-              cursor: 'col-resize',
-              zIndex: 20,
-              background: 'transparent',
-              transition: 'background 0.12s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.opacity = '0.5'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '1'; }}
-          />
           {selectedElement ? (
             <ElementInspector
               path={selectedElement}
