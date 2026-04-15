@@ -89,6 +89,15 @@ export const BLOCK_REGISTRY_META = {
     schema: [
       { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
       { key: 'title',   label: 'Title',   type: 'text' },
+      {
+        key: 'items', label: 'Feature items', type: 'array',
+        itemDefaults: { icon: '✨', title: '', description: '' },
+        itemFields: [
+          { key: 'icon',        label: 'Icon',        type: 'text', hint: 'Emoji or short symbol' },
+          { key: 'title',       label: 'Title',       type: 'text' },
+          { key: 'description', label: 'Description', type: 'textarea' },
+        ],
+      },
     ],
   },
 
@@ -151,6 +160,15 @@ export const BLOCK_REGISTRY_META = {
     },
     schema: [
       { key: 'title', label: 'Title', type: 'text' },
+      {
+        key: 'items', label: 'Testimonials', type: 'array',
+        itemDefaults: { quote: '', author: '', role: '' },
+        itemFields: [
+          { key: 'quote',  label: 'Quote',  type: 'textarea' },
+          { key: 'author', label: 'Author', type: 'text' },
+          { key: 'role',   label: 'Role',   type: 'text' },
+        ],
+      },
     ],
   },
 
@@ -162,14 +180,27 @@ export const BLOCK_REGISTRY_META = {
       title: 'Membership',
       subtitle: 'Pick a plan that suits you.',
       tiers: [
-        { name: 'Reader',   price: '₹499',  interval: 'month', features: ['2 books at a time', 'Cafe discount'], cta_text: 'Join', cta_href: '/membership' },
-        { name: 'Explorer', price: '₹899',  interval: 'month', features: ['4 books at a time', '10% cafe discount', 'Event priority'], cta_text: 'Join', cta_href: '/membership', highlight: true },
-        { name: 'Family',   price: '₹1299', interval: 'month', features: ['Up to 4 members', '6 books at a time', '15% cafe discount'], cta_text: 'Join', cta_href: '/membership' },
+        { name: 'Reader',   price: '₹499',  interval: 'month', features: '2 books at a time\nCafe discount', cta_text: 'Join', cta_href: '/membership' },
+        { name: 'Explorer', price: '₹899',  interval: 'month', features: '4 books at a time\n10% cafe discount\nEvent priority', cta_text: 'Join', cta_href: '/membership', highlight: true },
+        { name: 'Family',   price: '₹1299', interval: 'month', features: 'Up to 4 members\n6 books at a time\n15% cafe discount', cta_text: 'Join', cta_href: '/membership' },
       ],
     },
     schema: [
       { key: 'title',    label: 'Title',    type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      {
+        key: 'tiers', label: 'Pricing tiers', type: 'array',
+        itemDefaults: { name: '', price: '', interval: 'month', features: '', cta_text: 'Join', cta_href: '/', highlight: false },
+        itemFields: [
+          { key: 'name',      label: 'Name',     type: 'text' },
+          { key: 'price',     label: 'Price',    type: 'text' },
+          { key: 'interval',  label: 'Interval', type: 'text', hint: 'e.g. month, year' },
+          { key: 'features',  label: 'Features', type: 'textarea', hint: 'One feature per line' },
+          { key: 'cta_text',  label: 'Button',   type: 'text' },
+          { key: 'cta_href',  label: 'Link',     type: 'text' },
+          { key: 'highlight', label: 'Highlight plan', type: 'toggle' },
+        ],
+      },
     ],
   },
 
@@ -184,7 +215,17 @@ export const BLOCK_REGISTRY_META = {
         { question: 'Do you host events?',       answer: 'Yes — book clubs, author talks, open mics.' },
       ],
     },
-    schema: [{ key: 'title', label: 'Title', type: 'text' }],
+    schema: [
+      { key: 'title', label: 'Title', type: 'text' },
+      {
+        key: 'items', label: 'Questions', type: 'array',
+        itemDefaults: { question: '', answer: '' },
+        itemFields: [
+          { key: 'question', label: 'Question', type: 'text' },
+          { key: 'answer',   label: 'Answer',   type: 'textarea' },
+        ],
+      },
+    ],
   },
 
   gallery: {

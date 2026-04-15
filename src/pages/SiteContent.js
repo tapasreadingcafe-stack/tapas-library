@@ -583,10 +583,141 @@ function SelectionColorsFooter({ colors }) {
   );
 }
 
+// =====================================================================
+// ArrayField (Phase 4)
+//
+// Inspector UI for props that hold an array of item objects —
+// FeatureGrid items, Testimonials, FAQ questions, Pricing tiers, etc.
+// The field schema declares `itemFields` (using the same text/textarea/
+// etc types), and each item renders as a collapsible card with
+// per-item remove / move-up / move-down controls, plus an "Add item"
+// button at the bottom that seeds a fresh item from the field's
+// `itemDefaults` blueprint.
+// =====================================================================
+function ArrayField({ field, value, onChange }) {
+  const items = Array.isArray(value) ? value : [];
+  const itemFields = field.itemFields || [];
+  const update = (idx, key, v) => {
+    const next = items.map((it, i) => i === idx ? { ...it, [key]: v } : it);
+    onChange(next);
+  };
+  const remove = (idx) => {
+    if (!window.confirm('Remove this item?')) return;
+    onChange(items.filter((_, i) => i !== idx));
+  };
+  const move = (idx, dir) => {
+    const target = idx + dir;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  };
+  const addItem = () => {
+    const fresh = field.itemDefaults
+      ? JSON.parse(JSON.stringify(field.itemDefaults))
+      : itemFields.reduce((acc, f) => ({ ...acc, [f.key]: '' }), {});
+    onChange([...items, fresh]);
+  };
+  return (
+    <Row label={field.label} iconType="textarea" stacked>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {items.length === 0 && (
+          <div style={{
+            padding: '14px 10px', textAlign: 'center',
+            color: D.textFaint, fontSize: '11px',
+            border: `1px dashed ${D.border}`, borderRadius: '4px',
+          }}>
+            No items. Click + Add item below.
+          </div>
+        )}
+        {items.map((item, idx) => (
+          <div key={idx} style={{
+            background: D.input, border: `1px solid ${D.border}`,
+            borderRadius: '4px', padding: '8px 10px',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              marginBottom: '8px',
+              fontSize: '10px', color: D.textDim, fontWeight: '600',
+              textTransform: 'uppercase', letterSpacing: '0.6px',
+            }}>
+              <span style={{ flex: 1 }}>Item {idx + 1}</span>
+              <button
+                onClick={() => move(idx, -1)}
+                disabled={idx === 0}
+                title="Move up"
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: idx === 0 ? D.textFaint : D.textDim,
+                  cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: '11px', padding: '2px 5px', borderRadius: '2px',
+                }}
+              >↑</button>
+              <button
+                onClick={() => move(idx, 1)}
+                disabled={idx === items.length - 1}
+                title="Move down"
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: idx === items.length - 1 ? D.textFaint : D.textDim,
+                  cursor: idx === items.length - 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '11px', padding: '2px 5px', borderRadius: '2px',
+                }}
+              >↓</button>
+              <button
+                onClick={() => remove(idx)}
+                title="Remove item"
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: D.textDim, cursor: 'pointer',
+                  fontSize: '11px', padding: '2px 5px', borderRadius: '2px',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = D.danger; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = D.textDim; }}
+              >✕</button>
+            </div>
+            {itemFields.map((itemField) => {
+              const Renderer = FIELD_RENDERERS[itemField.type] || TextField;
+              return (
+                <Renderer
+                  key={itemField.key}
+                  field={itemField}
+                  value={item[itemField.key] ?? ''}
+                  onChange={(v) => update(idx, itemField.key, v)}
+                />
+              );
+            })}
+          </div>
+        ))}
+        <button
+          onClick={addItem}
+          style={{
+            padding: '8px', background: D.panelAlt || D.input,
+            color: D.text, border: `1px dashed ${D.border}`,
+            borderRadius: '4px', cursor: 'pointer',
+            fontSize: '11px', fontWeight: '600',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = D.accent + '22';
+            e.currentTarget.style.borderColor = D.accent;
+            e.currentTarget.style.color = D.accent;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = D.panelAlt || D.input;
+            e.currentTarget.style.borderColor = D.border;
+            e.currentTarget.style.color = D.text;
+          }}
+        >+ Add item</button>
+      </div>
+      {field.hint && <div style={hintStyle}>{field.hint}</div>}
+    </Row>
+  );
+}
+
 const FIELD_RENDERERS = {
   text: TextField, textarea: TextArea, color: ColorField, font: FontField,
   image: ImageField, toggle: ToggleField, number: NumberField, select: SelectField,
-  sectionOrder: SectionOrderField,
+  sectionOrder: SectionOrderField, array: ArrayField,
 };
 
 // =====================================================================
@@ -1499,16 +1630,109 @@ export default function SiteContent() {
         return;
       }
       if (e.key === 'Escape') {
+        if (selectedBlockId || multiSelectedIds.size > 0) {
+          setSelectedBlockId(null);
+          setMultiSelectedIds(new Set());
+          return;
+        }
         if (selectedElement) {
           setSelectedElement(null);
           try { iframeRef.current?.contentWindow?.postMessage({ type: 'tapas:clear-selection' }, '*'); } catch {}
         }
         return;
       }
+
+      // Phase 4: Block-level keyboard shortcuts. Only fire when a block
+      // is selected and we're not typing in an input. These operate on
+      // the primary selected block (+ multi-selection for delete/dup).
+      if (!typing && selectedBlockId) {
+        // Delete / Backspace → delete block(s)
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          const idsToDelete = new Set([selectedBlockId, ...multiSelectedIds]);
+          const count = idsToDelete.size;
+          if (!window.confirm(count > 1 ? `Delete ${count} blocks?` : 'Delete this block?')) return;
+          setDraftContent(prev => {
+            const page = prev.pages?.[editingPage];
+            if (!page || !Array.isArray(page.blocks)) return prev;
+            return {
+              ...prev,
+              pages: {
+                ...prev.pages,
+                [editingPage]: {
+                  ...page,
+                  blocks: page.blocks.filter(b => !idsToDelete.has(b.id)),
+                },
+              },
+            };
+          });
+          setSelectedBlockId(null);
+          setMultiSelectedIds(new Set());
+          return;
+        }
+        // Cmd+D → duplicate block(s)
+        if (isCmd && (e.key === 'd' || e.key === 'D')) {
+          e.preventDefault();
+          const idsToDuplicate = [selectedBlockId, ...multiSelectedIds];
+          setDraftContent(prev => {
+            const page = prev.pages?.[editingPage];
+            if (!page || !Array.isArray(page.blocks)) return prev;
+            const newBlocks = [...page.blocks];
+            idsToDuplicate.forEach(id => {
+              const idx = newBlocks.findIndex(x => x.id === id);
+              if (idx === -1) return;
+              newBlocks.splice(idx + 1, 0, {
+                ...newBlocks[idx],
+                id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+              });
+            });
+            return {
+              ...prev,
+              pages: {
+                ...prev.pages,
+                [editingPage]: { ...page, blocks: newBlocks },
+              },
+            };
+          });
+          return;
+        }
+        // Cmd+C → copy block to clipboard
+        if (isCmd && (e.key === 'c' || e.key === 'C')) {
+          e.preventDefault();
+          const page = draftContentRef.current?.pages?.[editingPage];
+          const block = page?.blocks?.find(b => b.id === selectedBlockId);
+          if (!block) return;
+          const clipboard = { type: block.type, props: block.props };
+          setCopiedBlock(clipboard);
+          try { localStorage.setItem('blockClipboard', JSON.stringify(clipboard)); } catch {}
+          return;
+        }
+        // Cmd+V → paste clipboard at the end of the current page
+        if (isCmd && (e.key === 'v' || e.key === 'V') && copiedBlock) {
+          e.preventDefault();
+          setDraftContent(prev => {
+            const page = prev.pages?.[editingPage];
+            if (!page || !Array.isArray(page.blocks)) return prev;
+            const newBlock = {
+              id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+              type: copiedBlock.type,
+              props: copiedBlock.props,
+            };
+            return {
+              ...prev,
+              pages: {
+                ...prev.pages,
+                [editingPage]: { ...page, blocks: [...page.blocks, newBlock] },
+              },
+            };
+          });
+          return;
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, selectedElement]);
+  }, [undo, redo, selectedElement, selectedBlockId, multiSelectedIds, copiedBlock, editingPage]);
 
   // Receive messages from the iframe (click-to-edit)
   useEffect(() => {

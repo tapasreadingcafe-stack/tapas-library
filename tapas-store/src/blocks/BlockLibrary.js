@@ -642,7 +642,7 @@ export function Pricing({ id, pageKey, props, blockIndex, totalBlocks }) {
               {t.interval && <span style={{ fontSize: '14px', fontWeight: 400, opacity: 0.7 }}> / {t.interval}</span>}
             </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', fontSize: '14px' }}>
-              {(t.features || []).map((f, j) => (
+              {(Array.isArray(t.features) ? t.features : String(t.features || '').split('\n').filter(Boolean)).map((f, j) => (
                 <li key={j} style={{ padding: '6px 0', opacity: 0.85 }}>✓ {f}</li>
               ))}
             </ul>
