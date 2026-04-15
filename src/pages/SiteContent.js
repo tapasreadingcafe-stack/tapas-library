@@ -1953,9 +1953,10 @@ export default function SiteContent() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Delete ${meta?.label || b.type}?`)) deleteBlock(editingPage, b.id);
+                            // One-click delete. Use ⌘Z to undo if wrong.
+                            deleteBlock(editingPage, b.id);
                           }}
-                          title="Delete"
+                          title="Delete (⌘Z to undo)"
                           style={{
                             width: '18px', height: '18px', padding: 0,
                             background: 'transparent', border: 'none',
@@ -2285,10 +2286,8 @@ export default function SiteContent() {
               onBack={() => setSelectedBlockId(null)}
               onDuplicate={() => duplicateBlock(editingPage, selectedBlock.id)}
               onDelete={() => {
-                const meta = BLOCK_REGISTRY_META[selectedBlock.type];
-                if (window.confirm(`Delete ${meta?.label || selectedBlock.type}?`)) {
-                  deleteBlock(editingPage, selectedBlock.id);
-                }
+                // One-click delete; ⌘Z to undo.
+                deleteBlock(editingPage, selectedBlock.id);
               }}
             />
           ) : (
