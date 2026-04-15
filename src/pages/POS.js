@@ -25,15 +25,7 @@ const DEFAULT_SERVICES = [
   { id: 'svc_other',      emoji: '💡', name: 'Other Charge',       price: 0,    cat: 'Other',     custom: true },
 ];
 
-// Load services from localStorage or use defaults
-const loadServices = () => {
-  try {
-    const saved = localStorage.getItem('pos_services');
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return DEFAULT_SERVICES;
-};
-const saveServices = (svcs) => localStorage.setItem('pos_services', JSON.stringify(svcs));
+// Services are loaded from Supabase app_settings (synced across all devices)
 
 const CATS = ['All', 'Books', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
 // Fine rate loaded dynamically from settings
@@ -180,7 +172,8 @@ export default function POS() {
   const [customAmtVal, setCustomAmtVal] = useState('');
 
   // Editable services
-  const [SERVICES, setSERVICES]         = useState(loadServices);
+  const [SERVICES, setSERVICES]         = useState(DEFAULT_SERVICES);
+  const [servicesLoaded, setServicesLoaded] = useState(false);
   const [editSvcModal, setEditSvcModal] = useState(null);
   const [editSvcForm, setEditSvcForm]   = useState({ emoji: '', name: '', price: '', cat: '' });
   const [showAddSvc, setShowAddSvc]     = useState(false);
@@ -188,6 +181,11 @@ export default function POS() {
   // Mobile view toggle
   const [mobileView, setMobileView] = useState('catalog'); // 'catalog' or 'cart'
   const [isMobile, setIsMobile] = useState(false);
+
+  // Save services to Supabase (synced across all devices)
+  const saveServices = async (svcs) => {
+    await supabase.from('app_settings').upsert({ key: 'pos_services', value: JSON.stringify(svcs), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  };
 
   useEffect(() => {
     const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth <= 768);
@@ -218,6 +216,17 @@ export default function POS() {
     fetchMembers();
     probeTables();
     getFineSettings().then(setFineSettings);
+    // Load POS services from Supabase
+    (async () => {
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'pos_services').single();
+      if (data?.value) {
+        try { setSERVICES(JSON.parse(data.value)); } catch {}
+      } else {
+        // Seed defaults to Supabase on first use
+        await supabase.from('app_settings').upsert({ key: 'pos_services', value: JSON.stringify(DEFAULT_SERVICES), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      }
+      setServicesLoaded(true);
+    })();
   }, []);
 
   useEffect(() => {
