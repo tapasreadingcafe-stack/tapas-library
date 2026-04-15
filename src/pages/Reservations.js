@@ -105,7 +105,7 @@ export default function Reservations() {
 
   const handleReserve = async (e) => {
     e.preventDefault();
-    if (!form.member_id || !form.book_id) return alert('Select both member and book.');
+    if (!form.member_id || !form.book_id) { toast.warning('Select both member and book.'); return; }
     setSaving(true);
     try {
       const { data: existing } = await supabase
@@ -116,7 +116,7 @@ export default function Reservations() {
         .in('status', ['pending', 'available']);
 
       if (existing && existing.length > 0) {
-        alert('This member already has an active reservation for this book.');
+        toast.warning('This member already has an active reservation for this book.');
         setSaving(false);
         return;
       }
@@ -140,7 +140,7 @@ export default function Reservations() {
       setForm({ member_id: '', book_id: '' });
       probeSchema().then(fetchAll);
     } catch (err) {
-      alert('Failed to create reservation: ' + err.message);
+      toast.error('Failed to create reservation: ' + err.message);
     } finally {
       setSaving(false);
     }

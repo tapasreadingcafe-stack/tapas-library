@@ -3,9 +3,11 @@ import { supabase } from '../utils/supabase';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { getFineSettings, calculateFine } from '../utils/fineUtils';
+import { useToast } from '../components/Toast';
 
 export default function Fines() {
   const { isReadOnly, canProcessFines } = usePermission();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('outstanding');
   const [outstanding, setOutstanding] = useState([]);
   const [history, setHistory] = useState([]);
@@ -112,7 +114,7 @@ export default function Fines() {
       setShowModal(false);
       fetchAll();
     } catch (err) {
-      alert('Error: ' + err.message);
+      toast.error('Error: ' + err.message);
     } finally {
       setSaving(false);
     }

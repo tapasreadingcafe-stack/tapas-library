@@ -5,8 +5,8 @@ import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
-import { getFineSettings, calculateFine, daysOverdue as calcDaysOverdue } from '../utils/fineUtils';
-import { sendEmail, reservationReadyEmailHtml, fineAlertEmailHtml } from '../utils/emailUtils';
+import { getFineSettings, calculateFine } from '../utils/fineUtils';
+import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
@@ -466,7 +466,7 @@ export default function Borrow() {
           }).then(r => {
             if (r.success) showToast(`Pickup email sent to ${resMember.name}`, 'info');
             else showToast(`Email failed: ${r.error}`, 'warning');
-          }).catch(() => {});
+          }).catch(err => showToast(`Email error: ${err.message}`, 'error'));
         }
 
         showToast('Book returned! A reservation is now available (48h window).', 'success');
