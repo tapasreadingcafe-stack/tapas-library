@@ -23,6 +23,11 @@ export const ROUTE_PERMISSION_MAP = {
   '/communications': 'marketing', '/community': 'marketing', '/advanced-tools': 'marketing',
   '/integrations': 'marketing', '/marketing-hub': 'marketing', '/marketing-dashboard': 'marketing',
   '/tasks': 'dashboard',
+  '/cafe/manage': 'cafe', '/cafe/orders': 'cafe', '/cafe/reports': 'cafe',
+  '/inventory/library': 'inventory', '/inventory/cafe': 'inventory',
+  '/settings/health': 'settings', '/settings/profile': 'dashboard',
+  '/settings/activity': 'settings', '/settings/devices': 'settings',
+  '/catalog': 'dashboard', '/kiosk': 'dashboard',
 };
 
 // Default permissions for staff role (non-admin)

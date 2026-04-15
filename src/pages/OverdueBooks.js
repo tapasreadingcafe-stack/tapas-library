@@ -30,7 +30,7 @@ export default function OverdueBooks() {
       const today = new Date().toISOString().split('T')[0];
       const { data: circulationData, error } = await supabase
         .from('circulation')
-        .select('id, due_date, checkout_date, fine_paid, members(name, phone, email), books(title, author)')
+        .select('id, member_id, book_id, due_date, checkout_date, fine_paid, members(name, phone, email), books(title, author)')
         .eq('status', 'checked_out')
         .lt('due_date', today)
         .order('due_date', { ascending: true })
@@ -52,7 +52,7 @@ export default function OverdueBooks() {
       setOverdueBooks(overdue);
     } catch (error) {
       console.error('Error fetching overdue books:', error);
-      alert('Failed to fetch overdue books');
+      toast.error('Failed to fetch overdue books');
     } finally {
       setLoading(false);
     }
@@ -93,12 +93,12 @@ export default function OverdueBooks() {
 
       if (circulationError) throw circulationError;
 
-      alert('Fine marked as paid!');
+      toast.success('Fine collected!');
       setShowFineModal(false);
       fetchOverdueBooks();
     } catch (error) {
       console.error('Error marking fine as paid:', error);
-      alert('Failed to mark fine as paid');
+      toast.error('Failed to collect fine');
     }
   };
 
@@ -127,11 +127,11 @@ export default function OverdueBooks() {
           .eq('id', item.book_id);
       }
 
-      alert('Book marked as returned!');
+      toast.success('Book marked as returned!');
       fetchOverdueBooks();
     } catch (error) {
       console.error('Error returning book:', error);
-      alert('Failed to return book');
+      toast.error('Failed to return book');
     }
   };
 

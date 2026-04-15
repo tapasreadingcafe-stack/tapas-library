@@ -465,7 +465,8 @@ export default function Borrow() {
             type: 'reservation_ready',
           }).then(r => {
             if (r.success) showToast(`Pickup email sent to ${resMember.name}`, 'info');
-          });
+            else showToast(`Email failed: ${r.error}`, 'warning');
+          }).catch(() => {});
         }
 
         showToast('Book returned! A reservation is now available (48h window).', 'success');

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { cacheGet, cacheSet } from '../utils/cache';
 import { useDevMode } from '../components/DevMode';
+import { getFineSettings, calculateFine } from '../utils/fineUtils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -81,9 +82,9 @@ export default function Dashboard() {
       try { const { data: posData } = await supabase.from('pos_transactions').select('total_amount').gte('created_at', firstDay + 'T00:00:00'); totalRevenue += (posData || []).reduce((s, t) => s + (t.total_amount || 0), 0); } catch {}
       try { const { data: cafeData } = await supabase.from('cafe_orders').select('total_amount').gte('created_at', firstDay + 'T00:00:00').eq('status', 'completed'); totalRevenue += (cafeData || []).reduce((s, t) => s + (t.total_amount || 0), 0); } catch {}
 
+      const fineSettings = await getFineSettings();
       const outstandingFines = (overdueForFines || []).reduce((s, item) => {
-        const days = Math.max(0, Math.floor((new Date() - new Date(item.due_date)) / 86400000));
-        return s + days * 10;
+        return s + calculateFine(item.due_date, fineSettings).fineAmount;
       }, 0);
 
       const metricsData = {

@@ -175,22 +175,24 @@ export default function CafePOS() {
 
       // Deduct from cafe inventory for each item sold
       for (const c of cart) {
-        const { data: inv } = await supabase
-          .from('cafe_inventory')
-          .select('id, current_stock, min_stock_level, item_name')
-          .ilike('item_name', c.name)
-          .limit(1)
-          .single();
-        if (inv) {
-          const newStock = (Number(inv.current_stock) || 0) - c.qty;
-          await supabase.from('cafe_inventory').update({
-            current_stock: newStock,
-            updated_at: new Date().toISOString(),
-          }).eq('id', inv.id);
-          if (newStock <= (Number(inv.min_stock_level) || 0)) {
-            toast.warning(`Low stock: ${inv.item_name} (${newStock} left)`);
+        try {
+          const { data: inv } = await supabase
+            .from('cafe_inventory')
+            .select('id, current_stock, min_stock_level, item_name')
+            .ilike('item_name', c.name)
+            .limit(1);
+          const item = inv?.[0];
+          if (item) {
+            const newStock = (Number(item.current_stock) || 0) - c.qty;
+            await supabase.from('cafe_inventory').update({
+              current_stock: newStock,
+              updated_at: new Date().toISOString(),
+            }).eq('id', item.id);
+            if (newStock <= (Number(item.min_stock_level) || 0)) {
+              toast.warning(`Low stock: ${item.item_name} (${newStock} left)`);
+            }
           }
-        }
+        } catch {}
       }
 
       setLastOrder({ ...order, items: cart, customerName: orderData.customer_name });
