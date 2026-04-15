@@ -58,6 +58,12 @@ const CATEGORIES = ['All', 'Tea', 'Coffee', 'Juice', 'Bakery', 'Snacks', 'Other'
 
 export default function CafePOS() {
   const toast = useToast();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -232,6 +238,13 @@ export default function CafePOS() {
         .cafe-pos-stat .val { font-size: 18px; font-weight: 700; color: #667eea; }
         .cafe-pos-stat .lbl { font-size: 11px; color: #999; }
         .cafe-pos-grid { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
+        @media (max-width: 768px) {
+          .cafe-pos-page { padding: 10px; }
+          .cafe-pos-grid { grid-template-columns: 1fr; }
+          .cafe-pos-stats { flex-wrap: wrap; gap: 8px; }
+          .cafe-item-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); max-height: 50vh; }
+          .cafe-pos-header h1 { font-size: 22px; }
+        }
         .cafe-menu-panel { background: white; border-radius: 8px; padding: 16px; }
         .cafe-cart-panel { background: white; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; }
         .cafe-cats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }

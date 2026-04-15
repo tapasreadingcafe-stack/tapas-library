@@ -21,8 +21,25 @@ export default function Dashboard() {
   const [cardOrder, setCardOrder] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dashboard_card_order')) || null; } catch { return null; }
   });
+  const [shiftNotes, setShiftNotes] = useState([]);
+  const [newNote, setNewNote] = useState('');
+  const [showNoteInput, setShowNoteInput] = useState(false);
 
-  useEffect(() => { fetchDashboardData(); }, []);
+  useEffect(() => { fetchDashboardData(); fetchShiftNotes(); }, []);
+
+  const fetchShiftNotes = async () => {
+    const { data } = await supabase.from('shift_notes').select('*, staff(name)').order('created_at', { ascending: false }).limit(5);
+    if (data) setShiftNotes(data);
+  };
+
+  const addShiftNote = async () => {
+    if (!newNote.trim()) return;
+    const { data: staff } = await supabase.from('staff').select('id').eq('email', (await supabase.auth.getUser()).data.user?.email).single();
+    await supabase.from('shift_notes').insert({ staff_id: staff?.id, note: newNote.trim() });
+    setNewNote('');
+    setShowNoteInput(false);
+    fetchShiftNotes();
+  };
 
   const fetchDashboardData = async (force = false) => {
     if (!force) {
@@ -319,6 +336,37 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Shift Handoff Notes */}
+        <div className="db-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>📝 Shift Notes</h3>
+            <button onClick={() => setShowNoteInput(!showNoteInput)} style={{ padding: '4px 10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
+              + Add Note
+            </button>
+          </div>
+          {showNoteInput && (
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+              <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Leave a note for next shift..." onKeyDown={e => e.key === 'Enter' && addShiftNote()}
+                style={{ flex: 1, padding: '8px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px' }} autoFocus />
+              <button onClick={addShiftNote} style={{ padding: '8px 14px', background: '#38a169', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px' }}>Save</button>
+            </div>
+          )}
+          {shiftNotes.length === 0 ? (
+            <p style={{ color: '#999', fontSize: 13 }}>No notes yet. Leave one for the next shift!</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {shiftNotes.map(n => (
+                <div key={n.id} style={{ background: '#f8f9fa', borderRadius: '6px', padding: '8px 10px', fontSize: '13px' }}>
+                  <div style={{ color: '#333' }}>{n.note}</div>
+                  <div style={{ color: '#999', fontSize: '11px', marginTop: '3px' }}>
+                    {n.staff?.name || 'Staff'} · {new Date(n.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="db-panel" onClick={() => navigate('/books')} style={{ cursor: 'pointer' }}>
