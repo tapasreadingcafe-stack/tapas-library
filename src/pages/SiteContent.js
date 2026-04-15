@@ -1541,6 +1541,76 @@ export default function SiteContent() {
           }
         }, 60);
       }
+      // Phase 3: On-canvas toolbar actions (delete, duplicate, move)
+      if (msg.type === 'tapas:delete-block' && msg.blockId && msg.pageKey) {
+        setDraftContent(prev => {
+          const page = prev.pages?.[msg.pageKey];
+          if (!page || !Array.isArray(page.blocks)) return prev;
+          return {
+            ...prev,
+            pages: {
+              ...prev.pages,
+              [msg.pageKey]: {
+                ...page,
+                blocks: page.blocks.filter(b => b.id !== msg.blockId),
+              },
+            },
+          };
+        });
+        setSelectedBlockId(null);
+        return;
+      }
+      if (msg.type === 'tapas:duplicate-block' && msg.blockId && msg.pageKey) {
+        setDraftContent(prev => {
+          const page = prev.pages?.[msg.pageKey];
+          if (!page || !Array.isArray(page.blocks)) return prev;
+          const blockIdx = page.blocks.findIndex(b => b.id === msg.blockId);
+          if (blockIdx === -1) return prev;
+          const blockToDuplicate = page.blocks[blockIdx];
+          const newBlock = {
+            ...blockToDuplicate,
+            id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          };
+          const newBlocks = [...page.blocks];
+          newBlocks.splice(blockIdx + 1, 0, newBlock);
+          return {
+            ...prev,
+            pages: {
+              ...prev.pages,
+              [msg.pageKey]: {
+                ...page,
+                blocks: newBlocks,
+              },
+            },
+          };
+        });
+        return;
+      }
+      if (msg.type === 'tapas:move-block' && msg.blockId && msg.pageKey && msg.direction) {
+        setDraftContent(prev => {
+          const page = prev.pages?.[msg.pageKey];
+          if (!page || !Array.isArray(page.blocks)) return prev;
+          const blockIdx = page.blocks.findIndex(b => b.id === msg.blockId);
+          if (blockIdx === -1) return prev;
+          const newBlocks = [...page.blocks];
+          if (msg.direction === 'up' && blockIdx > 0) {
+            [newBlocks[blockIdx], newBlocks[blockIdx - 1]] = [newBlocks[blockIdx - 1], newBlocks[blockIdx]];
+          } else if (msg.direction === 'down' && blockIdx < newBlocks.length - 1) {
+            [newBlocks[blockIdx], newBlocks[blockIdx + 1]] = [newBlocks[blockIdx + 1], newBlocks[blockIdx]];
+          }
+          return {
+            ...prev,
+            pages: {
+              ...prev.pages,
+              [msg.pageKey]: {
+                ...page,
+                blocks: newBlocks,
+              },
+            },
+          };
+        });
+        return;
+      }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);

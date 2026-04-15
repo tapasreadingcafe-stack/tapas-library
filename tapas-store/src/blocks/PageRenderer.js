@@ -45,9 +45,9 @@ class BlockErrorBoundary extends React.Component {
 }
 
 // Renders one block by dispatching to its registry entry. Exposed as a
-// separate component so the future on-canvas toolbar (Phase 3) can
+// separate component so the on-canvas toolbar (Phase 3) can
 // decorate individual blocks without touching PageRenderer.
-export function BlockView({ block, pageKey }) {
+export function BlockView({ block, pageKey, blockIndex, totalBlocks }) {
   if (!block || !block.type) return null;
   const entry = BLOCK_REGISTRY[block.type];
   if (!entry) {
@@ -67,7 +67,7 @@ export function BlockView({ block, pageKey }) {
   const Renderer = entry.Renderer;
   return (
     <BlockErrorBoundary blockType={block.type}>
-      <Renderer id={block.id} pageKey={pageKey} props={block.props || {}} />
+      <Renderer id={block.id} pageKey={pageKey} props={block.props || {}} blockIndex={blockIndex} totalBlocks={totalBlocks} />
     </BlockErrorBoundary>
   );
 }
@@ -85,8 +85,8 @@ export default function PageRenderer({ pageKey, fallback = null }) {
 
   return (
     <>
-      {blocks.map((b) => (
-        <BlockView key={b.id} block={b} pageKey={pageKey} />
+      {blocks.map((b, idx) => (
+        <BlockView key={b.id} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={blocks.length} />
       ))}
     </>
   );

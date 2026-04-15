@@ -266,7 +266,7 @@ function Button({ href, children, variant = 'primary' }) {
 export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: p.background_image
         ? `linear-gradient(rgba(0,0,0,${p.overlay_opacity ?? 0.4}), rgba(0,0,0,${p.overlay_opacity ?? 0.4})), url("${p.background_image}") center/cover`
         : 'linear-gradient(135deg, var(--tapas-primary, #26170c), var(--tapas-primary-dark, #1a0f08))',
@@ -312,10 +312,10 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function CTA({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function CTA({ id, pageKey, props }) {
   const p = props || {};
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+    <BlockFrame id={id} pageKey={pageKey} style={{
       background: p.background_color || 'var(--tapas-accent, #006a6a)',
       color: p.text_color || '#fff',
       textAlign: 'center',
@@ -337,11 +337,11 @@ export function CTA({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function FeatureGrid({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function FeatureGrid({ id, pageKey, props }) {
   const p = props || {};
   const items = Array.isArray(p.items) ? p.items : [];
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.eyebrow && (
         <div style={{
           textAlign: 'center',
@@ -385,11 +385,11 @@ export function FeatureGrid({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function Footer({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function Footer({ id, pageKey, props }) {
   const p = props || {};
   const columns = Array.isArray(p.columns) ? p.columns : [];
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+    <BlockFrame id={id} pageKey={pageKey} style={{
       background: p.background_color || 'var(--tapas-primary-dark, #1a0f08)',
       color: '#f5f5dc',
       padding: '60px 20px 32px',
@@ -428,11 +428,11 @@ export function Footer({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function TextImage({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function TextImage({ id, pageKey, props }) {
   const p = props || {};
   const imageRight = p.image_side !== 'left';
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -482,11 +482,11 @@ export function TextImage({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function Testimonials({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function Testimonials({ id, pageKey, props }) {
   const p = props || {};
   const items = Array.isArray(p.items) ? p.items : [];
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+    <BlockFrame id={id} pageKey={pageKey} style={{
       background: 'var(--tapas-cream, #f5f5dc)',
     }}>
       {p.title && (
@@ -523,11 +523,11 @@ export function Testimonials({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function Pricing({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function Pricing({ id, pageKey, props }) {
   const p = props || {};
   const tiers = Array.isArray(p.tiers) ? p.tiers : [];
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.title && (
         <h2 style={{
           textAlign: 'center',
@@ -584,12 +584,12 @@ export function Pricing({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function FAQ({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function FAQ({ id, pageKey, props }) {
   const p = props || {};
   const items = Array.isArray(p.items) ? p.items : [];
   const [openIdx, setOpenIdx] = useState(null);
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.title && (
         <h2 style={{
           textAlign: 'center',
@@ -631,11 +631,11 @@ export function FAQ({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function Gallery({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function Gallery({ id, pageKey, props }) {
   const p = props || {};
   const images = Array.isArray(p.images) ? p.images : [];
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.title && (
         <h2 style={{
           textAlign: 'center',
@@ -662,10 +662,10 @@ export function Gallery({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function Newsletter({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function Newsletter({ id, pageKey, props }) {
   const p = props || {};
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+    <BlockFrame id={id} pageKey={pageKey} style={{
       background: 'var(--tapas-sand, #fbfbe2)',
       textAlign: 'center',
     }}>
@@ -752,7 +752,7 @@ function Skeleton({ count = 4, aspectRatio = '3/4' }) {
   );
 }
 
-export function BookList({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function BookList({ id, pageKey, props }) {
   const p = props || {};
   const limit = Math.max(1, Math.min(48, Number(p.limit) || 8));
   const { rows, error } = useCollection(
@@ -770,7 +770,7 @@ export function BookList({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.eyebrow && (
         <div style={{
           textAlign: 'center',
@@ -851,7 +851,7 @@ export function BookList({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function BlogList({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function BlogList({ id, pageKey, props }) {
   const p = props || {};
   const limit = Math.max(1, Math.min(24, Number(p.limit) || 6));
   const { rows, error } = useCollection(
@@ -865,7 +865,7 @@ export function BlogList({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.title && (
         <h2 style={{
           textAlign: 'center',
@@ -927,7 +927,7 @@ export function BlogList({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
-export function EventList({ id, pageKey, props, blockIndex, totalBlocks }) {
+export function EventList({ id, pageKey, props }) {
   const p = props || {};
   const limit = Math.max(1, Math.min(24, Number(p.limit) || 6));
   const today = new Date().toISOString().slice(0, 10);
@@ -944,7 +944,7 @@ export function EventList({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 
   return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+    <BlockFrame id={id} pageKey={pageKey}>
       {p.title && (
         <h2 style={{
           textAlign: 'center',
