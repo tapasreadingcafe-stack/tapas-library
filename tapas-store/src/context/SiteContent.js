@@ -197,6 +197,15 @@ export function SiteContentProvider({ children }) {
       if (!msg || typeof msg !== 'object') return;
       if (msg.type !== 'tapas:apply-content') return;
       if (!msg.content || typeof msg.content !== 'object') return;
+      // Pause while the user is inline-editing a text node on the canvas
+      // — a React re-render would destroy the contentEditable caret.
+      // StoreEditorSync sets this flag while an edit is active.
+      if (typeof window !== 'undefined' && window.__tapasInlineEditing) {
+        // Still apply the theme so colors/fonts live-update from the
+        // right panel, but don't re-render the content tree.
+        try { applyTheme(deepMerge(DEFAULT_CONTENT, msg.content)); } catch {}
+        return;
+      }
       try {
         const merged = deepMerge(DEFAULT_CONTENT, msg.content);
         setContent(merged);
