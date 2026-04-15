@@ -116,23 +116,23 @@ const SECTION_SUB_GROUPS = {
   ],
 };
 
-// Dark palette for the right inspector panel — matches Figma's real
-// dark-mode inspector so the property panel has the same density and
-// contrast the user expects. Used only inside the right <aside> and
-// its field renderers; the rest of the page stays light.
+// Light palette for the right inspector panel — Figma-style structural
+// layout (subsections, paired inputs, icon rows) applied on a clean
+// white panel. Used only inside the right <aside> and its field
+// renderers so the left sidebar and center preview stay in sync.
 const D = {
-  panel:      '#2C2C2C',   // main panel background
-  panelAlt:   '#383838',   // slightly lifted surface (tab bar, headers)
-  input:      '#3B3B3B',   // input background at rest
-  inputHover: '#474747',   // input on hover
-  inputFocus: '#1E1E1E',   // input on focus (goes darker, accent border)
-  border:     '#444444',   // strong divider
-  divider:    '#383838',   // faint divider between sections
-  text:       '#EDEDED',   // primary text
-  textDim:    '#A0A0A0',   // labels
-  textFaint:  '#6E6E6E',   // hints, placeholders
+  panel:      '#FFFFFF',   // main panel background
+  panelAlt:   '#FAFAFA',   // slightly lifted surface (tab bar, headers)
+  input:      '#F2F2F2',   // input background at rest
+  inputHover: '#EAEAEA',   // input on hover
+  inputFocus: '#FFFFFF',   // input on focus (white + accent border)
+  border:     '#E5E5E5',   // strong divider
+  divider:    '#ECECEC',   // faint divider between sections
+  text:       '#2C2C2C',   // primary text
+  textDim:    '#8A8A8A',   // labels
+  textFaint:  '#B3B3B3',   // hints, placeholders
   accent:     '#0D99FF',   // Figma blue (unchanged)
-  accentFaint:'rgba(13,153,255,0.14)',
+  accentFaint:'rgba(13,153,255,0.08)',
   danger:     '#F24822',
 };
 
@@ -287,7 +287,7 @@ function ColorField({ field, value, onChange, inputRef }) {
             width: '100%', height: '100%', borderRadius: '2px',
             background: value || 'transparent',
             border: `1px solid ${D.border}`,
-            backgroundImage: value ? 'none' : 'linear-gradient(45deg, #555 25%, transparent 25%), linear-gradient(-45deg, #555 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #555 75%), linear-gradient(-45deg, transparent 75%, #555 75%)',
+            backgroundImage: value ? 'none' : 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
             backgroundSize: '6px 6px',
             backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
           }} />
@@ -445,7 +445,7 @@ function SelectField({ field, value, onChange, inputRef }) {
     <Row label={field.label} iconType="select">
       <select ref={inputRef} value={value || (field.options?.[0]?.value ?? '')}
         onChange={e => onChange(e.target.value)}
-        style={{ ...inputBaseStyle, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path fill='%23A0A0A0' d='M5 7L1 3h8z'/></svg>")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '22px' }}>
+        style={{ ...inputBaseStyle, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path fill='%238A8A8A' d='M5 7L1 3h8z'/></svg>")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '22px' }}>
         {(field.options || []).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
     </Row>
@@ -697,7 +697,7 @@ function CssSelectField({ field, value, onChange }) {
   return (
     <Row label={field.label} iconType="select">
       <select value={value || ''} onChange={e => onChange(e.target.value)}
-        style={{ ...inputBaseStyle, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path fill='%23A0A0A0' d='M5 7L1 3h8z'/></svg>")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '22px' }}>
+        style={{ ...inputBaseStyle, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path fill='%238A8A8A' d='M5 7L1 3h8z'/></svg>")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '22px' }}>
         {(field.options || []).map(opt => (
           <option key={opt} value={opt}>{opt || '— auto —'}</option>
         ))}
@@ -715,7 +715,7 @@ function CssColorField({ field, value, onChange }) {
             width: '100%', height: '100%', borderRadius: '2px',
             background: value || 'transparent',
             border: `1px solid ${D.border}`,
-            backgroundImage: value ? 'none' : 'linear-gradient(45deg, #555 25%, transparent 25%), linear-gradient(-45deg, #555 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #555 75%), linear-gradient(-45deg, transparent 75%, #555 75%)',
+            backgroundImage: value ? 'none' : 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
             backgroundSize: '6px 6px',
             backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
           }} />
@@ -919,7 +919,7 @@ function ElementStyleRow({ field, value, onChange }) {
               width: '100%', height: '100%', borderRadius: '2px',
               background: value || 'transparent',
               border: `1px solid ${D.border}`,
-              backgroundImage: value ? 'none' : 'linear-gradient(45deg, #555 25%, transparent 25%), linear-gradient(-45deg, #555 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #555 75%), linear-gradient(-45deg, transparent 75%, #555 75%)',
+              backgroundImage: value ? 'none' : 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
               backgroundSize: '6px 6px',
               backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
             }} />
@@ -1720,15 +1720,14 @@ export default function SiteContent() {
           </div>
         </main>
 
-        {/* RIGHT: property inspector — Figma-style (dark), one active section */}
+        {/* RIGHT: property inspector — Figma-style, one active section */}
         <aside style={{
           width: '320px',
           flexShrink: 0,
           background: D.panel,
-          borderLeft: `1px solid #1A1A1A`,
+          borderLeft: `1px solid ${D.border}`,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.03)',
         }}>
           {selectedElement ? (
             <ElementInspector
