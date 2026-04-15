@@ -216,7 +216,7 @@ export default function OverdueBooks() {
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
         {filteredBooks.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-            {totalOverdueBooks === 0 ? '✓ No overdue books!' : 'No results found'}
+            {totalOverdueBooks === 0 ? '🎉 No overdue books! Your members are keeping up.' : 'No results matching your search'}
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>

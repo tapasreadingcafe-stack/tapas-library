@@ -126,7 +126,7 @@ export default function Dashboard() {
     { id: 1, label: 'Books', value: metrics.totalBooks, color: '#1dd1a1', icon: '📚', link: '/books' },
     { id: 2, label: 'Today', value: metrics.checkedOutToday, color: '#3498db', icon: '📤', link: '/Borrow' },
     { id: 3, label: 'Active', value: metrics.activeCheckouts, color: '#9b59b6', icon: '📖', link: '/Borrow' },
-    { id: 4, label: 'Overdue', value: metrics.overdueBooks, color: '#ff9f43', icon: '⚠️', link: '/overdue' },
+    { id: 4, label: 'Overdue', value: metrics.overdueBooks, sub: metrics.outstandingFines > 0 ? `₹${metrics.outstandingFines.toLocaleString('en-IN')} fines` : '', color: '#ff9f43', icon: '⚠️', link: '/overdue' },
     { id: 5, label: 'Fines', value: `₹${metrics.outstandingFines.toLocaleString('en-IN')}`, color: '#e74c3c', icon: '💰', link: '/fines' },
     { id: 6, label: 'Revenue', value: `₹${metrics.revenueMonth.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, color: '#1dd1a1', icon: '💵', link: '/accounts/overview' },
   ];
@@ -304,6 +304,7 @@ export default function Dashboard() {
               <div className="db-card-icon">{s.icon}</div>
               <div className={typeof s.value === 'string' ? 'db-card-val-sm' : 'db-card-val'} style={{ color: s.color }}>{s.value}</div>
               <div className="db-card-label">{s.label.toUpperCase()}</div>
+              {s.sub && <div style={{ fontSize: '10px', color: '#e74c3c', fontWeight: 600, marginTop: 2 }}>{s.sub}</div>}
             </div>
           ))
         )}

@@ -524,6 +524,7 @@ export default function Borrow() {
     if (filter === 'overdue') return isOverdue(c.due_date);
     if (filter === 'today') return isDueToday(c.due_date);
     if (filter === 'week') return isDueThisWeek(c.due_date);
+    if (filter === 'dueSoon') { const d = new Date(c.due_date); const now = new Date(); const three = new Date(); three.setDate(now.getDate() + 3); return d >= now && d <= three; }
     return true;
   });
 
@@ -906,6 +907,7 @@ export default function Borrow() {
                 ['overdue', `⚠️ Overdue (${stats.overdue})`],
                 ['today', `📅 Due Today (${stats.dueToday})`],
                 ['week', '📆 This Week'],
+                ['dueSoon', '🔔 Due in 3 Days'],
               ].map(([key, label]) => (
                 <button key={key} onClick={() => setFilter(key)} style={{
                   padding: '6px 14px', border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '12px',

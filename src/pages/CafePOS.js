@@ -366,7 +366,10 @@ export default function CafePOS() {
               </div>
             ) : (
               <>
-                <input placeholder="Search member or type name..." value={memberSearch || customerName} onChange={e => { const v = e.target.value; setCustomerName(v); searchMembers(v); }} />
+                <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                  <input placeholder="Search member..." value={memberSearch || customerName} onChange={e => { const v = e.target.value; setCustomerName(v); searchMembers(v); }} style={{ flex: 1 }} />
+                  <button onClick={() => { setCustomerName('Walk-in'); setMemberResults([]); }} style={{ padding: '6px 12px', background: '#f0f0f0', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>🚶 Walk-in</button>
+                </div>
                 {memberResults.length > 0 && (
                   <div className="cafe-member-results">
                     {memberResults.map(m => (

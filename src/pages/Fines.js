@@ -191,10 +191,20 @@ export default function Fines() {
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>💰 Fine & Payment Management</h1>
           <p style={{ color: '#999', fontSize: '14px' }}>Auto-calculated at ₹{fineSettings.ratePerDay}/day{fineSettings.gracePeriod > 0 ? ` (${fineSettings.gracePeriod}-day grace period)` : ''}. Track, collect, or waive overdue fines.</p>
         </div>
-        <button onClick={fetchAll} disabled={loading}
-          style={{ padding: '8px 16px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
-          🔄 Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => {
+            const csv = ['Member,Book,Days Overdue,Fine Amount', ...outstanding.map(f => `"${f.memberName}","${f.bookTitle}",${f.daysOverdue},${f.fineAmount}`)].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'outstanding_fines.csv'; a.click();
+          }} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+            📥 Export Fines
+          </button>
+          <button onClick={fetchAll} disabled={loading}
+            style={{ padding: '8px 16px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

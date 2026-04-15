@@ -840,7 +840,11 @@ export default function Books() {
             </table>
           )
         ) : filteredBooks.length === 0 ? (
-          <p style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No books found</p>
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📚</div>
+            <p style={{ color: '#999', fontSize: '15px', margin: '0 0 12px' }}>{books.length === 0 ? 'No books in your library yet' : 'No books match your search'}</p>
+            {books.length === 0 && <button onClick={handleAddBook} style={{ padding: '8px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>+ Add Your First Book</button>}
+          </div>
         ) : isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
             {filteredBooks.map((book) => {
