@@ -44,6 +44,51 @@ class BlockErrorBoundary extends React.Component {
   }
 }
 
+// Build a per-block <style> string with scoped media queries for the
+// "resp_*" overrides. We target the section rendered by BlockFrame
+// via `[data-editable="pages.{pageKey}.blocks.{id}"]` — that attribute
+// is already on every block for the canvas click-to-edit selector. The
+// rules use !important because BlockFrame uses inline `style` which
+// would otherwise win.
+const BP = {
+  mobile:  '@media (max-width: 639px)',
+  tablet:  '@media (min-width: 640px) and (max-width: 1023px)',
+  desktop: '@media (min-width: 1024px)',
+};
+
+const ALLOWED_TEXT_ALIGN = new Set(['left', 'center', 'right']);
+
+function buildResponsiveCSS(id, pageKey, p) {
+  const selector = `[data-editable="pages.${pageKey || 'unknown'}.blocks.${id}"]`;
+  const chunks = [];
+  for (const bp of ['mobile', 'tablet', 'desktop']) {
+    const rules = [];
+    // Padding Y override (number in px). 0 is a legal value.
+    const padY = p[`resp_padding_y_${bp}`];
+    if (padY !== undefined && padY !== null && padY !== '') {
+      const n = Number(padY);
+      if (!Number.isNaN(n) && n >= 0 && n <= 400) {
+        rules.push(`padding-top:${n}px !important;padding-bottom:${n}px !important;`);
+      }
+    }
+    // Padding X override
+    const padX = p[`resp_padding_x_${bp}`];
+    if (padX !== undefined && padX !== null && padX !== '') {
+      const n = Number(padX);
+      if (!Number.isNaN(n) && n >= 0 && n <= 200) {
+        rules.push(`padding-left:${n}px !important;padding-right:${n}px !important;`);
+      }
+    }
+    // Text alignment override
+    const align = p[`resp_text_align_${bp}`];
+    if (align && ALLOWED_TEXT_ALIGN.has(align)) {
+      rules.push(`text-align:${align} !important;`);
+    }
+    if (rules.length) chunks.push(`${BP[bp]}{${selector}{${rules.join('')}}}`);
+  }
+  return chunks.join('\n');
+}
+
 // Renders one block by dispatching to its registry entry. Exposed as a
 // separate component so the on-canvas toolbar (Phase 3) can
 // decorate individual blocks without touching PageRenderer.
@@ -75,8 +120,13 @@ export function BlockView({ block, pageKey, blockIndex, totalBlocks }) {
   if (p.hide_mobile)  classes.push('tapas-hide-mobile');
   if (p.hide_tablet)  classes.push('tapas-hide-tablet');
   if (p.hide_desktop) classes.push('tapas-hide-desktop');
+  // Phase 4 closer: per-breakpoint padding & alignment overrides. Built
+  // as a scoped <style> next to the block so unused blocks inject no
+  // CSS at all.
+  const responsiveCss = buildResponsiveCSS(block.id, pageKey, p);
   return (
     <BlockErrorBoundary blockType={block.type}>
+      {responsiveCss && <style>{responsiveCss}</style>}
       <div className={classes.join(' ') || undefined} style={{ display: 'contents' }}>
         <Renderer id={block.id} pageKey={pageKey} props={p} blockIndex={blockIndex} totalBlocks={totalBlocks} />
       </div>

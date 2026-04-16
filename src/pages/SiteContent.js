@@ -987,6 +987,94 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
             );
           })}
         </div>
+
+        {/* Phase 4 closer: Responsive overrides — per-breakpoint
+            padding & alignment. Applied via scoped CSS in PageRenderer. */}
+        <div style={{
+          marginTop: '0', padding: '14px 16px 16px',
+          borderTop: `1px solid ${D.border}`,
+          background: D.panelAlt || D.panel,
+        }}>
+          <details>
+            <summary style={{
+              cursor: 'pointer', userSelect: 'none', listStyle: 'none',
+              fontSize: '9px', color: D.textFaint, fontWeight: '600',
+              textTransform: 'uppercase', letterSpacing: '0.8px',
+              marginBottom: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span>Responsive overrides</span>
+              <span style={{ fontSize: '10px', color: D.textFaint }}>▾</span>
+            </summary>
+            <div style={{ fontSize: '10px', color: D.textFaint, marginBottom: '10px', lineHeight: 1.4 }}>
+              Leave blank to inherit. Padding is in px.
+            </div>
+            {[
+              { bp: 'mobile',  label: 'Mobile',  hint: '< 640px' },
+              { bp: 'tablet',  label: 'Tablet',  hint: '640–1023px' },
+              { bp: 'desktop', label: 'Desktop', hint: '≥ 1024px' },
+            ].map(({ bp, label, hint }) => (
+              <div key={bp} style={{ marginBottom: '10px' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                  marginBottom: '4px',
+                }}>
+                  <span style={{ fontSize: '10px', fontWeight: '600', color: D.text }}>{label}</span>
+                  <span style={{ fontSize: '9px', color: D.textFaint }}>{hint}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
+                  <input
+                    type="number" min={0} max={400}
+                    value={block.props?.[`resp_padding_y_${bp}`] ?? ''}
+                    onChange={(e) => onChangeProp(`resp_padding_y_${bp}`, e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="Pad Y"
+                    title="Vertical padding (px)"
+                    style={{
+                      padding: '5px 6px',
+                      background: D.input, border: '1px solid transparent',
+                      borderRadius: '3px', color: D.text,
+                      fontSize: '11px', outline: 'none', width: '100%', boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => { e.target.style.border = `1px solid ${D.accent}`; }}
+                    onBlur={(e) => { e.target.style.border = '1px solid transparent'; }}
+                  />
+                  <input
+                    type="number" min={0} max={200}
+                    value={block.props?.[`resp_padding_x_${bp}`] ?? ''}
+                    onChange={(e) => onChangeProp(`resp_padding_x_${bp}`, e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="Pad X"
+                    title="Horizontal padding (px)"
+                    style={{
+                      padding: '5px 6px',
+                      background: D.input, border: '1px solid transparent',
+                      borderRadius: '3px', color: D.text,
+                      fontSize: '11px', outline: 'none', width: '100%', boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => { e.target.style.border = `1px solid ${D.accent}`; }}
+                    onBlur={(e) => { e.target.style.border = '1px solid transparent'; }}
+                  />
+                  <select
+                    value={block.props?.[`resp_text_align_${bp}`] ?? ''}
+                    onChange={(e) => onChangeProp(`resp_text_align_${bp}`, e.target.value || null)}
+                    title="Text alignment"
+                    style={{
+                      padding: '5px 6px',
+                      background: D.input, border: '1px solid transparent',
+                      borderRadius: '3px', color: D.text,
+                      fontSize: '11px', outline: 'none', width: '100%', boxSizing: 'border-box',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">Align</option>
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+          </details>
+        </div>
       </div>
     </>
   );
