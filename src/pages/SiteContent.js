@@ -11,6 +11,12 @@ import {
   SortableContext, useSortable, arrayMove, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+  Undo2, Redo2, History, CalendarClock, Palette, Rocket, MoreHorizontal,
+  PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
+  Monitor, Tablet, Smartphone, RefreshCw, ExternalLink,
+  GripVertical, Copy, Trash2,
+} from 'lucide-react';
 
 // =====================================================================
 // SiteContent — Figma-style three-panel visual editor.
@@ -1702,12 +1708,12 @@ function SortableBlockRow({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '14px', flexShrink: 0,
-          color: S.textFaint, fontSize: '14px',
+          color: S.textFaint,
           cursor: isDragging ? 'grabbing' : 'grab',
-          textAlign: 'center', userSelect: 'none',
-          lineHeight: 1, letterSpacing: '-3px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          userSelect: 'none',
         }}
-      >⋮⋮</span>
+      ><GripVertical size={13} strokeWidth={2} /></span>
       <span style={{ fontSize: '13px', flexShrink: 0, width: '16px', textAlign: 'center' }}>
         {meta?.icon || '▫'}
       </span>
@@ -1723,24 +1729,28 @@ function SortableBlockRow({
         onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
         title="Duplicate (⌘D)"
         style={{
-          width: '20px', height: '20px', padding: 0,
+          width: '22px', height: '22px', padding: 0,
           background: 'transparent', border: 'none',
           color: S.textDim, cursor: 'pointer',
-          fontSize: '11px', borderRadius: '2px',
+          borderRadius: '3px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }}
-      >⎘</button>
+        onMouseEnter={(e) => { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S.textDim; }}
+      ><Copy size={12} strokeWidth={2} /></button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         title="Delete (⌫)"
         style={{
-          width: '20px', height: '20px', padding: 0,
+          width: '22px', height: '22px', padding: 0,
           background: 'transparent', border: 'none',
           color: S.textDim, cursor: 'pointer',
-          fontSize: '12px', borderRadius: '2px',
+          borderRadius: '3px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = S.danger; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; }}
-      >✕</button>
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = S.danger; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S.textDim; }}
+      ><Trash2 size={12} strokeWidth={2} /></button>
     </div>
   );
 }
@@ -1909,6 +1919,8 @@ export default function SiteContent() {
   // here rather than cluttering the left sidebar.
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [designModalTab, setDesignModalTab] = useState('brand');
+  // Overflow menu in the toolbar (History / Schedule / Discard).
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [editingPage, setEditingPage] = useState('home');
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   // Phase 4: clipboard for cross-page copy/paste
@@ -4016,7 +4028,12 @@ export default function SiteContent() {
         </div>
       )}
 
-      {/* ==================== Top toolbar ==================== */}
+      {/* ==================== Top toolbar ====================
+          Slim Webflow/Figma-style top bar:
+          - Title + page switcher + status dot on the left
+          - Undo/Redo + Styles + ⋯ overflow + Publish on the right
+          Destructive (Discard) and infrequent (History, Schedule) live
+          inside the ⋯ menu so the bar isn't crowded. */}
       <div style={{
         height: '52px',
         flexShrink: 0,
@@ -4025,15 +4042,14 @@ export default function SiteContent() {
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        gap: '12px',
+        gap: '10px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: S.text, flexShrink: 0 }}>🎨 Edit Website</span>
-          <span style={{ color: S.textFaint, fontSize: '12px', flexShrink: 0 }}>·</span>
+          <Palette size={16} color={S.text} strokeWidth={2.25} />
+          <span style={{ fontSize: '13px', fontWeight: '700', color: S.text, flexShrink: 0 }}>Edit Website</span>
+          <span style={{ color: S.textFaint, fontSize: '12px', flexShrink: 0 }}>/</span>
 
-          {/* Toolbar page switcher — drives the same editingPage state as
-              the left sidebar Pages list. Matches Figma's top-bar page
-              picker so users can switch without opening the sidebar. */}
+          {/* Page switcher — same state as the sidebar Pages list. */}
           <select
             value={editingPage}
             onChange={(e) => {
@@ -4044,7 +4060,7 @@ export default function SiteContent() {
             }}
             title="Switch page"
             style={{
-              padding: '6px 28px 6px 10px',
+              padding: '5px 26px 5px 10px',
               background: '#fff', border: `1px solid ${S.border}`,
               borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: S.text,
               cursor: 'pointer', outline: 'none',
@@ -4065,22 +4081,27 @@ export default function SiteContent() {
             )}
           </select>
 
-          {/* Status pill */}
-          {saving ? (
-            <span style={{ fontSize: '11px', color: S.accent, fontWeight: '600' }}>⏳ Saving draft…</span>
-          ) : dirty ? (
-            <span style={{
-              fontSize: '11px', color: S.warning, fontWeight: '600',
-              padding: '3px 10px', borderRadius: '20px',
-              background: '#FFFBEB', border: `1px solid ${S.warning}33`,
-            }}>● Unpublished changes</span>
-          ) : pushedAt ? (
-            <span style={{ fontSize: '11px', color: S.success, fontWeight: '600' }}>
-              ✓ Published {pushedAt.toLocaleTimeString()}
-            </span>
-          ) : (
-            <span style={{ fontSize: '11px', color: S.textDim }}>In sync with live site</span>
-          )}
+          {/* Status: a single colored dot + short label.
+              saving=blue, dirty=amber, recently-pushed=green, idle=gray. */}
+          {(() => {
+            let dot, label, tip;
+            if (saving) { dot = S.accent; label = 'Saving…'; tip = 'Saving draft to Supabase'; }
+            else if (dirty) { dot = S.warning; label = 'Unpublished'; tip = 'Draft has changes that aren\'t live yet'; }
+            else if (pushedAt) { dot = S.success; label = 'Published'; tip = `Published at ${pushedAt.toLocaleTimeString()}`; }
+            else { dot = S.borderStrong; label = 'In sync'; tip = 'Draft matches the live site'; }
+            return (
+              <div title={tip} style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '4px 10px',
+                background: S.bg, borderRadius: '20px',
+                fontSize: '11px', color: S.textDim, fontWeight: '600',
+                cursor: 'default', userSelect: 'none',
+              }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                {label}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Undo / redo */}
@@ -4090,130 +4111,140 @@ export default function SiteContent() {
             disabled={!canUndo}
             title="Undo (⌘Z)"
             style={{
-              width: '28px', height: '24px',
+              width: '30px', height: '26px',
               background: canUndo ? 'white' : 'transparent',
               border: 'none', borderRadius: '4px',
               cursor: canUndo ? 'pointer' : 'not-allowed',
               color: canUndo ? S.text : S.textFaint,
-              fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'background 0.15s',
               boxShadow: canUndo ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
             }}
-          >↶</button>
+          ><Undo2 size={14} strokeWidth={2.25} /></button>
           <button
             onClick={redo}
             disabled={!canRedo}
             title="Redo (⌘⇧Z)"
             style={{
-              width: '28px', height: '24px',
+              width: '30px', height: '26px',
               background: canRedo ? 'white' : 'transparent',
               border: 'none', borderRadius: '4px',
               cursor: canRedo ? 'pointer' : 'not-allowed',
               color: canRedo ? S.text : S.textFaint,
-              fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'background 0.15s',
               boxShadow: canRedo ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
             }}
-          >↷</button>
+          ><Redo2 size={14} strokeWidth={2.25} /></button>
         </div>
 
-        {/* Phase 5: revision history */}
-        <button
-          onClick={() => setHistoryModalOpen(true)}
-          title="View publish history"
-          style={{
-            padding: '7px 12px',
-            background: 'white',
-            border: `1px solid ${S.border}`,
-            borderRadius: '6px',
-            color: S.text,
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '600',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = S.bg; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
-        >📜 History</button>
-
-        {/* Phase 6: schedule publish */}
-        <button
-          onClick={() => setScheduleModalOpen(true)}
-          disabled={!dirty}
-          title={dirty ? 'Schedule the draft to publish at a future time' : 'Edit the draft before scheduling'}
-          style={{
-            padding: '7px 12px',
-            background: 'white',
-            border: `1px solid ${S.border}`,
-            borderRadius: '6px',
-            color: dirty ? S.text : S.textFaint,
-            cursor: dirty ? 'pointer' : 'not-allowed',
-            fontSize: '12px',
-            fontWeight: '600',
-          }}
-          onMouseEnter={e => { if (dirty) e.currentTarget.style.background = S.bg; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
-        >⏰ Schedule</button>
-
-        {/* Design System modal trigger — global tokens (brand, typography,
-            buttons, images) live behind this button rather than the
-            sidebar so they don't clutter page-level editing. */}
+        {/* Design System trigger */}
         <button
           onClick={() => setDesignModalOpen(true)}
           title="Edit global brand, typography, buttons, and images"
           style={{
-            padding: '7px 12px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '6px 12px', height: '30px',
             background: 'white',
             border: `1px solid ${S.border}`,
             borderRadius: '6px',
-            color: S.text,
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '600',
+            color: S.text, cursor: 'pointer',
+            fontSize: '12px', fontWeight: '600',
           }}
           onMouseEnter={e => { e.currentTarget.style.background = S.bg; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
-        >🎨 Styles</button>
-
-        <button
-          onClick={revertDraft}
-          disabled={!dirty || pushing}
-          title="Revert draft to the live version"
-          style={{
-            padding: '7px 14px',
-            background: 'white',
-            border: `1px solid ${S.border}`,
-            borderRadius: '6px',
-            color: dirty ? S.danger : S.textFaint,
-            cursor: !dirty || pushing ? 'not-allowed' : 'pointer',
-            fontSize: '12px',
-            fontWeight: '600',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { if (dirty && !pushing) { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.borderColor = S.danger + '55'; } }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = S.border; }}
         >
-          Discard changes
+          <Palette size={13} strokeWidth={2.25} />
+          Styles
         </button>
+
+        {/* Overflow menu — History, Schedule, Discard */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setOverflowMenuOpen(o => !o)}
+            title="More actions"
+            style={{
+              width: '30px', height: '30px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: overflowMenuOpen ? S.bg : 'white',
+              border: `1px solid ${S.border}`, borderRadius: '6px',
+              color: S.text, cursor: 'pointer',
+            }}
+            onMouseEnter={e => { if (!overflowMenuOpen) e.currentTarget.style.background = S.bg; }}
+            onMouseLeave={e => { if (!overflowMenuOpen) e.currentTarget.style.background = 'white'; }}
+          ><MoreHorizontal size={16} strokeWidth={2.25} /></button>
+          {overflowMenuOpen && (
+            <>
+              {/* Click-outside catcher */}
+              <div
+                onClick={() => setOverflowMenuOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+              />
+              <div style={{
+                position: 'absolute', top: '34px', right: 0,
+                minWidth: '210px',
+                background: '#fff',
+                border: `1px solid ${S.border}`, borderRadius: '8px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+                padding: '6px', zIndex: 91,
+              }}>
+                {[
+                  { label: 'Publish history', icon: History, onClick: () => { setHistoryModalOpen(true); setOverflowMenuOpen(false); }, disabled: false },
+                  { label: 'Schedule publish', icon: CalendarClock, onClick: () => { setScheduleModalOpen(true); setOverflowMenuOpen(false); }, disabled: !dirty, disabledTip: 'Edit the draft first' },
+                  { sep: true },
+                  { label: 'Discard changes', icon: Trash2, danger: true, onClick: () => { revertDraft(); setOverflowMenuOpen(false); }, disabled: !dirty || pushing, disabledTip: 'Nothing to discard' },
+                ].map((item, idx) => {
+                  if (item.sep) return <div key={idx} style={{ height: '1px', background: S.border, margin: '4px 6px' }} />;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={item.disabled ? undefined : item.onClick}
+                      disabled={item.disabled}
+                      title={item.disabled ? item.disabledTip : ''}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '8px 10px',
+                        background: 'transparent', border: 'none', borderRadius: '4px',
+                        color: item.disabled ? S.textFaint : (item.danger ? S.danger : S.text),
+                        cursor: item.disabled ? 'not-allowed' : 'pointer',
+                        fontSize: '12px', fontWeight: '500',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={e => { if (!item.disabled) e.currentTarget.style.background = item.danger ? '#FEF2F2' : S.bg; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <Icon size={14} strokeWidth={2.25} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Publish — the only button that stays a primary CTA. */}
         <button
           onClick={pushToLive}
           disabled={!dirty || pushing || saving}
           title={dirty ? 'Publish draft to live site' : 'Nothing to publish'}
           style={{
-            padding: '8px 18px',
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '7px 16px', height: '30px',
             background: dirty ? S.accent : S.borderStrong,
             color: 'white',
-            border: 'none',
-            borderRadius: '6px',
+            border: 'none', borderRadius: '6px',
             cursor: (!dirty || pushing || saving) ? 'not-allowed' : 'pointer',
-            fontSize: '12px',
-            fontWeight: '700',
+            fontSize: '12px', fontWeight: '700',
             boxShadow: dirty ? '0 2px 8px rgba(13,153,255,0.35)' : 'none',
             transition: 'all 0.15s',
           }}
           onMouseEnter={e => { if (dirty && !pushing) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(13,153,255,0.45)'; } }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = dirty ? '0 2px 8px rgba(13,153,255,0.35)' : 'none'; }}
         >
-          {pushing ? '⏳ Publishing…' : '🚀 Push to live'}
+          <Rocket size={13} strokeWidth={2.25} />
+          {pushing ? 'Publishing…' : 'Publish'}
         </button>
       </div>
 
@@ -4908,75 +4939,107 @@ export default function SiteContent() {
             gap: '10px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-              {/* Hamburger toggle for the left sidebar — mirrors the
-                  outer dashboard's collapsible nav pattern. */}
+              {/* Left sidebar collapse — uses a directional panel icon so
+                  it's distinct from the right-side toggle (no more two
+                  identical hamburgers). */}
               <button
                 onClick={() => setLeftCollapsed(c => !c)}
-                title={leftCollapsed ? 'Show pages panel' : 'Hide pages panel'}
+                title={leftCollapsed ? 'Show Pages & Layers' : 'Hide Pages & Layers'}
                 style={{
-                  width: '28px', height: '28px', padding: 0,
+                  width: '30px', height: '28px', padding: 0,
                   background: leftCollapsed ? S.accentLight : 'white',
                   border: `1px solid ${leftCollapsed ? S.accent + '55' : S.border}`,
                   borderRadius: '4px', cursor: 'pointer',
                   color: leftCollapsed ? S.accent : S.textDim,
-                  fontSize: '14px',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}
                 onMouseEnter={(e) => { if (!leftCollapsed) { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; } }}
                 onMouseLeave={(e) => { if (!leftCollapsed) { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = S.textDim; } }}
-              >☰</button>
-              <div style={{ fontSize: '11px', color: S.textDim, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Previewing <span style={{ color: S.text, fontFamily: 'ui-monospace, monospace', fontWeight: '600' }}>{STORE_URL + iframePath}</span>
+              >
+                {leftCollapsed
+                  ? <PanelLeftOpen size={15} strokeWidth={2.25} />
+                  : <PanelLeftClose size={15} strokeWidth={2.25} />}
+              </button>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                fontSize: '11px', color: S.textDim, minWidth: 0,
+              }}>
                 <span style={{
-                  marginLeft: '8px', padding: '2px 8px',
+                  padding: '2px 8px',
                   background: '#EEF2FF', color: S.accent,
                   borderRadius: '10px', fontSize: '10px', fontWeight: '700',
+                  flexShrink: 0,
                 }}>DRAFT</span>
+                <span style={{
+                  fontFamily: 'ui-monospace, monospace', fontWeight: '600', color: S.text,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  maxWidth: '300px',
+                }}>{iframePath}</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {/* Viewport switcher — Lucide device glyphs. */}
               <div style={{ display: 'flex', gap: '2px', background: S.bg, padding: '2px', borderRadius: '6px' }}>
-                {VIEWPORTS.map(v => (
-                  <button key={v.key} onClick={() => setViewport(v.key)}
-                    title={v.key}
-                    style={{
-                      padding: '5px 10px',
-                      background: viewport === v.key ? 'white' : 'transparent',
-                      color: viewport === v.key ? S.text : S.textDim,
-                      border: 'none', borderRadius: '4px', cursor: 'pointer',
-                      fontSize: '13px',
-                      boxShadow: viewport === v.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                    }}>
-                    {v.label}
-                  </button>
-                ))}
+                {VIEWPORTS.map(v => {
+                  const Icon = v.key === 'desktop' ? Monitor : v.key === 'tablet' ? Tablet : Smartphone;
+                  const active = viewport === v.key;
+                  return (
+                    <button key={v.key} onClick={() => setViewport(v.key)}
+                      title={v.key.charAt(0).toUpperCase() + v.key.slice(1)}
+                      style={{
+                        width: '32px', height: '24px', padding: 0,
+                        background: active ? 'white' : 'transparent',
+                        color: active ? S.text : S.textDim,
+                        border: 'none', borderRadius: '4px', cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      }}>
+                      <Icon size={14} strokeWidth={2.25} />
+                    </button>
+                  );
+                })}
               </div>
               <button onClick={() => setIframeKey(k => k + 1)} title="Reload preview"
-                style={{ padding: '6px 10px', background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: S.textDim }}>
-                ↻
-              </button>
-              <a href={STORE_URL + iframePath} target="_blank" rel="noreferrer"
-                style={{ padding: '6px 10px', background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px', color: S.textDim, fontSize: '11px', textDecoration: 'none', fontWeight: '600' }}>
-                ↗ Open live
-              </a>
-              {/* Hamburger toggle for the right inspector panel. */}
+                style={{
+                  width: '30px', height: '28px', padding: 0,
+                  background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px',
+                  cursor: 'pointer', color: S.textDim,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = S.textDim; }}
+              ><RefreshCw size={13} strokeWidth={2.25} /></button>
+              <a href={STORE_URL + iframePath} target="_blank" rel="noreferrer" title="Open live site in new tab"
+                style={{
+                  width: '30px', height: '28px', padding: 0,
+                  background: 'white', border: `1px solid ${S.border}`, borderRadius: '4px',
+                  color: S.textDim, textDecoration: 'none',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = S.textDim; }}
+              ><ExternalLink size={13} strokeWidth={2.25} /></a>
+              {/* Right inspector collapse — distinct directional icon. */}
               <button
                 onClick={() => setRightCollapsed(c => !c)}
-                title={rightCollapsed ? 'Show inspector' : 'Hide inspector'}
+                title={rightCollapsed ? 'Show Inspector' : 'Hide Inspector'}
                 style={{
-                  width: '28px', height: '28px', padding: 0,
+                  width: '30px', height: '28px', padding: 0,
                   background: rightCollapsed ? S.accentLight : 'white',
                   border: `1px solid ${rightCollapsed ? S.accent + '55' : S.border}`,
                   borderRadius: '4px', cursor: 'pointer',
                   color: rightCollapsed ? S.accent : S.textDim,
-                  fontSize: '14px',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}
                 onMouseEnter={(e) => { if (!rightCollapsed) { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; } }}
                 onMouseLeave={(e) => { if (!rightCollapsed) { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = S.textDim; } }}
-              >☰</button>
+              >
+                {rightCollapsed
+                  ? <PanelRightOpen size={15} strokeWidth={2.25} />
+                  : <PanelRightClose size={15} strokeWidth={2.25} />}
+              </button>
             </div>
           </div>
 
