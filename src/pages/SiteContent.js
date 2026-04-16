@@ -1253,6 +1253,22 @@ export default function SiteContent() {
   const [templates, setTemplates] = useState(() => {
     try { return JSON.parse(localStorage.getItem('blockTemplates') || '[]'); } catch { return []; }
   });
+  // Phase 5: custom confirmation modal. window.confirm() from inside a
+  // cross-origin postMessage handler is unreliable (some Chromium
+  // channels suppress it without user activation on the parent). A
+  // React modal is also a nicer UX — matches the rest of the editor.
+  // Shape: { title, message, confirmLabel, tone, onConfirm }
+  const [confirmModal, setConfirmModal] = useState(null);
+  const askConfirm = useCallback((opts) => {
+    // opts: { title, message, confirmLabel?, tone?, onConfirm }
+    setConfirmModal({
+      title: opts.title || 'Confirm',
+      message: opts.message || '',
+      confirmLabel: opts.confirmLabel || 'Confirm',
+      tone: opts.tone || 'danger',
+      onConfirm: opts.onConfirm,
+    });
+  }, []);
   // Hamburger-style collapse for both sidebars. Each panel is either
   // at its full fixed width or fully hidden (width 0 with a CSS
   // transition for a smooth slide). State persists across sessions so
@@ -1657,23 +1673,30 @@ export default function SiteContent() {
           e.preventDefault();
           const idsToDelete = new Set([selectedBlockId, ...multiSelectedIds]);
           const count = idsToDelete.size;
-          if (!window.confirm(count > 1 ? `Delete ${count} blocks?` : 'Delete this block?')) return;
-          setDraftContent(prev => {
-            const page = prev.pages?.[editingPage];
-            if (!page || !Array.isArray(page.blocks)) return prev;
-            return {
-              ...prev,
-              pages: {
-                ...prev.pages,
-                [editingPage]: {
-                  ...page,
-                  blocks: page.blocks.filter(b => !idsToDelete.has(b.id)),
-                },
-              },
-            };
+          setConfirmModal({
+            title: count > 1 ? `Delete ${count} blocks?` : 'Delete this block?',
+            message: 'Removes from the draft. You can undo with ⌘Z.',
+            confirmLabel: count > 1 ? `Delete ${count}` : 'Delete',
+            tone: 'danger',
+            onConfirm: () => {
+              setDraftContent(prev => {
+                const page = prev.pages?.[editingPage];
+                if (!page || !Array.isArray(page.blocks)) return prev;
+                return {
+                  ...prev,
+                  pages: {
+                    ...prev.pages,
+                    [editingPage]: {
+                      ...page,
+                      blocks: page.blocks.filter(b => !idsToDelete.has(b.id)),
+                    },
+                  },
+                };
+              });
+              setSelectedBlockId(null);
+              setMultiSelectedIds(new Set());
+            },
           });
-          setSelectedBlockId(null);
-          setMultiSelectedIds(new Set());
           return;
         }
         // Cmd+D → duplicate block(s)
@@ -1823,23 +1846,34 @@ export default function SiteContent() {
       }
       // Phase 3: On-canvas toolbar actions (delete, duplicate, move)
       if (msg.type === 'tapas:delete-block' && msg.blockId && msg.pageKey) {
-        // Ask for confirmation in the editor (avoids popup blocker issues)
-        if (!window.confirm(`Delete this block?`)) return;
-        setDraftContent(prev => {
-          const page = prev.pages?.[msg.pageKey];
-          if (!page || !Array.isArray(page.blocks)) return prev;
-          return {
-            ...prev,
-            pages: {
-              ...prev.pages,
-              [msg.pageKey]: {
-                ...page,
-                blocks: page.blocks.filter(b => b.id !== msg.blockId),
-              },
-            },
-          };
+        // Ask for confirmation via the in-page modal (native confirm()
+        // can be silently suppressed when triggered from a cross-origin
+        // iframe's postMessage without parent-side user activation).
+        const pageKey = msg.pageKey;
+        const blockId = msg.blockId;
+        setConfirmModal({
+          title: 'Delete block?',
+          message: 'This removes the block from the draft. You can undo with ⌘Z or restore by discarding changes.',
+          confirmLabel: 'Delete',
+          tone: 'danger',
+          onConfirm: () => {
+            setDraftContent(prev => {
+              const page = prev.pages?.[pageKey];
+              if (!page || !Array.isArray(page.blocks)) return prev;
+              return {
+                ...prev,
+                pages: {
+                  ...prev.pages,
+                  [pageKey]: {
+                    ...page,
+                    blocks: page.blocks.filter(b => b.id !== blockId),
+                  },
+                },
+              };
+            });
+            setSelectedBlockId(null);
+          },
         });
-        setSelectedBlockId(null);
         return;
       }
       if (msg.type === 'tapas:duplicate-block' && msg.blockId && msg.pageKey) {
@@ -1960,6 +1994,81 @@ export default function SiteContent() {
       background: S.bg,
       fontFamily: '-apple-system, system-ui, sans-serif',
     }}>
+      {/* ==================== Confirm modal ==================== */}
+      {confirmModal && (
+        <div
+          onClick={() => setConfirmModal(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirmModal(null);
+            if (e.key === 'Enter') {
+              try { confirmModal.onConfirm?.(); } catch {}
+              setConfirmModal(null);
+            }
+          }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '420px',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+              padding: '24px',
+              fontFamily: '-apple-system, system-ui, sans-serif',
+            }}
+          >
+            <div style={{
+              fontSize: '16px', fontWeight: '700', color: S.text, marginBottom: '8px',
+            }}>{confirmModal.title}</div>
+            {confirmModal.message && (
+              <div style={{
+                fontSize: '13px', color: S.textDim, lineHeight: 1.5, marginBottom: '20px',
+              }}>{confirmModal.message}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => setConfirmModal(null)}
+                style={{
+                  padding: '8px 16px',
+                  background: '#fff',
+                  border: `1px solid ${S.border}`,
+                  borderRadius: '6px',
+                  color: S.text,
+                  fontSize: '13px', fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >Cancel</button>
+              <button
+                autoFocus
+                onClick={() => {
+                  const fn = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  try { fn?.(); } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('[confirm] action failed', err);
+                  }
+                }}
+                style={{
+                  padding: '8px 16px',
+                  background: confirmModal.tone === 'danger' ? (S.danger || '#dc2626') : S.accent,
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '13px', fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220,38,38,0.3)',
+                }}
+              >{confirmModal.confirmLabel || 'Confirm'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== Templates modal ==================== */}
       {templatesOpen && (
         <div
@@ -2081,11 +2190,16 @@ export default function SiteContent() {
                           >Insert</button>
                           <button
                             onClick={() => {
-                              if (!window.confirm(`Delete template "${t.name}"?`)) return;
-                              setTemplates(prev => {
-                                const next = prev.filter((_, i) => i !== idx);
-                                try { localStorage.setItem('blockTemplates', JSON.stringify(next)); } catch {}
-                                return next;
+                              askConfirm({
+                                title: `Delete template "${t.name}"?`,
+                                message: 'The template will be removed from your saved list.',
+                                confirmLabel: 'Delete template',
+                                tone: 'danger',
+                                onConfirm: () => setTemplates(prev => {
+                                  const next = prev.filter((_, i) => i !== idx);
+                                  try { localStorage.setItem('blockTemplates', JSON.stringify(next)); } catch {}
+                                  return next;
+                                }),
                               });
                             }}
                             title="Delete template"
@@ -2601,24 +2715,32 @@ export default function SiteContent() {
                   </span>
                   <button
                     onClick={() => {
-                      if (!window.confirm(`Delete ${multiSelectedIds.size + 1} blocks?`)) return;
-                      const idsToDelete = new Set([selectedBlockId, ...multiSelectedIds]);
-                      setDraftContent(prev => {
-                        const page = prev.pages?.[editingPage];
-                        if (!page || !Array.isArray(page.blocks)) return prev;
-                        return {
-                          ...prev,
-                          pages: {
-                            ...prev.pages,
-                            [editingPage]: {
-                              ...page,
-                              blocks: page.blocks.filter(b => !idsToDelete.has(b.id)),
-                            },
-                          },
-                        };
+                      const count = multiSelectedIds.size + 1;
+                      askConfirm({
+                        title: `Delete ${count} blocks?`,
+                        message: 'All selected blocks will be removed from the draft. You can undo with ⌘Z.',
+                        confirmLabel: `Delete ${count}`,
+                        tone: 'danger',
+                        onConfirm: () => {
+                          const idsToDelete = new Set([selectedBlockId, ...multiSelectedIds]);
+                          setDraftContent(prev => {
+                            const page = prev.pages?.[editingPage];
+                            if (!page || !Array.isArray(page.blocks)) return prev;
+                            return {
+                              ...prev,
+                              pages: {
+                                ...prev.pages,
+                                [editingPage]: {
+                                  ...page,
+                                  blocks: page.blocks.filter(b => !idsToDelete.has(b.id)),
+                                },
+                              },
+                            };
+                          });
+                          setSelectedBlockId(null);
+                          setMultiSelectedIds(new Set());
+                        },
                       });
-                      setSelectedBlockId(null);
-                      setMultiSelectedIds(new Set());
                     }}
                     style={{
                       padding: '5px 10px', background: S.danger || '#dc2626', color: '#fff',
@@ -2778,7 +2900,13 @@ export default function SiteContent() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Delete ${meta?.label || b.type}?`)) deleteBlock(editingPage, b.id);
+                            askConfirm({
+                              title: `Delete ${meta?.label || b.type}?`,
+                              message: 'This removes the block from the draft. You can undo with ⌘Z.',
+                              confirmLabel: 'Delete',
+                              tone: 'danger',
+                              onConfirm: () => deleteBlock(editingPage, b.id),
+                            });
                           }}
                           title="Delete"
                           style={{
@@ -3111,9 +3239,13 @@ export default function SiteContent() {
               onDuplicate={() => duplicateBlock(editingPage, selectedBlock.id)}
               onDelete={() => {
                 const meta = BLOCK_REGISTRY_META[selectedBlock.type];
-                if (window.confirm(`Delete ${meta?.label || selectedBlock.type}?`)) {
-                  deleteBlock(editingPage, selectedBlock.id);
-                }
+                askConfirm({
+                  title: `Delete ${meta?.label || selectedBlock.type}?`,
+                  message: 'This removes the block from the draft. You can undo with ⌘Z.',
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                  onConfirm: () => deleteBlock(editingPage, selectedBlock.id),
+                });
               }}
             />
           ) : (
