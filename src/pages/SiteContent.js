@@ -4,6 +4,13 @@ import { DEFAULT_CONTENT, CONTENT_SCHEMA, sectionForFieldPath } from '../utils/s
 import {
   BLOCK_REGISTRY_META, BLOCK_CATEGORIES, EDITABLE_PAGES, makeBlock,
 } from '../utils/blockRegistryMeta';
+import {
+  DndContext, PointerSensor, useSensor, useSensors, closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext, useSortable, arrayMove, verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // =====================================================================
 // SiteContent — Figma-style three-panel visual editor.
@@ -1649,6 +1656,95 @@ function ElementStyleRow({ field, value, onChange }) {
   );
 }
 
+// ---- SortableBlockRow --------------------------------------------------
+// One row in the Layers tree. Uses @dnd-kit's useSortable to make the row
+// reorderable via drag-and-drop. The drag handle (⋮⋮) on the left is the
+// only drag-activator — the rest of the row keeps its click-to-select
+// behavior. We also add a small pointer-distance activation constraint at
+// the DndContext level so a quick click doesn't get interpreted as a drag.
+function SortableBlockRow({
+  block, meta, isPrimary, isMulti, isSelected,
+  onSelect, onDuplicate, onDelete, S,
+}) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: block.id });
+  const dragStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : 'auto',
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      onClick={onSelect}
+      style={{
+        ...dragStyle,
+        display: 'flex', alignItems: 'center', gap: '4px',
+        padding: '7px 6px', marginBottom: '2px',
+        background: isPrimary ? S.accentLight : isMulti ? (S.accentLight || '#DBEAFE') + '88' : 'transparent',
+        border: `1px solid ${isSelected ? S.accent + '55' : 'transparent'}`,
+        borderRadius: '4px', cursor: 'pointer',
+        fontSize: '11.5px',
+        boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.12)' : 'none',
+      }}
+      onMouseEnter={(e) => { if (!isSelected && !isDragging) e.currentTarget.style.background = S.bg; }}
+      onMouseLeave={(e) => { if (!isSelected && !isDragging) e.currentTarget.style.background = 'transparent'; }}
+    >
+      {/* Drag handle — only spot that activates dragging. We attach the
+          attributes/listeners here so clicking elsewhere on the row still
+          selects. cursor:grab → grabbing during drag. */}
+      <span
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '14px', flexShrink: 0,
+          color: S.textFaint, fontSize: '14px',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          textAlign: 'center', userSelect: 'none',
+          lineHeight: 1, letterSpacing: '-3px',
+        }}
+      >⋮⋮</span>
+      <span style={{ fontSize: '13px', flexShrink: 0, width: '16px', textAlign: 'center' }}>
+        {meta?.icon || '▫'}
+      </span>
+      <span style={{
+        flex: 1, minWidth: 0, overflow: 'hidden',
+        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        color: isSelected ? S.accent : S.text,
+        fontWeight: isSelected ? '600' : '500',
+      }}>
+        {meta?.label || block.type}
+      </span>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+        title="Duplicate (⌘D)"
+        style={{
+          width: '20px', height: '20px', padding: 0,
+          background: 'transparent', border: 'none',
+          color: S.textDim, cursor: 'pointer',
+          fontSize: '11px', borderRadius: '2px',
+        }}
+      >⎘</button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        title="Delete (⌫)"
+        style={{
+          width: '20px', height: '20px', padding: 0,
+          background: 'transparent', border: 'none',
+          color: S.textDim, cursor: 'pointer',
+          fontSize: '12px', borderRadius: '2px',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = S.danger; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; }}
+      >✕</button>
+    </div>
+  );
+}
+
 // ---- PageSettingsPanel -------------------------------------------------
 // Right-inspector content when nothing is selected. Shows page-level
 // settings: visibility toggles filtered by the active page, and any
@@ -2124,6 +2220,13 @@ export default function SiteContent() {
       return next;
     });
   }, [mutateBlocks]);
+
+  // Drag-and-drop sensors. The 5px activation distance prevents a
+  // single click from being misread as a drag — important because the
+  // row's whole surface stays clickable for selection.
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   const moveBlock = useCallback((pageKey, blockId, delta) => {
     mutateBlocks(pageKey, (blocks) => {
@@ -4701,7 +4804,12 @@ export default function SiteContent() {
                 </div>
               )}
 
-              {/* Block tree for the current editing page */}
+              {/* Block tree for the current editing page — drag-to-reorder
+                  via @dnd-kit. The drag handle (⋮⋮ on the left of each
+                  row) is the only drag activator; the rest of the row
+                  retains click-to-select. On drop we splice the blocks
+                  array via the existing mutateBlocks path so undo/redo
+                  and autosave keep working. */}
               <div style={{ padding: '0 8px 12px', flex: 1 }}>
                 {(() => {
                   const blocks = getBlocks(editingPage);
@@ -4716,122 +4824,73 @@ export default function SiteContent() {
                       </div>
                     );
                   }
-                  return blocks.map((b, idx) => {
-                    const meta = BLOCK_REGISTRY_META[b.type];
-                    const isPrimary = selectedBlockId === b.id;
-                    const isMulti = multiSelectedIds.has(b.id);
-                    const isSelected = isPrimary || isMulti;
-                    return (
-                      <div
-                        key={b.id}
-                        onClick={(e) => {
-                          if (e.shiftKey && selectedBlockId) {
-                            // Range select: include all blocks between anchor and clicked block
-                            const anchorIdx = blocks.findIndex(x => x.id === selectedBlockId);
-                            if (anchorIdx !== -1) {
-                              const [start, end] = anchorIdx < idx ? [anchorIdx, idx] : [idx, anchorIdx];
-                              const range = new Set();
-                              for (let i = start; i <= end; i++) {
-                                if (blocks[i].id !== selectedBlockId) range.add(blocks[i].id);
-                              }
-                              setMultiSelectedIds(range);
-                              return;
-                            }
-                          }
-                          if (e.metaKey || e.ctrlKey) {
-                            // Toggle select: add/remove this block from multi-selection
-                            setMultiSelectedIds(prev => {
-                              const next = new Set(prev);
-                              if (next.has(b.id)) next.delete(b.id);
-                              else next.add(b.id);
-                              return next;
-                            });
-                            return;
-                          }
-                          // Normal click: select one block, clear multi-selection
-                          setSelectedBlockId(b.id);
-                          setMultiSelectedIds(new Set());
-                        }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '6px',
-                          padding: '7px 8px', marginBottom: '2px',
-                          background: isPrimary ? S.accentLight : isMulti ? (S.accentLight || '#DBEAFE') + '88' : 'transparent',
-                          border: `1px solid ${isSelected ? S.accent + '55' : 'transparent'}`,
-                          borderRadius: '4px', cursor: 'pointer',
-                          fontSize: '11.5px',
-                        }}
-                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = S.bg; }}
-                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <span style={{ fontSize: '13px', flexShrink: 0, width: '16px', textAlign: 'center' }}>
-                          {meta?.icon || '▫'}
-                        </span>
-                        <span style={{
-                          flex: 1, minWidth: 0, overflow: 'hidden',
-                          textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          color: isSelected ? S.accent : S.text,
-                          fontWeight: isSelected ? '600' : '500',
-                        }}>
-                          {meta?.label || b.type}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); moveBlock(editingPage, b.id, -1); }}
-                          disabled={idx === 0}
-                          title="Move up"
-                          style={{
-                            width: '18px', height: '18px', padding: 0,
-                            background: 'transparent', border: 'none',
-                            color: idx === 0 ? S.textFaint : S.textDim,
-                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                            fontSize: '11px', borderRadius: '2px',
-                          }}
-                        >↑</button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); moveBlock(editingPage, b.id, 1); }}
-                          disabled={idx === blocks.length - 1}
-                          title="Move down"
-                          style={{
-                            width: '18px', height: '18px', padding: 0,
-                            background: 'transparent', border: 'none',
-                            color: idx === blocks.length - 1 ? S.textFaint : S.textDim,
-                            cursor: idx === blocks.length - 1 ? 'not-allowed' : 'pointer',
-                            fontSize: '11px', borderRadius: '2px',
-                          }}
-                        >↓</button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); duplicateBlock(editingPage, b.id); }}
-                          title="Duplicate"
-                          style={{
-                            width: '18px', height: '18px', padding: 0,
-                            background: 'transparent', border: 'none',
-                            color: S.textDim, cursor: 'pointer',
-                            fontSize: '11px', borderRadius: '2px',
-                          }}
-                        >⎘</button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            askConfirm({
-                              title: `Delete ${meta?.label || b.type}?`,
-                              message: 'This removes the block from the draft. You can undo with ⌘Z.',
-                              confirmLabel: 'Delete',
-                              tone: 'danger',
-                              onConfirm: () => deleteBlock(editingPage, b.id),
-                            });
-                          }}
-                          title="Delete"
-                          style={{
-                            width: '18px', height: '18px', padding: 0,
-                            background: 'transparent', border: 'none',
-                            color: S.textDim, cursor: 'pointer',
-                            fontSize: '12px', borderRadius: '2px',
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = S.danger; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; }}
-                        >✕</button>
-                      </div>
-                    );
-                  });
+                  const handleSelect = (b, idx) => (e) => {
+                    if (e.shiftKey && selectedBlockId) {
+                      const anchorIdx = blocks.findIndex(x => x.id === selectedBlockId);
+                      if (anchorIdx !== -1) {
+                        const [start, end] = anchorIdx < idx ? [anchorIdx, idx] : [idx, anchorIdx];
+                        const range = new Set();
+                        for (let i = start; i <= end; i++) {
+                          if (blocks[i].id !== selectedBlockId) range.add(blocks[i].id);
+                        }
+                        setMultiSelectedIds(range);
+                        return;
+                      }
+                    }
+                    if (e.metaKey || e.ctrlKey) {
+                      setMultiSelectedIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(b.id)) next.delete(b.id);
+                        else next.add(b.id);
+                        return next;
+                      });
+                      return;
+                    }
+                    setSelectedBlockId(b.id);
+                    setMultiSelectedIds(new Set());
+                  };
+                  return (
+                    <DndContext
+                      sensors={dndSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={({ active, over }) => {
+                        if (!over || active.id === over.id) return;
+                        const oldIdx = blocks.findIndex(b => b.id === active.id);
+                        const newIdx = blocks.findIndex(b => b.id === over.id);
+                        if (oldIdx < 0 || newIdx < 0) return;
+                        mutateBlocks(editingPage, (b) => arrayMove(b, oldIdx, newIdx));
+                      }}
+                    >
+                      <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                        {blocks.map((b, idx) => {
+                          const meta = BLOCK_REGISTRY_META[b.type];
+                          const isPrimary = selectedBlockId === b.id;
+                          const isMulti = multiSelectedIds.has(b.id);
+                          const isSelected = isPrimary || isMulti;
+                          return (
+                            <SortableBlockRow
+                              key={b.id}
+                              block={b}
+                              meta={meta}
+                              isPrimary={isPrimary}
+                              isMulti={isMulti}
+                              isSelected={isSelected}
+                              S={S}
+                              onSelect={handleSelect(b, idx)}
+                              onDuplicate={() => duplicateBlock(editingPage, b.id)}
+                              onDelete={() => askConfirm({
+                                title: `Delete ${meta?.label || b.type}?`,
+                                message: 'This removes the block from the draft. You can undo with ⌘Z.',
+                                confirmLabel: 'Delete',
+                                tone: 'danger',
+                                onConfirm: () => deleteBlock(editingPage, b.id),
+                              })}
+                            />
+                          );
+                        })}
+                      </SortableContext>
+                    </DndContext>
+                  );
                 })()}
               </div>
             </div>
