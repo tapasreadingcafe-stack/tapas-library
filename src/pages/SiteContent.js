@@ -1874,21 +1874,21 @@ function SortableBlockRow({
 // in the Design System modal, not here.
 function PageSettingsPanel({
   page,
+  pageMeta,
+  blocksCount,
+  isCustom,
+  reservedPaths,
+  takenPaths,
+  onChangeMeta,
+  onChangePath,
+  onDuplicate,
+  onDelete,
+  openMediaLibrary,
   onOpenDesignSystem,
 }) {
-  // Per-page visibility/order subsections were removed:
-  //   - "Sections on this page" was redundant with the per-block 👁
-  //     toggle now in the Layers tree (see SortableBlockRow).
-  //   - "Section order" was a legacy `home_section_order` string that
-  //     only fed the pre-block rendering path; ordering for block-based
-  //     pages is handled by drag-to-reorder in Layers.
-  // Both lists also caused mid-word label truncation in the 320px
-  // panel — removing them is the cleanup.
-
   // Dismissible canvas-editing tip. Persisted in localStorage so the
   // "click any text on the preview" hint disappears after first dismiss
-  // instead of nagging every session. Initialiser is wrapped in try/catch
-  // so SSR / private-mode users still see the tip rather than crashing.
+  // instead of nagging every session.
   const [tipDismissed, setTipDismissed] = useState(() => {
     try { return localStorage.getItem('tapas_editor_tip_dismissed') === '1'; }
     catch { return false; }
@@ -1896,6 +1896,29 @@ function PageSettingsPanel({
   const dismissTip = () => {
     setTipDismissed(true);
     try { localStorage.setItem('tapas_editor_tip_dismissed', '1'); } catch {}
+  };
+
+  // Slug edit — local input, validated, committed on Enter or blur.
+  // Keeps an inline error visible so users see why a save was refused.
+  const [pathDraft, setPathDraft] = useState(page.path);
+  const [pathError, setPathError] = useState('');
+  useEffect(() => { setPathDraft(page.path); setPathError(''); }, [page.path, page.key]);
+  const validatePath = (raw) => {
+    let path = raw.trim();
+    if (!path.startsWith('/')) path = '/' + path;
+    if (path === page.path) return { ok: true, path, noop: true };
+    if (path.length < 2) return { ok: false, error: 'Path must include something after "/".' };
+    if (!/^\/[a-z0-9][a-z0-9-/]*$/.test(path)) return { ok: false, error: 'Lowercase letters, digits, and dashes only.' };
+    if (reservedPaths?.has(path) || /^\/(books|blog|order)\//.test(path)) return { ok: false, error: `"${path}" is reserved.` };
+    if (takenPaths?.includes(path)) return { ok: false, error: `Another page already uses "${path}".` };
+    return { ok: true, path };
+  };
+  const commitPath = () => {
+    const result = validatePath(pathDraft);
+    if (!result.ok) { setPathError(result.error); return; }
+    setPathError('');
+    if (!result.noop) onChangePath(result.path);
+    setPathDraft(result.path);
   };
 
   return (
@@ -1952,13 +1975,255 @@ function PageSettingsPanel({
         </div>
       )}
 
-      {/* Block management hint — replaces the legacy visibility/order
-          subsections. Block visibility now lives in the Layers tree (👁
-          toggle per row), and ordering is drag-to-reorder. */}
-      <div style={{ padding: '0 16px 4px', color: D.textDim, fontSize: '11px', lineHeight: 1.6 }}>
+      {/* Block management hint — block visibility lives in the Layers
+          tree (👁 toggle per row), ordering is drag-to-reorder. */}
+      <div style={{ padding: '0 16px 14px', color: D.textDim, fontSize: '11px', lineHeight: 1.6 }}>
         Hide / reorder blocks in the <strong style={{ color: D.text }}>Layers</strong> panel on the left.
         Click any block on the canvas to edit its properties.
       </div>
+
+      {/* Page details — name + slug. Read-only labels for fixed pages
+          (home/books/about/offers); editable for custom pages. */}
+      <SubSection title="Page details" defaultOpen={true}>
+        <div style={{ padding: '0 16px 8px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
+            Page name {!isCustom && <span style={{ color: D.textFaint, fontWeight: 400 }}>(fixed)</span>}
+          </label>
+          {isCustom ? (
+            <input
+              type="text"
+              value={pageMeta.label || page.label}
+              onChange={(e) => onChangeMeta('label', e.target.value)}
+              placeholder="e.g. Our Team"
+              style={{
+                width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+                background: '#fff', border: `1px solid ${D.border}`,
+                borderRadius: '4px', fontSize: '11.5px', color: D.text,
+                outline: 'none',
+              }}
+            />
+          ) : (
+            <div style={{ fontSize: '11.5px', color: D.text, padding: '6px 0' }}>{page.label}</div>
+          )}
+        </div>
+        <div style={{ padding: '0 16px 4px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
+            URL path {!isCustom && <span style={{ color: D.textFaint, fontWeight: 400 }}>(fixed)</span>}
+          </label>
+          {isCustom ? (
+            <>
+              <input
+                type="text"
+                value={pathDraft}
+                onChange={(e) => { setPathDraft(e.target.value); if (pathError) setPathError(''); }}
+                onBlur={commitPath}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitPath(); e.currentTarget.blur(); } }}
+                placeholder="/our-team"
+                style={{
+                  width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+                  background: '#fff',
+                  border: `1px solid ${pathError ? D.danger : D.border}`,
+                  borderRadius: '4px', fontSize: '11.5px', color: D.text,
+                  outline: 'none', fontFamily: 'ui-monospace, monospace',
+                }}
+              />
+              {pathError ? (
+                <div style={{ fontSize: '10px', color: D.danger, marginTop: '4px' }}>{pathError}</div>
+              ) : (
+                <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
+                  Renaming the slug will 404 the old URL once published.
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: '11.5px', color: D.text, padding: '6px 0', fontFamily: 'ui-monospace, monospace' }}>
+              {page.path}
+            </div>
+          )}
+        </div>
+      </SubSection>
+
+      {/* SEO meta — promoted from the sidebar's collapsed details panel
+          so per-page SEO is one click away instead of three. */}
+      <SubSection title="SEO & social" defaultOpen={true}>
+        <div style={{ padding: '0 16px 8px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
+            Page title <span style={{ color: D.textFaint, fontWeight: 400 }}>(&lt;title&gt;)</span>
+          </label>
+          <input
+            type="text"
+            value={pageMeta.title || ''}
+            onChange={(e) => onChangeMeta('title', e.target.value)}
+            placeholder="e.g. Home — Tapas Library"
+            style={{
+              width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+              background: '#fff', border: `1px solid ${D.border}`,
+              borderRadius: '4px', fontSize: '11.5px', color: D.text,
+              outline: 'none',
+            }}
+          />
+        </div>
+        <div style={{ padding: '0 16px 8px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
+            Meta description
+          </label>
+          <textarea
+            value={pageMeta.description || ''}
+            onChange={(e) => onChangeMeta('description', e.target.value)}
+            placeholder="Short summary for search results & social previews (150–160 chars)"
+            rows={3}
+            style={{
+              width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+              background: '#fff', border: `1px solid ${D.border}`,
+              borderRadius: '4px', fontSize: '11.5px', color: D.text,
+              outline: 'none', fontFamily: 'inherit', resize: 'vertical',
+            }}
+          />
+          <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '3px', textAlign: 'right' }}>
+            {(pageMeta.description || '').length}/160
+          </div>
+        </div>
+        <div style={{ padding: '0 16px 8px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
+            Share image <span style={{ color: D.textFaint, fontWeight: 400 }}>(og:image · 1200×630)</span>
+          </label>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={pageMeta.og_image || ''}
+              onChange={(e) => onChangeMeta('og_image', e.target.value)}
+              placeholder="https://… or pick from library"
+              style={{
+                flex: 1, padding: '6px 8px', boxSizing: 'border-box',
+                background: '#fff', border: `1px solid ${D.border}`,
+                borderRadius: '4px', fontSize: '11px', color: D.text,
+                outline: 'none', fontFamily: 'ui-monospace, monospace',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => openMediaLibrary({ onPick: (url) => onChangeMeta('og_image', url) })}
+              title="Pick from media library"
+              style={{
+                padding: '0 8px', height: '26px',
+                background: D.panelAlt, color: D.text, border: `1px solid ${D.border}`,
+                borderRadius: '4px', cursor: 'pointer', fontSize: '11px',
+              }}
+            >📁</button>
+          </div>
+        </div>
+
+        {/* Google SERP preview */}
+        <div style={{ padding: '0 16px 8px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, marginBottom: '6px' }}>
+            Google preview
+          </div>
+          <div style={{
+            padding: '10px 12px',
+            background: '#fff', border: `1px solid ${D.border}`,
+            borderRadius: '6px', fontFamily: 'arial, sans-serif',
+          }}>
+            <div style={{ fontSize: '11px', color: '#006621', marginBottom: '2px' }}>
+              tapasreadingcafe.com{page.path === '/' ? '' : page.path}
+            </div>
+            <div style={{
+              fontSize: '15px', color: '#1a0dab', fontWeight: 400, lineHeight: 1.3,
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+            }}>{pageMeta.title || 'Page title'}</div>
+            <div style={{
+              fontSize: '11px', color: '#545454', marginTop: '2px', lineHeight: 1.4,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}>{pageMeta.description || 'Your meta description will appear here as a preview in Google search results.'}</div>
+          </div>
+        </div>
+
+        {/* Social card preview */}
+        <div style={{ padding: '0 16px 8px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, marginBottom: '6px' }}>
+            Social card preview
+          </div>
+          <div style={{
+            background: '#fff', border: `1px solid ${D.border}`,
+            borderRadius: '8px', overflow: 'hidden',
+          }}>
+            <div style={{
+              width: '100%', aspectRatio: '1200 / 630',
+              background: pageMeta.og_image ? `url(${pageMeta.og_image}) center/cover` : 'linear-gradient(135deg, #667eea, #764ba2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: '11px', fontWeight: 600, letterSpacing: '1px',
+              textTransform: 'uppercase', opacity: pageMeta.og_image ? 1 : 0.9,
+            }}>
+              {!pageMeta.og_image && 'No share image set'}
+            </div>
+            <div style={{ padding: '10px 12px', borderTop: `1px solid ${D.border}` }}>
+              <div style={{ fontSize: '10px', color: D.textDim, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                tapasreadingcafe.com
+              </div>
+              <div style={{
+                fontSize: '13px', fontWeight: 700, color: D.text,
+                marginTop: '3px', lineHeight: 1.3,
+                overflow: 'hidden', textOverflow: 'ellipsis',
+                display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+              }}>{pageMeta.title || 'Page title'}</div>
+              <div style={{
+                fontSize: '11px', color: D.textDim, marginTop: '2px', lineHeight: 1.4,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}>{pageMeta.description || 'Your meta description…'}</div>
+            </div>
+          </div>
+        </div>
+      </SubSection>
+
+      {/* Page actions — duplicate any page; delete only for custom pages.
+          Delete is below a divider so it's harder to mis-click. */}
+      <SubSection title="Page actions" defaultOpen={true}>
+        <div style={{ padding: '0 16px 8px' }}>
+          <button
+            onClick={onDuplicate}
+            style={{
+              width: '100%', padding: '8px 12px',
+              background: D.panelAlt, color: D.text,
+              border: `1px solid ${D.border}`, borderRadius: '4px',
+              cursor: 'pointer', fontSize: '11.5px', fontWeight: '600',
+              display: 'flex', alignItems: 'center', gap: '8px',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = D.inputHover; }}
+            onMouseLeave={e => { e.currentTarget.style.background = D.panelAlt; }}
+          >
+            <Copy size={13} strokeWidth={2.25} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Duplicate page</span>
+          </button>
+          <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
+            Creates a custom copy with all blocks. You'll be switched to the new page.
+          </div>
+        </div>
+        {isCustom && (
+          <div style={{ padding: '8px 16px 4px', borderTop: `1px solid ${D.divider}`, marginTop: '8px' }}>
+            <button
+              onClick={onDelete}
+              style={{
+                width: '100%', padding: '8px 12px',
+                background: 'transparent', color: D.danger,
+                border: `1px solid ${D.danger}55`, borderRadius: '4px',
+                cursor: 'pointer', fontSize: '11.5px', fontWeight: '600',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.borderColor = D.danger; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = D.danger + '55'; }}
+            >
+              <Trash2 size={13} strokeWidth={2.25} />
+              <span style={{ flex: 1, textAlign: 'left' }}>Delete page</span>
+            </button>
+            <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
+              Removes the page and its {blocksCount} block{blocksCount === 1 ? '' : 's'} from the draft.
+              The URL will 404 once published.
+            </div>
+          </div>
+        )}
+      </SubSection>
 
       {/* Footer link to Design System */}
       <div style={{ padding: '20px 16px 0', marginTop: '16px', borderTop: `1px solid ${D.divider}` }}>
@@ -2397,6 +2662,30 @@ export default function SiteContent() {
   // has meta.custom === true — created by the staff via the "+ New
   // page" button. They're merged here and used everywhere a page list
   // is rendered (picker, SEO, store-url navigation).
+  // Reserved URL paths that custom pages can't claim. Mirrors the
+  // checks the New Page modal does so the slug-edit field rejects the
+  // same set. Keep in sync if you add new top-level routes.
+  const RESERVED_PATHS = useMemo(() => new Set([
+    '/', '/books', '/about', '/offers', '/blog', '/events',
+    '/cart', '/checkout', '/login', '/profile', '/order', '/member',
+  ]), []);
+
+  // Update a single key on a page's meta (title / description / og_image
+  // / label / path). Page key in draftContent.pages stays stable; only
+  // meta.path changes when a slug is renamed.
+  const updatePageMeta = useCallback((pageKey, key, value) => {
+    setDraftContent(prev => {
+      const page = prev.pages?.[pageKey] || { meta: {}, blocks: [] };
+      return {
+        ...prev,
+        pages: {
+          ...(prev.pages || {}),
+          [pageKey]: { ...page, meta: { ...(page.meta || {}), [key]: value } },
+        },
+      };
+    });
+  }, []);
+
   const allPages = useMemo(() => {
     const pages = draftContent?.pages || {};
     const customEntries = Object.entries(pages)
@@ -2411,6 +2700,63 @@ export default function SiteContent() {
     return [...EDITABLE_PAGES, ...customEntries];
   }, [draftContent]);
   const currentPageEntry = allPages.find(p => p.key === editingPage) || EDITABLE_PAGES[0];
+
+  // Duplicate the currently-edited page. Always produces a custom page
+  // (so fixed pages get cloned safely without breaking core routes).
+  // Generates a fresh slug by appending "-copy" / "-copy-2" / etc until
+  // it doesn't collide with an existing path. Block ids are regenerated
+  // so the copy is independent of the original.
+  const duplicateCurrentPage = useCallback(() => {
+    const source = draftContent?.pages?.[editingPage];
+    if (!source) return;
+    const baseLabel = (source.meta?.label || currentPageEntry.label || editingPage);
+    const baseSlug = (source.meta?.path || currentPageEntry.path || '/' + editingPage)
+      .replace(/^\/+/, '/').replace(/[^a-z0-9/-]/gi, '-').toLowerCase();
+    const existingPaths = new Set(allPages.map(p => p.path));
+    let suffix = 1;
+    let candidate = `${baseSlug}-copy`;
+    while (existingPaths.has(candidate) || RESERVED_PATHS.has(candidate)) {
+      suffix += 1;
+      candidate = `${baseSlug}-copy-${suffix}`;
+    }
+    const newKey = 'custom_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    const newBlocks = (Array.isArray(source.blocks) ? source.blocks : []).map(b => ({
+      ...JSON.parse(JSON.stringify(b)),
+      id: `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`,
+    }));
+    setDraftContent(prev => ({
+      ...prev,
+      pages: {
+        ...(prev.pages || {}),
+        [newKey]: {
+          meta: {
+            ...(source.meta || {}),
+            custom: true,
+            label: `${baseLabel} (Copy)`,
+            path: candidate,
+            title: source.meta?.title ? `${source.meta.title} (Copy)` : `${baseLabel} (Copy) — Tapas Library`,
+          },
+          blocks: newBlocks,
+        },
+      },
+    }));
+    setEditingPage(newKey);
+    setIframePath(candidate);
+    setSelectedBlockId(null);
+  }, [draftContent, editingPage, currentPageEntry, allPages, RESERVED_PATHS]);
+
+  // Delete the currently-edited custom page. Fixed pages are guarded at
+  // the call site (the Delete button only renders for custom pages).
+  const deleteCurrentPage = useCallback(() => {
+    setDraftContent(prev => {
+      const next = { ...(prev.pages || {}) };
+      delete next[editingPage];
+      return { ...prev, pages: next };
+    });
+    setEditingPage('home');
+    setSelectedBlockId(null);
+    setIframePath('/');
+  }, [editingPage]);
 
   // Update a single CSS property on the currently selected element.
   // Empty string clears the override.
@@ -4375,259 +4721,10 @@ export default function SiteContent() {
                     </optgroup>
                   )}
                 </select>
-                {currentPageEntry?.custom && (
-                  <div style={{
-                    marginTop: '6px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    fontSize: '10px', color: S.textDim,
-                  }}>
-                    <span style={{ fontFamily: 'ui-monospace, monospace' }}>{currentPageEntry.path}</span>
-                    <button
-                      onClick={() => {
-                        askConfirm({
-                          title: `Delete page "${currentPageEntry.label}"?`,
-                          message: `This removes the page and all ${(draftContent?.pages?.[editingPage]?.blocks || []).length} block(s) on it from the draft. URL ${currentPageEntry.path} will 404 once published.`,
-                          confirmLabel: 'Delete page',
-                          tone: 'danger',
-                          onConfirm: () => {
-                            setDraftContent(prev => {
-                              const nextPages = { ...(prev.pages || {}) };
-                              delete nextPages[editingPage];
-                              return { ...prev, pages: nextPages };
-                            });
-                            setEditingPage('home');
-                            setSelectedBlockId(null);
-                            setIframePath('/');
-                          },
-                        });
-                      }}
-                      style={{
-                        padding: '1px 6px', background: 'transparent',
-                        color: S.danger || '#dc2626',
-                        border: `1px solid ${S.border}`, borderRadius: '3px',
-                        fontSize: '10px', fontWeight: '600', cursor: 'pointer',
-                      }}
-                    >Delete page</button>
-                  </div>
-                )}
-
-                {/* SEO meta — collapsible so it doesn't clutter the tree */}
-                <details style={{ marginTop: '10px' }}>
-                  <summary style={{
-                    cursor: 'pointer', userSelect: 'none',
-                    fontSize: '10px', fontWeight: '700', color: S.textDim,
-                    textTransform: 'uppercase', letterSpacing: '0.5px',
-                    padding: '4px 0',
-                  }}>
-                    🔎 SEO &amp; meta
-                  </summary>
-                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div>
-                      <label style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '3px' }}>
-                        Page title <span style={{ color: S.textFaint, fontWeight: 400 }}>(&lt;title&gt;)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={draftContent?.pages?.[editingPage]?.meta?.title || ''}
-                        onChange={(e) => {
-                          const title = e.target.value;
-                          setDraftContent(prev => {
-                            const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
-                            return {
-                              ...prev,
-                              pages: {
-                                ...prev.pages,
-                                [editingPage]: {
-                                  ...page,
-                                  meta: { ...(page.meta || {}), title },
-                                },
-                              },
-                            };
-                          });
-                        }}
-                        placeholder="e.g. Home — Tapas Library"
-                        style={{
-                          width: '100%', padding: '6px 8px',
-                          background: '#fff', border: `1px solid ${S.border}`,
-                          borderRadius: '4px', fontSize: '11px', color: S.text,
-                          outline: 'none', boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '3px' }}>
-                        Meta description
-                      </label>
-                      <textarea
-                        value={draftContent?.pages?.[editingPage]?.meta?.description || ''}
-                        onChange={(e) => {
-                          const description = e.target.value;
-                          setDraftContent(prev => {
-                            const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
-                            return {
-                              ...prev,
-                              pages: {
-                                ...prev.pages,
-                                [editingPage]: {
-                                  ...page,
-                                  meta: { ...(page.meta || {}), description },
-                                },
-                              },
-                            };
-                          });
-                        }}
-                        placeholder="Short summary for search results & social previews (150–160 chars)"
-                        rows={3}
-                        style={{
-                          width: '100%', padding: '6px 8px',
-                          background: '#fff', border: `1px solid ${S.border}`,
-                          borderRadius: '4px', fontSize: '11px', color: S.text,
-                          outline: 'none', boxSizing: 'border-box',
-                          fontFamily: 'inherit', resize: 'vertical',
-                        }}
-                      />
-                      <div style={{ fontSize: '10px', color: S.textFaint, marginTop: '3px', textAlign: 'right' }}>
-                        {(draftContent?.pages?.[editingPage]?.meta?.description || '').length}/160
-                      </div>
-                    </div>
-
-                    {/* OG image for social sharing */}
-                    <div>
-                      <label style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '3px' }}>
-                        Share image <span style={{ color: S.textFaint, fontWeight: 400 }}>(og:image · 1200×630)</span>
-                      </label>
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          value={draftContent?.pages?.[editingPage]?.meta?.og_image || ''}
-                          onChange={(e) => {
-                            const og_image = e.target.value;
-                            setDraftContent(prev => {
-                              const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
-                              return {
-                                ...prev,
-                                pages: {
-                                  ...prev.pages,
-                                  [editingPage]: { ...page, meta: { ...(page.meta || {}), og_image } },
-                                },
-                              };
-                            });
-                          }}
-                          placeholder="https://… or pick from library"
-                          style={{
-                            flex: 1, padding: '6px 8px',
-                            background: '#fff', border: `1px solid ${S.border}`,
-                            borderRadius: '4px', fontSize: '11px', color: S.text,
-                            outline: 'none', boxSizing: 'border-box',
-                            fontFamily: 'ui-monospace, monospace',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => openMediaLibrary({ onPick: (url) => {
-                            setDraftContent(prev => {
-                              const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
-                              return {
-                                ...prev,
-                                pages: {
-                                  ...prev.pages,
-                                  [editingPage]: { ...page, meta: { ...(page.meta || {}), og_image: url } },
-                                },
-                              };
-                            });
-                          }})}
-                          title="Pick from media library"
-                          style={{
-                            padding: '0 8px', height: '26px',
-                            background: S.bg, color: S.text, border: `1px solid ${S.border}`,
-                            borderRadius: '4px', cursor: 'pointer', fontSize: '11px',
-                          }}
-                        >📁</button>
-                      </div>
-                    </div>
-
-                    {/* Google SERP preview */}
-                    {(() => {
-                      const pageMeta = draftContent?.pages?.[editingPage]?.meta || {};
-                      const t = pageMeta.title || 'Page title';
-                      const d = pageMeta.description || 'Your meta description will appear here as a preview in Google search results.';
-                      const pagePath = allPages.find(p => p.key === editingPage)?.path || '/';
-                      const host = 'tapasreadingcafe.com';
-                      return (
-                        <div>
-                          <div style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, marginBottom: '6px' }}>
-                            Google preview
-                          </div>
-                          <div style={{
-                            padding: '10px 12px',
-                            background: '#fff', border: `1px solid ${S.border}`,
-                            borderRadius: '6px',
-                            fontFamily: 'arial, sans-serif',
-                          }}>
-                            <div style={{ fontSize: '11px', color: '#006621', marginBottom: '2px' }}>
-                              {host}{pagePath === '/' ? '' : pagePath}
-                            </div>
-                            <div style={{
-                              fontSize: '15px', color: '#1a0dab', fontWeight: 400, lineHeight: 1.3,
-                              overflow: 'hidden', textOverflow: 'ellipsis',
-                              display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
-                            }}>{t}</div>
-                            <div style={{
-                              fontSize: '11px', color: '#545454', marginTop: '2px', lineHeight: 1.4,
-                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                            }}>{d}</div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Social card (OG) preview */}
-                    {(() => {
-                      const pageMeta = draftContent?.pages?.[editingPage]?.meta || {};
-                      const t = pageMeta.title || 'Page title';
-                      const d = pageMeta.description || 'Your meta description…';
-                      const img = pageMeta.og_image;
-                      return (
-                        <div>
-                          <div style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, marginBottom: '6px' }}>
-                            Social card preview
-                          </div>
-                          <div style={{
-                            background: '#fff', border: `1px solid ${S.border}`,
-                            borderRadius: '8px', overflow: 'hidden',
-                          }}>
-                            <div style={{
-                              width: '100%', aspectRatio: '1200 / 630',
-                              background: img ? `url(${img}) center/cover` : 'linear-gradient(135deg, #667eea, #764ba2)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#fff', fontSize: '11px', fontWeight: 600, letterSpacing: '1px',
-                              textTransform: 'uppercase', opacity: img ? 1 : 0.9,
-                            }}>
-                              {!img && 'No share image set'}
-                            </div>
-                            <div style={{ padding: '10px 12px', borderTop: `1px solid ${S.border}` }}>
-                              <div style={{ fontSize: '10px', color: S.textDim, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                tapasreadingcafe.com
-                              </div>
-                              <div style={{
-                                fontSize: '13px', fontWeight: 700, color: S.text,
-                                marginTop: '3px', lineHeight: 1.3,
-                                overflow: 'hidden', textOverflow: 'ellipsis',
-                                display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
-                              }}>{t}</div>
-                              <div style={{
-                                fontSize: '11px', color: S.textDim, marginTop: '2px', lineHeight: 1.4,
-                                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                              }}>{d}</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </details>
+                {/* Slug for custom pages + delete + SEO previously
+                    lived here. They're all in the right-panel Page
+                    Settings now (which is the contextual default when
+                    nothing is selected on the canvas). */}
               </div>
 
               {/* Add section button — toggles the inline Block Library
@@ -5278,6 +5375,25 @@ export default function SiteContent() {
             // the toolbar).
             <PageSettingsPanel
               page={currentPageEntry}
+              pageMeta={draftContent?.pages?.[editingPage]?.meta || {}}
+              blocksCount={(draftContent?.pages?.[editingPage]?.blocks || []).length}
+              isCustom={!!currentPageEntry.custom}
+              reservedPaths={RESERVED_PATHS}
+              takenPaths={allPages.filter(p => p.key !== editingPage).map(p => p.path)}
+              onChangeMeta={(key, value) => updatePageMeta(editingPage, key, value)}
+              onChangePath={(newPath) => {
+                updatePageMeta(editingPage, 'path', newPath);
+                setIframePath(newPath);
+              }}
+              onDuplicate={() => duplicateCurrentPage()}
+              onDelete={() => askConfirm({
+                title: `Delete page "${currentPageEntry.label}"?`,
+                message: `This removes the page and all ${(draftContent?.pages?.[editingPage]?.blocks || []).length} block(s) on it from the draft. URL ${currentPageEntry.path} will 404 once published.`,
+                confirmLabel: 'Delete page',
+                tone: 'danger',
+                onConfirm: () => deleteCurrentPage(),
+              })}
+              openMediaLibrary={openMediaLibrary}
               onOpenDesignSystem={() => setDesignModalOpen(true)}
             />
           )}
