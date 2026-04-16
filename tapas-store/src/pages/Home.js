@@ -157,7 +157,8 @@ function LegacyHome() {
   const [subscribed, setSubscribed] = useState(false);
   const [emailInput, setEmailInput] = useState('');
 
-  useEffect(() => { fetchData(); /* eslint-disable-next-line */ }, [member?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, [member?.id]);
 
   const fetchRecommended = async () => {
     if (!member) return [];
