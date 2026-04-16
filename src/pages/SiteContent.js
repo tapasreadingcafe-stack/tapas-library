@@ -37,7 +37,22 @@ import {
 // never loses your work. Only push touches production.
 // =====================================================================
 
-const STORE_URL = 'https://www.tapasreadingcafe.com';
+// Resolve the storefront URL the iframe should preview.
+//
+// Priority:
+//   1. REACT_APP_STORE_URL (so deployments can override per-env, and so
+//      local dev can point at http://localhost:3001 — the tapas-store
+//      app's default CRA port)
+//   2. Production fallback to the canonical domain
+//
+// Without this, hitting the editor on localhost loads the production
+// storefront in the iframe and you can't preview unpublished work.
+const STORE_URL = (
+  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_STORE_URL) ||
+  (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname)
+    ? `${window.location.protocol}//${window.location.hostname}:3001`
+    : 'https://www.tapasreadingcafe.com')
+);
 const STORAGE_BUCKET = 'site-content';
 const DRAFT_KEY = 'store_content_draft';
 const LIVE_KEY  = 'store_content';
@@ -1775,6 +1790,19 @@ function PageSettingsPanel({
   // affect what they're currently looking at.
   const pageVisibility = visibilityFields.filter(f => f.key.startsWith(page.key + '_'));
 
+  // Dismissible canvas-editing tip. Persisted in localStorage so the
+  // "click any text on the preview" hint disappears after first dismiss
+  // instead of nagging every session. Initialiser is wrapped in try/catch
+  // so SSR / private-mode users still see the tip rather than crashing.
+  const [tipDismissed, setTipDismissed] = useState(() => {
+    try { return localStorage.getItem('tapas_editor_tip_dismissed') === '1'; }
+    catch { return false; }
+  });
+  const dismissTip = () => {
+    setTipDismissed(true);
+    try { localStorage.setItem('tapas_editor_tip_dismissed', '1'); } catch {}
+  };
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: D.panel, paddingBottom: '40px' }}>
       {/* Page header */}
@@ -1798,18 +1826,36 @@ function PageSettingsPanel({
         </div>
       </div>
 
-      {/* Canvas-editing tip */}
-      <div style={{
-        margin: '14px 14px 16px', padding: '10px 12px',
-        background: D.accentFaint, border: `1px solid rgba(13,153,255,0.25)`,
-        borderRadius: '4px', display: 'flex', gap: '8px', alignItems: 'flex-start',
-      }}>
-        <span style={{ fontSize: '12px', color: D.accent, flexShrink: 0 }}>✎</span>
-        <div style={{ fontSize: '10.5px', color: D.text, lineHeight: '1.45' }}>
-          <strong>Tip:</strong> click a block or text on the canvas to edit it.
-          Nothing selected? This panel shows page-level settings.
+      {/* Canvas-editing tip — dismissible, persisted in localStorage. */}
+      {!tipDismissed && (
+        <div style={{
+          margin: '14px 14px 16px', padding: '10px 12px',
+          background: D.accentFaint, border: `1px solid rgba(13,153,255,0.25)`,
+          borderRadius: '4px', display: 'flex', gap: '8px', alignItems: 'flex-start',
+          position: 'relative',
+        }}>
+          <span style={{ fontSize: '12px', color: D.accent, flexShrink: 0 }}>✎</span>
+          <div style={{ fontSize: '10.5px', color: D.text, lineHeight: '1.45', paddingRight: '18px' }}>
+            <strong>Tip:</strong> click a block or text on the canvas to edit it.
+            Nothing selected? This panel shows page-level settings.
+          </div>
+          <button
+            onClick={dismissTip}
+            title="Dismiss tip"
+            style={{
+              position: 'absolute', top: '6px', right: '6px',
+              width: '18px', height: '18px', padding: 0,
+              background: 'transparent', border: 'none',
+              color: D.textFaint, cursor: 'pointer',
+              borderRadius: '3px',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '14px', lineHeight: 1,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = D.text; e.currentTarget.style.background = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = D.textFaint; e.currentTarget.style.background = 'transparent'; }}
+          >×</button>
         </div>
-      </div>
+      )}
 
       {/* Visibility toggles for this page */}
       {pageVisibility.length > 0 && (
@@ -1946,6 +1992,9 @@ export default function SiteContent() {
   const [newPageOpen, setNewPageOpen] = useState(false);
   const [newPageLabel, setNewPageLabel] = useState('');
   const [newPagePath, setNewPagePath] = useState('');
+  // Inline error in the New Page modal — replaces the old alert() calls
+  // so validation feedback stays inside the modal flow.
+  const [newPageError, setNewPageError] = useState('');
   // Phase 5: revision history — list + restore past publishes
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [revisions, setRevisions] = useState([]);
@@ -2381,11 +2430,20 @@ export default function SiteContent() {
     } finally { setPushing(false); }
   };
 
-  // Revert — discard draft, reload from live.
+  // Revert — discard draft, reload from live. Uses askConfirm so the
+  // modal matches the rest of the editor (and works reliably across
+  // Chromium variants where window.confirm gets suppressed).
   const revertDraft = () => {
-    if (!window.confirm('Discard all unpushed changes and revert to the live version?')) return;
-    setDraftContent(liveContent);
-    saveDraft(liveContent);
+    askConfirm({
+      title: 'Discard all unpublished changes?',
+      message: 'The draft will be reset to match the live site. This cannot be undone.',
+      confirmLabel: 'Discard changes',
+      tone: 'danger',
+      onConfirm: () => {
+        setDraftContent(liveContent);
+        saveDraft(liveContent);
+      },
+    });
   };
 
   // ---- Phase 6: Scheduled publishes ----------------------------------
@@ -2528,11 +2586,18 @@ export default function SiteContent() {
 
   const clearElementStyles = (path) => {
     if (!path) return;
-    if (!window.confirm('Clear all style overrides on this element?')) return;
-    setDraftContent(prev => {
-      const next = { ...(prev.element_styles || {}) };
-      delete next[path];
-      return { ...prev, element_styles: next };
+    askConfirm({
+      title: 'Clear style overrides?',
+      message: 'All custom CSS overrides on this element will be removed. The element will fall back to its block defaults.',
+      confirmLabel: 'Clear overrides',
+      tone: 'danger',
+      onConfirm: () => {
+        setDraftContent(prev => {
+          const next = { ...(prev.element_styles || {}) };
+          delete next[path];
+          return { ...prev, element_styles: next };
+        });
+      },
     });
   };
 
@@ -3600,7 +3665,7 @@ export default function SiteContent() {
       {/* ==================== New page modal ==================== */}
       {newPageOpen && (
         <div
-          onClick={() => { setNewPageOpen(false); setNewPageLabel(''); setNewPagePath(''); }}
+          onClick={() => { setNewPageOpen(false); setNewPageLabel(''); setNewPagePath(''); setNewPageError(''); }}
           style={{
             position: 'fixed', inset: 0, zIndex: 200,
             background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
@@ -3671,9 +3736,18 @@ export default function SiteContent() {
                 Must start with "/". Reserved paths (/, /books, /about, /offers, /blog, /events, /cart, /checkout, /login, /profile) can't be used.
               </div>
             </div>
+            {newPageError && (
+              <div style={{
+                marginBottom: '14px',
+                padding: '10px 12px',
+                background: '#FEF3F2', color: S.danger,
+                border: `1px solid ${S.danger}33`, borderRadius: '6px',
+                fontSize: '12px', fontWeight: '500', lineHeight: 1.45,
+              }}>{newPageError}</div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
-                onClick={() => { setNewPageOpen(false); setNewPageLabel(''); setNewPagePath(''); }}
+                onClick={() => { setNewPageOpen(false); setNewPageLabel(''); setNewPagePath(''); setNewPageError(''); }}
                 style={{
                   padding: '8px 16px', background: '#fff',
                   border: `1px solid ${S.border}`, borderRadius: '6px',
@@ -3685,17 +3759,21 @@ export default function SiteContent() {
                 onClick={() => {
                   const label = newPageLabel.trim();
                   let path = newPagePath.trim();
-                  if (!label) { alert('Page name is required.'); return; }
+                  if (!label) { setNewPageError('Page name is required.'); return; }
                   if (!path.startsWith('/')) path = '/' + path;
-                  if (path.length < 2) { alert('URL path must have at least one character after "/".'); return; }
+                  if (path.length < 2) { setNewPageError('URL path must have at least one character after "/".'); return; }
+                  if (!/^\/[a-z0-9][a-z0-9-/]*$/.test(path)) {
+                    setNewPageError('URL path may only contain lowercase letters, digits, and dashes (e.g. /our-team).');
+                    return;
+                  }
                   const RESERVED = new Set(['/', '/books', '/about', '/offers', '/blog', '/events', '/cart', '/checkout', '/login', '/profile', '/order', '/member']);
                   if (RESERVED.has(path) || path.startsWith('/books/') || path.startsWith('/blog/') || path.startsWith('/order/')) {
-                    alert(`"${path}" is reserved. Pick a different path.`);
+                    setNewPageError(`"${path}" is reserved. Pick a different path.`);
                     return;
                   }
                   // Make sure no existing page (fixed or custom) uses this path
                   const pathTaken = allPages.some(p => p.path === path);
-                  if (pathTaken) { alert(`A page already uses "${path}".`); return; }
+                  if (pathTaken) { setNewPageError(`A page already uses "${path}".`); return; }
                   const key = 'custom_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
                   setDraftContent(prev => ({
                     ...prev,
@@ -3713,6 +3791,7 @@ export default function SiteContent() {
                   setNewPageOpen(false);
                   setNewPageLabel('');
                   setNewPagePath('');
+                  setNewPageError('');
                 }}
                 style={{
                   padding: '8px 16px', background: S.accent,
