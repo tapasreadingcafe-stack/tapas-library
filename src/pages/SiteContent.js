@@ -1370,6 +1370,31 @@ export default function SiteContent() {
   const [newPageOpen, setNewPageOpen] = useState(false);
   const [newPageLabel, setNewPageLabel] = useState('');
   const [newPagePath, setNewPagePath] = useState('');
+  // Phase 5: revision history — list + restore past publishes
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [revisions, setRevisions] = useState([]);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [revisionsError, setRevisionsError] = useState('');
+  const fetchRevisions = useCallback(async () => {
+    setRevisionsLoading(true); setRevisionsError('');
+    try {
+      const { data, error: err } = await supabase
+        .from('site_content_revisions')
+        .select('id, published_by_email, note, published_at, content')
+        .order('published_at', { ascending: false })
+        .limit(100);
+      if (err) throw err;
+      setRevisions(data || []);
+    } catch (err) {
+      setRevisionsError(err.message || 'Failed to load history.');
+    } finally {
+      setRevisionsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (historyModalOpen) fetchRevisions();
+  }, [historyModalOpen, fetchRevisions]);
+
   // Phase 5: media library — shared picker modal for every ImageField.
   // onPick is the callback the caller (an ImageField) passes in; when
   // the user clicks a thumbnail we invoke it with the public URL.
@@ -1739,7 +1764,7 @@ export default function SiteContent() {
     return () => { if (applyContentTimerRef.current) clearTimeout(applyContentTimerRef.current); };
   }, [draftContent, loading, iframeReady]);
 
-  // Push — copies draft → live.
+  // Push — copies draft → live and records a revision snapshot.
   const pushToLive = async () => {
     setPushing(true); setError('');
     try {
@@ -1752,6 +1777,19 @@ export default function SiteContent() {
         key: LIVE_KEY, value: draftContent, updated_at: new Date().toISOString(),
       }, { onConflict: 'key' });
       if (liveErr) throw liveErr;
+      // Phase 5: record a revision. Don't fail the push if this fails —
+      // the live site is the source of truth; history is a nice-to-have.
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from('site_content_revisions').insert([{
+          content: draftContent,
+          published_by_email: user?.email || null,
+          note: null,
+        }]);
+      } catch (revErr) {
+        // eslint-disable-next-line no-console
+        console.warn('[pushToLive] revision snapshot failed:', revErr);
+      }
       setLiveContent(draftContent);
       setPushedAt(new Date());
       setIframeKey(k => k + 1);
@@ -2197,6 +2235,165 @@ export default function SiteContent() {
       background: S.bg,
       fontFamily: '-apple-system, system-ui, sans-serif',
     }}>
+      {/* ==================== Revision History modal ==================== */}
+      {historyModalOpen && (
+        <div
+          onClick={() => setHistoryModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+            fontFamily: '-apple-system, system-ui, sans-serif',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '640px', maxHeight: '80vh',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: `1px solid ${S.border}`,
+              display: 'flex', alignItems: 'center', gap: '12px',
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
+                  📜 Publish history
+                </div>
+                <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
+                  {revisionsLoading ? 'Loading…' : `${revisions.length} published revision${revisions.length === 1 ? '' : 's'}. Restoring a revision loads it into the draft — review and push again to go live.`}
+                </div>
+              </div>
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                style={{
+                  width: '28px', height: '28px',
+                  background: 'transparent', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', cursor: 'pointer',
+                  color: S.textDim, fontSize: '14px',
+                }}
+              >✕</button>
+            </div>
+            {revisionsError && (
+              <div style={{
+                margin: '12px 24px 0', padding: '10px 14px',
+                background: '#fef2f2', border: '1px solid #fecaca',
+                color: '#991b1b', borderRadius: '8px', fontSize: '12px',
+              }}>⚠️ {revisionsError}</div>
+            )}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px 20px' }}>
+              {revisionsLoading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: S.textDim, fontSize: '13px' }}>
+                  Loading…
+                </div>
+              ) : revisions.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center', color: S.textDim, fontSize: '13px', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: '40px', marginBottom: '10px' }}>🗂️</div>
+                  No publishes recorded yet.<br />
+                  Every time you push to live, a snapshot is saved here.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {revisions.map((rev, idx) => {
+                    const pages = rev.content?.pages || {};
+                    const totalBlocks = Object.values(pages).reduce((n, p) => n + (Array.isArray(p?.blocks) ? p.blocks.length : 0), 0);
+                    const pageCount = Object.keys(pages).length;
+                    const published = rev.published_at ? new Date(rev.published_at) : null;
+                    return (
+                      <div key={rev.id} style={{
+                        padding: '12px 14px',
+                        background: idx === 0 ? '#f0f9ff' : '#fff',
+                        border: `1px solid ${idx === 0 ? '#bae6fd' : S.border}`,
+                        borderRadius: '8px',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto auto',
+                        gap: '10px', alignItems: 'center',
+                      }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{
+                            fontSize: '13px', fontWeight: 700, color: S.text,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                          }}>
+                            {published ? published.toLocaleString() : 'Unknown date'}
+                            {idx === 0 && (
+                              <span style={{
+                                padding: '2px 8px', background: '#0284c7', color: '#fff',
+                                borderRadius: '10px', fontSize: '10px', fontWeight: 700,
+                              }}>CURRENT</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '11px', color: S.textDim, marginTop: '2px' }}>
+                            {pageCount} page{pageCount === 1 ? '' : 's'} · {totalBlocks} block{totalBlocks === 1 ? '' : 's'}
+                            {rev.published_by_email && ` · by ${rev.published_by_email}`}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            askConfirm({
+                              title: 'Restore this revision?',
+                              message: `Loads the ${published ? published.toLocaleString() : 'selected'} snapshot into your draft. Your current unsaved changes will be replaced. Push to live afterwards to make it active.`,
+                              confirmLabel: 'Restore to draft',
+                              tone: 'danger',
+                              onConfirm: () => {
+                                setDraftContent(rev.content);
+                                setHistoryModalOpen(false);
+                              },
+                            });
+                          }}
+                          disabled={idx === 0}
+                          title={idx === 0 ? 'This is already your current live content' : 'Load this revision into the draft'}
+                          style={{
+                            padding: '6px 12px',
+                            background: idx === 0 ? S.bg : S.accent,
+                            color: idx === 0 ? S.textFaint : '#fff',
+                            border: 'none', borderRadius: '6px',
+                            fontSize: '11px', fontWeight: '700',
+                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                          }}
+                        >Restore</button>
+                        <button
+                          onClick={() => {
+                            askConfirm({
+                              title: 'Delete this revision?',
+                              message: 'Removes the historical snapshot. Live content is unaffected. This cannot be undone.',
+                              confirmLabel: 'Delete',
+                              tone: 'danger',
+                              onConfirm: async () => {
+                                try {
+                                  const { error: delErr } = await supabase.from('site_content_revisions').delete().eq('id', rev.id);
+                                  if (delErr) throw delErr;
+                                  setRevisions(prev => prev.filter(r => r.id !== rev.id));
+                                } catch (err) {
+                                  setRevisionsError(err.message || 'Delete failed');
+                                }
+                              },
+                            });
+                          }}
+                          title="Delete this snapshot"
+                          style={{
+                            width: '24px', height: '24px', padding: 0,
+                            background: 'transparent', border: 'none',
+                            color: S.textDim, cursor: 'pointer',
+                            fontSize: '12px', borderRadius: '3px',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = S.danger; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; }}
+                        >🗑</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== Media Library modal ==================== */}
       {mediaLibrary.open && (
         <div
@@ -2961,6 +3158,24 @@ export default function SiteContent() {
           >↷</button>
         </div>
 
+        {/* Phase 5: revision history */}
+        <button
+          onClick={() => setHistoryModalOpen(true)}
+          title="View publish history"
+          style={{
+            padding: '7px 12px',
+            background: 'white',
+            border: `1px solid ${S.border}`,
+            borderRadius: '6px',
+            color: S.text,
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '600',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = S.bg; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
+        >📜 History</button>
+
         <button
           onClick={revertDraft}
           disabled={!dirty || pushing}
@@ -3286,6 +3501,111 @@ export default function SiteContent() {
                   }}
                   title={`Open template library (${templates.length} saved)`}
                 >⭐ Templates{templates.length > 0 ? ` (${templates.length})` : ''}</button>
+              </div>
+
+              {/* Phase 5: Export / Import current page as JSON */}
+              <div style={{ padding: '0 14px 12px', display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => {
+                    const page = draftContent?.pages?.[editingPage];
+                    const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+                    // Strip ids — caller may import into a different page and
+                    // we regenerate on import to avoid collisions.
+                    const stripped = blocks.map(b => ({ type: b.type, props: b.props || {} }));
+                    const meta = page?.meta || {};
+                    const payload = {
+                      format: 'tapas-page',
+                      version: 1,
+                      exported_at: new Date().toISOString(),
+                      page: {
+                        key: editingPage,
+                        label: allPages.find(p => p.key === editingPage)?.label || editingPage,
+                        meta: { title: meta.title || '', description: meta.description || '' },
+                        blocks: stripped,
+                      },
+                    };
+                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `tapas-${editingPage}-${new Date().toISOString().slice(0, 10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                  title="Download this page as JSON"
+                  style={{
+                    flex: 1, padding: '7px 8px',
+                    background: 'transparent', color: S.text,
+                    border: `1px solid ${S.border}`, borderRadius: '4px',
+                    fontSize: '11px', fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >⬇ Export JSON</button>
+                <label
+                  title="Replace this page's blocks with an imported JSON file"
+                  style={{
+                    flex: 1, padding: '7px 8px', textAlign: 'center',
+                    background: 'transparent', color: S.text,
+                    border: `1px solid ${S.border}`, borderRadius: '4px',
+                    fontSize: '11px', fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⬆ Import JSON
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const parsed = JSON.parse(text);
+                        const incoming = parsed?.page?.blocks;
+                        if (!Array.isArray(incoming)) throw new Error('File does not contain a valid page.blocks array.');
+                        askConfirm({
+                          title: `Replace ${allPages.find(p => p.key === editingPage)?.label || editingPage} with ${incoming.length} imported blocks?`,
+                          message: 'Blocks currently on this page will be replaced. Your draft is saved, so you can Discard changes to undo.',
+                          confirmLabel: 'Replace blocks',
+                          tone: 'danger',
+                          onConfirm: () => {
+                            const freshBlocks = incoming.map((b) => ({
+                              id: 'block_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+                              type: b.type,
+                              props: b.props || {},
+                            }));
+                            setDraftContent(prev => {
+                              const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
+                              const incomingMeta = parsed?.page?.meta || {};
+                              return {
+                                ...prev,
+                                pages: {
+                                  ...(prev.pages || {}),
+                                  [editingPage]: {
+                                    ...page,
+                                    meta: {
+                                      ...(page.meta || {}),
+                                      ...(incomingMeta.title ? { title: incomingMeta.title } : {}),
+                                      ...(incomingMeta.description ? { description: incomingMeta.description } : {}),
+                                    },
+                                    blocks: freshBlocks,
+                                  },
+                                },
+                              };
+                            });
+                            setSelectedBlockId(null);
+                          },
+                        });
+                      } catch (err) {
+                        setError('Import failed: ' + (err.message || err));
+                      }
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                </label>
               </div>
 
               {/* Phase 4: batch action bar (only visible when multi-selected) */}

@@ -57,7 +57,16 @@ function FooterResponsiveStyles() {
   );
 }
 
-function quickLinks(header) {
+// Phase 5: Quick-links column. If staff set custom_links in the Footer
+// section, use those; otherwise fall back to the nav_* labels from
+// the Header section for backwards compatibility.
+function quickLinks(header, footer) {
+  const custom = Array.isArray(footer?.custom_links)
+    ? footer.custom_links.filter(l => l && l.label && l.href)
+    : [];
+  if (custom.length > 0) {
+    return custom.map(l => [l.label, l.href]);
+  }
   return [
     [header.nav_home   || 'Home',   '/'],
     [header.nav_books  || 'Books',  '/books'],
@@ -89,7 +98,7 @@ function FooterClassic({ brand, footer, contact, header }) {
           </div>
           <div>
             <h4 style={{ color:brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', marginBottom:'16px' }}>{footer.quick_links_heading || 'Quick Links'}</h4>
-            {quickLinks(header).map(([label, to]) => (
+            {quickLinks(header, footer).map(([label, to]) => (
               <div key={to} style={{ marginBottom:'10px' }}>
                 <Link to={to} style={{ color:'#A0856A', textDecoration:'none', fontSize:'14px' }}>{label}</Link>
               </div>
@@ -135,7 +144,7 @@ function FooterMinimal({ brand, footer, header }) {
           <span style={{ fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', fontWeight:'700' }}>{brand.name}</span>
         </div>
         <div style={{ display:'flex', gap:'20px' }}>
-          {quickLinks(header).slice(0, 4).map(([label, to]) => (
+          {quickLinks(header, footer).slice(0, 4).map(([label, to]) => (
             <Link key={to} to={to} style={{ color:'#A0856A', textDecoration:'none', fontSize:'13px' }}>{label}</Link>
           ))}
         </div>
@@ -215,7 +224,7 @@ function FooterNewsletterFirst({ brand, footer, contact, header }) {
           </div>
           <div>
             <h4 style={{ color:brand.accent_color, fontSize:'14px', marginBottom:'12px', textTransform:'uppercase', letterSpacing:'1px' }}>Links</h4>
-            {quickLinks(header).map(([label, to]) => (
+            {quickLinks(header, footer).map(([label, to]) => (
               <div key={to} style={{ marginBottom:'8px' }}>
                 <Link to={to} style={{ color:'#A0856A', textDecoration:'none', fontSize:'13px' }}>{label}</Link>
               </div>
@@ -250,7 +259,7 @@ function FooterCentered({ brand, footer, contact, header }) {
         <div style={{ color:brand.accent_color, fontSize:'12px', letterSpacing:'2px', marginBottom:'20px' }}>{brand.tagline}</div>
         <p style={{ color:'#A0856A', fontSize:'14px', lineHeight:'1.6', marginBottom:'24px', maxWidth:'460px', margin:'0 auto 24px' }}>{footer.tagline}</p>
         <div style={{ display:'flex', gap:'24px', justifyContent:'center', flexWrap:'wrap', marginBottom:'24px' }}>
-          {quickLinks(header).map(([label, to]) => (
+          {quickLinks(header, footer).map(([label, to]) => (
             <Link key={to} to={to} style={{ color:brand.sand_color, textDecoration:'none', fontSize:'13px', fontWeight:'600' }}>{label}</Link>
           ))}
         </div>
@@ -288,7 +297,7 @@ function FooterTwoColumn({ brand, footer, contact, header }) {
           </div>
           <div>
             <h4 style={{ color:brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'16px', marginBottom:'14px' }}>{footer.quick_links_heading || 'Quick Links'}</h4>
-            {quickLinks(header).map(([label, to]) => (
+            {quickLinks(header, footer).map(([label, to]) => (
               <div key={to} style={{ marginBottom:'10px' }}>
                 <Link to={to} style={{ color:'#A0856A', textDecoration:'none', fontSize:'14px' }}>{label}</Link>
               </div>
@@ -324,7 +333,7 @@ function FooterDarkGold({ brand, footer, contact, header }) {
           </div>
           <div>
             <h4 style={{ color:brand.accent_color, fontSize:'13px', marginBottom:'14px', textTransform:'uppercase', letterSpacing:'2px' }}>Navigate</h4>
-            {quickLinks(header).map(([label, to]) => (
+            {quickLinks(header, footer).map(([label, to]) => (
               <div key={to} style={{ marginBottom:'10px' }}>
                 <Link to={to} style={{ color:'#8A7A5E', textDecoration:'none', fontSize:'13px' }}>{label}</Link>
               </div>
@@ -373,7 +382,7 @@ function FooterThreeColumn({ brand, footer, contact, header }) {
           </div>
           <div>
             <h4 style={{ color:brand.accent_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:'15px', marginBottom:'14px' }}>{footer.quick_links_heading || 'Quick Links'}</h4>
-            {quickLinks(header).map(([label, to]) => (
+            {quickLinks(header, footer).map(([label, to]) => (
               <div key={to} style={{ marginBottom:'8px' }}><Link to={to} style={{ color:'#A0856A', textDecoration:'none', fontSize:'13px' }}>{label}</Link></div>
             ))}
           </div>
@@ -426,7 +435,7 @@ function FooterSocialFirst({ brand, footer, contact, header }) {
         </div>
 
         <div style={{ display:'flex', gap:'24px', justifyContent:'center', flexWrap:'wrap', marginBottom:'24px' }}>
-          {quickLinks(header).map(([label, to]) => (
+          {quickLinks(header, footer).map(([label, to]) => (
             <Link key={to} to={to} style={{ color:'#A0856A', textDecoration:'none', fontSize:'13px' }}>{label}</Link>
           ))}
         </div>
@@ -469,7 +478,7 @@ function FooterMapEmbed({ brand, footer, contact, header }) {
           </div>
 
           <div style={{ display:'flex', gap:'18px', flexWrap:'wrap', marginBottom:'18px' }}>
-            {quickLinks(header).slice(0, 4).map(([label, to]) => (
+            {quickLinks(header, footer).slice(0, 4).map(([label, to]) => (
               <Link key={to} to={to} style={{ color:brand.accent_color, textDecoration:'none', fontSize:'13px', fontWeight:'600' }}>{label} →</Link>
             ))}
           </div>

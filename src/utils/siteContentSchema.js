@@ -119,6 +119,9 @@ export const DEFAULT_CONTENT = {
     quick_links_heading: 'Quick Links',
     hours_heading: 'Opening Hours',
     contact_heading: 'Contact',
+    // Optional custom quick-links. If non-empty, replaces the default
+    // Home/Books/Offers/About column on the storefront.
+    custom_links: [],
   },
   header: {
     template: 'classic',
@@ -130,6 +133,9 @@ export const DEFAULT_CONTENT = {
     login_label: 'Login',
     signup_label: 'Sign Up',
     search_placeholder: 'Search books...',
+    // Optional custom nav. If non-empty, replaces the 4 default links
+    // (Home/Books/Offers/About) in every header template.
+    custom_nav_links: [],
   },
   visibility: {
     home_hero: true,
@@ -492,10 +498,19 @@ export const CONTENT_SCHEMA = [
         { value:'announcement',   label: '10. Announcement (marquee + nav)' },
       ] },
       { key: 'logo_emoji',     label: 'Logo emoji',   type: 'text', hint: 'Shown next to the brand name in the navbar.' },
-      { key: 'nav_home',       label: 'Home link',    type: 'text' },
+      { key: 'nav_home',       label: 'Home link',    type: 'text', hint: 'Default label. Ignored if Custom nav links is non-empty.' },
       { key: 'nav_books',      label: 'Books link',   type: 'text' },
       { key: 'nav_offers',     label: 'Offers link',  type: 'text' },
       { key: 'nav_about',      label: 'About link',   type: 'text' },
+      {
+        key: 'custom_nav_links', label: 'Custom nav links', type: 'array',
+        hint: 'If any rows are added, these replace the four default Home/Books/Offers/About links on every header template. Great for adding a "Press" or "Team" page.',
+        itemDefaults: { label: 'New link', href: '/' },
+        itemFields: [
+          { key: 'label', label: 'Label', type: 'text' },
+          { key: 'href',  label: 'Link',  type: 'text', hint: 'Use a relative path like /about, or a full URL like https://…' },
+        ],
+      },
       { key: 'login_label',    label: 'Login button', type: 'text' },
       { key: 'signup_label',   label: 'Sign Up button', type: 'text' },
       { key: 'search_placeholder', label: 'Search placeholder', type: 'text' },
@@ -521,6 +536,15 @@ export const CONTENT_SCHEMA = [
       ] },
       { key: 'tagline',             label: 'Tagline',              type: 'textarea', hint: 'Short description next to the logo.' },
       { key: 'quick_links_heading', label: 'Quick Links heading',  type: 'text' },
+      {
+        key: 'custom_links', label: 'Custom Quick Links', type: 'array',
+        hint: 'If any rows are added, these replace the default Home/Books/Offers/About column in the footer.',
+        itemDefaults: { label: 'New link', href: '/' },
+        itemFields: [
+          { key: 'label', label: 'Label', type: 'text' },
+          { key: 'href',  label: 'Link',  type: 'text' },
+        ],
+      },
       { key: 'hours_heading',       label: 'Opening Hours heading', type: 'text' },
       { key: 'contact_heading',     label: 'Contact heading',      type: 'text' },
       { key: 'copyright_text',      label: 'Copyright text',       type: 'text', hint: 'Appears after "© {year} {brand name}".' },

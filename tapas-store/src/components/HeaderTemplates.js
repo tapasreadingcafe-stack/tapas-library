@@ -86,13 +86,21 @@ function useHeaderState() {
   const header = content.header || {};
   const contact = content.contact || {};
 
-  const navLinks = [
-    { to: '/',       label: header.nav_home   || 'Home' },
-    { to: '/books',  label: header.nav_books  || 'Books' },
-    { to: '/offers', label: header.nav_offers || 'Offers' },
-    { to: '/blog',   label: header.nav_blog   || 'Journal' },
-    { to: '/about',  label: header.nav_about  || 'About' },
-  ];
+  // Phase 5: if staff added Custom nav links in the Header section, use
+  // those instead of the fixed Home/Books/Offers/About set. An empty
+  // array keeps the default behavior.
+  const customLinks = Array.isArray(header.custom_nav_links)
+    ? header.custom_nav_links.filter(l => l && l.label && l.href)
+    : [];
+  const navLinks = customLinks.length > 0
+    ? customLinks.map(l => ({ to: l.href, label: l.label }))
+    : [
+        { to: '/',       label: header.nav_home   || 'Home' },
+        { to: '/books',  label: header.nav_books  || 'Books' },
+        { to: '/offers', label: header.nav_offers || 'Offers' },
+        { to: '/blog',   label: header.nav_blog   || 'Journal' },
+        { to: '/about',  label: header.nav_about  || 'About' },
+      ];
 
   const isActive = (path) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
