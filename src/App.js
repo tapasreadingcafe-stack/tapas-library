@@ -8,6 +8,7 @@ import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
 import { useAuth } from './context/AuthContext';
 import NotificationBell from './components/NotificationBell';
+import CommandPalette from './components/CommandPalette';
 import { ROUTE_PERMISSION_MAP, STAFF_DEFAULT_PERMISSIONS, getPermissionForPath, getStaffPermission } from './utils/permissions';
 import Login from './pages/Login';
 import './App.css';
@@ -105,6 +106,8 @@ const KioskMode             = lazyWithRetry(() => import('./pages/KioskMode'));
 const CustomerOrders        = lazyWithRetry(() => import('./pages/CustomerOrders'));
 const SiteContent           = lazyWithRetry(() => import('./pages/SiteContent'));
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
+const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
+const StoreAnalytics        = lazyWithRetry(() => import('./pages/StoreAnalytics'));
 
 // ── Lazy-loaded pages (New - Phase 6: Productivity + Marketing) ─────────────
 const Tasks                 = lazyWithRetry(() => import('./pages/Tasks'));
@@ -257,9 +260,11 @@ const NAV_CONFIG = [
   {
     icon: '🛒', label: 'Online Store', key: 'store',
     children: [
-      { to: '/store/orders',  icon: '📦', label: 'Online Orders' },
-      { to: '/store/inbox',   icon: '📨', label: 'Contact Inbox' },
-      { to: '/store/content', icon: '🎨', label: 'Edit Website' },
+      { to: '/store/orders',     icon: '📦', label: 'Online Orders' },
+      { to: '/store/inbox',      icon: '📨', label: 'Contact Inbox' },
+      { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
+      { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
+      { to: '/store/content',    icon: '🎨', label: 'Edit Website' },
     ],
   },
   {
@@ -733,6 +738,8 @@ function DashboardShell() {
             {/* Online Store */}
             <Route path="/store/orders"                       element={<CustomerOrders />} />
             <Route path="/store/inbox"                        element={<ContactInbox />} />
+            <Route path="/store/newsletter"                   element={<NewsletterInbox />} />
+            <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/store/content"                      element={<SiteContent />} />
 
             {/* Marketing */}
@@ -764,6 +771,7 @@ function DashboardShell() {
       </main>
       <GlobalTooltip />
       <AppTour active={tourActive} onClose={() => setTourActive(false)} />
+      <CommandPalette />
     </div>
   );
 }

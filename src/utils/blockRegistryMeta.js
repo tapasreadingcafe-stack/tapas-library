@@ -248,12 +248,14 @@ export const BLOCK_REGISTRY_META = {
       description: 'Staff picks, new arrivals, and upcoming events — once a month.',
       placeholder: 'you@email.com',
       button_text: 'Subscribe',
+      success_message: 'You\'re on the list. Thanks!',
     },
     schema: [
-      { key: 'headline',    label: 'Headline',    type: 'text' },
-      { key: 'description', label: 'Description', type: 'textarea' },
-      { key: 'placeholder', label: 'Placeholder', type: 'text' },
-      { key: 'button_text', label: 'Button text', type: 'text' },
+      { key: 'headline',        label: 'Headline',        type: 'text' },
+      { key: 'description',     label: 'Description',     type: 'textarea' },
+      { key: 'placeholder',     label: 'Placeholder',     type: 'text' },
+      { key: 'button_text',     label: 'Button text',     type: 'text' },
+      { key: 'success_message', label: 'Success message', type: 'text' },
     ],
   },
 

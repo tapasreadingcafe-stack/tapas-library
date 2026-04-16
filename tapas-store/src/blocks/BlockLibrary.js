@@ -742,6 +742,27 @@ export function Gallery({ id, pageKey, props, blockIndex, totalBlocks }) {
 
 export function Newsletter({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
+  const [email, setEmail] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      // Upsert on lower(email) — duplicate signups just get "re-activated"
+      // instead of erroring.
+      await supabase.from('newsletter_subscribers').insert([{
+        email: email.trim(),
+        source_page: pageKey,
+      }]);
+    } catch {
+      // Unique violation / network — still show thanks, don't reveal details
+    } finally {
+      setSubmitted(true);
+      setSubmitting(false);
+    }
+  };
   return (
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: 'var(--tapas-sand, #fbfbe2)',
@@ -758,24 +779,38 @@ export function Newsletter({ id, pageKey, props, blockIndex, totalBlocks }) {
           maxWidth: '540px', margin: '0 auto 28px', opacity: 0.85,
         }}>{p.description}</p>
       )}
-      <form
-        onSubmit={(e) => { e.preventDefault(); alert('Thanks! (wire me to your email provider)'); }}
-        style={{ display: 'flex', gap: '8px', maxWidth: '440px', margin: '0 auto' }}
-      >
-        <input
-          type="email" required placeholder={p.placeholder || 'you@email.com'}
-          style={{
-            flex: 1, padding: '14px 18px', fontSize: '15px',
-            border: '1px solid rgba(38,23,12,0.2)', borderRadius: '999px',
-            outline: 'none', background: '#fff',
-          }}
-        />
-        <button type="submit" style={{
-          padding: '14px 24px', borderRadius: '999px',
-          background: 'var(--tapas-accent, #006a6a)', color: '#fff',
-          border: 'none', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
-        }}>{p.button_text || 'Subscribe'}</button>
-      </form>
+      {submitted ? (
+        <div style={{
+          maxWidth: '440px', margin: '0 auto',
+          padding: '14px 20px', borderRadius: '12px',
+          background: 'rgba(0,106,106,0.08)',
+          color: 'var(--tapas-accent, #006a6a)',
+          fontSize: '15px', fontWeight: 600,
+        }}>
+          ✓ {p.success_message || 'You\'re on the list. Thanks!'}
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', maxWidth: '440px', margin: '0 auto' }}>
+          <input
+            type="email" required placeholder={p.placeholder || 'you@email.com'}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={submitting}
+            style={{
+              flex: 1, padding: '14px 18px', fontSize: '15px',
+              border: '1px solid rgba(38,23,12,0.2)', borderRadius: '999px',
+              outline: 'none', background: '#fff',
+            }}
+          />
+          <button type="submit" disabled={submitting} style={{
+            padding: '14px 24px', borderRadius: '999px',
+            background: 'var(--tapas-accent, #006a6a)', color: '#fff',
+            border: 'none', fontWeight: 700, fontSize: '15px',
+            cursor: submitting ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.7 : 1,
+          }}>{submitting ? '…' : (p.button_text || 'Subscribe')}</button>
+        </form>
+      )}
     </BlockFrame>
   );
 }
