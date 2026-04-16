@@ -1649,6 +1649,134 @@ function ElementStyleRow({ field, value, onChange }) {
   );
 }
 
+// ---- PageSettingsPanel -------------------------------------------------
+// Right-inspector content when nothing is selected. Shows page-level
+// settings: visibility toggles filtered by the active page, and any
+// section-order fields for the active page. Global design tokens live
+// in the Design System modal, not here.
+function PageSettingsPanel({
+  page,
+  visibilityFields,
+  visibilityValues,
+  sectionOrderFields,
+  sectionOrderValues,
+  onChangeVisibility,
+  onChangeSectionOrder,
+  onOpenDesignSystem,
+}) {
+  // Visibility fields are keyed like "home_hero", "about_values".
+  // Filter to the active page's prefix so users only see toggles that
+  // affect what they're currently looking at.
+  const pageVisibility = visibilityFields.filter(f => f.key.startsWith(page.key + '_'));
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', background: D.panel, paddingBottom: '40px' }}>
+      {/* Page header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '14px 16px', borderBottom: `1px solid ${D.border}`,
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: '15px' }}>{page.icon || '📄'}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: D.text, letterSpacing: '0.1px' }}>
+            {page.label}
+          </div>
+          <div style={{
+            fontSize: '10px', color: D.textFaint, marginTop: '1px',
+            fontFamily: 'ui-monospace, "SF Mono", monospace',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {page.path}
+          </div>
+        </div>
+      </div>
+
+      {/* Canvas-editing tip */}
+      <div style={{
+        margin: '14px 14px 16px', padding: '10px 12px',
+        background: D.accentFaint, border: `1px solid rgba(13,153,255,0.25)`,
+        borderRadius: '4px', display: 'flex', gap: '8px', alignItems: 'flex-start',
+      }}>
+        <span style={{ fontSize: '12px', color: D.accent, flexShrink: 0 }}>✎</span>
+        <div style={{ fontSize: '10.5px', color: D.text, lineHeight: '1.45' }}>
+          <strong>Tip:</strong> click a block or text on the canvas to edit it.
+          Nothing selected? This panel shows page-level settings.
+        </div>
+      </div>
+
+      {/* Visibility toggles for this page */}
+      {pageVisibility.length > 0 && (
+        <SubSection title="Sections on this page" defaultOpen={true}>
+          {pageVisibility.map(field => (
+            <ToggleField
+              key={field.key}
+              field={{
+                ...field,
+                // Strip the page prefix from labels so "Home — Hero"
+                // reads as just "Hero" inside the page panel.
+                label: field.label.replace(/^[A-Za-z]+\s*—\s*/, ''),
+              }}
+              value={visibilityValues[field.key]}
+              onChange={(v) => onChangeVisibility(field.key, v)}
+            />
+          ))}
+        </SubSection>
+      )}
+
+      {/* Section order (home only, or any page that has a *_section_order field) */}
+      {sectionOrderFields.length > 0 && (
+        <SubSection title="Section order" defaultOpen={true}>
+          {sectionOrderFields.map(field => {
+            const Renderer = FIELD_RENDERERS[field.type] || TextField;
+            return (
+              <Renderer
+                key={field.key}
+                field={field}
+                value={sectionOrderValues[field.key]}
+                onChange={(v) => onChangeSectionOrder(field.key, v)}
+              />
+            );
+          })}
+        </SubSection>
+      )}
+
+      {pageVisibility.length === 0 && sectionOrderFields.length === 0 && (
+        <div style={{ padding: '16px 16px 0', color: D.textFaint, fontSize: '11px', lineHeight: 1.6 }}>
+          No page-level settings for <strong style={{ color: D.textDim }}>{page.label}</strong>.
+          Add or edit blocks from the Layers panel, or click a block on the canvas to edit its properties.
+        </div>
+      )}
+
+      {/* Footer link to Design System */}
+      <div style={{ padding: '20px 16px 0', marginTop: '16px', borderTop: `1px solid ${D.divider}` }}>
+        <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '14px', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Global design
+        </div>
+        <button
+          onClick={onOpenDesignSystem}
+          style={{
+            width: '100%', padding: '9px 12px',
+            background: D.panelAlt, color: D.text,
+            border: `1px solid ${D.border}`, borderRadius: '4px',
+            cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = D.inputHover; }}
+          onMouseLeave={e => { e.currentTarget.style.background = D.panelAlt; }}
+        >
+          <span>🎨</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>Open Design System</span>
+          <span style={{ color: D.textFaint }}>→</span>
+        </button>
+        <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '6px', lineHeight: 1.5 }}>
+          Site-wide brand, typography, buttons, and images.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Main --------------------------------------------------------------
 
 export default function SiteContent() {
@@ -1666,10 +1794,6 @@ export default function SiteContent() {
   const [pushedAt, setPushedAt] = useState(null);
   const [error,   setError]     = useState('');
   const [activeSection, setActiveSection] = useState('brand');
-  // Right-panel top tab. 'design' is the full field editor; 'prototype'
-  // is a placeholder for interaction / animation settings — not wired up
-  // yet but we show it clearly marked as coming soon instead of a dead tab.
-  const [panelTab, setPanelTab] = useState('design');
   // Selected element on the canvas (fieldPath string). When set, the
   // right panel shows an Element Inspector with CSS overrides.
   const [selectedElement, setSelectedElement] = useState(null);
@@ -1680,12 +1804,15 @@ export default function SiteContent() {
   const [viewport, setViewport]   = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const [iframePath, setIframePath] = useState('/');
-  // Webflow-style block editor state (Phase 2).
-  //   sidebarTab     — which left-sidebar tab is active: 'layers' | 'design'
+  // Webflow-style block editor state.
   //   editingPage    — which page's block tree we're manipulating
   //   selectedBlockId — which block is selected (drives right-panel mode)
   //   addPickerOpen  — visibility of the Add-section modal
-  const [sidebarTab, setSidebarTab] = useState('layers');
+  // Design System modal (brand / typography / buttons / images).
+  // Opened from the toolbar Styles button. Global design tokens live
+  // here rather than cluttering the left sidebar.
+  const [designModalOpen, setDesignModalOpen] = useState(false);
+  const [designModalTab, setDesignModalTab] = useState('brand');
   const [editingPage, setEditingPage] = useState('home');
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   // Phase 4: clipboard for cross-page copy/paste
@@ -2461,7 +2588,6 @@ export default function SiteContent() {
         if (m) {
           setEditingPage(m[1]);
           setSelectedBlockId(m[2]);
-          setSidebarTab('layers');
           setSelectedElement(null);
         } else {
           setSelectedElement(msg.fieldPath);
@@ -3031,6 +3157,256 @@ export default function SiteContent() {
         </div>
       )}
 
+      {/* ==================== Design System modal ====================
+          Global design tokens live here, not in the sidebar. Tabs mirror
+          the old DESIGN sidebar group: Brand, Typography, Buttons, Images.
+          Fields use the existing CONTENT_SCHEMA + FIELD_RENDERERS so
+          autosave and live-preview continue to work unchanged. */}
+      {designModalOpen && (() => {
+        const DS_TABS = [
+          { key: 'brand',      label: 'Brand',      icon: '🎨' },
+          { key: 'typography', label: 'Typography', icon: '🔤' },
+          { key: 'buttons',    label: 'Buttons',    icon: '◯' },
+          { key: 'images',     label: 'Images',     icon: '🖼' },
+        ];
+        const activeKey = DS_TABS.some(t => t.key === designModalTab) ? designModalTab : 'brand';
+        const section = CONTENT_SCHEMA.find(s => s.key === activeKey);
+        if (!section) return null;
+        const subGroups = SECTION_SUB_GROUPS[activeKey];
+        const storage = activeKey;
+        const renderField = (field) => {
+          const Renderer = FIELD_RENDERERS[field.type] || TextField;
+          const value = draftContent[storage]?.[field.key];
+          return (
+            <Renderer
+              key={field.key}
+              field={field}
+              value={value}
+              onChange={(v) => updateField(storage, field.key, v)}
+            />
+          );
+        };
+        // Custom colors live on brand.custom_colors — a dynamic array
+        // appended to the Fill subsection so users can add palette
+        // swatches beyond the hard-coded primary/accent/cream/sand.
+        const customColors = (draftContent[storage]?.custom_colors) || [];
+        const addCustomColor = () => {
+          setDraftContent(prev => ({
+            ...prev,
+            [storage]: {
+              ...(prev[storage] || {}),
+              custom_colors: [...((prev[storage] || {}).custom_colors || []), '#FFFFFF'],
+            },
+          }));
+        };
+        const setCustomColor = (idx, val) => {
+          setDraftContent(prev => {
+            const arr = [...(((prev[storage] || {}).custom_colors) || [])];
+            arr[idx] = val;
+            return { ...prev, [storage]: { ...(prev[storage] || {}), custom_colors: arr } };
+          });
+        };
+        const removeCustomColor = (idx) => {
+          setDraftContent(prev => {
+            const arr = [...(((prev[storage] || {}).custom_colors) || [])];
+            arr.splice(idx, 1);
+            return { ...prev, [storage]: { ...(prev[storage] || {}), custom_colors: arr } };
+          });
+        };
+
+        return (
+          <div
+            onClick={() => setDesignModalOpen(false)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setDesignModalOpen(false); }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 180,
+              background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '40px 20px',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: '920px', maxHeight: 'calc(100vh - 80px)',
+                background: '#fff', borderRadius: '12px',
+                boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+                display: 'flex', flexDirection: 'column',
+                overflow: 'hidden',
+                fontFamily: '-apple-system, system-ui, sans-serif',
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '18px 22px', borderBottom: `1px solid ${S.border}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '18px' }}>🎨</span>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>Design System</div>
+                    <div style={{ fontSize: '11px', color: S.textDim }}>Global brand, typography, buttons &amp; images</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDesignModalOpen(false)}
+                  title="Close (Esc)"
+                  style={{
+                    width: '32px', height: '32px', padding: 0,
+                    background: 'transparent', border: 'none',
+                    color: S.textDim, cursor: 'pointer',
+                    fontSize: '22px', borderRadius: '6px',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = S.bg; e.currentTarget.style.color = S.text; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S.textDim; }}
+                >×</button>
+              </div>
+
+              {/* Body: left tab rail + right form */}
+              <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+                {/* Tabs */}
+                <div style={{
+                  width: '180px', flexShrink: 0,
+                  background: S.bg,
+                  borderRight: `1px solid ${S.border}`,
+                  padding: '14px 10px',
+                  display: 'flex', flexDirection: 'column', gap: '2px',
+                }}>
+                  {DS_TABS.map(t => {
+                    const active = activeKey === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => setDesignModalTab(t.key)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '9px 12px',
+                          background: active ? '#fff' : 'transparent',
+                          border: active ? `1px solid ${S.border}` : '1px solid transparent',
+                          borderRadius: '6px',
+                          color: active ? S.accent : S.text,
+                          cursor: 'pointer',
+                          fontSize: '12px', fontWeight: active ? '700' : '500',
+                          textAlign: 'left',
+                          boxShadow: active ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.12s',
+                        }}
+                        onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#fff'; }}
+                        onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <span style={{ fontSize: '14px' }}>{t.icon}</span>
+                        <span>{t.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Form */}
+                <div style={{ flex: 1, overflowY: 'auto', background: D.panel, padding: '16px 0 32px' }}>
+                  {section.subtitle && (
+                    <div style={{
+                      padding: '0 16px 14px', color: D.textFaint,
+                      fontSize: '11px', lineHeight: '1.45', fontStyle: 'italic',
+                    }}>
+                      {section.subtitle}
+                    </div>
+                  )}
+                  {(() => {
+                    if (!subGroups) return section.fields.map(renderField);
+                    const mentioned = new Set(subGroups.flatMap(g => g.keys));
+                    const other = section.fields.filter(f => !mentioned.has(f.key));
+                    return (
+                      <>
+                        {subGroups.map(group => {
+                          const groupFields = group.keys
+                            .map(k => section.fields.find(f => f.key === k))
+                            .filter(Boolean);
+                          if (groupFields.length === 0 && !group.hasAdd) return null;
+                          const isFill = group.hasAdd && activeKey === 'brand';
+                          return (
+                            <SubSection
+                              key={group.title}
+                              title={group.title}
+                              defaultOpen={true}
+                              actions={group.hasAdd ? (
+                                <HeaderIconButton title="Add fill" onClick={isFill ? addCustomColor : undefined}>+</HeaderIconButton>
+                              ) : null}
+                            >
+                              {groupFields.map(renderField)}
+                              {isFill && customColors.map((c, idx) => (
+                                <div key={`custom-${idx}`} style={{ position: 'relative' }}>
+                                  <ColorField
+                                    field={{ key: `custom_${idx}`, label: `Custom ${idx + 1}` }}
+                                    value={c}
+                                    onChange={(v) => setCustomColor(idx, v)}
+                                  />
+                                  <button
+                                    type="button"
+                                    title="Remove"
+                                    onClick={() => removeCustomColor(idx)}
+                                    style={{
+                                      position: 'absolute', top: '6px', right: '14px',
+                                      width: '18px', height: '18px', padding: 0,
+                                      background: 'transparent', border: 'none',
+                                      color: D.textFaint, cursor: 'pointer',
+                                      fontSize: '12px', borderRadius: '2px',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.color = D.danger; }}
+                                    onMouseLeave={e => { e.currentTarget.style.color = D.textFaint; }}
+                                  >✕</button>
+                                </div>
+                              ))}
+                            </SubSection>
+                          );
+                        })}
+                        {other.length > 0 && (
+                          <SubSection title="Other" defaultOpen={true}>
+                            {other.map(renderField)}
+                          </SubSection>
+                        )}
+                        {activeKey === 'brand' && (
+                          <SelectionColorsFooter
+                            colors={{
+                              'Primary':       draftContent[storage]?.primary_color,
+                              'Primary dark':  draftContent[storage]?.primary_color_dark,
+                              'Primary light': draftContent[storage]?.primary_color_light,
+                              'Accent':        draftContent[storage]?.accent_color,
+                              'Accent dark':   draftContent[storage]?.accent_color_dark,
+                              'Cream':         draftContent[storage]?.cream_color,
+                              'Sand':          draftContent[storage]?.sand_color,
+                            }}
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{
+                padding: '12px 22px', borderTop: `1px solid ${S.border}`,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: S.bg,
+              }}>
+                <div style={{ fontSize: '11px', color: S.textDim }}>
+                  Changes save to draft automatically. Click Publish to push.
+                </div>
+                <button
+                  onClick={() => setDesignModalOpen(false)}
+                  style={{
+                    padding: '8px 18px',
+                    background: S.accent, color: '#fff',
+                    border: 'none', borderRadius: '6px',
+                    cursor: 'pointer', fontSize: '12px', fontWeight: '700',
+                  }}
+                >Done</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ==================== Confirm modal ==================== */}
       {confirmModal && (
         <div
@@ -3548,9 +3924,44 @@ export default function SiteContent() {
         padding: '0 16px',
         gap: '12px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: S.text }}>🎨 Edit Website</span>
-          <span style={{ color: S.textFaint, fontSize: '12px' }}>·</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: S.text, flexShrink: 0 }}>🎨 Edit Website</span>
+          <span style={{ color: S.textFaint, fontSize: '12px', flexShrink: 0 }}>·</span>
+
+          {/* Toolbar page switcher — drives the same editingPage state as
+              the left sidebar Pages list. Matches Figma's top-bar page
+              picker so users can switch without opening the sidebar. */}
+          <select
+            value={editingPage}
+            onChange={(e) => {
+              setEditingPage(e.target.value);
+              setSelectedBlockId(null);
+              const p = allPages.find(x => x.key === e.target.value);
+              if (p) setIframePath(p.path);
+            }}
+            title="Switch page"
+            style={{
+              padding: '6px 28px 6px 10px',
+              background: '#fff', border: `1px solid ${S.border}`,
+              borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: S.text,
+              cursor: 'pointer', outline: 'none',
+              flexShrink: 0,
+            }}
+          >
+            <optgroup label="Fixed pages">
+              {EDITABLE_PAGES.map(p => (
+                <option key={p.key} value={p.key}>{p.label}</option>
+              ))}
+            </optgroup>
+            {allPages.some(p => p.custom) && (
+              <optgroup label="Custom pages">
+                {allPages.filter(p => p.custom).map(p => (
+                  <option key={p.key} value={p.key}>{p.label}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+
           {/* Status pill */}
           {saving ? (
             <span style={{ fontSize: '11px', color: S.accent, fontWeight: '600' }}>⏳ Saving draft…</span>
@@ -3640,6 +4051,26 @@ export default function SiteContent() {
           onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
         >⏰ Schedule</button>
 
+        {/* Design System modal trigger — global tokens (brand, typography,
+            buttons, images) live behind this button rather than the
+            sidebar so they don't clutter page-level editing. */}
+        <button
+          onClick={() => setDesignModalOpen(true)}
+          title="Edit global brand, typography, buttons, and images"
+          style={{
+            padding: '7px 12px',
+            background: 'white',
+            border: `1px solid ${S.border}`,
+            borderRadius: '6px',
+            color: S.text,
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '600',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = S.bg; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
+        >🎨 Styles</button>
+
         <button
           onClick={revertDraft}
           disabled={!dirty || pushing}
@@ -3704,38 +4135,10 @@ export default function SiteContent() {
           overflow: 'hidden',
           transition: 'width 0.22s ease',
         }}>
-          {/* Tab bar — Layers (block tree) vs Design (brand schema) */}
-          <div style={{
-            display: 'flex', flexShrink: 0,
-            borderBottom: `1px solid ${S.border}`,
-          }}>
-            {[
-              { key: 'layers', label: '☰ Layers' },
-              { key: 'design', label: '✦ Design' },
-            ].map(t => {
-              const active = sidebarTab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setSidebarTab(t.key)}
-                  style={{
-                    flex: 1, padding: '10px 8px',
-                    background: 'transparent', border: 'none',
-                    borderBottom: active ? `2px solid ${S.accent}` : '2px solid transparent',
-                    marginBottom: '-1px',
-                    color: active ? S.text : S.textDim,
-                    fontSize: '11px', fontWeight: active ? '700' : '500',
-                    cursor: 'pointer',
-                    transition: 'color 150ms',
-                  }}
-                >{t.label}</button>
-              );
-            })}
-          </div>
-
-          {/* === LAYERS TAB ============================================= */}
-          {sidebarTab === 'layers' && (
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {/* Single-panel sidebar (Webflow/Figma style): Pages + Layers.
+              Tabs removed — global design tokens live in the toolbar
+              Styles modal. */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               {/* Page picker — which page's block tree we're editing. */}
               <div style={{ padding: '12px 14px 8px', borderBottom: `1px solid ${S.border}` }}>
                 <div style={{
@@ -4432,182 +4835,6 @@ export default function SiteContent() {
                 })()}
               </div>
             </div>
-          )}
-
-          {/* === DESIGN TAB — legacy brand/typography/etc schema sections */}
-          {sidebarTab === 'design' && (
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: '14px 14px 6px' }}>
-            <div style={{ fontSize: '10px', fontWeight: '700', color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-              Pages
-            </div>
-            {PAGES.map(p => {
-              const active = iframePath === p.path;
-              return (
-                <button
-                  key={p.path}
-                  onClick={() => setIframePath(p.path)}
-                  title={`Open ${p.label} in the preview`}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '6px 10px',
-                    marginBottom: '2px',
-                    background: active ? S.accentLight : 'transparent',
-                    color: active ? S.accent : S.text,
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: active ? '600' : '500',
-                    textAlign: 'left',
-                    transition: 'background 0.12s',
-                  }}
-                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = S.bg; }}
-                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span>{p.icon}</span>
-                  <span>{p.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ borderTop: `1px solid ${S.border}`, marginTop: '6px' }}>
-            {SECTION_GROUPS.map(group => (
-              <div key={group.key}>
-                <div style={{
-                  padding: '12px 14px 6px',
-                  fontSize: '10px',
-                  fontWeight: '700',
-                  color: S.textDim,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}>
-                  {group.icon} {group.label}
-                </div>
-                <div style={{ padding: '0 8px 8px' }}>
-                  {group.sectionKeys.map(key => {
-                    const section = CONTENT_SCHEMA.find(s => s.key === key);
-                    if (!section) return null;
-                    const active = activeSection === section.key;
-                    return (
-                      <button
-                        key={section.key}
-                        onClick={() => jumpToSection(section.key)}
-                        title={section.subtitle || section.title}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '5px 8px',
-                          background: active ? S.accentLight : 'transparent',
-                          color: active ? S.accent : S.text,
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '11.5px',
-                          fontWeight: active ? '600' : '400',
-                          textAlign: 'left',
-                          marginBottom: '1px',
-                          transition: 'background 0.12s',
-                        }}
-                        onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = S.bg; }}
-                        onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <span style={{ opacity: 0.8 }}>{section.icon}</span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{section.title}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Add section / element buttons — bottom of the left sidebar.
-              These are affordances so the user has a visible place to add
-              new content; currently they add a custom inline block the
-              user can rename and fill in, rather than extending the
-              hardcoded schema. */}
-          <div style={{
-            marginTop: 'auto',
-            padding: '12px 10px 14px',
-            borderTop: `1px solid ${S.border}`,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-          }}>
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt('New section name:');
-                if (!name) return;
-                setDraftContent(prev => {
-                  const custom = Array.isArray(prev.custom_sections) ? prev.custom_sections : [];
-                  return {
-                    ...prev,
-                    custom_sections: [...custom, { id: `custom_${Date.now()}`, title: name, body: '' }],
-                  };
-                });
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: '6px', padding: '8px 10px',
-                background: 'transparent',
-                border: `1px dashed ${S.borderStrong}`,
-                borderRadius: '4px',
-                color: S.textDim, cursor: 'pointer',
-                fontSize: '11.5px', fontWeight: '600',
-                transition: 'all 0.12s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = S.accent;
-                e.currentTarget.style.color = S.accent;
-                e.currentTarget.style.background = S.accentLight;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = S.borderStrong;
-                e.currentTarget.style.color = S.textDim;
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              + Add section
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt('New element name:');
-                if (!name) return;
-                setDraftContent(prev => {
-                  const custom = Array.isArray(prev.custom_elements) ? prev.custom_elements : [];
-                  return {
-                    ...prev,
-                    custom_elements: [...custom, { id: `el_${Date.now()}`, label: name, value: '' }],
-                  };
-                });
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: '6px', padding: '6px 10px',
-                background: 'transparent',
-                border: `1px dashed ${S.border}`,
-                borderRadius: '4px',
-                color: S.textFaint, cursor: 'pointer',
-                fontSize: '11px', fontWeight: '500',
-                transition: 'all 0.12s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.borderColor = S.borderStrong; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = S.textFaint; e.currentTarget.style.borderColor = S.border; }}
-            >
-              + Add element
-            </button>
-          </div>
-          </div>
-          )}
         </aside>
 
         {/* CENTER: preview */}
@@ -4757,280 +4984,21 @@ export default function SiteContent() {
               }}
             />
           ) : (
-          <>
-          {/* Design / Prototype tab bar */}
-          <div style={{
-            display: 'flex',
-            borderBottom: `1px solid ${D.border}`,
-            background: D.panel,
-            flexShrink: 0,
-          }}>
-            <button
-              onClick={() => setPanelTab('design')}
-              style={{
-                flex: 1,
-                padding: '12px 0',
-                textAlign: 'center',
-                fontSize: '11px',
-                fontWeight: panelTab === 'design' ? '600' : '500',
-                color: panelTab === 'design' ? D.text : D.textDim,
-                borderBottom: panelTab === 'design' ? `2px solid ${D.text}` : '2px solid transparent',
-                marginBottom: '-1px',
-                background: 'transparent',
-                border: 'none',
-                borderBottomStyle: 'solid',
-                borderBottomWidth: '2px',
-                cursor: 'pointer',
-                transition: 'color 150ms',
-              }}
-            >
-              Design
-            </button>
-            <button
-              onClick={() => setPanelTab('prototype')}
-              style={{
-                flex: 1,
-                padding: '12px 0',
-                textAlign: 'center',
-                fontSize: '11px',
-                fontWeight: panelTab === 'prototype' ? '600' : '500',
-                color: panelTab === 'prototype' ? D.text : D.textDim,
-                borderBottom: panelTab === 'prototype' ? `2px solid ${D.text}` : '2px solid transparent',
-                marginBottom: '-1px',
-                background: 'transparent',
-                border: 'none',
-                borderBottomStyle: 'solid',
-                borderBottomWidth: '2px',
-                cursor: 'pointer',
-                transition: 'color 150ms',
-              }}
-            >
-              Prototype
-            </button>
-          </div>
-
-          {panelTab === 'prototype' && (
-            <div style={{ padding: '56px 24px', textAlign: 'center', color: D.textDim, fontSize: '12px', lineHeight: 1.7, background: D.panel }}>
-              <div style={{ fontSize: '42px', marginBottom: '14px' }}>🎬</div>
-              <div style={{ fontWeight: '700', color: D.text, marginBottom: '8px', fontSize: '13px' }}>Prototype — coming soon</div>
-              <p style={{ margin: '0 auto 18px', maxWidth: '260px' }}>
-                Interactive prototypes with animations, transitions, and click-through flows will land here.
-              </p>
-              <button
-                onClick={() => setPanelTab('design')}
-                style={{
-                  padding: '7px 16px',
-                  background: D.accent,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                ← Back to Design
-              </button>
-            </div>
-          )}
-
-          {/* Section header — Figma "Frame" style */}
-          {panelTab === 'design' && !loading && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 14px',
-              borderBottom: `1px solid ${D.border}`,
-              background: D.panel,
-              flexShrink: 0,
-            }}>
-              <span style={{ fontSize: '12px' }}>{currentSection.icon}</span>
-              <span style={{ flex: 1, fontSize: '12px', fontWeight: '600', color: D.text, letterSpacing: '0.1px' }}>
-                {currentSection.title}
-                <span style={{ marginLeft: '6px', color: D.textFaint, fontSize: '9px' }}>▾</span>
-              </span>
-              <button
-                title="Reset section"
-                onClick={() => {
-                  if (!window.confirm(`Reset ${currentSection.title}?`)) return;
-                  const defaults = DEFAULT_CONTENT[currentStorage] || {};
-                  const keysToReset = currentSection.fields.map(f => f.key);
-                  setDraftContent(prev => ({
-                    ...prev,
-                    [currentStorage]: keysToReset.reduce(
-                      (acc, k) => ({ ...acc, [k]: defaults[k] }),
-                      { ...(prev[currentStorage] || {}) }
-                    ),
-                  }));
-                }}
-                style={{
-                  background: 'transparent', border: 'none',
-                  color: D.textFaint, cursor: 'pointer',
-                  fontSize: '12px', padding: '4px 6px', borderRadius: '2px',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = D.text; e.currentTarget.style.background = D.panelAlt; }}
-                onMouseLeave={e => { e.currentTarget.style.color = D.textFaint; e.currentTarget.style.background = 'transparent'; }}
-              >↺</button>
-            </div>
-          )}
-
-          {/* Fields */}
-          {panelTab === 'design' && (
-          <div style={{ flex: 1, overflowY: 'auto', paddingTop: '12px', paddingBottom: '40px', background: D.panel }}>
-            {loading ? (
-              <div style={{ color: D.textDim, textAlign: 'center', padding: '40px', fontSize: '11px' }}>Loading…</div>
-            ) : (
-              <>
-                {/* Canvas-editing hint */}
-                <div style={{
-                  margin: '0 12px 14px',
-                  padding: '10px 12px',
-                  background: D.accentFaint,
-                  border: `1px solid rgba(13,153,255,0.25)`,
-                  borderRadius: '4px',
-                  display: 'flex',
-                  gap: '8px',
-                  alignItems: 'flex-start',
-                }}>
-                  <span style={{ fontSize: '12px', color: D.accent, flexShrink: 0 }}>✎</span>
-                  <div style={{ fontSize: '10.5px', color: D.text, lineHeight: '1.45' }}>
-                    <strong>Tip:</strong> click any text on the preview to edit its CSS styles directly.
-                  </div>
-                </div>
-
-                {currentSection.subtitle && (
-                  <div style={{
-                    padding: '0 16px 14px',
-                    color: D.textFaint,
-                    fontSize: '10.5px',
-                    lineHeight: '1.45',
-                    fontStyle: 'italic',
-                  }}>
-                    {currentSection.subtitle}
-                  </div>
-                )}
-                {(() => {
-                  const subGroups = SECTION_SUB_GROUPS[currentSection.key];
-                  const renderField = (field) => {
-                    const Renderer = FIELD_RENDERERS[field.type] || TextField;
-                    const value = draftContent[currentStorage]?.[field.key];
-                    const refKey = `${currentSection.key}.${field.key}`;
-                    return (
-                      <Renderer
-                        key={field.key}
-                        field={field}
-                        value={value}
-                        inputRef={(el) => { fieldRefs.current[refKey] = el; }}
-                        onChange={(v) => updateField(currentStorage, field.key, v)}
-                      />
-                    );
-                  };
-                  if (!subGroups) {
-                    return currentSection.fields.map(renderField);
-                  }
-                  // Grouped render: Figma-style collapsible subsections.
-                  // Any field not mentioned in a group falls into a
-                  // trailing "Other" subsection so we never drop data.
-                  const mentioned = new Set(subGroups.flatMap(g => g.keys));
-                  const other = currentSection.fields.filter(f => !mentioned.has(f.key));
-                  // Custom colors are a dynamic array appended to the
-                  // Fill subsection. Stored at brand.custom_colors so
-                  // it lives alongside the schema-defined colors.
-                  const customColors = (draftContent[currentStorage]?.custom_colors) || [];
-                  const addCustomColor = () => {
-                    setDraftContent(prev => ({
-                      ...prev,
-                      [currentStorage]: {
-                        ...(prev[currentStorage] || {}),
-                        custom_colors: [...((prev[currentStorage] || {}).custom_colors || []), '#FFFFFF'],
-                      },
-                    }));
-                  };
-                  const setCustomColor = (idx, val) => {
-                    setDraftContent(prev => {
-                      const arr = [...(((prev[currentStorage] || {}).custom_colors) || [])];
-                      arr[idx] = val;
-                      return { ...prev, [currentStorage]: { ...(prev[currentStorage] || {}), custom_colors: arr } };
-                    });
-                  };
-                  const removeCustomColor = (idx) => {
-                    setDraftContent(prev => {
-                      const arr = [...(((prev[currentStorage] || {}).custom_colors) || [])];
-                      arr.splice(idx, 1);
-                      return { ...prev, [currentStorage]: { ...(prev[currentStorage] || {}), custom_colors: arr } };
-                    });
-                  };
-                  return (
-                    <>
-                      {subGroups.map(group => {
-                        const groupFields = group.keys
-                          .map(k => currentSection.fields.find(f => f.key === k))
-                          .filter(Boolean);
-                        if (groupFields.length === 0 && !group.hasAdd) return null;
-                        const isFill = group.hasAdd && currentSection.key === 'brand';
-                        return (
-                          <SubSection
-                            key={group.title}
-                            title={group.title}
-                            defaultOpen={true}
-                            actions={group.hasAdd ? (
-                              <HeaderIconButton title="Add fill" onClick={isFill ? addCustomColor : undefined}>+</HeaderIconButton>
-                            ) : null}
-                          >
-                            {groupFields.map(renderField)}
-                            {isFill && customColors.map((c, idx) => (
-                              <div key={`custom-${idx}`} style={{ position: 'relative' }}>
-                                <ColorField
-                                  field={{ key: `custom_${idx}`, label: `Custom ${idx + 1}` }}
-                                  value={c}
-                                  onChange={(v) => setCustomColor(idx, v)}
-                                />
-                                <button
-                                  type="button"
-                                  title="Remove"
-                                  onClick={() => removeCustomColor(idx)}
-                                  style={{
-                                    position: 'absolute', top: '6px', right: '14px',
-                                    width: '18px', height: '18px', padding: 0,
-                                    background: 'transparent', border: 'none',
-                                    color: D.textFaint, cursor: 'pointer',
-                                    fontSize: '12px', borderRadius: '2px',
-                                  }}
-                                  onMouseEnter={e => { e.currentTarget.style.color = D.danger; }}
-                                  onMouseLeave={e => { e.currentTarget.style.color = D.textFaint; }}
-                                >✕</button>
-                              </div>
-                            ))}
-                          </SubSection>
-                        );
-                      })}
-                      {other.length > 0 && (
-                        <SubSection title="Other" defaultOpen={true}>
-                          {other.map(renderField)}
-                        </SubSection>
-                      )}
-                      {currentSection.key === 'brand' && (
-                        <SelectionColorsFooter
-                          colors={{
-                            'Primary':       draftContent[currentStorage]?.primary_color,
-                            'Primary dark':  draftContent[currentStorage]?.primary_color_dark,
-                            'Primary light': draftContent[currentStorage]?.primary_color_light,
-                            'Accent':        draftContent[currentStorage]?.accent_color,
-                            'Accent dark':   draftContent[currentStorage]?.accent_color_dark,
-                            'Cream':         draftContent[currentStorage]?.cream_color,
-                            'Sand':          draftContent[currentStorage]?.sand_color,
-                          }}
-                        />
-                      )}
-                    </>
-                  );
-                })()}
-              </>
-            )}
-          </div>
-          )}
-          </>
+            // Nothing selected → Page Settings (Webflow/Figma style).
+            // Shows visibility toggles and section-order fields that are
+            // relevant to the active page. Global brand/typography/button
+            // tokens moved to the Design System modal (Styles button in
+            // the toolbar).
+            <PageSettingsPanel
+              page={currentPageEntry}
+              visibilityFields={CONTENT_SCHEMA.find(s => s.key === 'visibility')?.fields || []}
+              visibilityValues={draftContent.visibility || {}}
+              sectionOrderFields={(CONTENT_SCHEMA.find(s => s.key === 'layout')?.fields || []).filter(f => f.key.startsWith(currentPageEntry.key + '_'))}
+              sectionOrderValues={draftContent.layout || {}}
+              onChangeVisibility={(key, value) => updateField('visibility', key, value)}
+              onChangeSectionOrder={(key, value) => updateField('layout', key, value)}
+              onOpenDesignSystem={() => setDesignModalOpen(true)}
+            />
           )}
         </aside>
       </div>
