@@ -4,6 +4,7 @@ import { DEFAULT_CONTENT, CONTENT_SCHEMA, sectionForFieldPath } from '../utils/s
 import {
   BLOCK_REGISTRY_META, BLOCK_CATEGORIES, EDITABLE_PAGES, makeBlock,
 } from '../utils/blockRegistryMeta';
+import { getBlockA11yWarnings } from '../utils/blockA11y';
 import {
   DndContext, PointerSensor, useSensor, useSensors, closestCenter,
   useDraggable, useDroppable, DragOverlay,
@@ -18,6 +19,7 @@ import {
   Monitor, Tablet, Smartphone, RefreshCw, ExternalLink,
   GripVertical, Copy, Trash2, Eye, EyeOff,
   Lock, Unlock, RotateCcw, Search, CornerDownLeft, ArrowUp, ArrowDown,
+  AlertTriangle,
 } from 'lucide-react';
 
 // =====================================================================
@@ -1149,6 +1151,13 @@ function SchedulePublishModal({ S, onClose, onSchedule, pending, onCancel }) {
 // free.
 // =====================================================================
 function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplicate, isLocked, onToggleLocked }) {
+  // Accessibility warnings — recomputed per render. Cheap (pure
+  // synchronous loops over the schema). Empty array when the block
+  // looks fine; a yellow banner appears below the header otherwise.
+  const a11yWarnings = useMemo(
+    () => getBlockA11yWarnings(block, meta),
+    [block, meta]
+  );
   if (!block || !meta) return null;
   return (
     <>
@@ -1228,6 +1237,45 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
               cursor: 'pointer',
             }}
           >Unlock</button>
+        </div>
+      )}
+
+      {/* A11y warnings — surfaces missing alt text, low text contrast,
+          and unlabeled buttons inline so editors notice them while
+          composing instead of after the fact. Heuristic per check (see
+          src/utils/blockA11y.js); blocks without the relevant fields
+          stay silent. The banner stays visible even when the inspector
+          is locked so users can see *why* something needs fixing. */}
+      {a11yWarnings.length > 0 && (
+        <div style={{
+          padding: '10px 14px',
+          background: '#FFFBEB',
+          borderBottom: `1px solid ${(D.warning || '#F59E0B') + '33'}`,
+          display: 'flex', gap: '10px',
+          flexShrink: 0,
+        }}>
+          <AlertTriangle size={13} strokeWidth={2.25} color={D.warning || '#F59E0B'} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1, fontSize: '11px', color: D.text, lineHeight: 1.5, minWidth: 0 }}>
+            <div style={{ fontWeight: '700', marginBottom: '4px' }}>
+              {a11yWarnings.length === 1
+                ? '1 accessibility issue'
+                : `${a11yWarnings.length} accessibility issues`}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '14px', listStyle: 'disc' }}>
+              {a11yWarnings.map((w, i) => (
+                <li key={i} style={{ marginBottom: '4px' }}>
+                  <span style={{ color: w.severity === 'error' ? D.danger : D.text }}>
+                    {w.message}
+                  </span>
+                  {w.fix && (
+                    <div style={{ fontSize: '10.5px', color: D.textDim, marginTop: '1px' }}>
+                      {w.fix}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
