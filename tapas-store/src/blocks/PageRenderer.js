@@ -15,7 +15,67 @@
 
 import React from 'react';
 import { useSiteContent } from '../context/SiteContent';
+import { supabase } from '../utils/supabase';
 import { BLOCK_REGISTRY } from './index';
+
+// ---------------------------------------------------------------------
+// Phase 7: A/B testing. Blocks with an `ab_variant` prop (values 'A' or
+// 'B') are only rendered to visitors in the matching group. We assign
+// visitors to a group once on first load and persist in localStorage so
+// the same visitor consistently sees the same variant across sessions.
+// ---------------------------------------------------------------------
+const AB_STORAGE_KEY = 'tapas_ab_group';
+function getVisitorGroup() {
+  if (typeof window === 'undefined') return 'A';
+  try {
+    let g = window.localStorage.getItem(AB_STORAGE_KEY);
+    if (g !== 'A' && g !== 'B') {
+      g = Math.random() < 0.5 ? 'A' : 'B';
+      window.localStorage.setItem(AB_STORAGE_KEY, g);
+    }
+    return g;
+  } catch {
+    return Math.random() < 0.5 ? 'A' : 'B';
+  }
+}
+// Impression dedup: once per block per visitor per day.
+function shouldLogImpression(blockId) {
+  if (typeof window === 'undefined') return false;
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `tapas_abi_${blockId}_${today}`;
+  try {
+    if (window.localStorage.getItem(key)) return false;
+    window.localStorage.setItem(key, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+// Log a fire-and-forget A/B event.
+export function logAbEvent({ kind, blockId, variant, group, pageKey }) {
+  try {
+    supabase.from('ab_events').insert([{
+      kind, block_id: blockId, variant, visitor_group: group, page_key: pageKey,
+    }]).then(() => {}, () => {});
+  } catch {}
+}
+
+// Module-level registry of every A/B-varianted block the current visitor
+// has seen on this page. Form/newsletter blocks call `logAbConversions`
+// on successful submit so each visible variant on the page gets a
+// conversion credit. Cleared on route change.
+const ACTIVE_VARIANTS = new Map(); // blockId → { variant, group, pageKey }
+export function registerAbImpression(blockId, meta) {
+  ACTIVE_VARIANTS.set(blockId, meta);
+}
+export function clearAbImpressions() {
+  ACTIVE_VARIANTS.clear();
+}
+export function logAbConversions() {
+  for (const [blockId, meta] of ACTIVE_VARIANTS.entries()) {
+    logAbEvent({ kind: 'conversion', blockId, ...meta });
+  }
+}
 
 class BlockErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -89,10 +149,52 @@ function buildResponsiveCSS(id, pageKey, p) {
   return chunks.join('\n');
 }
 
+// Phase 7: per-block scheduling. A block is rendered only if the
+// current time is inside [schedule_start, schedule_end]. Either end
+// can be blank. Storefront checks every 30s so visitors viewing the
+// page at a boundary see the transition without a full reload.
+function useNowTicker(everyMs = 30000) {
+  const [, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const t = setInterval(() => setTick(x => x + 1), everyMs);
+    return () => clearInterval(t);
+  }, [everyMs]);
+  return Date.now();
+}
+
+function isWithinSchedule(p, now) {
+  const startRaw = p.schedule_start;
+  const endRaw = p.schedule_end;
+  if (!startRaw && !endRaw) return true;
+  const start = startRaw ? Date.parse(startRaw) : null;
+  const end = endRaw ? Date.parse(endRaw) : null;
+  if (start && Number.isFinite(start) && now < start) return false;
+  if (end && Number.isFinite(end) && now > end) return false;
+  return true;
+}
+
 // Renders one block by dispatching to its registry entry. Exposed as a
 // separate component so the on-canvas toolbar (Phase 3) can
 // decorate individual blocks without touching PageRenderer.
-export function BlockView({ block, pageKey, blockIndex, totalBlocks }) {
+export function BlockView({ block, pageKey, blockIndex, totalBlocks, editorMode }) {
+  // Hooks — must be called unconditionally in the same order on every
+  // render, even for invalid blocks. Read every value defensively.
+  const now = useNowTicker(30000);
+  const visitorGroup = React.useMemo(() => getVisitorGroup(), []);
+  const p = block?.props || {};
+  const variant = p.ab_variant === 'A' || p.ab_variant === 'B' ? p.ab_variant : null;
+  const variantMatches = !variant || variant === visitorGroup;
+  const blockId = block?.id;
+  React.useEffect(() => {
+    if (!blockId) return;
+    if (editorMode || !variant || !variantMatches) return;
+    registerAbImpression(blockId, { variant, group: visitorGroup, pageKey });
+    if (shouldLogImpression(blockId)) {
+      logAbEvent({ kind: 'impression', blockId, variant, group: visitorGroup, pageKey });
+    }
+  }, [editorMode, variant, variantMatches, visitorGroup, blockId, pageKey]);
+
+  // After hooks — bail on invalid blocks or unknown types.
   if (!block || !block.type) return null;
   const entry = BLOCK_REGISTRY[block.type];
   if (!entry) {
@@ -115,7 +217,6 @@ export function BlockView({ block, pageKey, blockIndex, totalBlocks }) {
   // actual hiding is done by global media queries injected once in
   // PageRenderer. The wrapper is display:contents so it doesn't affect
   // layout when visible.
-  const p = block.props || {};
   const classes = [];
   if (p.hide_mobile)  classes.push('tapas-hide-mobile');
   if (p.hide_tablet)  classes.push('tapas-hide-tablet');
@@ -124,11 +225,55 @@ export function BlockView({ block, pageKey, blockIndex, totalBlocks }) {
   // as a scoped <style> next to the block so unused blocks inject no
   // CSS at all.
   const responsiveCss = buildResponsiveCSS(block.id, pageKey, p);
+  // Phase 7: per-block scheduling. In the live storefront, outside the
+  // window we hide the block entirely. In the editor preview we dim it
+  // with a yellow tag so staff can still edit blocks that aren't
+  // currently live.
+  const scheduled = isWithinSchedule(p, now);
+  if (!scheduled && !editorMode) return null;
+  // Phase 7: A/B testing. A block with `ab_variant` set to 'A' or 'B'
+  // is only shown to the matching group in live mode.
+  if (variant && !variantMatches && !editorMode) return null;
   return (
     <BlockErrorBoundary blockType={block.type}>
       {responsiveCss && <style>{responsiveCss}</style>}
-      <div className={classes.join(' ') || undefined} style={{ display: 'contents' }}>
-        <Renderer id={block.id} pageKey={pageKey} props={p} blockIndex={blockIndex} totalBlocks={totalBlocks} />
+      <div
+        className={classes.join(' ') || undefined}
+        style={editorMode && (variant || !scheduled)
+          ? { position: 'relative' }
+          : { display: 'contents' }
+        }
+      >
+        {!scheduled && editorMode && (
+          <div style={{
+            position: 'sticky', top: '50%', zIndex: 5,
+            margin: '12px auto', maxWidth: '380px',
+            padding: '6px 12px',
+            background: '#fef3c7', color: '#92400e',
+            border: '1px solid #fde68a', borderRadius: '999px',
+            fontSize: '12px', fontWeight: 700, textAlign: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          }}>
+            ⏰ Scheduled block — not live right now
+          </div>
+        )}
+        {editorMode && variant && (
+          <div style={{
+            position: 'absolute', top: '8px', right: '8px', zIndex: 5,
+            padding: '4px 10px',
+            background: variant === 'A' ? '#dbeafe' : '#fce7f3',
+            color: variant === 'A' ? '#1e40af' : '#9d174d',
+            border: `1px solid ${variant === 'A' ? '#bfdbfe' : '#fbcfe8'}`,
+            borderRadius: '999px',
+            fontSize: '11px', fontWeight: 700,
+            letterSpacing: '0.5px',
+          }}>
+            Variant {variant}
+          </div>
+        )}
+        <div style={!scheduled && editorMode ? { opacity: 0.45, pointerEvents: 'auto' } : {}}>
+          <Renderer id={block.id} pageKey={pageKey} props={p} blockIndex={blockIndex} totalBlocks={totalBlocks} />
+        </div>
       </div>
     </BlockErrorBoundary>
   );
@@ -192,10 +337,29 @@ function usePageMeta(meta) {
   }, [title, description, ogImage]);
 }
 
+// Rough editor-mode detector: the staff dashboard loads the store with
+// `?preview=draft` in the iframe, so props scheduled outside their
+// window stay visible (dimmed) in the editor.
+function isEditorMode() {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.self !== window.top) return true;
+    return /[?&]preview=draft\b/.test(window.location.search || '');
+  } catch {
+    return false;
+  }
+}
+
 export default function PageRenderer({ pageKey, fallback = null }) {
   const content = useSiteContent();
   const page = content?.pages?.[pageKey];
   const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+  const editorMode = isEditorMode();
+  // Reset the A/B impression registry on every page mount so conversions
+  // credit only the variants visible on this page's render.
+  React.useEffect(() => {
+    clearAbImpressions();
+  }, [pageKey]);
 
   // Apply SEO meta even when the page falls back to legacy JSX — the
   // meta fields should take effect regardless of whether blocks are
@@ -212,7 +376,7 @@ export default function PageRenderer({ pageKey, fallback = null }) {
     <>
       <style>{RESPONSIVE_CSS}</style>
       {blocks.map((b, idx) => (
-        <BlockView key={b.id} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={blocks.length} />
+        <BlockView key={b.id} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={blocks.length} editorMode={editorMode} />
       ))}
     </>
   );

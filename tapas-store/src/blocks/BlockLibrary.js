@@ -23,6 +23,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { logAbConversions } from './PageRenderer';
 
 // Shared wrapper every block uses. Provides the data-editable attribute
 // the canvas selector keys off, plus sensible max-width + padding so
@@ -541,7 +542,7 @@ export function TextImage({ id, pageKey, props, blockIndex, totalBlocks }) {
         </div>
         <div style={{ direction: 'ltr' }}>
           {p.image_url ? (
-            <img src={p.image_url} alt={p.heading || ''} style={{
+            <img loading="lazy" decoding="async" src={p.image_url} alt={p.heading || ''} style={{
               width: '100%', borderRadius: '12px',
               aspectRatio: '4/3', objectFit: 'cover',
               boxShadow: '0 20px 60px rgba(38,23,12,0.15)',
@@ -732,7 +733,7 @@ export function Gallery({ id, pageKey, props, blockIndex, totalBlocks }) {
             aspectRatio: '1 / 1', overflow: 'hidden', borderRadius: '8px',
             background: '#ede8d0',
           }}>
-            <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img loading="lazy" decoding="async" src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           </div>
         ))}
       </div>
@@ -762,6 +763,7 @@ export function Newsletter({ id, pageKey, props, blockIndex, totalBlocks }) {
         received_at: new Date().toISOString(),
         fields: { email: email.trim() },
       });
+      logAbConversions();
     } catch {
       // Unique violation / network — still show thanks, don't reveal details
     } finally {
@@ -1078,6 +1080,7 @@ export function ContactForm({ id, pageKey, props, blockIndex, totalBlocks }) {
         received_at: row.created_at,
         fields: row.fields,
       });
+      logAbConversions();
       setSubmitted(true);
     } catch (err) {
       // Silently fail if table doesn't exist — still show thank-you
@@ -1322,7 +1325,7 @@ export function BookList({ id, pageKey, props, blockIndex, totalBlocks }) {
                   boxShadow: '0 8px 24px rgba(38,23,12,0.12)',
                 }}>
                   {b.book_image ? (
-                    <img src={b.book_image} alt={b.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img loading="lazy" decoding="async" src={b.book_image} alt={b.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a7a5c', fontSize: '28px' }}>📖</div>
                   )}
@@ -1401,7 +1404,7 @@ export function BlogList({ id, pageKey, props, blockIndex, totalBlocks }) {
                   background: '#ede8d0', marginBottom: '16px',
                 }}>
                   {post.cover_image ? (
-                    <img src={post.cover_image} alt={post.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img loading="lazy" decoding="async" src={post.cover_image} alt={post.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a7a5c', fontSize: '32px' }}>✍️</div>
                   )}
@@ -1484,7 +1487,7 @@ export function EventList({ id, pageKey, props, blockIndex, totalBlocks }) {
                   aspectRatio: '16/10', background: '#ede8d0', position: 'relative',
                 }}>
                   {e.image_url ? (
-                    <img src={e.image_url} alt={e.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img loading="lazy" decoding="async" src={e.image_url} alt={e.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', color: '#8a7a5c' }}>🎟️</div>
                   )}
@@ -1875,7 +1878,7 @@ export function Team({ id, pageKey, props, blockIndex, totalBlocks }) {
                 background: 'var(--tapas-card-bg, #faf7ed)',
                 boxShadow: '0 4px 16px rgba(38,23,12,0.08)',
               }}>
-                <img src={m.photo} alt={m.name || 'Team member'} style={{
+                <img loading="lazy" decoding="async" src={m.photo} alt={m.name || 'Team member'} style={{
                   width: '100%', height: '100%', objectFit: 'cover',
                   display: 'block',
                 }} />
@@ -2099,7 +2102,7 @@ export function TestimonialCarousel({ id, pageKey, props, blockIndex, totalBlock
           minHeight: '4.2em',
         }}>“{active.quote}”</div>
         {active.photo && (
-          <img src={active.photo} alt={active.name || ''} style={{
+          <img loading="lazy" decoding="async" src={active.photo} alt={active.name || ''} style={{
             width: '56px', height: '56px', borderRadius: '50%',
             objectFit: 'cover', margin: '0 auto 10px', display: 'block',
           }} />

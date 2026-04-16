@@ -114,7 +114,8 @@ function useHeaderState() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      navigate(`/books?search=${encodeURIComponent(searchTerm.trim())}`);
+      // Phase 7: unified search across books, journal, events.
+      navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
       setSearchOpen(false);
       setSearchTerm('');
     }

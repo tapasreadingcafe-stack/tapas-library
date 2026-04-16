@@ -892,6 +892,84 @@ const CSS_RENDERERS = {
 };
 
 // =====================================================================
+// ABStats (Phase 7) — impressions + conversions for a block across both
+// variants, with a simple conversion-rate comparison.
+// =====================================================================
+function ABStats({ blockId, S }) {
+  const [rows, setRows] = React.useState(null);
+  const [error, setError] = React.useState('');
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error: err } = await supabase
+          .from('ab_events')
+          .select('kind, variant')
+          .eq('block_id', blockId)
+          .limit(20000);
+        if (err) throw err;
+        if (!cancelled) setRows(data || []);
+      } catch (e) {
+        if (!cancelled) setError(e.message || 'Failed to load');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [blockId]);
+  const stats = React.useMemo(() => {
+    if (!rows) return null;
+    const acc = { A: { i: 0, c: 0 }, B: { i: 0, c: 0 } };
+    for (const r of rows) {
+      const v = r.variant === 'A' || r.variant === 'B' ? r.variant : null;
+      if (!v) continue;
+      if (r.kind === 'impression') acc[v].i++;
+      else if (r.kind === 'conversion') acc[v].c++;
+    }
+    return acc;
+  }, [rows]);
+  if (error) {
+    return <div style={{ fontSize: '10px', color: S.danger }}>{error}</div>;
+  }
+  if (!stats) {
+    return <div style={{ fontSize: '10px', color: S.textFaint }}>Loading stats…</div>;
+  }
+  const rate = (a) => a.i > 0 ? (a.c / a.i * 100) : 0;
+  const aRate = rate(stats.A);
+  const bRate = rate(stats.B);
+  const winner = aRate > bRate ? 'A' : bRate > aRate ? 'B' : null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+      {['A', 'B'].map(v => {
+        const isWinner = winner === v && (stats.A.i + stats.B.i) > 0;
+        return (
+          <div key={v} style={{
+            padding: '8px 10px',
+            background: v === 'A' ? '#dbeafe' : '#fce7f3',
+            border: `1px solid ${isWinner ? '#10b981' : 'transparent'}`,
+            borderRadius: '4px',
+          }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: '10px', fontWeight: 700,
+              color: v === 'A' ? '#1e40af' : '#9d174d',
+              marginBottom: '4px',
+            }}>
+              <span>Variant {v}</span>
+              {isWinner && <span style={{ color: '#10b981' }}>👑</span>}
+            </div>
+            <div style={{ fontSize: '11px', color: S.text }}>
+              {stats[v].i} impr · {stats[v].c} conv
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: S.text }}>
+              {stats[v].i > 0 ? `${rate(stats[v]).toFixed(1)}%` : '—'}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =====================================================================
 // SchedulePublishModal (Phase 6)
 //
 // Lets staff queue a future publish. Dates are stored in UTC (ISO) on
@@ -1144,6 +1222,130 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
               </label>
             );
           })}
+        </div>
+
+        {/* Phase 7: A/B variant selector + live stats for this block. */}
+        <div style={{
+          marginTop: '0', padding: '14px 16px 16px',
+          borderTop: `1px solid ${D.border}`,
+          background: D.panelAlt || D.panel,
+        }}>
+          <details>
+            <summary style={{
+              cursor: 'pointer', userSelect: 'none', listStyle: 'none',
+              fontSize: '9px', color: D.textFaint, fontWeight: '600',
+              textTransform: 'uppercase', letterSpacing: '0.8px',
+              marginBottom: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span>🧪 A/B testing</span>
+              <span style={{ fontSize: '10px', color: D.textFaint }}>▾</span>
+            </summary>
+            <div style={{ fontSize: '10px', color: D.textFaint, marginBottom: '10px', lineHeight: 1.4 }}>
+              Mark this block as variant A or B. Each visitor is randomly (and stably) assigned to a group — they only see the matching variant. Create a sibling block set to the other letter to run the test.
+            </div>
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
+              {[
+                { value: '',  label: 'Off',       color: null },
+                { value: 'A', label: 'Variant A', color: '#1e40af' },
+                { value: 'B', label: 'Variant B', color: '#9d174d' },
+              ].map(opt => {
+                const active = (block.props?.ab_variant || '') === opt.value;
+                return (
+                  <button
+                    key={opt.value || 'off'}
+                    type="button"
+                    onClick={() => onChangeProp('ab_variant', opt.value || null)}
+                    style={{
+                      flex: 1, padding: '5px 6px',
+                      background: active ? (opt.color || D.accent) : D.input,
+                      color: active ? '#fff' : D.text,
+                      border: '1px solid transparent',
+                      borderRadius: '3px', cursor: 'pointer',
+                      fontSize: '11px', fontWeight: 600,
+                    }}
+                  >{opt.label}</button>
+                );
+              })}
+            </div>
+            {block.props?.ab_variant && <ABStats blockId={block.id} S={D} />}
+          </details>
+        </div>
+
+        {/* Phase 7: per-block scheduling — show a block only between a
+            start and end time. Used for timed promos (e.g. Diwali sale
+            banner). Storefront hides outside the window; the editor
+            dims with a "Scheduled block" chip so staff can still edit. */}
+        <div style={{
+          marginTop: '0', padding: '14px 16px 16px',
+          borderTop: `1px solid ${D.border}`,
+          background: D.panelAlt || D.panel,
+        }}>
+          <details>
+            <summary style={{
+              cursor: 'pointer', userSelect: 'none', listStyle: 'none',
+              fontSize: '9px', color: D.textFaint, fontWeight: '600',
+              textTransform: 'uppercase', letterSpacing: '0.8px',
+              marginBottom: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span>⏰ Schedule block</span>
+              <span style={{ fontSize: '10px', color: D.textFaint }}>▾</span>
+            </summary>
+            <div style={{ fontSize: '10px', color: D.textFaint, marginBottom: '10px', lineHeight: 1.4 }}>
+              Live on the storefront only inside this window. Leave either side empty to remove the bound.
+            </div>
+            {[
+              { key: 'schedule_start', label: 'Start' },
+              { key: 'schedule_end',   label: 'End' },
+            ].map(({ key, label }) => {
+              const iso = block.props?.[key] || '';
+              // datetime-local wants local time with no tz. Convert ISO→local.
+              const toLocal = (s) => {
+                if (!s) return '';
+                const d = new Date(s);
+                if (Number.isNaN(d.getTime())) return '';
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+              };
+              return (
+                <div key={key} style={{ marginBottom: '8px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '600', color: D.text, marginBottom: '3px' }}>{label}</div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <input
+                      type="datetime-local"
+                      value={toLocal(iso)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) { onChangeProp(key, null); return; }
+                        onChangeProp(key, new Date(v).toISOString());
+                      }}
+                      style={{
+                        flex: 1, padding: '5px 6px',
+                        background: D.input, border: '1px solid transparent',
+                        borderRadius: '3px', color: D.text,
+                        fontSize: '11px', outline: 'none', boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => { e.target.style.border = `1px solid ${D.accent}`; }}
+                      onBlur={(e) => { e.target.style.border = '1px solid transparent'; }}
+                    />
+                    {iso && (
+                      <button
+                        type="button"
+                        onClick={() => onChangeProp(key, null)}
+                        title="Clear"
+                        style={{
+                          padding: '0 8px', background: 'transparent',
+                          border: `1px solid ${D.border}`, borderRadius: '3px',
+                          color: D.textDim, cursor: 'pointer', fontSize: '10px',
+                        }}
+                      >✕</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </details>
         </div>
 
         {/* Phase 4 closer: Responsive overrides — per-breakpoint
