@@ -17,6 +17,7 @@ import {
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   Monitor, Tablet, Smartphone, RefreshCw, ExternalLink,
   GripVertical, Copy, Trash2, Eye, EyeOff,
+  Lock, Unlock, RotateCcw, Search, CornerDownLeft, ArrowUp, ArrowDown,
 } from 'lucide-react';
 
 // =====================================================================
@@ -1147,7 +1148,7 @@ function SchedulePublishModal({ S, onClose, onSchedule, pending, onCancel }) {
 // so dark-theme styling and inline validation all come along for
 // free.
 // =====================================================================
-function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplicate }) {
+function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplicate, isLocked, onToggleLocked }) {
   if (!block || !meta) return null;
   return (
     <>
@@ -1172,6 +1173,19 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
           </div>
         </div>
         <button
+          onClick={onToggleLocked}
+          title={isLocked ? 'Unlock content edits' : 'Lock content edits'}
+          style={{
+            background: isLocked ? '#FFF7ED' : 'transparent',
+            border: isLocked ? `1px solid ${D.warning || '#F59E0B'}55` : 'none',
+            color: isLocked ? (D.warning || '#F59E0B') : D.textDim,
+            cursor: 'pointer', padding: '4px 6px', borderRadius: '3px',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onMouseEnter={(e) => { if (!isLocked) e.currentTarget.style.color = D.text; }}
+          onMouseLeave={(e) => { if (!isLocked) e.currentTarget.style.color = D.textDim; }}
+        >{isLocked ? <Lock size={13} strokeWidth={2.25} /> : <Unlock size={13} strokeWidth={2.25} />}</button>
+        <button
           onClick={onDuplicate}
           title="Duplicate block"
           style={{ background: 'transparent', border: 'none', color: D.textDim, fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '2px' }}
@@ -1187,11 +1201,48 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
         >✕</button>
       </div>
 
+      {/* Locked banner — when block.locked is true, show a clear status
+          + Unlock button and dim the field area below. We use
+          pointer-events:none so labels stay readable but every input
+          becomes inert without having to thread a `disabled` prop into
+          every FIELD_RENDERER. */}
+      {isLocked && (
+        <div style={{
+          padding: '10px 14px',
+          background: '#FFFBEB',
+          borderBottom: `1px solid ${(D.warning || '#F59E0B') + '33'}`,
+          display: 'flex', alignItems: 'center', gap: '10px',
+          flexShrink: 0,
+        }}>
+          <Lock size={13} strokeWidth={2.25} color={D.warning || '#F59E0B'} />
+          <div style={{ flex: 1, fontSize: '11px', color: D.text, lineHeight: 1.45 }}>
+            <strong>Locked.</strong> Content edits are disabled. Drag &amp; visibility still work.
+          </div>
+          <button
+            onClick={onToggleLocked}
+            style={{
+              padding: '4px 10px',
+              background: 'white', color: D.warning || '#F59E0B',
+              border: `1px solid ${(D.warning || '#F59E0B') + '55'}`,
+              borderRadius: '4px', fontSize: '11px', fontWeight: '700',
+              cursor: 'pointer',
+            }}
+          >Unlock</button>
+        </div>
+      )}
+
       {/* Fields — rendered via the same FIELD_RENDERERS the schema
           sections use, so dark theme + inline validation flow through
           automatically. Missing props fall back to defaultProps so the
-          user sees a useful starting value. */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingTop: '12px', paddingBottom: '40px', background: D.panel }}>
+          user sees a useful starting value. When locked, the field area
+          is fully dim + non-interactive (the Lock toggle / Unlock button
+          in the banner remain clickable because they're outside this
+          wrapper). */}
+      <div style={{
+        flex: 1, overflowY: 'auto', paddingTop: '12px', paddingBottom: '40px', background: D.panel,
+        opacity: isLocked ? 0.5 : 1,
+        pointerEvents: isLocked ? 'none' : 'auto',
+      }}>
         {(!meta.schema || meta.schema.length === 0) ? (
           <div style={{ padding: '24px 16px', color: D.textFaint, fontSize: '11px', lineHeight: 1.55, textAlign: 'center' }}>
             This block has no editable fields yet.
@@ -1759,8 +1810,8 @@ function LayersDropZone({ children, S }) {
 // behavior. We also add a small pointer-distance activation constraint at
 // the DndContext level so a quick click doesn't get interpreted as a drag.
 function SortableBlockRow({
-  block, meta, isPrimary, isMulti, isSelected, isHidden,
-  onSelect, onDuplicate, onDelete, onToggleVisibility, S,
+  block, meta, isPrimary, isMulti, isSelected, isHidden, isLocked,
+  onSelect, onDuplicate, onDelete, onToggleVisibility, onToggleLocked, onReset, S,
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -1821,14 +1872,29 @@ function SortableBlockRow({
       }}>
         {meta?.label || block.type}
       </span>
-      {/* Visibility toggle — eye = visible, eye-off = hidden. Replaces
-          the legacy "Sections on this page" panel; visibility is now
-          per-block and managed inline in the Layers tree. */}
+      {/* Lock toggle — when locked, BlockInspector field edits are
+          disabled. Drag/duplicate/delete still work (lock is about
+          content, not position). Lock state lives at block.locked
+          (not in props) so Reset doesn't clear it. */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleLocked(); }}
+        title={isLocked ? 'Unlock content edits' : 'Lock content edits'}
+        style={{
+          width: '20px', height: '22px', padding: 0,
+          background: 'transparent', border: 'none',
+          color: isLocked ? S.warning : S.textDim, cursor: 'pointer',
+          borderRadius: '3px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = S.bg; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >{isLocked ? <Lock size={11} strokeWidth={2} /> : <Unlock size={11} strokeWidth={2} />}</button>
+      {/* Visibility toggle — eye = visible, eye-off = hidden. */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
         title={isHidden ? 'Show on storefront' : 'Hide from storefront'}
         style={{
-          width: '22px', height: '22px', padding: 0,
+          width: '20px', height: '22px', padding: 0,
           background: 'transparent', border: 'none',
           color: isHidden ? S.warning : S.textDim, cursor: 'pointer',
           borderRadius: '3px',
@@ -1837,11 +1903,28 @@ function SortableBlockRow({
         onMouseEnter={(e) => { e.currentTarget.style.background = S.bg; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >{isHidden ? <EyeOff size={12} strokeWidth={2} /> : <Eye size={12} strokeWidth={2} />}</button>
+      {/* Reset to defaults — disabled when locked (locked block can't
+          have content overwritten). */}
+      <button
+        onClick={(e) => { e.stopPropagation(); if (!isLocked) onReset(); }}
+        disabled={isLocked}
+        title={isLocked ? 'Unlock to reset' : 'Reset to default values'}
+        style={{
+          width: '20px', height: '22px', padding: 0,
+          background: 'transparent', border: 'none',
+          color: isLocked ? S.textFaint : S.textDim,
+          cursor: isLocked ? 'not-allowed' : 'pointer',
+          borderRadius: '3px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onMouseEnter={(e) => { if (!isLocked) e.currentTarget.style.background = S.bg; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      ><RotateCcw size={11} strokeWidth={2} /></button>
       <button
         onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
         title="Duplicate (⌘D)"
         style={{
-          width: '22px', height: '22px', padding: 0,
+          width: '20px', height: '22px', padding: 0,
           background: 'transparent', border: 'none',
           color: S.textDim, cursor: 'pointer',
           borderRadius: '3px',
@@ -1854,7 +1937,7 @@ function SortableBlockRow({
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         title="Delete (⌫)"
         style={{
-          width: '22px', height: '22px', padding: 0,
+          width: '20px', height: '22px', padding: 0,
           background: 'transparent', border: 'none',
           color: S.textDim, cursor: 'pointer',
           borderRadius: '3px',
@@ -2292,6 +2375,14 @@ export default function SiteContent() {
   const [designModalTab, setDesignModalTab] = useState('brand');
   // Overflow menu in the toolbar (History / Schedule / Discard).
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  // Editor command palette (Cmd+K). Lives inline in this component so
+  // commands can close over editor state. Steals Cmd+K from the global
+  // CommandPalette (which only does route navigation) using a capture-
+  // phase listener that stops propagation while the editor is mounted.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
+  const [paletteCursor, setPaletteCursor] = useState(0);
+  const paletteInputRef = useRef(null);
   // The block-type currently being dragged from the Library panel, used
   // by the DragOverlay so the user sees a floating preview that follows
   // their cursor. Null when no library drag is in progress (in-tree
@@ -2494,6 +2585,39 @@ export default function SiteContent() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Cmd+K editor palette hotkey. Capture phase + stopImmediatePropagation
+  // means the global navigation CommandPalette never sees the event while
+  // we're mounted — Cmd+K becomes editor-scoped here. Esc closes the
+  // palette. Avoids hijacking when an input/textarea has focus AND the
+  // palette is closed (so Cmd+K in a text field still feels normal).
+  useEffect(() => {
+    const onKey = (e) => {
+      const isCmdK = (e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K');
+      if (isCmdK) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setPaletteOpen(o => !o);
+        setPaletteQuery('');
+        setPaletteCursor(0);
+        return;
+      }
+      if (e.key === 'Escape' && paletteOpen) {
+        e.stopImmediatePropagation();
+        setPaletteOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [paletteOpen]);
+
+  // Autofocus the palette input when it opens.
+  useEffect(() => {
+    if (paletteOpen && paletteInputRef.current) {
+      const t = setTimeout(() => paletteInputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [paletteOpen]);
+
   // Seed the history with the loaded content exactly once.
   useEffect(() => {
     if (loading) return;
@@ -2628,6 +2752,29 @@ export default function SiteContent() {
     mutateBlocks(pageKey, (blocks) => blocks.map(b =>
       b.id === blockId ? { ...b, props: { ...(b.props || {}), hidden: !b.props?.hidden } } : b
     ));
+  }, [mutateBlocks]);
+
+  // Toggle block.locked. Locked blocks have BlockInspector field edits
+  // disabled (the inspector shows a "🔒 Locked" banner with an Unlock
+  // button) and the Reset action is disabled in the row. Drag/duplicate/
+  // delete still work — locking is about content, not position. Stored
+  // at block.locked (not in props) so it never gets reset by Reset.
+  const toggleBlockLocked = useCallback((pageKey, blockId) => {
+    mutateBlocks(pageKey, (blocks) => blocks.map(b =>
+      b.id === blockId ? { ...b, locked: !b.locked } : b
+    ));
+  }, [mutateBlocks]);
+
+  // Reset a block's props to the registry defaults (via makeBlock).
+  // Preserves the block's id and locked flag so the row identity stays
+  // stable; only props are replaced. Hidden flag in props is reset too,
+  // which is intentional (Reset = "make this look like a fresh insert").
+  const resetBlockProps = useCallback((pageKey, blockId) => {
+    mutateBlocks(pageKey, (blocks) => blocks.map(b => {
+      if (b.id !== blockId) return b;
+      const fresh = makeBlock(b.type);
+      return { ...b, props: fresh.props };
+    }));
   }, [mutateBlocks]);
 
   const moveBlock = useCallback((pageKey, blockId, delta) => {
@@ -2870,6 +3017,9 @@ export default function SiteContent() {
 
   // ---- Phase 6: Scheduled publishes ----------------------------------
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  // The Cmd+K palette commands need scheduleModalOpen and history modal
+  // setters too — defined below. We assemble the full list with another
+  // useMemo further down to avoid hoisting these state declarations.
   const [scheduledPublishes, setScheduledPublishes] = useState([]);
   const fetchScheduled = useCallback(async () => {
     try {
@@ -3380,6 +3530,62 @@ export default function SiteContent() {
   const vp = VIEWPORTS.find(v => v.key === viewport) || VIEWPORTS[0];
   const currentSection = CONTENT_SCHEMA.find(s => s.key === activeSection) || CONTENT_SCHEMA[0];
   const currentStorage = storageKeyForSection(currentSection);
+
+  // Cmd+K palette commands — assembled from current editor state. New
+  // commands are appended here; the palette filters by label + kind. The
+  // `dirty`/`addPickerOpen` deps mean publish/discard/library entries
+  // reflect the live state of the editor at open time.
+  const paletteCommands = useMemo(() => {
+    const cmds = [];
+    for (const p of allPages) {
+      cmds.push({
+        id: `page:${p.key}`,
+        label: `Switch to ${p.label}`,
+        kind: 'Page',
+        hint: p.path,
+        run: () => {
+          setEditingPage(p.key); setSelectedBlockId(null); setIframePath(p.path);
+        },
+      });
+    }
+    for (const [type, m] of Object.entries(BLOCK_REGISTRY_META)) {
+      cmds.push({
+        id: `add:${type}`,
+        label: `Add block: ${m.label || type}`,
+        kind: 'Add',
+        hint: m.category || '',
+        run: () => addBlockToPage(editingPage, type),
+      });
+    }
+    cmds.push({ id: 'styles',     label: 'Open Design System',          kind: 'Action', run: () => setDesignModalOpen(true) });
+    cmds.push({ id: 'view-d',     label: 'View: Desktop',               kind: 'View',   run: () => setViewport('desktop') });
+    cmds.push({ id: 'view-t',     label: 'View: Tablet',                kind: 'View',   run: () => setViewport('tablet') });
+    cmds.push({ id: 'view-m',     label: 'View: Mobile',                kind: 'View',   run: () => setViewport('mobile') });
+    cmds.push({ id: 'reload',     label: 'Reload preview',              kind: 'Action', run: () => setIframeKey(k => k + 1) });
+    cmds.push({ id: 'open-live',  label: 'Open live site in new tab',   kind: 'Action', run: () => window.open(STORE_URL + iframePath, '_blank', 'noreferrer') });
+    cmds.push({ id: 'history',    label: 'View publish history',        kind: 'Action', run: () => setHistoryModalOpen(true) });
+    cmds.push({ id: 'lib',        label: addPickerOpen ? 'Hide block library' : 'Show block library', kind: 'Action', run: () => setAddPickerOpen(o => !o) });
+    if (dirty) {
+      cmds.push({ id: 'publish',  label: 'Publish to live',             kind: 'Publish', accent: true,  run: () => pushToLive() });
+      cmds.push({ id: 'schedule', label: 'Schedule publish…',           kind: 'Publish', run: () => setScheduleModalOpen(true) });
+      cmds.push({ id: 'discard',  label: 'Discard unpublished changes', kind: 'Publish', danger: true,  run: () => revertDraft() });
+    }
+    return cmds;
+  }, [allPages, editingPage, dirty, iframePath, addPickerOpen, addBlockToPage, pushToLive, revertDraft]);
+
+  const filteredPaletteCommands = useMemo(() => {
+    const q = paletteQuery.trim().toLowerCase();
+    if (!q) return paletteCommands;
+    return paletteCommands.filter(c =>
+      c.label.toLowerCase().includes(q) || c.kind.toLowerCase().includes(q) || (c.hint || '').toLowerCase().includes(q)
+    );
+  }, [paletteQuery, paletteCommands]);
+
+  // Clamp the cursor inside the filtered list bounds so search-then-Enter
+  // never points at a stale row that no longer exists.
+  useEffect(() => {
+    if (paletteCursor >= filteredPaletteCommands.length) setPaletteCursor(0);
+  }, [filteredPaletteCommands.length, paletteCursor]);
 
   return (
     <MediaLibraryContext.Provider value={mediaLibraryApi}>
@@ -5047,9 +5253,18 @@ export default function SiteContent() {
                             isMulti={isMulti}
                             isSelected={isSelected}
                             isHidden={!!b.props?.hidden}
+                            isLocked={!!b.locked}
                             S={S}
                             onSelect={handleSelect(b, idx)}
                             onToggleVisibility={() => toggleBlockHidden(editingPage, b.id)}
+                            onToggleLocked={() => toggleBlockLocked(editingPage, b.id)}
+                            onReset={() => askConfirm({
+                              title: `Reset ${meta?.label || b.type} to defaults?`,
+                              message: 'Block content will be replaced with the registry defaults. You can undo with ⌘Z.',
+                              confirmLabel: 'Reset block',
+                              tone: 'danger',
+                              onConfirm: () => resetBlockProps(editingPage, b.id),
+                            })}
                             onDuplicate={() => duplicateBlock(editingPage, b.id)}
                             onDelete={() => askConfirm({
                               title: `Delete ${meta?.label || b.type}?`,
@@ -5353,6 +5568,8 @@ export default function SiteContent() {
             <BlockInspector
               block={selectedBlock}
               meta={BLOCK_REGISTRY_META[selectedBlock.type]}
+              isLocked={!!selectedBlock.locked}
+              onToggleLocked={() => toggleBlockLocked(editingPage, selectedBlock.id)}
               onChangeProp={(key, value) => updateBlockProp(editingPage, selectedBlock.id, key, value)}
               onBack={() => setSelectedBlockId(null)}
               onDuplicate={() => duplicateBlock(editingPage, selectedBlock.id)}
@@ -5399,6 +5616,130 @@ export default function SiteContent() {
           )}
         </aside>
       </div>
+      {/* ==================== Cmd+K command palette ==================== */}
+      {paletteOpen && (
+        <div
+          onClick={() => setPaletteOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 220,
+            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: '88px 20px 20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '560px', maxHeight: 'calc(100vh - 120px)',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+              fontFamily: '-apple-system, system-ui, sans-serif',
+            }}
+          >
+            {/* Search */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '14px 16px', borderBottom: `1px solid ${S.border}`,
+            }}>
+              <Search size={16} strokeWidth={2.25} color={S.textDim} />
+              <input
+                ref={paletteInputRef}
+                type="text"
+                value={paletteQuery}
+                onChange={(e) => { setPaletteQuery(e.target.value); setPaletteCursor(0); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setPaletteCursor(c => Math.min(c + 1, Math.max(0, filteredPaletteCommands.length - 1)));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setPaletteCursor(c => Math.max(0, c - 1));
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const cmd = filteredPaletteCommands[paletteCursor];
+                    if (cmd) { setPaletteOpen(false); try { cmd.run(); } catch {} }
+                  }
+                }}
+                placeholder="Type a command, page name, or block…"
+                style={{
+                  flex: 1, padding: '4px 0',
+                  background: 'transparent', border: 'none',
+                  fontSize: '14px', color: S.text, outline: 'none',
+                }}
+              />
+              <span style={{
+                fontSize: '10px', color: S.textFaint, fontWeight: '600',
+                padding: '2px 6px', background: S.bg, borderRadius: '3px',
+                fontFamily: 'ui-monospace, monospace',
+              }}>⌘K</span>
+            </div>
+
+            {/* Results */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+              {filteredPaletteCommands.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: S.textDim, fontSize: '12px' }}>
+                  No commands match "{paletteQuery}".
+                </div>
+              ) : (
+                filteredPaletteCommands.map((cmd, idx) => {
+                  const focused = idx === paletteCursor;
+                  return (
+                    <div
+                      key={cmd.id}
+                      onMouseEnter={() => setPaletteCursor(idx)}
+                      onClick={() => { setPaletteOpen(false); try { cmd.run(); } catch {} }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '8px 16px', cursor: 'pointer',
+                        background: focused ? S.accentLight : 'transparent',
+                        color: cmd.danger ? S.danger : (cmd.accent ? S.accent : S.text),
+                        fontSize: '12.5px', fontWeight: focused ? '600' : '500',
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '9px', fontWeight: '700',
+                        textTransform: 'uppercase', letterSpacing: '0.5px',
+                        color: focused ? S.accent : S.textFaint,
+                        width: '54px', flexShrink: 0,
+                      }}>{cmd.kind}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {cmd.label}
+                      </span>
+                      {cmd.hint && (
+                        <span style={{ fontSize: '10.5px', color: S.textFaint, fontFamily: 'ui-monospace, monospace' }}>
+                          {cmd.hint}
+                        </span>
+                      )}
+                      {focused && <CornerDownLeft size={12} strokeWidth={2.25} color={S.textDim} />}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '8px 16px', borderTop: `1px solid ${S.border}`,
+              background: S.bg,
+              display: 'flex', alignItems: 'center', gap: '14px',
+              fontSize: '10.5px', color: S.textDim,
+            }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowUp size={11} strokeWidth={2.25} /> <ArrowDown size={11} strokeWidth={2.25} /> Navigate
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <CornerDownLeft size={11} strokeWidth={2.25} /> Select
+              </span>
+              <span>Esc to close</span>
+              <span style={{ flex: 1 }} />
+              <span>{filteredPaletteCommands.length} of {paletteCommands.length}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating preview that follows the cursor while a library tile
           is being dragged. Empty when not dragging or when the active
           drag is an in-tree reorder (those use SortableBlockRow's own
