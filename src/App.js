@@ -12,81 +12,116 @@ import { ROUTE_PERMISSION_MAP, STAFF_DEFAULT_PERMISSIONS, getPermissionForPath, 
 import Login from './pages/Login';
 import './App.css';
 
+// ── Lazy loader with automatic recovery ─────────────────────────────────────
+// Dev rebuilds and production redeploys both change chunk filenames. If a
+// browser tab has a stale entry chunk cached, the lazy import will throw
+// ChunkLoadError. We catch it once per session and do a hard reload so the
+// user gets the fresh entry chunk. The session-storage flag prevents reload
+// loops if the error is actually a real network/bundling failure.
+function lazyWithRetry(importFn) {
+  return React.lazy(() =>
+    importFn()
+      .then((mod) => {
+        // A successful load means the current entry chunk is healthy; clear
+        // the retry flag so a later stale-chunk hit can reload once again.
+        try { sessionStorage.removeItem('tapas_chunk_reload'); } catch {}
+        return mod;
+      })
+      .catch((err) => {
+        const name = err?.name || '';
+        const msg = err?.message || '';
+        const isChunkError = name === 'ChunkLoadError' || /Loading chunk .* failed/i.test(msg);
+        if (isChunkError) {
+          try {
+            if (!sessionStorage.getItem('tapas_chunk_reload')) {
+              sessionStorage.setItem('tapas_chunk_reload', String(Date.now()));
+              window.location.reload();
+              // Return a stub so React doesn't flash an error boundary before
+              // the reload actually fires. This promise never resolves.
+              return new Promise(() => {});
+            }
+          } catch {}
+        }
+        throw err;
+      })
+  );
+}
+
 // ── Lazy-loaded pages (Existing) ─────────────────────────────────────────────
-const Dashboard        = React.lazy(() => import('./pages/Dashboard'));
-const Members          = React.lazy(() => import('./pages/Members'));
-const Books            = React.lazy(() => import('./pages/Books'));
-const Borrow           = React.lazy(() => import('./pages/Borrow'));
-const POS              = React.lazy(() => import('./pages/POS'));
-const Reports          = React.lazy(() => import('./pages/Reports'));
-const MemberProfile    = React.lazy(() => import('./pages/MemberProfile'));
-const OverdueBooks     = React.lazy(() => import('./pages/OverdueBooks'));
-const BookAvailability = React.lazy(() => import('./pages/BookAvailability'));
-const BorrowStatistics = React.lazy(() => import('./pages/BorrowStatistics'));
-const Reservations     = React.lazy(() => import('./pages/Reservations'));
-const Fines            = React.lazy(() => import('./pages/Fines'));
-const Reviews          = React.lazy(() => import('./pages/Reviews'));
-const Wishlist         = React.lazy(() => import('./pages/Wishlist'));
-const Recommendations  = React.lazy(() => import('./pages/Recommendations'));
-const ChildProfile     = React.lazy(() => import('./pages/ChildProfile'));
-const StaffManagement  = React.lazy(() => import('./pages/StaffManagement'));
+const Dashboard        = lazyWithRetry(() => import('./pages/Dashboard'));
+const Members          = lazyWithRetry(() => import('./pages/Members'));
+const Books            = lazyWithRetry(() => import('./pages/Books'));
+const Borrow           = lazyWithRetry(() => import('./pages/Borrow'));
+const POS              = lazyWithRetry(() => import('./pages/POS'));
+const Reports          = lazyWithRetry(() => import('./pages/Reports'));
+const MemberProfile    = lazyWithRetry(() => import('./pages/MemberProfile'));
+const OverdueBooks     = lazyWithRetry(() => import('./pages/OverdueBooks'));
+const BookAvailability = lazyWithRetry(() => import('./pages/BookAvailability'));
+const BorrowStatistics = lazyWithRetry(() => import('./pages/BorrowStatistics'));
+const Reservations     = lazyWithRetry(() => import('./pages/Reservations'));
+const Fines            = lazyWithRetry(() => import('./pages/Fines'));
+const Reviews          = lazyWithRetry(() => import('./pages/Reviews'));
+const Wishlist         = lazyWithRetry(() => import('./pages/Wishlist'));
+const Recommendations  = lazyWithRetry(() => import('./pages/Recommendations'));
+const ChildProfile     = lazyWithRetry(() => import('./pages/ChildProfile'));
+const StaffManagement  = lazyWithRetry(() => import('./pages/StaffManagement'));
 
 // ── Lazy-loaded pages (New - Phase 2: Cafe) ──────────────────────────────────
-const CafePOS          = React.lazy(() => import('./pages/CafePOS'));
-const CafeMenu         = React.lazy(() => import('./pages/CafeMenu'));
-const CafeOrders       = React.lazy(() => import('./pages/CafeOrders'));
-const CafeReports      = React.lazy(() => import('./pages/CafeReports'));
+const CafePOS          = lazyWithRetry(() => import('./pages/CafePOS'));
+const CafeMenu         = lazyWithRetry(() => import('./pages/CafeMenu'));
+const CafeOrders       = lazyWithRetry(() => import('./pages/CafeOrders'));
+const CafeReports      = lazyWithRetry(() => import('./pages/CafeReports'));
 
 // ── Lazy-loaded pages (New - Phase 3: Events) ────────────────────────────────
-const EventListing     = React.lazy(() => import('./pages/EventListing'));
-const EventCreate      = React.lazy(() => import('./pages/EventCreate'));
-const EventAttendance  = React.lazy(() => import('./pages/EventAttendance'));
+const EventListing     = lazyWithRetry(() => import('./pages/EventListing'));
+const EventCreate      = lazyWithRetry(() => import('./pages/EventCreate'));
+const EventAttendance  = lazyWithRetry(() => import('./pages/EventAttendance'));
 
 // ── Lazy-loaded pages (New - Phase 4: Inventory, Accounts, Vendors, Settings)
-const InventoryLibrary      = React.lazy(() => import('./pages/InventoryLibrary'));
-const InventoryCafe         = React.lazy(() => import('./pages/InventoryCafe'));
-const VendorList            = React.lazy(() => import('./pages/VendorList'));
-const PurchaseOrders        = React.lazy(() => import('./pages/PurchaseOrders'));
-const AccountsOverview      = React.lazy(() => import('./pages/AccountsOverview'));
-const AccountsTransactions  = React.lazy(() => import('./pages/AccountsTransactions'));
-const AccountsExpenses      = React.lazy(() => import('./pages/AccountsExpenses'));
-const AccountsPnL           = React.lazy(() => import('./pages/AccountsPnL'));
-const AccountsInvoices      = React.lazy(() => import('./pages/AccountsInvoices'));
-const AccountsMemberPayments = React.lazy(() => import('./pages/AccountsMemberPayments'));
-const AccountsVendorPayments = React.lazy(() => import('./pages/AccountsVendorPayments'));
-const SettingsApp           = React.lazy(() => import('./pages/SettingsApp'));
-const SettingsProfile       = React.lazy(() => import('./pages/SettingsProfile'));
-const SettingsHealth        = React.lazy(() => import('./pages/SettingsHealth'));
-const ActivityLog           = React.lazy(() => import('./pages/ActivityLog'));
-const StaffDetail           = React.lazy(() => import('./pages/StaffDetail'));
-const PublicCatalog         = React.lazy(() => import('./pages/PublicCatalog'));
-const BookCopies            = React.lazy(() => import('./pages/BookCopies'));
-const BarcodeManager        = React.lazy(() => import('./pages/BarcodeManager'));
-const BarcodeEditor         = React.lazy(() => import('./pages/BarcodeEditor'));
-const DeviceManager         = React.lazy(() => import('./pages/DeviceManager'));
-const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
+const InventoryLibrary      = lazyWithRetry(() => import('./pages/InventoryLibrary'));
+const InventoryCafe         = lazyWithRetry(() => import('./pages/InventoryCafe'));
+const VendorList            = lazyWithRetry(() => import('./pages/VendorList'));
+const PurchaseOrders        = lazyWithRetry(() => import('./pages/PurchaseOrders'));
+const AccountsOverview      = lazyWithRetry(() => import('./pages/AccountsOverview'));
+const AccountsTransactions  = lazyWithRetry(() => import('./pages/AccountsTransactions'));
+const AccountsExpenses      = lazyWithRetry(() => import('./pages/AccountsExpenses'));
+const AccountsPnL           = lazyWithRetry(() => import('./pages/AccountsPnL'));
+const AccountsInvoices      = lazyWithRetry(() => import('./pages/AccountsInvoices'));
+const AccountsMemberPayments = lazyWithRetry(() => import('./pages/AccountsMemberPayments'));
+const AccountsVendorPayments = lazyWithRetry(() => import('./pages/AccountsVendorPayments'));
+const SettingsApp           = lazyWithRetry(() => import('./pages/SettingsApp'));
+const SettingsProfile       = lazyWithRetry(() => import('./pages/SettingsProfile'));
+const SettingsHealth        = lazyWithRetry(() => import('./pages/SettingsHealth'));
+const ActivityLog           = lazyWithRetry(() => import('./pages/ActivityLog'));
+const StaffDetail           = lazyWithRetry(() => import('./pages/StaffDetail'));
+const PublicCatalog         = lazyWithRetry(() => import('./pages/PublicCatalog'));
+const BookCopies            = lazyWithRetry(() => import('./pages/BookCopies'));
+const BarcodeManager        = lazyWithRetry(() => import('./pages/BarcodeManager'));
+const BarcodeEditor         = lazyWithRetry(() => import('./pages/BarcodeEditor'));
+const DeviceManager         = lazyWithRetry(() => import('./pages/DeviceManager'));
+const KioskMode             = lazyWithRetry(() => import('./pages/KioskMode'));
 
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
-const CustomerOrders        = React.lazy(() => import('./pages/CustomerOrders'));
-const SiteContent           = React.lazy(() => import('./pages/SiteContent'));
-const ContactInbox          = React.lazy(() => import('./pages/ContactInbox'));
+const CustomerOrders        = lazyWithRetry(() => import('./pages/CustomerOrders'));
+const SiteContent           = lazyWithRetry(() => import('./pages/SiteContent'));
+const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 
 // ── Lazy-loaded pages (New - Phase 6: Productivity + Marketing) ─────────────
-const Tasks                 = React.lazy(() => import('./pages/Tasks'));
-const MarketingTools        = React.lazy(() => import('./pages/MarketingTools'));
-const PromoCodes            = React.lazy(() => import('./pages/PromoCodes'));
-const MarketingHub          = React.lazy(() => import('./pages/MarketingHub'));
-const LoyaltySystem         = React.lazy(() => import('./pages/LoyaltySystem'));
-const GrowthTools           = React.lazy(() => import('./pages/GrowthTools'));
-const CampaignTools         = React.lazy(() => import('./pages/CampaignTools'));
-const Automations           = React.lazy(() => import('./pages/Automations'));
-const EngagementTools       = React.lazy(() => import('./pages/EngagementTools'));
-const MarketingDashboard    = React.lazy(() => import('./pages/MarketingDashboard'));
-const Newsletter            = React.lazy(() => import('./pages/Newsletter'));
-const Communications        = React.lazy(() => import('./pages/Communications'));
-const CommunityBlog         = React.lazy(() => import('./pages/CommunityBlog'));
-const AdvancedTools         = React.lazy(() => import('./pages/AdvancedTools'));
-const Integrations          = React.lazy(() => import('./pages/Integrations'));
+const Tasks                 = lazyWithRetry(() => import('./pages/Tasks'));
+const MarketingTools        = lazyWithRetry(() => import('./pages/MarketingTools'));
+const PromoCodes            = lazyWithRetry(() => import('./pages/PromoCodes'));
+const MarketingHub          = lazyWithRetry(() => import('./pages/MarketingHub'));
+const LoyaltySystem         = lazyWithRetry(() => import('./pages/LoyaltySystem'));
+const GrowthTools           = lazyWithRetry(() => import('./pages/GrowthTools'));
+const CampaignTools         = lazyWithRetry(() => import('./pages/CampaignTools'));
+const Automations           = lazyWithRetry(() => import('./pages/Automations'));
+const EngagementTools       = lazyWithRetry(() => import('./pages/EngagementTools'));
+const MarketingDashboard    = lazyWithRetry(() => import('./pages/MarketingDashboard'));
+const Newsletter            = lazyWithRetry(() => import('./pages/Newsletter'));
+const Communications        = lazyWithRetry(() => import('./pages/Communications'));
+const CommunityBlog         = lazyWithRetry(() => import('./pages/CommunityBlog'));
+const AdvancedTools         = lazyWithRetry(() => import('./pages/AdvancedTools'));
+const Integrations          = lazyWithRetry(() => import('./pages/Integrations'));
 
 // ── Page loader ───────────────────────────────────────────────────────────────
 
@@ -106,7 +141,7 @@ function PageLoader() {
 }
 
 // ── Error boundary for chunk-load failures ─────────────────────────────────────
-// After a deploy, old cached JS chunks may 404. When React.lazy() fails to fetch
+// After a deploy, old cached JS chunks may 404. When lazyWithRetry() fails to fetch
 // a chunk, Suspense can't recover — the page stays on the loading spinner forever.
 // This error boundary catches the load failure and offers a one-click hard refresh.
 class ChunkErrorBoundary extends React.Component {

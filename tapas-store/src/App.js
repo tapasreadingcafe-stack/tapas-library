@@ -9,19 +9,44 @@ import HeaderTemplate from './components/HeaderTemplates';
 import FooterTemplate from './components/FooterTemplates';
 import './App.css';
 
-const Home            = React.lazy(() => import('./pages/Home'));
-const Catalog         = React.lazy(() => import('./pages/Catalog'));
-const BookDetail      = React.lazy(() => import('./pages/BookDetail'));
-const Offers          = React.lazy(() => import('./pages/Offers'));
-const About           = React.lazy(() => import('./pages/About'));
-const CustomerLogin   = React.lazy(() => import('./pages/CustomerLogin'));
-const Profile         = React.lazy(() => import('./pages/Profile'));
-const Cart            = React.lazy(() => import('./pages/Cart'));
-const Checkout        = React.lazy(() => import('./pages/Checkout'));
-const OrderSuccess    = React.lazy(() => import('./pages/OrderSuccess'));
-const Blog            = React.lazy(() => import('./pages/Blog'));
-const BlogPost        = React.lazy(() => import('./pages/BlogPost'));
-const CustomPage      = React.lazy(() => import('./pages/CustomPage'));
+// Recover from ChunkLoadError by forcing one hard reload. Prevents a
+// stale browser tab from being stuck after a dev rebuild or deploy.
+function lazyWithRetry(importFn) {
+  return React.lazy(() =>
+    importFn()
+      .then((mod) => {
+        try { sessionStorage.removeItem('tapas_store_chunk_reload'); } catch {}
+        return mod;
+      })
+      .catch((err) => {
+        const isChunkError = err?.name === 'ChunkLoadError' || /Loading chunk .* failed/i.test(err?.message || '');
+        if (isChunkError) {
+          try {
+            if (!sessionStorage.getItem('tapas_store_chunk_reload')) {
+              sessionStorage.setItem('tapas_store_chunk_reload', String(Date.now()));
+              window.location.reload();
+              return new Promise(() => {});
+            }
+          } catch {}
+        }
+        throw err;
+      })
+  );
+}
+
+const Home            = lazyWithRetry(() => import('./pages/Home'));
+const Catalog         = lazyWithRetry(() => import('./pages/Catalog'));
+const BookDetail      = lazyWithRetry(() => import('./pages/BookDetail'));
+const Offers          = lazyWithRetry(() => import('./pages/Offers'));
+const About           = lazyWithRetry(() => import('./pages/About'));
+const CustomerLogin   = lazyWithRetry(() => import('./pages/CustomerLogin'));
+const Profile         = lazyWithRetry(() => import('./pages/Profile'));
+const Cart            = lazyWithRetry(() => import('./pages/Cart'));
+const Checkout        = lazyWithRetry(() => import('./pages/Checkout'));
+const OrderSuccess    = lazyWithRetry(() => import('./pages/OrderSuccess'));
+const Blog            = lazyWithRetry(() => import('./pages/Blog'));
+const BlogPost        = lazyWithRetry(() => import('./pages/BlogPost'));
+const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
