@@ -165,7 +165,26 @@ export default function EmailCampaigns() {
               style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #dfe4ea', borderRadius: '6px', outline: 'none', boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: '4px' }}>Subject line</label>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', display: 'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '4px' }}>
+              <span>Subject line</span>
+              <button type="button"
+                onClick={async () => {
+                  if (!draft.body_html.trim()) { alert('Write the body first — the AI needs content to suggest from.'); return; }
+                  try {
+                    const { data, error } = await supabase.functions.invoke('ai-assist', {
+                      body: { task: 'email_subjects', body: draft.body_html.replace(/<[^>]+>/g, ' '), goal: draft.name },
+                    });
+                    if (error || !data?.suggestions?.length) throw new Error(data?.error || error?.message || 'AI failed');
+                    const pick = window.prompt('Pick a subject:\n\n' + data.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n') + '\n\nType the number (1-5), or Cancel.');
+                    const idx = parseInt(pick, 10) - 1;
+                    if (idx >= 0 && data.suggestions[idx]) setDraft(d => ({ ...d, subject: data.suggestions[idx] }));
+                  } catch (err) {
+                    alert('AI subject suggestions failed: ' + (err.message || err));
+                  }
+                }}
+                style={{ padding: '3px 8px', fontSize: '10px', fontWeight: 700, background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >✨ Suggest</button>
+            </label>
             <input type="text" value={draft.subject} onChange={e => setDraft({ ...draft, subject: e.target.value })} placeholder="Goes in the inbox list — make it compelling"
               style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #dfe4ea', borderRadius: '6px', outline: 'none', boxSizing: 'border-box' }} />
           </div>

@@ -450,6 +450,30 @@ export default function ContactInbox() {
                         >✉️ Reply by email</a>
                       )}
 
+                      {disp.email && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const { data, error } = await supabase.functions.invoke('ai-assist', {
+                                body: { task: 'reply_draft', subject: row.subject || '', body: row.message || disp.preview || '', context: `Customer: ${disp.name || 'unknown'}` },
+                              });
+                              if (error || !data?.text) throw new Error(data?.error || error?.message || 'AI failed');
+                              const mailto = `mailto:${encodeURIComponent(disp.email)}?subject=${encodeURIComponent('Re: ' + (row.subject || 'Your message'))}&body=${encodeURIComponent(data.text)}`;
+                              window.location.href = mailto;
+                            } catch (err) {
+                              alert('AI reply draft failed: ' + (err.message || err));
+                            }
+                          }}
+                          style={{
+                            padding: '8px 14px', background: '#a78bfa', color: 'white',
+                            border: 'none', borderRadius: '6px',
+                            fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                          }}
+                          title="AI drafts a reply, opens it in your mail client"
+                        >✨ Draft AI reply</button>
+                      )}
+
                       {row.status !== 'replied' && (
                         <button
                           onClick={(e) => { e.stopPropagation(); patchRow(row, { status: 'replied' }); }}

@@ -196,6 +196,23 @@ export default function ReviewsInbox() {
                         style={{ padding: '6px 14px', background: '#fff', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                       >✗ Reject</button>
                     )}
+                    {row.guest_email && row.review_text && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { data, error } = await supabase.functions.invoke('ai-assist', {
+                              body: { task: 'reply_draft', subject: `Your review of ${book?.title || 'a book'}`, body: row.review_text, context: `Rating: ${row.rating}/5` },
+                            });
+                            if (error || !data?.text) throw new Error(data?.error || error?.message || 'AI failed');
+                            const mailto = `mailto:${encodeURIComponent(row.guest_email)}?subject=${encodeURIComponent('Thanks for your review')}&body=${encodeURIComponent(data.text)}`;
+                            window.location.href = mailto;
+                          } catch (err) {
+                            alert('AI reply draft failed: ' + (err.message || err));
+                          }
+                        }}
+                        style={{ padding: '6px 14px', background: '#a78bfa', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                      >✨ Draft AI reply</button>
+                    )}
                     <button onClick={() => removeRow(row)} disabled={actioning === row.id}
                       style={{ marginLeft: 'auto', padding: '6px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                     >🗑 Delete</button>

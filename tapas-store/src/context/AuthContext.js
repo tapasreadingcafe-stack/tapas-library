@@ -18,6 +18,33 @@ import { supabase } from '../utils/supabase';
 
 const AuthContext = createContext(null);
 
+// On first page load, capture ?ref=CODE so that when the visitor later
+// signs up we can stamp it onto their members row. Stored in
+// localStorage so it survives navigation + the auth redirect roundtrip.
+const REF_STORAGE_KEY = 'tapas_pending_referral_code';
+
+function captureReferralFromUrl() {
+  if (typeof window === 'undefined') return;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('ref') || '').trim();
+    if (code && /^[A-Za-z0-9_-]{4,24}$/.test(code)) {
+      localStorage.setItem(REF_STORAGE_KEY, code);
+    }
+  } catch {}
+}
+captureReferralFromUrl();
+
+function popPendingReferralCode() {
+  try {
+    const code = localStorage.getItem(REF_STORAGE_KEY);
+    if (code) localStorage.removeItem(REF_STORAGE_KEY);
+    return code || null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [authUser, setAuthUser]         = useState(null);
   const [member, setMember]             = useState(null);
@@ -69,6 +96,7 @@ export function AuthProvider({ children }) {
 
     // 3) last-resort insert (trigger failure)
     if (!row) {
+      const referralCode = popPendingReferralCode();
       const { data: created, error: insErr } = await supabase
         .from('members')
         .insert({
@@ -78,6 +106,7 @@ export function AuthProvider({ children }) {
           phone: user.phone || '',  // NOT NULL column — fill empty string for online signups
           customer_type: 'online',
           status: 'active',
+          referred_by_code: referralCode,
         })
         .select('*')
         .single();
@@ -85,6 +114,19 @@ export function AuthProvider({ children }) {
         console.error('[Auth] member insert fallback failed:', insErr);
       }
       row = created || null;
+    } else if (!row.referred_by_code) {
+      // If the DB trigger created the row before we could stamp the referral,
+      // patch it in now. Only does a write when we actually have a code.
+      const pending = popPendingReferralCode();
+      if (pending) {
+        const { data: patched } = await supabase
+          .from('members')
+          .update({ referred_by_code: pending })
+          .eq('id', row.id)
+          .select('*')
+          .single();
+        if (patched) row = patched;
+      }
     }
 
     setMember(row);

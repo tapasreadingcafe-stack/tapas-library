@@ -232,16 +232,21 @@ export default function OrderSuccess() {
         <div style={{
           display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap',
         }}>
-          <Link to="/profile?tab=orders" className="tps-btn tps-btn-teal" style={{
+          <Link to={`/order/${order.id}/track`} className="tps-btn tps-btn-teal" style={{
             fontSize: '14px', padding: '10px 24px',
           }}>
-            View My Orders
+            Track this order
           </Link>
-          <Link to="/books" className="tps-btn" style={{
+          <Link to="/profile?tab=orders" className="tps-btn" style={{
             background: 'transparent',
             color: 'var(--secondary, #006a6a)',
             border: '1.5px solid var(--secondary, #006a6a)',
             fontWeight: 600, fontSize: '14px', padding: '10px 24px',
+          }}>
+            All My Orders
+          </Link>
+          <Link to="/books" className="tps-btn tps-btn-ghost" style={{
+            fontSize: '14px', padding: '10px 24px',
           }}>
             Continue Shopping
           </Link>

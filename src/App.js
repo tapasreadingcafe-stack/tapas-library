@@ -108,6 +108,7 @@ const SiteContent           = lazyWithRetry(() => import('./pages/SiteContent'))
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
 const StoreAnalytics        = lazyWithRetry(() => import('./pages/StoreAnalytics'));
+const CommerceInsights      = lazyWithRetry(() => import('./pages/CommerceInsights'));
 const ReviewsInbox          = lazyWithRetry(() => import('./pages/ReviewsInbox'));
 const EventRsvpInbox        = lazyWithRetry(() => import('./pages/EventRsvpInbox'));
 const EmailCampaigns        = lazyWithRetry(() => import('./pages/EmailCampaigns'));
@@ -269,6 +270,7 @@ const NAV_CONFIG = [
       { to: '/store/rsvps',      icon: '🎟', label: 'Event RSVPs' },
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
+      { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
       { to: '/store/content',    icon: '🎨', label: 'Edit Website' },
     ],
   },
@@ -748,6 +750,7 @@ function DashboardShell() {
             <Route path="/store/rsvps"                        element={<EventRsvpInbox />} />
             <Route path="/store/newsletter"                   element={<NewsletterInbox />} />
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
+            <Route path="/commerce-insights"                  element={<CommerceInsights />} />
             <Route path="/store/content"                      element={<SiteContent />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 

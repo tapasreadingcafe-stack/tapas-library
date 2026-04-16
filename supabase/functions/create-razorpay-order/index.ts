@@ -29,6 +29,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { applyCheckoutExtras, finalizeExtrasForOrder } from "../_shared/order-extras.ts";
 
 interface CartItem {
   type: "book" | "membership";
@@ -41,6 +42,11 @@ interface CartItem {
 interface CreateOrderBody {
   items: CartItem[];
   notes?: string;
+  fulfillment_type?: "pickup" | "delivery";
+  shipping_address_id?: string | null;
+  promo_code?: string | null;
+  points_to_redeem?: number | null;
+  snapshot_id?: string | null;
 }
 
 serve(async (req) => {
@@ -178,7 +184,26 @@ serve(async (req) => {
       }
     }
 
-    const total = subtotal; // discount handling deferred
+    // ---- promo / points / address extras --------------------------
+    let applied;
+    try {
+      applied = await applyCheckoutExtras({
+        svc: svcClient,
+        memberId: member.id,
+        subtotal,
+        extras: {
+          fulfillment_type: body.fulfillment_type,
+          shipping_address_id: body.shipping_address_id ?? null,
+          promo_code: body.promo_code ?? null,
+          points_to_redeem: body.points_to_redeem ?? null,
+          snapshot_id: body.snapshot_id ?? null,
+        },
+      });
+    } catch (e) {
+      return json({ error: (e as Error).message || "extras_failed" }, 400);
+    }
+
+    const total = Math.max(0, subtotal - applied.discount);
     const amountPaise = Math.round(total * 100);
 
     // ---- insert pending customer_order ----------------------------
@@ -188,11 +213,14 @@ serve(async (req) => {
         member_id: member.id,
         status: "pending",
         subtotal,
-        discount: 0,
+        discount: applied.discount,
         total,
-        fulfillment_type: "pickup",
+        fulfillment_type: applied.fulfillment_type,
+        shipping_address_id: applied.shipping_address_id,
         payment_method: "razorpay",
         payment_status: "pending",
+        promo_code_id: applied.promo_code_id,
+        points_redeemed: applied.points_redeemed,
         notes: body.notes ?? null,
       })
       .select("id, order_number")
@@ -212,6 +240,13 @@ serve(async (req) => {
       await svcClient.from("customer_orders").delete().eq("id", order.id);
       return json({ error: "order_items_failed" }, 500);
     }
+
+    await finalizeExtrasForOrder({
+      svc: svcClient,
+      orderId: order.id,
+      memberId: member.id,
+      applied,
+    });
 
     // ---- call Razorpay Orders API ---------------------------------
     const keyId = Deno.env.get("RAZORPAY_KEY_ID");

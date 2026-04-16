@@ -16,6 +16,13 @@ function TabBtn({ active, onClick, children }) {
   );
 }
 
+function randomCode() {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
 export default function MemberDashboard() {
   const navigate = useNavigate();
   const { member } = useApp();
@@ -24,6 +31,11 @@ export default function MemberDashboard() {
   const [reservations, setReservations] = useState([]);
   const [fines, setFines] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+  const [points, setPoints] = useState(null);
+  const [pointsTx, setPointsTx] = useState([]);
+  const [referral, setReferral] = useState(null);
+  const [referralStats, setReferralStats] = useState({ invited: 0, rewarded: 0 });
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,11 +46,13 @@ export default function MemberDashboard() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [borrowedRes, reservRes, finesRes, wishlistRes] = await Promise.all([
+      const [borrowedRes, reservRes, wishlistRes, pointsRes, txRes, refRes] = await Promise.all([
         supabase.from('circulation').select('*, books(title, author, genre)').eq('member_id', member.id).eq('status', 'checked_out').order('due_date'),
         supabase.from('reservations').select('*, books(title, author)').eq('member_id', member.id).order('reservation_date', { ascending:false }),
-        supabase.from('circulation').select('id').eq('member_id', member.id).limit(1), // placeholder
         supabase.from('wishlists').select('*, books(id, title, author, genre, quantity_available)').eq('member_id', member.id).order('created_at', { ascending:false }),
+        supabase.from('loyalty_balances').select('*').eq('member_id', member.id).maybeSingle(),
+        supabase.from('loyalty_transactions').select('*').eq('member_id', member.id).order('created_at', { ascending:false }).limit(30),
+        supabase.from('referrals').select('id, code, reward_status, to_member_id').eq('from_member_id', member.id),
       ]);
       setBorrowed(borrowedRes.data || []);
       setReservations(reservRes.data || []);
@@ -49,10 +63,53 @@ export default function MemberDashboard() {
         fineAmount: Math.floor((today - new Date(b.due_date)) / (1000*60*60*24)) * 10
       })));
       setWishlist(wishlistRes.data || []);
+      setPoints(pointsRes.data || { balance: 0, lifetime_earned: 0 });
+      setPointsTx(txRes.data || []);
+
+      const refs = refRes.data || [];
+      // Keep the first active referral; if none, create one lazily on first render of Rewards tab.
+      const activeRef = refs.find(r => r.reward_status !== 'void') || null;
+      setReferral(activeRef);
+      setReferralStats({
+        invited: refs.filter(r => r.to_member_id).length,
+        rewarded: refs.filter(r => r.reward_status === 'rewarded').length,
+      });
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ensureReferralCode = async () => {
+    if (referral?.code) return referral.code;
+    // Create one — retry a few times in the astronomically unlikely case of collision.
+    for (let i = 0; i < 5; i++) {
+      const code = randomCode();
+      const { data, error } = await supabase
+        .from('referrals')
+        .insert({ code, from_member_id: member.id })
+        .select('id, code, reward_status, to_member_id')
+        .single();
+      if (!error && data) {
+        setReferral(data);
+        return data.code;
+      }
+    }
+    return null;
+  };
+
+  const handleCopyReferral = async () => {
+    const code = await ensureReferralCode();
+    if (!code) return;
+    const url = `${window.location.origin}/?ref=${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: prompt
+      window.prompt('Copy this link:', url);
     }
   };
 
@@ -69,6 +126,7 @@ export default function MemberDashboard() {
   if (!member) return null;
 
   const totalFines = fines.reduce((s, f) => s + f.fineAmount, 0);
+  const pointsBalance = points?.balance || 0;
 
   return (
     <div style={{ maxWidth:'1100px', margin:'0 auto', padding:'40px 20px', fontFamily:'Lato, sans-serif' }}>
@@ -99,6 +157,7 @@ export default function MemberDashboard() {
         {/* Quick Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:'16px', marginTop:'24px' }}>
           {[
+            { num: pointsBalance, label:'Reward Points', icon:'✨', accent:true },
             { num: borrowed.length, label:'Books Borrowed', icon:'📚' },
             { num: reservations.filter(r => r.status === 'pending').length, label:'Reservations', icon:'🔖' },
             { num: fines.length, label:'Overdue', icon:'⚠️', warning: fines.length > 0 },
@@ -106,7 +165,7 @@ export default function MemberDashboard() {
           ].map(s => (
             <div key={s.label} style={{ background:'rgba(255,255,255,0.08)', borderRadius:'12px', padding:'16px', textAlign:'center' }}>
               <div style={{ fontSize:'24px', marginBottom:'4px' }}>{s.icon}</div>
-              <div style={{ fontSize:'28px', fontWeight:'800', color: s.warning ? '#FC8181' : '#D4A853', fontFamily:'"Playfair Display", serif' }}>{s.num}</div>
+              <div style={{ fontSize:'28px', fontWeight:'800', color: s.warning ? '#FC8181' : s.accent ? '#F5DEB3' : '#D4A853', fontFamily:'"Playfair Display", serif' }}>{s.num}</div>
               <div style={{ color:'rgba(245,222,179,0.7)', fontSize:'12px' }}>{s.label}</div>
             </div>
           ))}
@@ -128,9 +187,10 @@ export default function MemberDashboard() {
 
       {/* Tabs */}
       <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.08)' }}>
-        <div style={{ background:'#FFF8ED', padding:'8px', display:'flex', gap:'4px', borderBottom:'1px solid #F5DEB3' }}>
+        <div style={{ background:'#FFF8ED', padding:'8px', display:'flex', gap:'4px', borderBottom:'1px solid #F5DEB3', flexWrap:'wrap' }}>
           <TabBtn active={tab==='borrowed'} onClick={() => setTab('borrowed')}>📚 Borrowed ({borrowed.length})</TabBtn>
           <TabBtn active={tab==='reservations'} onClick={() => setTab('reservations')}>🔖 Reservations ({reservations.length})</TabBtn>
+          <TabBtn active={tab==='rewards'} onClick={() => setTab('rewards')}>✨ Rewards ({pointsBalance})</TabBtn>
           <TabBtn active={tab==='fines'} onClick={() => setTab('fines')}>⚠️ Fines ({fines.length})</TabBtn>
           <TabBtn active={tab==='wishlist'} onClick={() => setTab('wishlist')}>❤️ Wishlist ({wishlist.length})</TabBtn>
         </div>
@@ -212,6 +272,114 @@ export default function MemberDashboard() {
                                 Cancel
                               </button>
                             )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rewards */}
+              {tab === 'rewards' && (
+                <div>
+                  <h3 style={{ fontFamily:'"Playfair Display", serif', fontSize:'22px', color:'#2C1810', marginBottom:'20px' }}>
+                    Reward Points
+                  </h3>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'24px' }}>
+                    <div style={{ background:'linear-gradient(135deg, #FFF8ED, #F5DEB3)', borderRadius:'12px', padding:'20px' }}>
+                      <div style={{ fontSize:'12px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1.5px', color:'#8B6914', marginBottom:'6px' }}>
+                        Balance
+                      </div>
+                      <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'800', color:'#2C1810' }}>
+                        {pointsBalance} <span style={{ fontSize:'14px', color:'#8B6914', fontWeight:'600' }}>pts</span>
+                      </div>
+                      <div style={{ fontSize:'12px', color:'#5C3A1E', marginTop:'4px' }}>
+                        Worth ₹{pointsBalance} at checkout
+                      </div>
+                    </div>
+                    <div style={{ background:'#FFF8ED', borderRadius:'12px', padding:'20px' }}>
+                      <div style={{ fontSize:'12px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1.5px', color:'#8B6914', marginBottom:'6px' }}>
+                        Lifetime earned
+                      </div>
+                      <div style={{ fontFamily:'"Playfair Display", serif', fontSize:'36px', fontWeight:'800', color:'#2C1810' }}>
+                        {points?.lifetime_earned || 0}
+                      </div>
+                      <div style={{ fontSize:'12px', color:'#5C3A1E', marginTop:'4px' }}>
+                        1 pt per ₹10 spent · redeemable at checkout
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Referral card */}
+                  <div style={{
+                    background:'linear-gradient(135deg, #2C1810 0%, #4A2C17 100%)',
+                    borderRadius:'16px', padding:'24px', marginBottom:'28px', color:'#F5DEB3',
+                  }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'16px', flexWrap:'wrap', marginBottom:'16px' }}>
+                      <div>
+                        <div style={{ fontSize:'12px', fontWeight:'700', letterSpacing:'2px', textTransform:'uppercase', color:'#D4A853', marginBottom:'6px' }}>
+                          Invite friends, both earn points
+                        </div>
+                        <h4 style={{ fontFamily:'"Playfair Display", serif', fontSize:'20px', fontWeight:'700', color:'#F5DEB3', margin:0 }}>
+                          Get 100 points when a friend places their first order
+                        </h4>
+                        <p style={{ fontSize:'13px', color:'rgba(245,222,179,0.75)', marginTop:'6px' }}>
+                          Your friend also gets a 50-point welcome bonus.
+                        </p>
+                      </div>
+                      <div style={{ textAlign:'right', fontSize:'11px', color:'rgba(245,222,179,0.6)' }}>
+                        <div>{referralStats.invited} invited</div>
+                        <div>{referralStats.rewarded} rewarded</div>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:'10px', flexWrap:'wrap', alignItems:'center' }}>
+                      <button
+                        onClick={handleCopyReferral}
+                        style={{
+                          background:'#D4A853', color:'#2C1810', border:'none',
+                          padding:'10px 20px', borderRadius:'8px',
+                          fontWeight:'700', fontSize:'14px', cursor:'pointer',
+                          fontFamily:'Lato, sans-serif',
+                        }}
+                      >
+                        {copied ? '✓ Copied!' : referral?.code ? `Copy link (${referral.code})` : 'Generate invite link'}
+                      </button>
+                      {referral?.code && (
+                        <span style={{ fontSize:'12px', color:'rgba(245,222,179,0.6)', fontFamily:'ui-monospace, monospace' }}>
+                          {window.location.origin}/?ref={referral.code}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <h4 style={{ fontFamily:'"Playfair Display", serif', fontSize:'16px', color:'#2C1810', marginBottom:'12px' }}>
+                    Recent activity
+                  </h4>
+                  {pointsTx.length === 0 ? (
+                    <div style={{ textAlign:'center', padding:'30px', color:'#8B6914' }}>
+                      No points activity yet. Place an order to start earning.
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+                      {pointsTx.map(t => (
+                        <div key={t.id} style={{
+                          display:'flex', justifyContent:'space-between', alignItems:'center',
+                          padding:'14px 18px', background:'#FFF8ED',
+                          borderRadius:'10px', border:'1px solid #F5DEB3',
+                        }}>
+                          <div>
+                            <div style={{ fontWeight:'700', color:'#2C1810', fontSize:'14px' }}>{t.reason}</div>
+                            <div style={{ fontSize:'12px', color:'#8B6914', marginTop:'2px' }}>
+                              {new Date(t.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontFamily:'"Playfair Display", serif', fontSize:'20px', fontWeight:'800',
+                            color: t.points > 0 ? '#48BB78' : '#FC8181',
+                          }}>
+                            {t.points > 0 ? '+' : ''}{t.points}
                           </div>
                         </div>
                       ))}

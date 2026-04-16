@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useSiteContent } from '../context/SiteContent';
+import { useAuth } from '../context/AuthContext';
 import HeroCarousel from '../components/HeroCarousel';
 import PageRenderer from '../blocks/PageRenderer';
 
@@ -140,27 +141,72 @@ function LegacyHome() {
     return defaultBg;
   };
 
-  const orderArr = (layout.home_section_order || 'hero,genres,staff_picks,new_arrivals,cafe_story,newsletter')
+  const orderArr = (layout.home_section_order || 'hero,genres,staff_picks,recommended,new_arrivals,cafe_story,newsletter')
     .split(',').map(s => s.trim()).filter(Boolean);
   const getOrder = (id) => {
     const idx = orderArr.indexOf(id);
     return idx === -1 ? 999 : idx;
   };
 
+  const { member } = useAuth();
+
   const [staffPicks, setStaffPicks] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
+  const [recommended, setRecommended] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subscribed, setSubscribed] = useState(false);
   const [emailInput, setEmailInput] = useState('');
 
-  useEffect(() => { fetchData(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, [member?.id]);
+
+  const fetchRecommended = async () => {
+    if (!member) return [];
+    // Derive genres from wishlist + borrow history + order history.
+    const [wlRes, circRes, orderItRes] = await Promise.all([
+      supabase.from('wishlists').select('books(id, genre)').eq('member_id', member.id).limit(20),
+      supabase.from('circulation').select('books(id, genre)').eq('member_id', member.id).limit(20),
+      supabase.from('customer_order_items')
+        .select('book_id, books(id, genre), customer_orders!inner(member_id)')
+        .eq('customer_orders.member_id', member.id)
+        .limit(20),
+    ]);
+    const seenIds = new Set();
+    const genreCounts = {};
+    const collect = (rows, pickBook) => {
+      for (const r of (rows || [])) {
+        const b = pickBook(r);
+        if (!b?.id) continue;
+        seenIds.add(b.id);
+        if (b.genre) genreCounts[b.genre] = (genreCounts[b.genre] || 0) + 1;
+      }
+    };
+    collect(wlRes.data, r => r.books);
+    collect(circRes.data, r => r.books);
+    collect(orderItRes.data, r => r.books);
+
+    const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
+    if (topGenres.length === 0) return [];
+
+    // OR query across genres
+    const filters = topGenres.map(g => `genre.ilike.%${g}%`).join(',');
+    const { data } = await supabase.from('books').select('*')
+      .eq('store_visible', true)
+      .gt('quantity_available', 0)
+      .or(filters)
+      .order('created_at', { ascending: false })
+      .limit(16);
+    const filtered = (data || []).filter(b => !seenIds.has(b.id)).slice(0, 6);
+    return filtered;
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [flaggedRes, newRes] = await Promise.all([
+      const [flaggedRes, newRes, recRes] = await Promise.all([
         supabase.from('books').select('*').eq('store_visible', true).eq('is_staff_pick', true).order('created_at', { ascending: false }).limit(5),
         supabase.from('books').select('*').eq('store_visible', true).order('created_at', { ascending: false }).limit(10),
+        fetchRecommended(),
       ]);
       let picks = flaggedRes.data || [];
       const newest = newRes.data || [];
@@ -173,6 +219,7 @@ function LegacyHome() {
       }
       setStaffPicks(picks.slice(0, 4));
       setNewArrivals(newest.slice(0, 8));
+      setRecommended(recRes || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -248,6 +295,30 @@ function LegacyHome() {
           )}
         </div>
       </section>
+      )}
+
+      {/* 3b. RECOMMENDED FOR YOU — signed-in members only */}
+      {member && recommended.length > 0 && visibility.home_recommended !== false && (
+        <section style={{
+          order: getOrder('recommended'),
+          background: 'var(--bg)',
+          padding: '72px 24px',
+        }}>
+          <div className="tps-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '36px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <div className="tps-eyebrow" style={{ marginBottom: '10px', color: 'var(--accent)' }}>
+                  ✨ For {member.name?.split(' ')[0] || 'you'}
+                </div>
+                <h2 className="tps-h2">Picked based on your reading</h2>
+              </div>
+              <Link to="/books" className="tps-btn-tertiary">Discover more →</Link>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+              {recommended.map(book => <GridBookCard key={book.id} book={book} />)}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* 4. NEW ARRIVALS */}

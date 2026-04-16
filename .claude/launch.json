@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 3000
+    },
+    {
+      "name": "tapas-store",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "tapas-store", "start"],
+      "port": 3001
     }
   ]
 }

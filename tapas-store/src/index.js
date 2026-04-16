@@ -12,3 +12,13 @@ root.render(
     </Router>
   </React.StrictMode>
 );
+
+// Register the service worker (PWA). Deferred until after paint so it
+// doesn't compete with the initial render.
+if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch((err) => {
+      console.warn('[SW] registration failed', err);
+    });
+  });
+}
