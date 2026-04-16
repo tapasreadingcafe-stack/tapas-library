@@ -21,6 +21,7 @@ const Checkout        = React.lazy(() => import('./pages/Checkout'));
 const OrderSuccess    = React.lazy(() => import('./pages/OrderSuccess'));
 const Blog            = React.lazy(() => import('./pages/Blog'));
 const BlogPost        = React.lazy(() => import('./pages/BlogPost'));
+const CustomPage      = React.lazy(() => import('./pages/CustomPage'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -72,6 +73,9 @@ function AppShell() {
             <Route path="/cart"          element={<Cart />} />
             <Route path="/checkout"      element={<Checkout />} />
             <Route path="/order/:id"     element={<OrderSuccess />} />
+            {/* Catch-all: resolve against custom pages in SiteContent,
+                or render a 404 card. Must be last. */}
+            <Route path="*"              element={<CustomPage />} />
           </Routes>
         </Suspense>
         <FooterTemplate />

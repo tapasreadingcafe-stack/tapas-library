@@ -1547,3 +1547,127 @@ export function Tabs({ id, pageKey, props, blockIndex, totalBlocks }) {
     </BlockFrame>
   );
 }
+
+// Stats — big-number metrics row. Trust-building content like
+// "500+ books · 200 active members · 4.8★ average rating".
+export function Stats({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const items = Array.isArray(p.items) ? p.items : [];
+  const columns = items.length || 1;
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+      background: p.background_color || 'transparent',
+    }}>
+      {(p.eyebrow || p.title) && (
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          {p.eyebrow && (
+            <div style={{
+              fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+              textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+              marginBottom: '8px',
+            }}>{p.eyebrow}</div>
+          )}
+          {p.title && (
+            <h2 style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: 'var(--tapas-h-l-size, 32px)', margin: 0,
+              color: 'var(--tapas-h-color, #26170c)',
+            }}>{p.title}</h2>
+          )}
+        </div>
+      )}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(160, Math.floor(1000 / columns))}px, 1fr))`,
+        gap: '24px', textAlign: 'center',
+        maxWidth: '1000px', margin: '0 auto',
+      }}>
+        {items.map((it, i) => (
+          <div key={i}>
+            <div style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: 'clamp(36px, 6vw, 56px)',
+              fontWeight: 600, lineHeight: 1.1,
+              color: p.number_color || 'var(--tapas-accent, #006a6a)',
+              marginBottom: '6px',
+            }}>{it.value}</div>
+            <div style={{
+              fontSize: '14px', fontWeight: 600,
+              color: 'var(--tapas-primary, #26170c)',
+              marginBottom: it.caption ? '4px' : 0,
+            }}>{it.label}</div>
+            {it.caption && (
+              <div style={{
+                fontSize: '12px', color: 'var(--tapas-body-color, #5c3a1e)',
+                opacity: 0.75, lineHeight: 1.4,
+              }}>{it.caption}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </BlockFrame>
+  );
+}
+
+// LogoRow — horizontal strip of brand/partner logos. Often called a
+// "trust bar". Accepts an array of { src, alt, href? }.
+export function LogoRow({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const logos = Array.isArray(p.logos) ? p.logos : [];
+  const grayscale = p.grayscale !== false;
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+      background: p.background_color || 'transparent',
+    }}>
+      {p.title && (
+        <div style={{
+          textAlign: 'center', marginBottom: '28px',
+          fontSize: '12px', fontWeight: 700, letterSpacing: '2px',
+          textTransform: 'uppercase',
+          color: 'var(--tapas-body-color, #5c3a1e)',
+          opacity: 0.7,
+        }}>{p.title}</div>
+      )}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 'clamp(28px, 5vw, 56px)',
+        maxWidth: '1100px', margin: '0 auto',
+      }}>
+        {logos.map((l, i) => {
+          const img = (
+            <img
+              src={l.src}
+              alt={l.alt || ''}
+              style={{
+                maxHeight: `${p.logo_height || 40}px`,
+                maxWidth: '160px',
+                objectFit: 'contain',
+                filter: grayscale ? 'grayscale(100%)' : 'none',
+                opacity: grayscale ? 0.65 : 1,
+                transition: 'filter 0.2s, opacity 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if (grayscale) {
+                  e.currentTarget.style.filter = 'grayscale(0%)';
+                  e.currentTarget.style.opacity = '1';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (grayscale) {
+                  e.currentTarget.style.filter = 'grayscale(100%)';
+                  e.currentTarget.style.opacity = '0.65';
+                }
+              }}
+            />
+          );
+          return l.href ? (
+            <a key={i} href={l.href} target="_blank" rel="noopener noreferrer" aria-label={l.alt || 'Logo link'}>{img}</a>
+          ) : (
+            <span key={i}>{img}</span>
+          );
+        })}
+      </div>
+    </BlockFrame>
+  );
+}

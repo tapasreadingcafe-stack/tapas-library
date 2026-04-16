@@ -1259,6 +1259,10 @@ export default function SiteContent() {
   // React modal is also a nicer UX — matches the rest of the editor.
   // Shape: { title, message, confirmLabel, tone, onConfirm }
   const [confirmModal, setConfirmModal] = useState(null);
+  // Phase 5: custom pages — "+ New page" modal state
+  const [newPageOpen, setNewPageOpen] = useState(false);
+  const [newPageLabel, setNewPageLabel] = useState('');
+  const [newPagePath, setNewPagePath] = useState('');
   const askConfirm = useCallback((opts) => {
     // opts: { title, message, confirmLabel?, tone?, onConfirm }
     setConfirmModal({
@@ -1476,6 +1480,26 @@ export default function SiteContent() {
     const blocks = getBlocks(editingPage);
     return blocks.find(b => b.id === selectedBlockId) || null;
   }, [selectedBlockId, editingPage, getBlocks]);
+
+  // Phase 5: Custom pages. The 6 "fixed" pages from EDITABLE_PAGES
+  // always exist. Custom pages are any page in draftContent.pages that
+  // has meta.custom === true — created by the staff via the "+ New
+  // page" button. They're merged here and used everywhere a page list
+  // is rendered (picker, SEO, store-url navigation).
+  const allPages = useMemo(() => {
+    const pages = draftContent?.pages || {};
+    const customEntries = Object.entries(pages)
+      .filter(([, p]) => p?.meta?.custom)
+      .map(([key, p]) => ({
+        key,
+        label: p.meta?.label || key,
+        path: p.meta?.path || `/${key}`,
+        custom: true,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [...EDITABLE_PAGES, ...customEntries];
+  }, [draftContent]);
+  const currentPageEntry = allPages.find(p => p.key === editingPage) || EDITABLE_PAGES[0];
 
   // Update a single CSS property on the currently selected element.
   // Empty string clears the override.
@@ -2069,6 +2093,135 @@ export default function SiteContent() {
         </div>
       )}
 
+      {/* ==================== New page modal ==================== */}
+      {newPageOpen && (
+        <div
+          onClick={() => { setNewPageOpen(false); setNewPageLabel(''); setNewPagePath(''); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '460px',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+              padding: '24px',
+              fontFamily: '-apple-system, system-ui, sans-serif',
+            }}
+          >
+            <div style={{ fontSize: '16px', fontWeight: '700', color: S.text, marginBottom: '4px' }}>
+              Create a new page
+            </div>
+            <div style={{ fontSize: '13px', color: S.textDim, lineHeight: 1.5, marginBottom: '18px' }}>
+              Give the page a name and a URL path. You'll drop blocks onto it like any other page.
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '4px' }}>
+                Page name
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={newPageLabel}
+                onChange={(e) => {
+                  const label = e.target.value;
+                  setNewPageLabel(label);
+                  // Auto-fill path from label if path is still empty or matches the auto-generated one
+                  const autoPath = '/' + label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                  if (!newPagePath || newPagePath === '/' || newPagePath.startsWith('/') && /^[/a-z0-9-]*$/.test(newPagePath)) {
+                    setNewPagePath(autoPath);
+                  }
+                }}
+                placeholder="e.g. Our Team"
+                style={{
+                  width: '100%', padding: '8px 10px', boxSizing: 'border-box',
+                  background: '#fff', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', fontSize: '13px', color: S.text,
+                  outline: 'none',
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '4px' }}>
+                URL path
+              </label>
+              <input
+                type="text"
+                value={newPagePath}
+                onChange={(e) => setNewPagePath(e.target.value)}
+                placeholder="/our-team"
+                style={{
+                  width: '100%', padding: '8px 10px', boxSizing: 'border-box',
+                  background: '#fff', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', fontSize: '13px', color: S.text,
+                  outline: 'none',
+                  fontFamily: 'ui-monospace, monospace',
+                }}
+              />
+              <div style={{ fontSize: '11px', color: S.textFaint, marginTop: '4px' }}>
+                Must start with "/". Reserved paths (/, /books, /about, /offers, /blog, /events, /cart, /checkout, /login, /profile) can't be used.
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => { setNewPageOpen(false); setNewPageLabel(''); setNewPagePath(''); }}
+                style={{
+                  padding: '8px 16px', background: '#fff',
+                  border: `1px solid ${S.border}`, borderRadius: '6px',
+                  color: S.text, fontSize: '13px', fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >Cancel</button>
+              <button
+                onClick={() => {
+                  const label = newPageLabel.trim();
+                  let path = newPagePath.trim();
+                  if (!label) { alert('Page name is required.'); return; }
+                  if (!path.startsWith('/')) path = '/' + path;
+                  if (path.length < 2) { alert('URL path must have at least one character after "/".'); return; }
+                  const RESERVED = new Set(['/', '/books', '/about', '/offers', '/blog', '/events', '/cart', '/checkout', '/login', '/profile', '/order', '/member']);
+                  if (RESERVED.has(path) || path.startsWith('/books/') || path.startsWith('/blog/') || path.startsWith('/order/')) {
+                    alert(`"${path}" is reserved. Pick a different path.`);
+                    return;
+                  }
+                  // Make sure no existing page (fixed or custom) uses this path
+                  const pathTaken = allPages.some(p => p.path === path);
+                  if (pathTaken) { alert(`A page already uses "${path}".`); return; }
+                  const key = 'custom_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+                  setDraftContent(prev => ({
+                    ...prev,
+                    pages: {
+                      ...(prev.pages || {}),
+                      [key]: {
+                        meta: { custom: true, label, path, title: label + ' — Tapas Library', description: '' },
+                        blocks: [],
+                      },
+                    },
+                  }));
+                  setEditingPage(key);
+                  setIframePath(path);
+                  setSelectedBlockId(null);
+                  setNewPageOpen(false);
+                  setNewPageLabel('');
+                  setNewPagePath('');
+                }}
+                style={{
+                  padding: '8px 16px', background: S.accent,
+                  border: 'none', borderRadius: '6px',
+                  color: '#fff', fontSize: '13px', fontWeight: '700',
+                  cursor: 'pointer',
+                }}
+              >Create page</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== Templates modal ==================== */}
       {templatesOpen && (
         <div
@@ -2102,7 +2255,7 @@ export default function SiteContent() {
                 <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
                   {templates.length === 0
                     ? 'Save a block as a template from the canvas toolbar (⭐ button).'
-                    : `${templates.length} saved. Click to insert into ${EDITABLE_PAGES.find(p => p.key === editingPage)?.label || editingPage}.`}
+                    : `${templates.length} saved. Click to insert into ${allPages.find(p => p.key === editingPage)?.label || editingPage}.`}
                 </div>
               </div>
               <button
@@ -2250,7 +2403,7 @@ export default function SiteContent() {
             }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
-                  Add section to <span style={{ color: S.accent }}>{EDITABLE_PAGES.find(p => p.key === editingPage)?.label || editingPage}</span>
+                  Add section to <span style={{ color: S.accent }}>{allPages.find(p => p.key === editingPage)?.label || editingPage}</span>
                 </div>
                 <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
                   Pick a block type to append to the page.
@@ -2535,8 +2688,28 @@ export default function SiteContent() {
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               {/* Page picker — which page's block tree we're editing. */}
               <div style={{ padding: '12px 14px 8px', borderBottom: `1px solid ${S.border}` }}>
-                <div style={{ fontSize: '10px', fontWeight: '700', color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                  Editing page
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginBottom: '6px',
+                }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Editing page
+                  </div>
+                  <button
+                    onClick={() => setNewPageOpen(true)}
+                    title="Create a new page"
+                    style={{
+                      padding: '2px 8px',
+                      background: 'transparent',
+                      color: S.accent,
+                      border: `1px solid ${S.accent}55`,
+                      borderRadius: '3px',
+                      fontSize: '10px', fontWeight: '700',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = S.accent; }}
+                  >+ New</button>
                 </div>
                 <select
                   value={editingPage}
@@ -2545,7 +2718,7 @@ export default function SiteContent() {
                     setSelectedBlockId(null);
                     // Navigate the preview iframe to match so staff sees
                     // the page they're editing.
-                    const p = EDITABLE_PAGES.find(x => x.key === e.target.value);
+                    const p = allPages.find(x => x.key === e.target.value);
                     if (p) setIframePath(p.path);
                   }}
                   style={{
@@ -2555,10 +2728,54 @@ export default function SiteContent() {
                     cursor: 'pointer', outline: 'none',
                   }}
                 >
-                  {EDITABLE_PAGES.map(p => (
-                    <option key={p.key} value={p.key}>{p.label}</option>
-                  ))}
+                  <optgroup label="Fixed pages">
+                    {EDITABLE_PAGES.map(p => (
+                      <option key={p.key} value={p.key}>{p.label}</option>
+                    ))}
+                  </optgroup>
+                  {allPages.some(p => p.custom) && (
+                    <optgroup label="Custom pages">
+                      {allPages.filter(p => p.custom).map(p => (
+                        <option key={p.key} value={p.key}>{p.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                {currentPageEntry?.custom && (
+                  <div style={{
+                    marginTop: '6px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontSize: '10px', color: S.textDim,
+                  }}>
+                    <span style={{ fontFamily: 'ui-monospace, monospace' }}>{currentPageEntry.path}</span>
+                    <button
+                      onClick={() => {
+                        askConfirm({
+                          title: `Delete page "${currentPageEntry.label}"?`,
+                          message: `This removes the page and all ${(draftContent?.pages?.[editingPage]?.blocks || []).length} block(s) on it from the draft. URL ${currentPageEntry.path} will 404 once published.`,
+                          confirmLabel: 'Delete page',
+                          tone: 'danger',
+                          onConfirm: () => {
+                            setDraftContent(prev => {
+                              const nextPages = { ...(prev.pages || {}) };
+                              delete nextPages[editingPage];
+                              return { ...prev, pages: nextPages };
+                            });
+                            setEditingPage('home');
+                            setSelectedBlockId(null);
+                            setIframePath('/');
+                          },
+                        });
+                      }}
+                      style={{
+                        padding: '1px 6px', background: 'transparent',
+                        color: S.danger || '#dc2626',
+                        border: `1px solid ${S.border}`, borderRadius: '3px',
+                        fontSize: '10px', fontWeight: '600', cursor: 'pointer',
+                      }}
+                    >Delete page</button>
+                  </div>
+                )}
 
                 {/* SEO meta — collapsible so it doesn't clutter the tree */}
                 <details style={{ marginTop: '10px' }}>

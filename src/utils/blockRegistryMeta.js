@@ -398,6 +398,66 @@ export const BLOCK_REGISTRY_META = {
     ],
   },
 
+  stats: {
+    label: 'Stats / Metrics',
+    category: 'Content',
+    icon: '#',
+    defaultProps: {
+      eyebrow: 'By the numbers',
+      title: '',
+      items: [
+        { value: '500+', label: 'Books in catalog',  caption: 'Fiction, non-fiction, kids' },
+        { value: '200',  label: 'Active members',    caption: 'And growing every month' },
+        { value: '4.8★', label: 'Google rating',     caption: 'From 120+ reviews' },
+      ],
+      background_color: '',
+      number_color: '',
+    },
+    schema: [
+      { key: 'eyebrow',          label: 'Eyebrow',      type: 'text' },
+      { key: 'title',            label: 'Title',        type: 'text' },
+      { key: 'background_color', label: 'Background',   type: 'color' },
+      { key: 'number_color',     label: 'Number color', type: 'color' },
+      {
+        key: 'items', label: 'Metrics', type: 'array',
+        itemDefaults: { value: '0', label: 'Metric', caption: '' },
+        itemFields: [
+          { key: 'value',   label: 'Big number',  type: 'text' },
+          { key: 'label',   label: 'Label',       type: 'text' },
+          { key: 'caption', label: 'Caption',     type: 'text' },
+        ],
+      },
+    ],
+  },
+
+  logo_row: {
+    label: 'Logo row',
+    category: 'Media',
+    icon: '▦',
+    defaultProps: {
+      title: 'As featured in',
+      logos: [],
+      logo_height: 40,
+      grayscale: true,
+      background_color: '',
+    },
+    schema: [
+      { key: 'title',            label: 'Title',           type: 'text' },
+      { key: 'logo_height',      label: 'Logo height (px)', type: 'number', min: 20, max: 120 },
+      { key: 'grayscale',        label: 'Grayscale (color on hover)', type: 'toggle' },
+      { key: 'background_color', label: 'Background',      type: 'color' },
+      {
+        key: 'logos', label: 'Logos', type: 'array',
+        itemDefaults: { src: '', alt: '', href: '' },
+        itemFields: [
+          { key: 'src',  label: 'Image',         type: 'image' },
+          { key: 'alt',  label: 'Alt text',      type: 'text' },
+          { key: 'href', label: 'Link (optional)', type: 'text' },
+        ],
+      },
+    ],
+  },
+
   // ---- Dynamic blocks — live from Supabase ---------------------------
 
   book_list: {

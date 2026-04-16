@@ -25,7 +25,7 @@ import {
   Hero, CTA, FeatureGrid, Footer,
   TextImage, Testimonials, Pricing, FAQ, Gallery, Newsletter,
   VideoEmbed, MapEmbed, Countdown, ContactForm,
-  Accordion, Tabs,
+  Accordion, Tabs, Stats, LogoRow,
   BookList, BlogList, EventList,
 } from './BlockLibrary';
 
@@ -349,6 +349,48 @@ export const BLOCK_REGISTRY = {
     },
     schema: [
       { key: 'title', label: 'Title (optional)', type: 'text' },
+    ],
+  },
+
+  stats: {
+    label: 'Stats / Metrics',
+    category: 'Content',
+    Renderer: Stats,
+    defaultProps: {
+      eyebrow: 'By the numbers',
+      title: '',
+      items: [
+        { value: '500+', label: 'Books in catalog',  caption: 'Fiction, non-fiction, kids' },
+        { value: '200',  label: 'Active members',    caption: 'And growing every month' },
+        { value: '4.8★', label: 'Google rating',     caption: 'From 120+ reviews' },
+      ],
+      background_color: '',
+      number_color: '',
+    },
+    schema: [
+      { key: 'eyebrow',          label: 'Eyebrow',      type: 'text' },
+      { key: 'title',            label: 'Title',        type: 'text' },
+      { key: 'background_color', label: 'Background',   type: 'color' },
+      { key: 'number_color',     label: 'Number color', type: 'color' },
+    ],
+  },
+
+  logo_row: {
+    label: 'Logo row',
+    category: 'Media',
+    Renderer: LogoRow,
+    defaultProps: {
+      title: 'As featured in',
+      logos: [],
+      logo_height: 40,
+      grayscale: true,
+      background_color: '',
+    },
+    schema: [
+      { key: 'title',            label: 'Title',           type: 'text' },
+      { key: 'logo_height',      label: 'Logo height (px)', type: 'number', min: 20, max: 120 },
+      { key: 'grayscale',        label: 'Grayscale (color on hover)', type: 'toggle' },
+      { key: 'background_color', label: 'Background',      type: 'color' },
     ],
   },
 
