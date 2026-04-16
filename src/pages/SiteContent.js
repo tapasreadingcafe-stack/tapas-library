@@ -16,7 +16,7 @@ import {
   Undo2, Redo2, History, CalendarClock, Palette, Rocket, MoreHorizontal,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   Monitor, Tablet, Smartphone, RefreshCw, ExternalLink,
-  GripVertical, Copy, Trash2,
+  GripVertical, Copy, Trash2, Eye, EyeOff,
 } from 'lucide-react';
 
 // =====================================================================
@@ -1759,8 +1759,8 @@ function LayersDropZone({ children, S }) {
 // behavior. We also add a small pointer-distance activation constraint at
 // the DndContext level so a quick click doesn't get interpreted as a drag.
 function SortableBlockRow({
-  block, meta, isPrimary, isMulti, isSelected,
-  onSelect, onDuplicate, onDelete, S,
+  block, meta, isPrimary, isMulti, isSelected, isHidden,
+  onSelect, onDuplicate, onDelete, onToggleVisibility, S,
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -1804,7 +1804,10 @@ function SortableBlockRow({
           userSelect: 'none',
         }}
       ><GripVertical size={13} strokeWidth={2} /></span>
-      <span style={{ fontSize: '13px', flexShrink: 0, width: '16px', textAlign: 'center' }}>
+      <span style={{
+        fontSize: '13px', flexShrink: 0, width: '16px', textAlign: 'center',
+        opacity: isHidden ? 0.4 : 1,
+      }}>
         {meta?.icon || '▫'}
       </span>
       <span style={{
@@ -1812,9 +1815,28 @@ function SortableBlockRow({
         textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         color: isSelected ? S.accent : S.text,
         fontWeight: isSelected ? '600' : '500',
+        opacity: isHidden ? 0.5 : 1,
+        textDecoration: isHidden ? 'line-through' : 'none',
+        textDecorationColor: S.textFaint,
       }}>
         {meta?.label || block.type}
       </span>
+      {/* Visibility toggle — eye = visible, eye-off = hidden. Replaces
+          the legacy "Sections on this page" panel; visibility is now
+          per-block and managed inline in the Layers tree. */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
+        title={isHidden ? 'Show on storefront' : 'Hide from storefront'}
+        style={{
+          width: '22px', height: '22px', padding: 0,
+          background: 'transparent', border: 'none',
+          color: isHidden ? S.warning : S.textDim, cursor: 'pointer',
+          borderRadius: '3px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = S.bg; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >{isHidden ? <EyeOff size={12} strokeWidth={2} /> : <Eye size={12} strokeWidth={2} />}</button>
       <button
         onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
         title="Duplicate (⌘D)"
@@ -1852,18 +1874,16 @@ function SortableBlockRow({
 // in the Design System modal, not here.
 function PageSettingsPanel({
   page,
-  visibilityFields,
-  visibilityValues,
-  sectionOrderFields,
-  sectionOrderValues,
-  onChangeVisibility,
-  onChangeSectionOrder,
   onOpenDesignSystem,
 }) {
-  // Visibility fields are keyed like "home_hero", "about_values".
-  // Filter to the active page's prefix so users only see toggles that
-  // affect what they're currently looking at.
-  const pageVisibility = visibilityFields.filter(f => f.key.startsWith(page.key + '_'));
+  // Per-page visibility/order subsections were removed:
+  //   - "Sections on this page" was redundant with the per-block 👁
+  //     toggle now in the Layers tree (see SortableBlockRow).
+  //   - "Section order" was a legacy `home_section_order` string that
+  //     only fed the pre-block rendering path; ordering for block-based
+  //     pages is handled by drag-to-reorder in Layers.
+  // Both lists also caused mid-word label truncation in the 320px
+  // panel — removing them is the cleanup.
 
   // Dismissible canvas-editing tip. Persisted in localStorage so the
   // "click any text on the preview" hint disappears after first dismiss
@@ -1932,48 +1952,13 @@ function PageSettingsPanel({
         </div>
       )}
 
-      {/* Visibility toggles for this page */}
-      {pageVisibility.length > 0 && (
-        <SubSection title="Sections on this page" defaultOpen={true}>
-          {pageVisibility.map(field => (
-            <ToggleField
-              key={field.key}
-              field={{
-                ...field,
-                // Strip the page prefix from labels so "Home — Hero"
-                // reads as just "Hero" inside the page panel.
-                label: field.label.replace(/^[A-Za-z]+\s*—\s*/, ''),
-              }}
-              value={visibilityValues[field.key]}
-              onChange={(v) => onChangeVisibility(field.key, v)}
-            />
-          ))}
-        </SubSection>
-      )}
-
-      {/* Section order (home only, or any page that has a *_section_order field) */}
-      {sectionOrderFields.length > 0 && (
-        <SubSection title="Section order" defaultOpen={true}>
-          {sectionOrderFields.map(field => {
-            const Renderer = FIELD_RENDERERS[field.type] || TextField;
-            return (
-              <Renderer
-                key={field.key}
-                field={field}
-                value={sectionOrderValues[field.key]}
-                onChange={(v) => onChangeSectionOrder(field.key, v)}
-              />
-            );
-          })}
-        </SubSection>
-      )}
-
-      {pageVisibility.length === 0 && sectionOrderFields.length === 0 && (
-        <div style={{ padding: '16px 16px 0', color: D.textFaint, fontSize: '11px', lineHeight: 1.6 }}>
-          No page-level settings for <strong style={{ color: D.textDim }}>{page.label}</strong>.
-          Add or edit blocks from the Layers panel, or click a block on the canvas to edit its properties.
-        </div>
-      )}
+      {/* Block management hint — replaces the legacy visibility/order
+          subsections. Block visibility now lives in the Layers tree (👁
+          toggle per row), and ordering is drag-to-reorder. */}
+      <div style={{ padding: '0 16px 4px', color: D.textDim, fontSize: '11px', lineHeight: 1.6 }}>
+        Hide / reorder blocks in the <strong style={{ color: D.text }}>Layers</strong> panel on the left.
+        Click any block on the canvas to edit its properties.
+      </div>
 
       {/* Footer link to Design System */}
       <div style={{ padding: '20px 16px 0', marginTop: '16px', borderTop: `1px solid ${D.divider}` }}>
@@ -2368,6 +2353,17 @@ export default function SiteContent() {
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
+
+  // Toggle block.props.hidden. Hidden blocks are skipped by the
+  // storefront's PageRenderer (see tapas-store/src/blocks/PageRenderer.js)
+  // and rendered with a strikethrough + dim opacity in the Layers panel.
+  // This replaces the legacy per-page "visibility.*" schema for everything
+  // that has migrated to blocks.
+  const toggleBlockHidden = useCallback((pageKey, blockId) => {
+    mutateBlocks(pageKey, (blocks) => blocks.map(b =>
+      b.id === blockId ? { ...b, props: { ...(b.props || {}), hidden: !b.props?.hidden } } : b
+    ));
+  }, [mutateBlocks]);
 
   const moveBlock = useCallback((pageKey, blockId, delta) => {
     mutateBlocks(pageKey, (blocks) => {
@@ -4953,8 +4949,10 @@ export default function SiteContent() {
                             isPrimary={isPrimary}
                             isMulti={isMulti}
                             isSelected={isSelected}
+                            isHidden={!!b.props?.hidden}
                             S={S}
                             onSelect={handleSelect(b, idx)}
+                            onToggleVisibility={() => toggleBlockHidden(editingPage, b.id)}
                             onDuplicate={() => duplicateBlock(editingPage, b.id)}
                             onDelete={() => askConfirm({
                               title: `Delete ${meta?.label || b.type}?`,
@@ -5280,12 +5278,6 @@ export default function SiteContent() {
             // the toolbar).
             <PageSettingsPanel
               page={currentPageEntry}
-              visibilityFields={CONTENT_SCHEMA.find(s => s.key === 'visibility')?.fields || []}
-              visibilityValues={draftContent.visibility || {}}
-              sectionOrderFields={(CONTENT_SCHEMA.find(s => s.key === 'layout')?.fields || []).filter(f => f.key.startsWith(currentPageEntry.key + '_'))}
-              sectionOrderValues={draftContent.layout || {}}
-              onChangeVisibility={(key, value) => updateField('visibility', key, value)}
-              onChangeSectionOrder={(key, value) => updateField('layout', key, value)}
               onOpenDesignSystem={() => setDesignModalOpen(true)}
             />
           )}
