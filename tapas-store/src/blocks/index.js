@@ -27,6 +27,7 @@ import {
   VideoEmbed, MapEmbed, Countdown, ContactForm,
   Accordion, Tabs, Stats, LogoRow,
   Team, AnnouncementBar, PricingCompare, TestimonialCarousel,
+  ReviewWall, EventRSVP,
   BookList, BlogList, EventList,
 } from './BlockLibrary';
 
@@ -465,6 +466,50 @@ export const BLOCK_REGISTRY = {
     schema: [
       { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
       { key: 'title',   label: 'Title',   type: 'text' },
+    ],
+  },
+
+  review_wall: {
+    label: 'Review wall',
+    category: 'Dynamic',
+    Renderer: ReviewWall,
+    defaultProps: {
+      eyebrow: '',
+      title: 'Reader reviews',
+      book_id: '',
+      limit: 12,
+      min_card_width: 260,
+      cta_text: '✍ Leave a review',
+      allow_submissions: true,
+      auto_publish: true,
+    },
+    schema: [
+      { key: 'eyebrow',           label: 'Eyebrow',             type: 'text' },
+      { key: 'title',             label: 'Title',               type: 'text' },
+      { key: 'book_id',           label: 'Filter by book id',   type: 'text', hint: 'Optional. Leave blank for site-wide reviews.' },
+      { key: 'limit',             label: 'Show count',          type: 'number', min: 1, max: 60 },
+      { key: 'min_card_width',    label: 'Min card width (px)', type: 'number', min: 160, max: 400 },
+      { key: 'cta_text',          label: 'CTA button text',     type: 'text' },
+      { key: 'allow_submissions', label: 'Allow submissions',   type: 'toggle' },
+      { key: 'auto_publish',      label: 'Auto-publish (off = moderate first)', type: 'toggle' },
+    ],
+  },
+
+  event_rsvp: {
+    label: 'Event RSVP',
+    category: 'Dynamic',
+    Renderer: EventRSVP,
+    defaultProps: {
+      eyebrow: 'Reserve your spot',
+      event_id: '',
+      button_text: 'Reserve my spot',
+      success_message: 'You\'re in. See you there!',
+    },
+    schema: [
+      { key: 'eyebrow',         label: 'Eyebrow',         type: 'text' },
+      { key: 'event_id',        label: 'Event id',        type: 'text', hint: 'Optional. Leave blank to auto-pick the next upcoming event.' },
+      { key: 'button_text',     label: 'Button text',     type: 'text' },
+      { key: 'success_message', label: 'Success message', type: 'text' },
     ],
   },
 

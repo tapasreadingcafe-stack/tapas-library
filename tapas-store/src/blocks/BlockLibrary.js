@@ -2162,3 +2162,472 @@ export function TestimonialCarousel({ id, pageKey, props, blockIndex, totalBlock
     </BlockFrame>
   );
 }
+
+// ---------------------------------------------------------------------
+// Phase 8: Review Wall block
+// ---------------------------------------------------------------------
+// Shows published reviews for a given book (or all published reviews if
+// no book_id is set) as a masonry-ish grid. Has an "Add your review"
+// button that opens an inline form (name/email/rating/photo/text).
+// Submissions go into the existing public.reviews table and default to
+// status='published'; set `auto_publish` false for moderation.
+
+const STAR = '★';
+const STAR_EMPTY = '☆';
+
+function StarInput({ value, onChange, size = 28 }) {
+  return (
+    <div style={{ display: 'flex', gap: '4px' }} role="radiogroup" aria-label="Rating">
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          aria-label={`${n} star${n === 1 ? '' : 's'}`}
+          style={{
+            background: 'transparent', border: 'none',
+            cursor: 'pointer', padding: 0,
+            fontSize: `${size}px`, lineHeight: 1,
+            color: n <= value ? 'var(--tapas-accent, #006a6a)' : 'rgba(38,23,12,0.25)',
+            transition: 'color 0.1s',
+          }}
+        >{n <= value ? STAR : STAR_EMPTY}</button>
+      ))}
+    </div>
+  );
+}
+
+async function uploadReviewPhoto(file) {
+  if (!file) return null;
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `reviews/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from('site-content').upload(path, file, { upsert: false, contentType: file.type });
+    if (upErr) throw upErr;
+    const { data: { publicUrl } } = supabase.storage.from('site-content').getPublicUrl(path);
+    return publicUrl;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[review photo upload]', err);
+    return null;
+  }
+}
+
+export function ReviewWall({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', rating: 0, text: '', photo: null });
+
+  const fetchReviews = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      let q = supabase.from('reviews')
+        .select('id, rating, review_text, guest_name, photo_url, created_at')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(p.limit || 12);
+      if (p.book_id) q = q.eq('book_id', p.book_id);
+      const { data } = await q;
+      setReviews(data || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [p.book_id, p.limit]);
+
+  useEffect(() => { fetchReviews(); }, [fetchReviews]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.rating) { alert('Pick a star rating.'); return; }
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      let photoUrl = null;
+      if (form.photo) photoUrl = await uploadReviewPhoto(form.photo);
+      const status = p.auto_publish === false ? 'pending' : 'published';
+      const { error: err } = await supabase.from('reviews').insert([{
+        book_id: p.book_id || null,
+        rating: form.rating,
+        review_text: form.text || null,
+        guest_name: form.name || null,
+        guest_email: form.email || null,
+        photo_url: photoUrl,
+        status,
+      }]);
+      if (err) throw err;
+      setSubmitted(true);
+      if (status === 'published') fetchReviews();
+    } catch (err) {
+      alert('Failed to submit review: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const avg = reviews.length
+    ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1)
+    : null;
+
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {(p.title || p.eyebrow) && (
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          {p.eyebrow && (
+            <div style={{
+              fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+              textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+              marginBottom: '8px',
+            }}>{p.eyebrow}</div>
+          )}
+          {p.title && (
+            <h2 style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: 'var(--tapas-h-l-size, 32px)', margin: 0,
+              color: 'var(--tapas-h-color, #26170c)',
+            }}>{p.title}</h2>
+          )}
+          {avg && (
+            <div style={{ marginTop: '10px', fontSize: '14px', color: 'var(--tapas-body-color, #5c3a1e)' }}>
+              <span style={{ color: 'var(--tapas-accent, #006a6a)', fontSize: '18px' }}>{STAR}</span>{' '}
+              <b>{avg}</b> · {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+            </div>
+          )}
+        </div>
+      )}
+      {!loading && reviews.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(auto-fill, minmax(${p.min_card_width || 260}px, 1fr))`,
+          gap: '18px',
+          marginBottom: '28px',
+        }}>
+          {reviews.map(r => (
+            <div key={r.id} style={{
+              padding: '18px 20px',
+              background: 'var(--tapas-card-bg, #faf7ed)',
+              border: '1px solid rgba(38,23,12,0.08)',
+              borderRadius: '12px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <div style={{ color: 'var(--tapas-accent, #006a6a)', fontSize: '16px', letterSpacing: '2px' }}>
+                  {STAR.repeat(r.rating || 0)}{STAR_EMPTY.repeat(Math.max(0, 5 - (r.rating || 0)))}
+                </div>
+              </div>
+              {r.photo_url && (
+                <img loading="lazy" decoding="async" src={r.photo_url} alt=""
+                  style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }} />
+              )}
+              {r.review_text && (
+                <p style={{
+                  fontSize: '14px', lineHeight: 1.6,
+                  color: 'var(--tapas-body-color, #5c3a1e)',
+                  margin: '0 0 10px',
+                }}>{r.review_text}</p>
+              )}
+              <div style={{ fontSize: '12px', color: 'var(--tapas-body-color, #5c3a1e)', opacity: 0.75 }}>
+                — {r.guest_name || 'Anonymous reader'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!loading && reviews.length === 0 && (
+        <div style={{ textAlign: 'center', color: 'var(--tapas-body-color, #5c3a1e)', opacity: 0.6, fontSize: '14px', marginBottom: '24px' }}>
+          Be the first to leave a review.
+        </div>
+      )}
+      {!formOpen && !submitted && p.allow_submissions !== false && (
+        <div style={{ textAlign: 'center' }}>
+          <button
+            onClick={() => setFormOpen(true)}
+            style={{
+              padding: 'var(--tapas-btn-padding, 14px 32px)',
+              background: 'var(--tapas-accent, #006a6a)', color: '#fff',
+              border: 'none', borderRadius: 'var(--tapas-btn-radius, 50px)',
+              fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+            }}
+          >{p.cta_text || '✍ Leave a review'}</button>
+        </div>
+      )}
+      {formOpen && !submitted && (
+        <form onSubmit={handleSubmit} style={{
+          maxWidth: '560px', margin: '0 auto',
+          padding: '24px',
+          background: 'var(--tapas-card-bg, #faf7ed)',
+          border: '1px solid rgba(38,23,12,0.08)',
+          borderRadius: '12px',
+          display: 'flex', flexDirection: 'column', gap: '14px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <StarInput value={form.rating} onChange={(r) => setForm({ ...form, rating: r })} />
+          </div>
+          <input
+            type="text" placeholder="Your name (optional)"
+            value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+            style={{
+              padding: '12px 16px', fontSize: '14px',
+              border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+              background: '#fff', outline: 'none',
+            }}
+          />
+          <input
+            type="email" placeholder="Email (optional, stays private)"
+            value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+            style={{
+              padding: '12px 16px', fontSize: '14px',
+              border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+              background: '#fff', outline: 'none',
+            }}
+          />
+          <textarea
+            required placeholder="What did you think?"
+            value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })}
+            rows={4}
+            style={{
+              padding: '12px 16px', fontSize: '14px',
+              border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+              background: '#fff', outline: 'none',
+              fontFamily: 'inherit', resize: 'vertical',
+            }}
+          />
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '10px 14px', background: '#fff',
+            border: '1px dashed rgba(38,23,12,0.25)', borderRadius: '8px',
+            fontSize: '13px', color: 'var(--tapas-body-color, #5c3a1e)',
+            cursor: 'pointer',
+          }}>
+            📷 {form.photo ? form.photo.name : 'Attach a photo (optional)'}
+            <input type="file" accept="image/*"
+              onChange={(e) => setForm({ ...form, photo: e.target.files?.[0] || null })}
+              style={{ display: 'none' }} />
+          </label>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={() => setFormOpen(false)}
+              style={{
+                padding: '10px 18px', background: 'transparent',
+                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '50px',
+                color: 'var(--tapas-body-color, #5c3a1e)',
+                fontWeight: 600, cursor: 'pointer',
+              }}
+            >Cancel</button>
+            <button type="submit" disabled={submitting}
+              style={{
+                padding: '10px 22px', background: 'var(--tapas-accent, #006a6a)',
+                color: '#fff', border: 'none', borderRadius: '50px',
+                fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.7 : 1,
+              }}
+            >{submitting ? 'Sending…' : 'Submit review'}</button>
+          </div>
+        </form>
+      )}
+      {submitted && (
+        <div style={{
+          maxWidth: '520px', margin: '0 auto', padding: '20px 24px',
+          background: '#ecfdf5', border: '1px solid #a7f3d0',
+          borderRadius: '12px', textAlign: 'center', color: '#065f46',
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: '4px' }}>✓</div>
+          <div style={{ fontWeight: 600 }}>
+            {p.auto_publish === false
+              ? 'Thanks! Your review is awaiting moderation.'
+              : 'Thanks! Your review is up.'}
+          </div>
+        </div>
+      )}
+    </BlockFrame>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Phase 8: Event RSVP block
+// ---------------------------------------------------------------------
+// Presents a single upcoming event (by event_id, or the next upcoming
+// one if unset) + an RSVP form (name / email / phone / guest count).
+// Writes to public.event_registrations with source_page attribution.
+export function EventRSVP({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', phone: '', guests: 1, notes: '' });
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        let q = supabase.from('events')
+          .select('id, title, description, event_date, start_time, end_time, location, is_paid, ticket_price, image_url, event_type, status')
+          .in('status', ['upcoming', 'published'])
+          .order('event_date', { ascending: true })
+          .limit(1);
+        if (p.event_id) q = q.eq('id', p.event_id).limit(1);
+        const { data } = await q;
+        if (!cancelled) setEvent((data || [])[0] || null);
+      } catch {
+        if (!cancelled) setEvent(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [p.event_id]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!event?.id) { setError('No event selected.'); return; }
+    if (submitting) return;
+    setSubmitting(true); setError('');
+    try {
+      const { error: err } = await supabase.from('event_registrations').insert([{
+        event_id: event.id,
+        guest_name:  form.name  || null,
+        guest_email: form.email || null,
+        guest_phone: form.phone || null,
+        ticket_count: Math.max(1, Number(form.guests) || 1),
+        status: 'confirmed',
+        notes: form.notes || null,
+        source_page: pageKey,
+      }]);
+      if (err) throw err;
+      dispatchSubmissionWebhook({
+        source: 'event_rsvp',
+        page: pageKey,
+        received_at: new Date().toISOString(),
+        fields: { event_id: event.id, event_title: event.title, ...form },
+      });
+      logAbConversions();
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message || 'Failed to RSVP. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--tapas-body-color, #5c3a1e)', opacity: 0.5 }}>Loading event…</div>
+      </BlockFrame>
+    );
+  }
+  if (!event) {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+        <div style={{
+          textAlign: 'center', padding: '40px 24px',
+          color: 'var(--tapas-body-color, #5c3a1e)',
+        }}>
+          <div style={{ fontSize: '36px', marginBottom: '8px' }}>🎟</div>
+          <div style={{ fontSize: '14px', opacity: 0.7 }}>No upcoming events to RSVP for right now.</div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  const when = [
+    event.event_date && new Date(event.event_date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }),
+    event.start_time && event.start_time.slice(0, 5),
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      <div style={{
+        maxWidth: '780px', margin: '0 auto',
+        display: 'grid',
+        gridTemplateColumns: event.image_url ? '1fr 1fr' : '1fr',
+        gap: '32px', alignItems: 'center',
+      }} className="tapas-event-rsvp-grid">
+        {event.image_url && (
+          <img loading="lazy" decoding="async" src={event.image_url} alt={event.title}
+            style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: '12px', display: 'block' }} />
+        )}
+        <div>
+          <div style={{
+            fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+            textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+            marginBottom: '8px',
+          }}>{p.eyebrow || 'Reserve your spot'}</div>
+          <h2 style={{
+            fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'var(--tapas-h-l-size, 30px)', margin: '0 0 10px',
+            color: 'var(--tapas-h-color, #26170c)',
+          }}>{event.title}</h2>
+          <div style={{ fontSize: '14px', color: 'var(--tapas-body-color, #5c3a1e)', marginBottom: '6px' }}>
+            📅 {when}
+          </div>
+          {event.location && (
+            <div style={{ fontSize: '14px', color: 'var(--tapas-body-color, #5c3a1e)', marginBottom: '6px' }}>
+              📍 {event.location}
+            </div>
+          )}
+          {event.is_paid && event.ticket_price && (
+            <div style={{ fontSize: '14px', color: 'var(--tapas-body-color, #5c3a1e)', marginBottom: '16px' }}>
+              💰 ₹{event.ticket_price}
+            </div>
+          )}
+          {event.description && (
+            <p style={{ fontSize: '14px', lineHeight: 1.6, color: 'var(--tapas-body-color, #5c3a1e)', margin: '0 0 20px', opacity: 0.85 }}>
+              {event.description.length > 220 ? event.description.slice(0, 220) + '…' : event.description}
+            </p>
+          )}
+          {submitted ? (
+            <div style={{
+              padding: '18px 22px',
+              background: '#ecfdf5', border: '1px solid #a7f3d0',
+              borderRadius: '10px', color: '#065f46',
+            }}>
+              <div style={{ fontSize: '22px', marginBottom: '4px' }}>✓</div>
+              <div style={{ fontWeight: 600 }}>{p.success_message || 'You\'re in. See you there!'}</div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <input required type="text" placeholder="Your name" value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                style={{ padding: '12px 14px', fontSize: '14px', border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px', background: '#fff', outline: 'none' }} />
+              <input required type="email" placeholder="Email" value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                style={{ padding: '12px 14px', fontSize: '14px', border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px', background: '#fff', outline: 'none' }} />
+              <input type="tel" placeholder="Phone (optional)" value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                style={{ padding: '12px 14px', fontSize: '14px', border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px', background: '#fff', outline: 'none' }} />
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '4px 0', fontSize: '13px', color: 'var(--tapas-body-color, #5c3a1e)',
+              }}>
+                How many of you?
+                <input type="number" min={1} max={20} value={form.guests}
+                  onChange={(e) => setForm({ ...form, guests: e.target.value })}
+                  style={{ width: '70px', padding: '8px 10px', fontSize: '14px', border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px', background: '#fff', outline: 'none' }} />
+              </label>
+              {error && <div style={{ fontSize: '13px', color: '#b91c1c' }}>⚠ {error}</div>}
+              <button type="submit" disabled={submitting} style={{
+                marginTop: '4px',
+                padding: '12px 24px', borderRadius: '50px',
+                background: 'var(--tapas-accent, #006a6a)', color: '#fff',
+                border: 'none', fontWeight: 700, fontSize: '15px',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.7 : 1,
+              }}>{submitting ? 'Reserving…' : (p.button_text || 'Reserve my spot')}</button>
+            </form>
+          )}
+        </div>
+      </div>
+      <style>{`
+        @media (max-width: 720px) {
+          .tapas-event-rsvp-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+    </BlockFrame>
+  );
+}

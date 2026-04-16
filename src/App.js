@@ -108,6 +108,9 @@ const SiteContent           = lazyWithRetry(() => import('./pages/SiteContent'))
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
 const StoreAnalytics        = lazyWithRetry(() => import('./pages/StoreAnalytics'));
+const ReviewsInbox          = lazyWithRetry(() => import('./pages/ReviewsInbox'));
+const EventRsvpInbox        = lazyWithRetry(() => import('./pages/EventRsvpInbox'));
+const EmailCampaigns        = lazyWithRetry(() => import('./pages/EmailCampaigns'));
 
 // ── Lazy-loaded pages (New - Phase 6: Productivity + Marketing) ─────────────
 const Tasks                 = lazyWithRetry(() => import('./pages/Tasks'));
@@ -262,6 +265,8 @@ const NAV_CONFIG = [
     children: [
       { to: '/store/orders',     icon: '📦', label: 'Online Orders' },
       { to: '/store/inbox',      icon: '📨', label: 'Contact Inbox' },
+      { to: '/store/reviews',    icon: '★',  label: 'Reviews' },
+      { to: '/store/rsvps',      icon: '🎟', label: 'Event RSVPs' },
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
       { to: '/store/content',    icon: '🎨', label: 'Edit Website' },
@@ -278,6 +283,7 @@ const NAV_CONFIG = [
       { to: '/automations',    icon: '⚡', label: 'Automations' },
       { to: '/engagement',     icon: '💬', label: 'Engagement' },
       { to: '/newsletter',     icon: '✉️', label: 'Newsletter' },
+      { to: '/marketing/campaigns', icon: '📨', label: 'Email Campaigns' },
       { to: '/communications', icon: '📲', label: 'Communications' },
       { to: '/community',      icon: '👥', label: 'Community & Blog' },
       { to: '/advanced-tools', icon: '🧪', label: 'Advanced Tools' },
@@ -738,9 +744,12 @@ function DashboardShell() {
             {/* Online Store */}
             <Route path="/store/orders"                       element={<CustomerOrders />} />
             <Route path="/store/inbox"                        element={<ContactInbox />} />
+            <Route path="/store/reviews"                      element={<ReviewsInbox />} />
+            <Route path="/store/rsvps"                        element={<EventRsvpInbox />} />
             <Route path="/store/newsletter"                   element={<NewsletterInbox />} />
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/store/content"                      element={<SiteContent />} />
+            <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
             {/* Marketing */}
             <Route path="/marketing-dashboard"                element={<MarketingDashboard />} />

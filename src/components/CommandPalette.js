@@ -37,7 +37,10 @@ const COMMANDS = [
   // Store (Phase 5-6)
   { label: 'Online orders',          path: '/store/orders',         icon: '📦', keywords: 'customer order' },
   { label: 'Contact inbox',          path: '/store/inbox',          icon: '📨', keywords: 'form submissions messages' },
+  { label: 'Review moderation',      path: '/store/reviews',        icon: '★',  keywords: 'reviews ratings stars moderate' },
+  { label: 'Event RSVPs',            path: '/store/rsvps',          icon: '🎟', keywords: 'rsvp registrations attendees' },
   { label: 'Newsletter subscribers', path: '/store/newsletter',     icon: '💌', keywords: 'emails list subscribers' },
+  { label: 'Email campaigns',        path: '/marketing/campaigns',  icon: '✉️', keywords: 'broadcast newsletter send email' },
   { label: 'Store analytics',        path: '/store/analytics',      icon: '📊', keywords: 'stats dashboard revenue' },
   { label: 'Edit website',           path: '/store/content',        icon: '🎨', keywords: 'site content blocks pages editor' },
   // Marketing
