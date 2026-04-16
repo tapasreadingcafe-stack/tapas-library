@@ -959,27 +959,128 @@ export function Countdown({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
+// Default field set when a block hasn't been customized yet. Matches
+// the legacy name/email/message trio so existing pages keep rendering
+// identically.
+const DEFAULT_FORM_FIELDS = [
+  { key: 'name',    label: 'Your name',     type: 'text',     required: true, placeholder: 'Your name' },
+  { key: 'email',   label: 'Email',         type: 'email',    required: true, placeholder: 'your@email.com' },
+  { key: 'message', label: 'Message',       type: 'textarea', required: true, placeholder: 'Your message...' },
+];
+
+const FORM_INPUT_STYLE = {
+  padding: '14px 18px', fontSize: '15px',
+  border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
+  outline: 'none', background: '#fff',
+  fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+};
+
 export function ContactForm({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
+  const configured = Array.isArray(p.fields) && p.fields.length > 0 ? p.fields : DEFAULT_FORM_FIELDS;
+  // Normalize + generate keys for any fields missing one
+  const fields = configured.map((f, i) => ({
+    type: f?.type || 'text',
+    label: f?.label || `Field ${i + 1}`,
+    required: !!f?.required,
+    placeholder: f?.placeholder || '',
+    options: Array.isArray(f?.options) ? f.options : [],
+    key: f?.key || (f?.label || `field_${i}`).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `field_${i}`,
+  }));
   const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [values, setValues] = useState(() => {
+    const init = {};
+    fields.forEach(f => { init[f.key] = f.type === 'checkbox' ? false : ''; });
+    return init;
+  });
+  const setValue = (key, v) => setValues(prev => ({ ...prev, [key]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Store in Supabase contact_submissions table
-      const { error } = await supabase.from('contact_submissions').insert([{
-        name: formData.name,
-        email: formData.email,
-        message: formData.message,
+      // Populate the legacy top-level columns when the corresponding
+      // keys exist, so the existing inbox renders nicely. The full
+      // shape is always stored on `fields`.
+      const row = {
         source_page: pageKey,
         created_at: new Date().toISOString(),
-      }]);
+        fields: { ...values },
+        name: typeof values.name === 'string' ? values.name : null,
+        email: typeof values.email === 'string' ? values.email : null,
+        message: typeof values.message === 'string' ? values.message : null,
+      };
+      const { error } = await supabase.from('contact_submissions').insert([row]);
       if (error) throw error;
       setSubmitted(true);
     } catch (err) {
       // Silently fail if table doesn't exist — still show thank-you
       setSubmitted(true);
+    }
+  };
+
+  const renderField = (f) => {
+    const v = values[f.key];
+    const common = { required: f.required, placeholder: f.placeholder || f.label, style: FORM_INPUT_STYLE };
+    switch (f.type) {
+      case 'textarea':
+        return (
+          <textarea
+            {...common}
+            value={v || ''}
+            onChange={(e) => setValue(f.key, e.target.value)}
+            rows={5}
+            style={{ ...FORM_INPUT_STYLE, resize: 'vertical' }}
+          />
+        );
+      case 'select':
+        return (
+          <select
+            value={v || ''}
+            required={f.required}
+            onChange={(e) => setValue(f.key, e.target.value)}
+            style={{ ...FORM_INPUT_STYLE, cursor: 'pointer' }}
+          >
+            <option value="">{f.placeholder || 'Select one…'}</option>
+            {(f.options || []).map((opt, i) => {
+              const value = typeof opt === 'string' ? opt : (opt?.value ?? opt?.label ?? '');
+              const label = typeof opt === 'string' ? opt : (opt?.label ?? value);
+              return <option key={i} value={value}>{label}</option>;
+            })}
+          </select>
+        );
+      case 'checkbox':
+        return (
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: '10px',
+            fontSize: '14px', color: 'var(--tapas-body-color, #5c3a1e)',
+            lineHeight: 1.5, cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox"
+              checked={!!v}
+              required={f.required}
+              onChange={(e) => setValue(f.key, e.target.checked)}
+              style={{ marginTop: '3px', cursor: 'pointer' }}
+            />
+            <span>{f.label}{f.required && <span style={{ color: '#dc2626' }}> *</span>}</span>
+          </label>
+        );
+      case 'tel':
+      case 'phone':
+        return (
+          <input type="tel" inputMode="tel" {...common}
+            value={v || ''} onChange={(e) => setValue(f.key, e.target.value)} />
+        );
+      case 'email':
+        return (
+          <input type="email" {...common}
+            value={v || ''} onChange={(e) => setValue(f.key, e.target.value)} />
+        );
+      default:
+        return (
+          <input type="text" {...common}
+            value={v || ''} onChange={(e) => setValue(f.key, e.target.value)} />
+        );
     }
   };
 
@@ -1013,38 +1114,21 @@ export function ContactForm({ id, pageKey, props, blockIndex, totalBlocks }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <input
-              type="text" required placeholder="Your name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              style={{
-                padding: '14px 18px', fontSize: '15px',
-                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
-                outline: 'none', background: '#fff',
-              }}
-            />
-            <input
-              type="email" required placeholder="your@email.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              style={{
-                padding: '14px 18px', fontSize: '15px',
-                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
-                outline: 'none', background: '#fff',
-              }}
-            />
-            <textarea
-              required placeholder={p.message_placeholder || 'Your message...'}
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              rows={5}
-              style={{
-                padding: '14px 18px', fontSize: '15px',
-                border: '1px solid rgba(38,23,12,0.2)', borderRadius: '8px',
-                outline: 'none', background: '#fff', resize: 'vertical',
-                fontFamily: 'inherit',
-              }}
-            />
+            {fields.map((f) => (
+              <div key={f.key}>
+                {/* Checkbox label is inline; others get a label above */}
+                {f.type !== 'checkbox' && (
+                  <label style={{
+                    display: 'block', fontSize: '12px', fontWeight: 600,
+                    color: 'var(--tapas-body-color, #5c3a1e)',
+                    marginBottom: '6px',
+                  }}>
+                    {f.label}{f.required && <span style={{ color: '#dc2626' }}> *</span>}
+                  </label>
+                )}
+                {renderField(f)}
+              </div>
+            ))}
             <button type="submit" style={{
               padding: '14px 24px', borderRadius: '8px',
               background: 'var(--tapas-accent, #006a6a)', color: '#fff',

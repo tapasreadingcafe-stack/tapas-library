@@ -54,7 +54,7 @@ export default function ContactInbox() {
     try {
       const { data, error: err } = await supabase
         .from('contact_submissions')
-        .select('id, name, email, message, source_page, status, staff_notes, created_at, updated_at')
+        .select('id, name, email, message, fields, source_page, status, staff_notes, created_at, updated_at')
         .order('created_at', { ascending: false })
         .limit(500);
       if (err) throw err;
@@ -109,6 +109,21 @@ export default function ContactInbox() {
       // Auto-mark-read the first time we open a "new" message.
       if (row.status === 'new') patchRow(row, { status: 'read' });
     }
+  };
+
+  // Pull "name" / "email" / summary line out of either legacy columns
+  // or the custom-fields blob, whichever is populated first.
+  const resolveDisplay = (r) => {
+    const fields = r.fields && typeof r.fields === 'object' ? r.fields : {};
+    const name = r.name || fields.name || fields.full_name || fields.your_name || '(Anonymous)';
+    const email = r.email || fields.email || fields.your_email || '';
+    let preview = r.message;
+    if (!preview) {
+      const keys = Object.keys(fields).filter(k => !['name', 'email', 'full_name', 'your_name', 'your_email'].includes(k));
+      const first = keys.find(k => typeof fields[k] === 'string' && fields[k].trim());
+      if (first) preview = String(fields[first]);
+    }
+    return { name, email, preview: preview || '' };
   };
 
   const visibleRows = rows.filter(r => {
@@ -211,6 +226,7 @@ export default function ContactInbox() {
             const expanded = expandedId === row.id;
             const statusMeta = STATUS_META[row.status] || STATUS_META.new;
             const isNew = row.status === 'new';
+            const disp = resolveDisplay(row);
             return (
               <div
                 key={row.id}
@@ -231,10 +247,10 @@ export default function ContactInbox() {
                 >
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: isNew ? 700 : 600, color: '#111827', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.name}
+                      {disp.name}
                     </div>
                     <div style={{ fontSize: '12px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.email}
+                      {disp.email || <span style={{ fontStyle: 'italic', opacity: 0.6 }}>no email</span>}
                     </div>
                   </div>
                   <div style={{
@@ -242,7 +258,7 @@ export default function ContactInbox() {
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     fontWeight: isNew ? 600 : 400,
                   }}>
-                    {row.message}
+                    {disp.preview}
                   </div>
                   <span style={{
                     padding: '3px 10px',
@@ -266,14 +282,18 @@ export default function ContactInbox() {
                     }}>
                       <div>
                         <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Name</div>
-                        <div style={{ fontWeight: 600 }}>{row.name}</div>
+                        <div style={{ fontWeight: 600 }}>{disp.name}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Email</div>
-                        <a href={`mailto:${row.email}?subject=Re:%20Your%20message%20to%20Tapas%20Reading%20Cafe`}
-                          style={{ color: '#667eea', textDecoration: 'none', fontWeight: 600 }}
-                          onClick={(e) => e.stopPropagation()}
-                        >{row.email} ↗</a>
+                        {disp.email ? (
+                          <a href={`mailto:${disp.email}?subject=Re:%20Your%20message%20to%20Tapas%20Reading%20Cafe`}
+                            style={{ color: '#667eea', textDecoration: 'none', fontWeight: 600 }}
+                            onClick={(e) => e.stopPropagation()}
+                          >{disp.email} ↗</a>
+                        ) : (
+                          <div style={{ fontStyle: 'italic', color: '#9ca3af' }}>not provided</div>
+                        )}
                       </div>
                       {row.source_page && (
                         <div>
@@ -287,31 +307,63 @@ export default function ContactInbox() {
                       </div>
                     </div>
 
-                    <div style={{
-                      padding: '16px', background: 'white',
-                      border: '1px solid #e5e7eb', borderRadius: '8px',
-                      fontSize: '14px', color: '#111827',
-                      whiteSpace: 'pre-wrap', lineHeight: 1.6,
-                    }}>
-                      {row.message}
-                    </div>
+                    {/* Phase 6: custom form builder support. If `fields`
+                        is present, render every field the form stored;
+                        otherwise fall back to the legacy Message box. */}
+                    {row.fields && typeof row.fields === 'object' ? (
+                      <div style={{
+                        padding: '16px', background: 'white',
+                        border: '1px solid #e5e7eb', borderRadius: '8px',
+                        fontSize: '13px', color: '#111827', lineHeight: 1.6,
+                        display: 'grid', gridTemplateColumns: '1fr', gap: '12px',
+                      }}>
+                        {Object.entries(row.fields).map(([key, val]) => {
+                          // Skip keys already shown at the top (name/email)
+                          if (key === 'name' || key === 'email') return null;
+                          let display;
+                          if (typeof val === 'boolean') display = val ? '✓ Yes' : '— No';
+                          else if (val === null || val === undefined || val === '') display = <span style={{ color: '#9ca3af' }}>(empty)</span>;
+                          else display = <span style={{ whiteSpace: 'pre-wrap' }}>{String(val)}</span>;
+                          return (
+                            <div key={key}>
+                              <div style={{
+                                fontSize: '11px', color: '#6b7280', fontWeight: 600,
+                                textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px',
+                              }}>{key.replace(/_/g, ' ')}</div>
+                              <div>{display}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: '16px', background: 'white',
+                        border: '1px solid #e5e7eb', borderRadius: '8px',
+                        fontSize: '14px', color: '#111827',
+                        whiteSpace: 'pre-wrap', lineHeight: 1.6,
+                      }}>
+                        {row.message}
+                      </div>
+                    )}
 
                     {/* Action buttons */}
                     <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <a
-                        href={`mailto:${encodeURIComponent(row.email)}?subject=${encodeURIComponent('Re: Your message to Tapas Reading Cafe')}&body=${encodeURIComponent(`Hi ${row.name},\n\n\n\n—\n\nOn ${new Date(row.created_at).toLocaleString()} you wrote:\n\n> ${row.message.split('\n').join('\n> ')}`)}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (row.status !== 'replied') patchRow(row, { status: 'replied' });
-                        }}
-                        style={{
-                          padding: '8px 14px', background: '#667eea', color: 'white',
-                          border: 'none', borderRadius: '6px',
-                          fontSize: '13px', fontWeight: '600',
-                          textDecoration: 'none',
-                          display: 'inline-flex', alignItems: 'center', gap: '6px',
-                        }}
-                      >✉️ Reply by email</a>
+                      {disp.email && (
+                        <a
+                          href={`mailto:${encodeURIComponent(disp.email)}?subject=${encodeURIComponent('Re: Your message to Tapas Reading Cafe')}&body=${encodeURIComponent(`Hi ${disp.name},\n\n\n\n—\n\nOn ${new Date(row.created_at).toLocaleString()} you wrote:\n\n> ${(disp.preview || '').split('\n').join('\n> ')}`)}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (row.status !== 'replied') patchRow(row, { status: 'replied' });
+                          }}
+                          style={{
+                            padding: '8px 14px', background: '#667eea', color: 'white',
+                            border: 'none', borderRadius: '6px',
+                            fontSize: '13px', fontWeight: '600',
+                            textDecoration: 'none',
+                            display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          }}
+                        >✉️ Reply by email</a>
+                      )}
 
                       {row.status !== 'replied' && (
                         <button

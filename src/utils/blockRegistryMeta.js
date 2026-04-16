@@ -327,16 +327,37 @@ export const BLOCK_REGISTRY_META = {
     defaultProps: {
       title: 'Get in touch',
       subtitle: 'We usually reply within a day.',
-      message_placeholder: 'Your message...',
       button_text: 'Send message',
       success_message: 'Thanks! We\'ll be in touch soon.',
+      fields: [],
     },
     schema: [
       { key: 'title',               label: 'Title',              type: 'text' },
       { key: 'subtitle',            label: 'Subtitle',           type: 'text' },
-      { key: 'message_placeholder', label: 'Message placeholder',type: 'text' },
       { key: 'button_text',         label: 'Button text',        type: 'text' },
       { key: 'success_message',     label: 'Success message',    type: 'text' },
+      {
+        key: 'fields', label: 'Form fields', type: 'array',
+        hint: 'Leave empty to use the default Name / Email / Message trio. Add rows to build a fully custom form.',
+        itemDefaults: { key: '', label: 'New field', type: 'text', required: false, placeholder: '' },
+        itemFields: [
+          { key: 'label',       label: 'Label',              type: 'text' },
+          { key: 'key',         label: 'Storage key',        type: 'text', hint: 'Optional. Auto-derived from label if blank. Use "name" / "email" / "message" to also populate the inbox summary columns.' },
+          {
+            key: 'type', label: 'Field type', type: 'select',
+            options: [
+              { value: 'text',     label: 'Text (single-line)' },
+              { value: 'email',    label: 'Email' },
+              { value: 'tel',      label: 'Phone' },
+              { value: 'textarea', label: 'Textarea (multi-line)' },
+              { value: 'select',   label: 'Dropdown' },
+              { value: 'checkbox', label: 'Checkbox' },
+            ],
+          },
+          { key: 'required',    label: 'Required',           type: 'toggle' },
+          { key: 'placeholder', label: 'Placeholder',        type: 'text' },
+        ],
+      },
     ],
   },
 

@@ -298,14 +298,14 @@ export const BLOCK_REGISTRY = {
     defaultProps: {
       title: 'Get in touch',
       subtitle: 'We usually reply within a day.',
-      message_placeholder: 'Your message...',
       button_text: 'Send message',
       success_message: 'Thanks! We\'ll be in touch soon.',
+      // Empty = use the default Name / Email / Message fields.
+      fields: [],
     },
     schema: [
       { key: 'title',              label: 'Title',             type: 'text' },
       { key: 'subtitle',           label: 'Subtitle',          type: 'text' },
-      { key: 'message_placeholder',label: 'Message placeholder', type: 'text' },
       { key: 'button_text',        label: 'Button text',       type: 'text' },
       { key: 'success_message',    label: 'Success message',   type: 'text' },
     ],
