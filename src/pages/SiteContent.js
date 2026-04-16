@@ -353,9 +353,16 @@ function FontField({ field, value, onChange, inputRef }) {
   );
 }
 
+// Phase 5: Media library context — lets any ImageField (or nested array
+// itemField of type "image") pop the shared media library modal. The
+// main SiteContent component provides `openMediaLibrary({ onPick })`;
+// ImageField consumes it if present and renders a "Library" button.
+const MediaLibraryContext = React.createContext(null);
+
 function ImageField({ field, value, onChange, inputRef }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const mediaLibrary = React.useContext(MediaLibraryContext);
   const handleUpload = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true); setUploadError('');
@@ -381,13 +388,25 @@ function ImageField({ field, value, onChange, inputRef }) {
       )}
       <div style={{ display: 'flex', gap: '4px' }}>
         <input ref={inputRef} type="text" value={value || ''} onChange={e => onChange(e.target.value)}
-          placeholder="URL or upload"
+          placeholder="URL, upload, or pick"
           style={{ ...inputBaseStyle, flex: 1, fontFamily: 'ui-monospace, monospace' }} />
+        {mediaLibrary && (
+          <button
+            type="button"
+            onClick={() => mediaLibrary.open({ onPick: (url) => onChange(url) })}
+            title="Pick from media library"
+            style={{
+              padding: '0 10px', height: '28px',
+              background: D.input, color: D.text, border: 'none', borderRadius: '2px',
+              cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+            }}
+          >📁</button>
+        )}
         <label style={{
           padding: '0 10px', height: '28px', display: 'inline-flex', alignItems: 'center',
           background: D.accent, color: 'white', border: 'none', borderRadius: '2px',
           cursor: 'pointer', fontSize: '11px', fontWeight: '600', opacity: uploading ? 0.7 : 1,
-        }}>
+        }} title="Upload new image">
           {uploading ? '⏳' : '↑'}
           <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} style={{ display: 'none' }} />
         </label>
@@ -1351,6 +1370,77 @@ export default function SiteContent() {
   const [newPageOpen, setNewPageOpen] = useState(false);
   const [newPageLabel, setNewPageLabel] = useState('');
   const [newPagePath, setNewPagePath] = useState('');
+  // Phase 5: media library — shared picker modal for every ImageField.
+  // onPick is the callback the caller (an ImageField) passes in; when
+  // the user clicks a thumbnail we invoke it with the public URL.
+  const [mediaLibrary, setMediaLibrary] = useState({ open: false, onPick: null });
+  const [mediaItems, setMediaItems] = useState([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState('');
+  const [mediaQuery, setMediaQuery] = useState('');
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const openMediaLibrary = useCallback(({ onPick }) => {
+    setMediaLibrary({ open: true, onPick });
+  }, []);
+  const mediaLibraryApi = useMemo(() => ({ open: openMediaLibrary }), [openMediaLibrary]);
+  const fetchMediaItems = useCallback(async () => {
+    setMediaLoading(true); setMediaError('');
+    try {
+      const { data, error: listErr } = await supabase
+        .storage.from(STORAGE_BUCKET)
+        .list('', { limit: 200, sortBy: { column: 'created_at', order: 'desc' } });
+      if (listErr) throw listErr;
+      const files = (data || []).filter(f => f?.name && !f.name.endsWith('/'));
+      const items = files.map(f => {
+        const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(f.name);
+        return {
+          name: f.name,
+          url: publicUrl,
+          size: f.metadata?.size || 0,
+          mime: f.metadata?.mimetype || '',
+          created_at: f.created_at || f.updated_at || null,
+        };
+      });
+      setMediaItems(items);
+    } catch (err) {
+      setMediaError(err.message?.includes('not found') || err.message?.includes('Bucket')
+        ? `Create a public bucket named "${STORAGE_BUCKET}" in Supabase → Storage first.`
+        : (err.message || 'Failed to load media.'));
+    } finally {
+      setMediaLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (mediaLibrary.open) fetchMediaItems();
+  }, [mediaLibrary.open, fetchMediaItems]);
+  const uploadToLibrary = async (file) => {
+    if (!file) return null;
+    setMediaUploading(true); setMediaError('');
+    try {
+      const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]+/g, '-').slice(0, 40) || 'upload';
+      const path = `${safeBase}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+      await fetchMediaItems();
+      return publicUrl;
+    } catch (err) {
+      setMediaError(err.message || 'Upload failed');
+      return null;
+    } finally {
+      setMediaUploading(false);
+    }
+  };
+  const deleteMediaItem = async (name) => {
+    try {
+      const { error: delErr } = await supabase.storage.from(STORAGE_BUCKET).remove([name]);
+      if (delErr) throw delErr;
+      setMediaItems(prev => prev.filter(m => m.name !== name));
+    } catch (err) {
+      setMediaError(err.message || 'Delete failed');
+    }
+  };
   const askConfirm = useCallback((opts) => {
     // opts: { title, message, confirmLabel?, tone?, onConfirm }
     setConfirmModal({
@@ -2099,6 +2189,7 @@ export default function SiteContent() {
   const currentStorage = storageKeyForSection(currentSection);
 
   return (
+    <MediaLibraryContext.Provider value={mediaLibraryApi}>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -2106,6 +2197,198 @@ export default function SiteContent() {
       background: S.bg,
       fontFamily: '-apple-system, system-ui, sans-serif',
     }}>
+      {/* ==================== Media Library modal ==================== */}
+      {mediaLibrary.open && (
+        <div
+          onClick={() => setMediaLibrary({ open: false, onPick: null })}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '880px', maxHeight: '85vh',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+              fontFamily: '-apple-system, system-ui, sans-serif',
+            }}
+          >
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: `1px solid ${S.border}`,
+              display: 'flex', alignItems: 'center', gap: '12px',
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
+                  📁 Media Library
+                </div>
+                <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
+                  {mediaLoading ? 'Loading…' : `${mediaItems.length} file${mediaItems.length === 1 ? '' : 's'} · bucket: ${STORAGE_BUCKET}`}
+                </div>
+              </div>
+              <label style={{
+                padding: '7px 14px',
+                background: S.accent, color: '#fff', border: 'none', borderRadius: '6px',
+                cursor: mediaUploading ? 'not-allowed' : 'pointer',
+                fontSize: '12px', fontWeight: '700', opacity: mediaUploading ? 0.7 : 1,
+              }}>
+                {mediaUploading ? '⏳ Uploading…' : '↑ Upload'}
+                <input
+                  type="file" accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) await uploadToLibrary(file);
+                  }}
+                  disabled={mediaUploading}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              <button
+                onClick={() => setMediaLibrary({ open: false, onPick: null })}
+                style={{
+                  width: '28px', height: '28px',
+                  background: 'transparent', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', cursor: 'pointer',
+                  color: S.textDim, fontSize: '14px',
+                }}
+              >✕</button>
+            </div>
+
+            {/* Search */}
+            <div style={{ padding: '12px 24px', borderBottom: `1px solid ${S.border}`, background: S.bg }}>
+              <input
+                type="text"
+                value={mediaQuery}
+                onChange={(e) => setMediaQuery(e.target.value)}
+                placeholder="🔍 Search by filename…"
+                style={{
+                  width: '100%', padding: '8px 10px', boxSizing: 'border-box',
+                  background: '#fff', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', fontSize: '13px', color: S.text,
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {mediaError && (
+              <div style={{
+                margin: '12px 24px 0', padding: '10px 14px',
+                background: '#fef2f2', border: '1px solid #fecaca',
+                color: '#991b1b', borderRadius: '8px', fontSize: '12px',
+              }}>⚠️ {mediaError}</div>
+            )}
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
+              {mediaLoading ? (
+                <div style={{ padding: '48px', textAlign: 'center', color: S.textDim, fontSize: '13px' }}>
+                  Loading library…
+                </div>
+              ) : mediaItems.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center', color: S.textDim, fontSize: '13px', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: '40px', marginBottom: '10px' }}>🖼️</div>
+                  No images uploaded yet.<br />
+                  Click <b>↑ Upload</b> above to add one.
+                </div>
+              ) : (() => {
+                const q = mediaQuery.trim().toLowerCase();
+                const filtered = q ? mediaItems.filter(m => m.name.toLowerCase().includes(q)) : mediaItems;
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ padding: '40px', textAlign: 'center', color: S.textDim, fontSize: '13px' }}>
+                      No files match "{mediaQuery}".
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                    gap: '12px',
+                  }}>
+                    {filtered.map((m) => (
+                      <div
+                        key={m.name}
+                        style={{
+                          background: '#fff',
+                          border: `1px solid ${S.border}`,
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          position: 'relative',
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            const pick = mediaLibrary.onPick;
+                            setMediaLibrary({ open: false, onPick: null });
+                            if (pick) try { pick(m.url); } catch {}
+                          }}
+                          title={m.name}
+                          style={{
+                            display: 'block', width: '100%',
+                            padding: 0, background: 'transparent',
+                            border: 'none', cursor: 'pointer',
+                          }}
+                        >
+                          <img
+                            src={m.url}
+                            alt={m.name}
+                            loading="lazy"
+                            style={{
+                              width: '100%', height: '120px', objectFit: 'cover',
+                              background: '#f3f4f6',
+                              display: 'block',
+                            }}
+                          />
+                        </button>
+                        <div style={{
+                          padding: '6px 10px',
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          borderTop: `1px solid ${S.border}`,
+                        }}>
+                          <div style={{
+                            flex: 1, minWidth: 0,
+                            fontSize: '10px', color: S.textDim,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            fontFamily: 'ui-monospace, monospace',
+                          }}>{m.name}</div>
+                          <button
+                            onClick={() => {
+                              askConfirm({
+                                title: `Delete "${m.name}"?`,
+                                message: 'The file will be permanently removed from storage. Blocks still referencing this URL will show a broken image until you update them.',
+                                confirmLabel: 'Delete file',
+                                tone: 'danger',
+                                onConfirm: () => deleteMediaItem(m.name),
+                              });
+                            }}
+                            title="Delete from storage"
+                            style={{
+                              width: '22px', height: '22px', padding: 0,
+                              background: 'transparent', border: 'none',
+                              color: S.textDim, cursor: 'pointer',
+                              fontSize: '11px', borderRadius: '2px',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = S.danger; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; }}
+                          >🗑</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== Confirm modal ==================== */}
       {confirmModal && (
         <div
@@ -3832,5 +4115,6 @@ export default function SiteContent() {
         </aside>
       </div>
     </div>
+    </MediaLibraryContext.Provider>
   );
 }
