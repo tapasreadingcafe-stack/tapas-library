@@ -98,10 +98,36 @@ const RESPONSIVE_CSS = `
 }
 `;
 
+// Applies per-page SEO meta (title + description) to the document &
+// the <head>. Keeps the effect scoped — on unmount the title isn't
+// restored because each route mounts its own <PageRenderer> which
+// overrides it again. Description is upserted rather than duplicated.
+function usePageMeta(meta) {
+  const title = meta?.title;
+  const description = meta?.description;
+  React.useEffect(() => {
+    if (title) document.title = title;
+    if (typeof description === 'string') {
+      let tag = document.querySelector('meta[name="description"]');
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.setAttribute('name', 'description');
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute('content', description);
+    }
+  }, [title, description]);
+}
+
 export default function PageRenderer({ pageKey, fallback = null }) {
   const content = useSiteContent();
   const page = content?.pages?.[pageKey];
   const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
+
+  // Apply SEO meta even when the page falls back to legacy JSX — the
+  // meta fields should take effect regardless of whether blocks are
+  // rendered.
+  usePageMeta(page?.meta);
 
   // If the page has no blocks defined, fall through to whatever the
   // caller passed as `fallback` — typically the legacy JSX of the

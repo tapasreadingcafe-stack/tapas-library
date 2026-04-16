@@ -1247,6 +1247,12 @@ export default function SiteContent() {
   // Phase 4: multi-select support (Set of block IDs selected beyond the primary one)
   const [multiSelectedIds, setMultiSelectedIds] = useState(() => new Set());
   const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const [addPickerSearch, setAddPickerSearch] = useState('');
+  // Phase 5: templates modal (replaces the old prompt()-based picker)
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('blockTemplates') || '[]'); } catch { return []; }
+  });
   // Hamburger-style collapse for both sidebars. Each panel is either
   // at its full fixed width or fully hidden (width 0 with a CSS
   // transition for a smooth slide). State persists across sessions so
@@ -1902,15 +1908,16 @@ export default function SiteContent() {
         if (!block) return;
         const templateName = window.prompt('Template name:', block.type);
         if (templateName) {
-          const templates = JSON.parse(localStorage.getItem('blockTemplates') || '[]');
-          templates.push({
-            name: templateName,
-            type: block.type,
-            props: block.props,
-            createdAt: new Date().toISOString(),
+          setTemplates(prev => {
+            const next = [...prev, {
+              name: templateName,
+              type: block.type,
+              props: block.props,
+              createdAt: new Date().toISOString(),
+            }];
+            try { localStorage.setItem('blockTemplates', JSON.stringify(next)); } catch {}
+            return next;
           });
-          localStorage.setItem('blockTemplates', JSON.stringify(templates));
-          alert(`Saved template: ${templateName}`);
         }
         return;
       }
@@ -1953,10 +1960,158 @@ export default function SiteContent() {
       background: S.bg,
       fontFamily: '-apple-system, system-ui, sans-serif',
     }}>
+      {/* ==================== Templates modal ==================== */}
+      {templatesOpen && (
+        <div
+          onClick={() => setTemplatesOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '720px', maxHeight: '80vh',
+              background: '#fff', borderRadius: '12px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: `1px solid ${S.border}`,
+              display: 'flex', alignItems: 'center', gap: '12px',
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
+                  ⭐ Block Templates
+                </div>
+                <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
+                  {templates.length === 0
+                    ? 'Save a block as a template from the canvas toolbar (⭐ button).'
+                    : `${templates.length} saved. Click to insert into ${EDITABLE_PAGES.find(p => p.key === editingPage)?.label || editingPage}.`}
+                </div>
+              </div>
+              <button
+                onClick={() => setTemplatesOpen(false)}
+                style={{
+                  width: '28px', height: '28px',
+                  background: 'transparent', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', cursor: 'pointer',
+                  color: S.textDim, fontSize: '14px',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = S.text; e.currentTarget.style.background = S.bg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = 'transparent'; }}
+              >✕</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
+              {templates.length === 0 ? (
+                <div style={{
+                  padding: '48px 20px', textAlign: 'center',
+                  color: S.textDim, fontSize: '13px', lineHeight: 1.6,
+                }}>
+                  No templates saved yet.<br />
+                  Hover over any block on the canvas and click <b>⭐</b> to save it as a template.
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '10px',
+                }}>
+                  {templates.map((t, idx) => {
+                    const meta = BLOCK_REGISTRY_META[t.type];
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex', flexDirection: 'column',
+                          padding: '14px',
+                          background: '#fff',
+                          border: `1px solid ${S.border}`,
+                          borderRadius: '8px',
+                          gap: '8px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>{meta?.icon || '▫'}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '12px', fontWeight: '700', color: S.text,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>{t.name}</div>
+                            <div style={{ fontSize: '10px', color: S.textDim }}>
+                              {meta?.label || t.type}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => {
+                              setDraftContent(prev => {
+                                const page = prev.pages?.[editingPage];
+                                if (!page || !Array.isArray(page.blocks)) return prev;
+                                const newBlock = {
+                                  id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                                  type: t.type,
+                                  props: JSON.parse(JSON.stringify(t.props || {})),
+                                };
+                                return {
+                                  ...prev,
+                                  pages: {
+                                    ...prev.pages,
+                                    [editingPage]: { ...page, blocks: [...page.blocks, newBlock] },
+                                  },
+                                };
+                              });
+                              setTemplatesOpen(false);
+                            }}
+                            style={{
+                              flex: 1, padding: '6px 10px',
+                              background: S.accent, color: '#fff',
+                              border: 'none', borderRadius: '4px',
+                              fontSize: '11px', fontWeight: '700',
+                              cursor: 'pointer',
+                            }}
+                          >Insert</button>
+                          <button
+                            onClick={() => {
+                              if (!window.confirm(`Delete template "${t.name}"?`)) return;
+                              setTemplates(prev => {
+                                const next = prev.filter((_, i) => i !== idx);
+                                try { localStorage.setItem('blockTemplates', JSON.stringify(next)); } catch {}
+                                return next;
+                              });
+                            }}
+                            title="Delete template"
+                            style={{
+                              padding: '6px 10px',
+                              background: 'transparent', color: S.danger || '#dc2626',
+                              border: `1px solid ${S.border}`, borderRadius: '4px',
+                              fontSize: '11px', fontWeight: '600',
+                              cursor: 'pointer',
+                            }}
+                          >🗑</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== Add section picker modal ==================== */}
       {addPickerOpen && (
         <div
-          onClick={() => setAddPickerOpen(false)}
+          onClick={() => { setAddPickerOpen(false); setAddPickerSearch(''); }}
           style={{
             position: 'fixed', inset: 0, zIndex: 100,
             background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(2px)',
@@ -1988,7 +2143,7 @@ export default function SiteContent() {
                 </div>
               </div>
               <button
-                onClick={() => setAddPickerOpen(false)}
+                onClick={() => { setAddPickerOpen(false); setAddPickerSearch(''); }}
                 style={{
                   width: '28px', height: '28px',
                   background: 'transparent', border: `1px solid ${S.border}`,
@@ -2000,9 +2155,49 @@ export default function SiteContent() {
               >✕</button>
             </div>
 
+            {/* Search bar */}
+            <div style={{
+              padding: '12px 24px',
+              borderBottom: `1px solid ${S.border}`,
+              background: S.bg,
+            }}>
+              <input
+                autoFocus
+                type="text"
+                value={addPickerSearch}
+                onChange={(e) => setAddPickerSearch(e.target.value)}
+                placeholder="🔍 Search blocks…"
+                style={{
+                  width: '100%', padding: '9px 12px',
+                  background: '#fff', border: `1px solid ${S.border}`,
+                  borderRadius: '6px', fontSize: '13px', color: S.text,
+                  outline: 'none',
+                }}
+              />
+            </div>
+
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
+              {(() => {
+                const query = addPickerSearch.trim().toLowerCase();
+                const anyMatches = !query || Object.entries(BLOCK_REGISTRY_META).some(
+                  ([type, m]) => type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query)
+                );
+                if (query && !anyMatches) {
+                  return (
+                    <div style={{ padding: '32px', textAlign: 'center', color: S.textDim, fontSize: '13px' }}>
+                      No blocks match "{addPickerSearch}".
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               {BLOCK_CATEGORIES.map(cat => {
-                const types = Object.entries(BLOCK_REGISTRY_META).filter(([, m]) => m.category === cat);
+                const query = addPickerSearch.trim().toLowerCase();
+                const types = Object.entries(BLOCK_REGISTRY_META).filter(([type, m]) => {
+                  if (m.category !== cat) return false;
+                  if (!query) return true;
+                  return type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query);
+                });
                 if (types.length === 0) return null;
                 return (
                   <div key={cat} style={{ marginBottom: '24px' }}>
@@ -2021,6 +2216,7 @@ export default function SiteContent() {
                           onClick={() => {
                             addBlockToPage(editingPage, type);
                             setAddPickerOpen(false);
+                            setAddPickerSearch('');
                           }}
                           style={{
                             display: 'flex', flexDirection: 'column',
@@ -2249,6 +2445,88 @@ export default function SiteContent() {
                     <option key={p.key} value={p.key}>{p.label}</option>
                   ))}
                 </select>
+
+                {/* SEO meta — collapsible so it doesn't clutter the tree */}
+                <details style={{ marginTop: '10px' }}>
+                  <summary style={{
+                    cursor: 'pointer', userSelect: 'none',
+                    fontSize: '10px', fontWeight: '700', color: S.textDim,
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                    padding: '4px 0',
+                  }}>
+                    🔎 SEO &amp; meta
+                  </summary>
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '3px' }}>
+                        Page title <span style={{ color: S.textFaint, fontWeight: 400 }}>(&lt;title&gt;)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={draftContent?.pages?.[editingPage]?.meta?.title || ''}
+                        onChange={(e) => {
+                          const title = e.target.value;
+                          setDraftContent(prev => {
+                            const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
+                            return {
+                              ...prev,
+                              pages: {
+                                ...prev.pages,
+                                [editingPage]: {
+                                  ...page,
+                                  meta: { ...(page.meta || {}), title },
+                                },
+                              },
+                            };
+                          });
+                        }}
+                        placeholder="e.g. Home — Tapas Library"
+                        style={{
+                          width: '100%', padding: '6px 8px',
+                          background: '#fff', border: `1px solid ${S.border}`,
+                          borderRadius: '4px', fontSize: '11px', color: S.text,
+                          outline: 'none', boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '3px' }}>
+                        Meta description
+                      </label>
+                      <textarea
+                        value={draftContent?.pages?.[editingPage]?.meta?.description || ''}
+                        onChange={(e) => {
+                          const description = e.target.value;
+                          setDraftContent(prev => {
+                            const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
+                            return {
+                              ...prev,
+                              pages: {
+                                ...prev.pages,
+                                [editingPage]: {
+                                  ...page,
+                                  meta: { ...(page.meta || {}), description },
+                                },
+                              },
+                            };
+                          });
+                        }}
+                        placeholder="Short summary for search results & social previews (150–160 chars)"
+                        rows={3}
+                        style={{
+                          width: '100%', padding: '6px 8px',
+                          background: '#fff', border: `1px solid ${S.border}`,
+                          borderRadius: '4px', fontSize: '11px', color: S.text,
+                          outline: 'none', boxSizing: 'border-box',
+                          fontFamily: 'inherit', resize: 'vertical',
+                        }}
+                      />
+                      <div style={{ fontSize: '10px', color: S.textFaint, marginTop: '3px', textAlign: 'right' }}>
+                        {(draftContent?.pages?.[editingPage]?.meta?.description || '').length}/160
+                      </div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               {/* Add section button */}
@@ -2296,37 +2574,7 @@ export default function SiteContent() {
                   >📋 Paste</button>
                 )}
                 <button
-                  onClick={() => {
-                    const templates = JSON.parse(localStorage.getItem('blockTemplates') || '[]');
-                    if (templates.length === 0) {
-                      alert('No templates saved yet. Save a block as a template from the canvas toolbar (⭐ button).');
-                      return;
-                    }
-                    const names = templates.map(t => `${t.name} (${t.type})`).join('\n');
-                    const idx = parseInt(window.prompt(`Load template:\n\n${names}\n\nEnter number (0-${templates.length-1}):`, '0'));
-                    if (idx >= 0 && idx < templates.length) {
-                      const template = templates[idx];
-                      setDraftContent(prev => {
-                        const page = prev.pages?.[editingPage];
-                        if (!page || !Array.isArray(page.blocks)) return prev;
-                        const newBlock = {
-                          id: 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                          type: template.type,
-                          props: template.props,
-                        };
-                        return {
-                          ...prev,
-                          pages: {
-                            ...prev.pages,
-                            [editingPage]: {
-                              ...page,
-                              blocks: [...page.blocks, newBlock],
-                            },
-                          },
-                        };
-                      });
-                    }
-                  }}
+                  onClick={() => setTemplatesOpen(true)}
                   style={{
                     padding: '10px 12px',
                     background: S.borderStrong, color: S.text,
@@ -2334,8 +2582,8 @@ export default function SiteContent() {
                     fontSize: '12px', fontWeight: '700',
                     cursor: 'pointer',
                   }}
-                  title="Load a saved template"
-                >⭐ Templates</button>
+                  title={`Open template library (${templates.length} saved)`}
+                >⭐ Templates{templates.length > 0 ? ` (${templates.length})` : ''}</button>
               </div>
 
               {/* Phase 4: batch action bar (only visible when multi-selected) */}
