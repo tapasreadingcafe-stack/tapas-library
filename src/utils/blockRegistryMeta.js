@@ -340,6 +340,64 @@ export const BLOCK_REGISTRY_META = {
     ],
   },
 
+  // ---- Phase 5: Accordion + Tabs -------------------------------------
+
+  accordion: {
+    label: 'Accordion',
+    category: 'Content',
+    icon: '☰',
+    defaultProps: {
+      eyebrow: '',
+      title: 'Good to know',
+      allow_multiple: true,
+      open_first: true,
+      items: [
+        { title: 'Opening hours',      content: 'Mon–Fri · 9am to 9pm\nSat–Sun · 10am to 10pm' },
+        { title: 'Membership',         content: 'Choose from monthly, quarterly, or annual plans.' },
+        { title: 'How borrowing works', content: 'Members can borrow up to 2 books for 14 days.' },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow',        label: 'Eyebrow',              type: 'text' },
+      { key: 'title',          label: 'Title',                type: 'text' },
+      { key: 'allow_multiple', label: 'Allow multiple open',  type: 'toggle' },
+      { key: 'open_first',     label: 'Open first by default', type: 'toggle' },
+      {
+        key: 'items', label: 'Sections', type: 'array',
+        itemDefaults: { title: 'New section', content: '' },
+        itemFields: [
+          { key: 'title',   label: 'Title',   type: 'text' },
+          { key: 'content', label: 'Content', type: 'textarea' },
+        ],
+      },
+    ],
+  },
+
+  tabs: {
+    label: 'Tabs',
+    category: 'Content',
+    icon: '◰',
+    defaultProps: {
+      title: '',
+      items: [
+        { label: 'About',    content: 'Tell the story of your space in a warm, welcoming tone.' },
+        { label: 'Policies', content: 'Share your house rules, late-return fees, or community guidelines.' },
+        { label: 'Visit',    content: 'Address, phone, and a friendly note about what to expect on arrival.' },
+      ],
+    },
+    schema: [
+      { key: 'title', label: 'Title (optional)', type: 'text' },
+      {
+        key: 'items', label: 'Tabs', type: 'array',
+        itemDefaults: { label: 'New tab', content: '' },
+        itemFields: [
+          { key: 'label',   label: 'Label',   type: 'text' },
+          { key: 'content', label: 'Content', type: 'textarea' },
+        ],
+      },
+    ],
+  },
+
   // ---- Dynamic blocks — live from Supabase ---------------------------
 
   book_list: {

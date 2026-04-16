@@ -69,6 +69,7 @@ const KioskMode             = React.lazy(() => import('./pages/KioskMode'));
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
 const CustomerOrders        = React.lazy(() => import('./pages/CustomerOrders'));
 const SiteContent           = React.lazy(() => import('./pages/SiteContent'));
+const ContactInbox          = React.lazy(() => import('./pages/ContactInbox'));
 
 // ── Lazy-loaded pages (New - Phase 6: Productivity + Marketing) ─────────────
 const Tasks                 = React.lazy(() => import('./pages/Tasks'));
@@ -222,6 +223,7 @@ const NAV_CONFIG = [
     icon: '🛒', label: 'Online Store', key: 'store',
     children: [
       { to: '/store/orders',  icon: '📦', label: 'Online Orders' },
+      { to: '/store/inbox',   icon: '📨', label: 'Contact Inbox' },
       { to: '/store/content', icon: '🎨', label: 'Edit Website' },
     ],
   },
@@ -695,6 +697,7 @@ function DashboardShell() {
 
             {/* Online Store */}
             <Route path="/store/orders"                       element={<CustomerOrders />} />
+            <Route path="/store/inbox"                        element={<ContactInbox />} />
             <Route path="/store/content"                      element={<SiteContent />} />
 
             {/* Marketing */}

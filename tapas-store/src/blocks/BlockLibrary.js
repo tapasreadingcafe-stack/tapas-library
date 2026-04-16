@@ -1386,3 +1386,164 @@ export function EventList({ id, pageKey, props, blockIndex, totalBlocks }) {
     </BlockFrame>
   );
 }
+
+// ---------------------------------------------------------------------
+// Phase 5: Accordion + Tabs blocks
+// ---------------------------------------------------------------------
+
+// Accordion — stacked panels that expand/collapse. Similar to FAQ but
+// supports an optional "open by default" first item and richer content.
+export function Accordion({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const items = Array.isArray(p.items) ? p.items : [];
+  const allowMultiple = p.allow_multiple !== false;
+  const [openSet, setOpenSet] = useState(() => new Set(p.open_first ? [0] : []));
+
+  const toggle = (i) => {
+    setOpenSet(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) {
+        next.delete(i);
+      } else {
+        if (!allowMultiple) next.clear();
+        next.add(i);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {(p.eyebrow || p.title) && (
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          {p.eyebrow && (
+            <div style={{
+              fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+              textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+              marginBottom: '8px',
+            }}>{p.eyebrow}</div>
+          )}
+          {p.title && (
+            <h2 style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: 'var(--tapas-h-l-size, 32px)', margin: 0,
+              color: 'var(--tapas-h-color, #26170c)',
+            }}>{p.title}</h2>
+          )}
+        </div>
+      )}
+      <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+        {items.map((it, i) => {
+          const open = openSet.has(i);
+          return (
+            <div key={i} style={{
+              marginBottom: '10px',
+              background: 'var(--tapas-card-bg, #faf7ed)',
+              border: '1px solid rgba(38,23,12,0.08)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              transition: 'box-shadow 0.2s',
+              boxShadow: open ? '0 4px 18px rgba(38,23,12,0.08)' : 'none',
+            }}>
+              <button
+                onClick={() => toggle(i)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', gap: '16px',
+                  padding: '18px 22px',
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', textAlign: 'left',
+                  fontSize: '16px', fontWeight: 600,
+                  color: 'var(--tapas-primary, #26170c)',
+                }}
+              >
+                <span>{it.title}</span>
+                <span style={{
+                  flexShrink: 0, fontSize: '18px',
+                  transform: open ? 'rotate(180deg)' : 'rotate(0)',
+                  transition: 'transform 0.2s',
+                  color: 'var(--tapas-accent, #006a6a)',
+                }}>⌄</span>
+              </button>
+              {open && (
+                <div style={{
+                  padding: '0 22px 20px',
+                  fontSize: '15px', lineHeight: 1.7,
+                  color: 'var(--tapas-body-color, #5c3a1e)',
+                  whiteSpace: 'pre-wrap',
+                }}>{it.content}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </BlockFrame>
+  );
+}
+
+// Tabs — horizontal tab bar with panels underneath. Good for product
+// details, sections like "Shipping / Returns / Sizing".
+export function Tabs({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const items = Array.isArray(p.items) ? p.items : [];
+  const [activeIdx, setActiveIdx] = useState(0);
+  const safeIdx = Math.min(Math.max(0, activeIdx), Math.max(0, items.length - 1));
+  const active = items[safeIdx];
+
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {p.title && (
+        <h2 style={{
+          textAlign: 'center',
+          fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+          fontSize: 'var(--tapas-h-l-size, 32px)', margin: '0 0 36px',
+          color: 'var(--tapas-h-color, #26170c)',
+        }}>{p.title}</h2>
+      )}
+      <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+        {/* Tab bar */}
+        <div role="tablist" style={{
+          display: 'flex', flexWrap: 'wrap', gap: '4px',
+          borderBottom: '2px solid rgba(38,23,12,0.08)',
+          marginBottom: '32px',
+        }}>
+          {items.map((it, i) => {
+            const isActive = i === safeIdx;
+            return (
+              <button
+                key={i}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveIdx(i)}
+                style={{
+                  padding: '12px 20px',
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', position: 'relative',
+                  fontSize: '14px',
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'var(--tapas-accent, #006a6a)' : 'var(--tapas-body-color, #5c3a1e)',
+                  borderBottom: isActive ? '2px solid var(--tapas-accent, #006a6a)' : '2px solid transparent',
+                  marginBottom: '-2px',
+                  transition: 'color 0.15s',
+                }}
+              >
+                {it.label}
+              </button>
+            );
+          })}
+        </div>
+        {/* Active panel */}
+        {active && (
+          <div style={{
+            fontSize: '15px', lineHeight: 1.75,
+            color: 'var(--tapas-body-color, #5c3a1e)',
+            whiteSpace: 'pre-wrap',
+            minHeight: '120px',
+          }}>
+            {active.content}
+          </div>
+        )}
+      </div>
+    </BlockFrame>
+  );
+}

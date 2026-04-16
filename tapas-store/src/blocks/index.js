@@ -25,6 +25,7 @@ import {
   Hero, CTA, FeatureGrid, Footer,
   TextImage, Testimonials, Pricing, FAQ, Gallery, Newsletter,
   VideoEmbed, MapEmbed, Countdown, ContactForm,
+  Accordion, Tabs,
   BookList, BlogList, EventList,
 } from './BlockLibrary';
 
@@ -306,6 +307,48 @@ export const BLOCK_REGISTRY = {
       { key: 'message_placeholder',label: 'Message placeholder', type: 'text' },
       { key: 'button_text',        label: 'Button text',       type: 'text' },
       { key: 'success_message',    label: 'Success message',   type: 'text' },
+    ],
+  },
+
+  // ---- Phase 5: Accordion + Tabs ------------------------------------
+
+  accordion: {
+    label: 'Accordion',
+    category: 'Content',
+    Renderer: Accordion,
+    defaultProps: {
+      eyebrow: '',
+      title: 'Good to know',
+      allow_multiple: true,
+      open_first: true,
+      items: [
+        { title: 'Opening hours',      content: 'Mon–Fri · 9am to 9pm\nSat–Sun · 10am to 10pm' },
+        { title: 'Membership',         content: 'Choose from monthly, quarterly, or annual plans. All include unlimited borrowing and 10% off cafe orders.' },
+        { title: 'How borrowing works', content: 'Members can borrow up to 2 books for 14 days. Renew once if no one is waiting.' },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow',        label: 'Eyebrow',         type: 'text' },
+      { key: 'title',          label: 'Title',           type: 'text' },
+      { key: 'allow_multiple', label: 'Allow multiple open', type: 'toggle' },
+      { key: 'open_first',     label: 'Open first item by default', type: 'toggle' },
+    ],
+  },
+
+  tabs: {
+    label: 'Tabs',
+    category: 'Content',
+    Renderer: Tabs,
+    defaultProps: {
+      title: '',
+      items: [
+        { label: 'About',    content: 'Tell the story of your space in a warm, welcoming tone.' },
+        { label: 'Policies', content: 'Share your house rules, late-return fees, or community guidelines.' },
+        { label: 'Visit',    content: 'Address, phone, and a friendly note about what to expect on arrival.' },
+      ],
+    },
+    schema: [
+      { key: 'title', label: 'Title (optional)', type: 'text' },
     ],
   },
 
