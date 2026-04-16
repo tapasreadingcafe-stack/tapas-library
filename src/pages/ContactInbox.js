@@ -48,6 +48,38 @@ export default function ContactInbox() {
   const [expandedId, setExpandedId] = useState(null);
   const [actioning, setActioning] = useState(null);
   const [error, setError] = useState('');
+  // Phase 6: site-wide webhook URL for new form + newsletter submissions.
+  // Stored in app_settings.integrations.submission_webhook_url.
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookInput, setWebhookInput] = useState('');
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState('');
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'integrations').maybeSingle();
+      const url = data?.value?.submission_webhook_url || '';
+      setWebhookUrl(url);
+      setWebhookInput(url);
+    })();
+  }, []);
+  const saveWebhook = async () => {
+    setWebhookSaving(true); setWebhookStatus('');
+    try {
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'integrations').maybeSingle();
+      const current = (data?.value && typeof data.value === 'object') ? data.value : {};
+      const next = { ...current, submission_webhook_url: webhookInput.trim() };
+      const { error: err } = await supabase.from('app_settings')
+        .upsert({ key: 'integrations', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (err) throw err;
+      setWebhookUrl(webhookInput.trim());
+      setWebhookStatus('Saved.');
+      setTimeout(() => setWebhookStatus(''), 2500);
+    } catch (err) {
+      setWebhookStatus('Failed: ' + err.message);
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
 
   const fetchRows = useCallback(async () => {
     setLoading(true); setError('');
@@ -170,6 +202,59 @@ export default function ContactInbox() {
           }}
         >↻ Refresh</button>
       </div>
+
+      {/* Phase 6: Webhook integration setting */}
+      <details style={{ marginBottom: '20px' }}>
+        <summary style={{
+          cursor: 'pointer', userSelect: 'none',
+          fontSize: '12px', fontWeight: 600, color: '#374151',
+          padding: '10px 14px', background: '#fff',
+          border: '1px solid #e5e7eb', borderRadius: '8px',
+          display: 'inline-flex', alignItems: 'center', gap: '8px',
+        }}>
+          🔌 Submission webhook {webhookUrl ? <span style={{ color: '#10b981', fontSize: '11px' }}>✓ enabled</span> : <span style={{ color: '#9ca3af', fontSize: '11px' }}>not set</span>}
+        </summary>
+        <div style={{
+          marginTop: '8px', padding: '14px 16px',
+          background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px',
+          fontSize: '12px', color: '#374151',
+        }}>
+          <p style={{ margin: '0 0 10px', lineHeight: 1.5 }}>
+            POST every new contact-form and newsletter submission to a URL you choose.
+            Perfect for Zapier / Make / IFTTT / Slack incoming webhook → email yourself on each signup.
+            Payload: <code style={{ background: '#f3f4f6', padding: '1px 4px', borderRadius: '3px' }}>{'{ source, page, received_at, fields }'}</code>.
+          </p>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <input
+              type="url"
+              value={webhookInput}
+              onChange={(e) => setWebhookInput(e.target.value)}
+              placeholder="https://hooks.zapier.com/hooks/catch/…"
+              style={{
+                flex: 1, padding: '8px 10px', fontSize: '12px',
+                background: '#fff', border: '1px solid #d1d5db', borderRadius: '6px',
+                outline: 'none', fontFamily: 'ui-monospace, monospace',
+              }}
+            />
+            <button
+              onClick={saveWebhook}
+              disabled={webhookSaving || webhookInput === webhookUrl}
+              style={{
+                padding: '8px 14px', background: '#667eea', color: '#fff',
+                border: 'none', borderRadius: '6px',
+                fontSize: '12px', fontWeight: 600,
+                cursor: (webhookSaving || webhookInput === webhookUrl) ? 'not-allowed' : 'pointer',
+                opacity: (webhookSaving || webhookInput === webhookUrl) ? 0.6 : 1,
+              }}
+            >{webhookSaving ? 'Saving…' : 'Save'}</button>
+          </div>
+          {webhookStatus && (
+            <div style={{ marginTop: '6px', fontSize: '11px', color: webhookStatus.startsWith('Failed') ? '#dc2626' : '#10b981' }}>
+              {webhookStatus}
+            </div>
+          )}
+        </div>
+      </details>
 
       {/* Filter chips */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>

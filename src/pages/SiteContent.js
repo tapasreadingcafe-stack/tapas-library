@@ -892,6 +892,145 @@ const CSS_RENDERERS = {
 };
 
 // =====================================================================
+// SchedulePublishModal (Phase 6)
+//
+// Lets staff queue a future publish. Dates are stored in UTC (ISO) on
+// the server; the picker below converts local ↔ UTC. Also shows the
+// current pending queue so it's easy to cancel a mistake.
+// =====================================================================
+function SchedulePublishModal({ S, onClose, onSchedule, pending, onCancel }) {
+  // Default: 1 hour from now, local
+  const defaultLocal = React.useMemo(() => {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }, []);
+  const [when, setWhen] = useState(defaultLocal);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!when) return;
+    const localDate = new Date(when);
+    if (localDate.getTime() <= Date.now()) { alert('Pick a time in the future.'); return; }
+    setSaving(true);
+    try { await onSchedule(localDate.toISOString(), note.trim()); } finally { setSaving(false); }
+  };
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 20px', fontFamily: '-apple-system, system-ui, sans-serif',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '480px',
+          background: '#fff', borderRadius: '12px',
+          boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${S.border}` }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: S.text, marginBottom: '4px' }}>
+            ⏰ Schedule publish
+          </div>
+          <div style={{ fontSize: '12px', color: S.textDim, lineHeight: 1.5 }}>
+            The current draft is snapshotted now. When the scheduled time arrives it replaces your live site — even if you've moved on to edit other things in the draft.
+          </div>
+        </div>
+        <form onSubmit={submit} style={{ padding: '20px 24px' }}>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: S.textDim, marginBottom: '4px' }}>
+              Publish at <span style={{ color: S.textFaint }}>(your local time)</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={when}
+              onChange={(e) => setWhen(e.target.value)}
+              required
+              style={{
+                width: '100%', padding: '8px 10px', boxSizing: 'border-box',
+                background: '#fff', border: `1px solid ${S.border}`,
+                borderRadius: '6px', fontSize: '13px', color: S.text, outline: 'none',
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: S.textDim, marginBottom: '4px' }}>
+              Note (optional)
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Diwali campaign launch"
+              style={{
+                width: '100%', padding: '8px 10px', boxSizing: 'border-box',
+                background: '#fff', border: `1px solid ${S.border}`,
+                borderRadius: '6px', fontSize: '13px', color: S.text, outline: 'none',
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <button type="button" onClick={onClose}
+              style={{
+                padding: '8px 14px', background: '#fff',
+                border: `1px solid ${S.border}`, borderRadius: '6px',
+                color: S.text, fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}
+            >Cancel</button>
+            <button type="submit" disabled={saving}
+              style={{
+                padding: '8px 16px', background: S.accent,
+                border: 'none', borderRadius: '6px',
+                color: '#fff', fontSize: '13px', fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+              }}
+            >{saving ? 'Scheduling…' : 'Schedule'}</button>
+          </div>
+        </form>
+        {/* Pending schedules */}
+        {pending.length > 0 && (
+          <div style={{ padding: '14px 24px 20px', borderTop: `1px solid ${S.border}`, background: S.bg }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: S.textDim, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+              Pending publishes
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {pending.map(p => (
+                <div key={p.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 10px', background: '#fff',
+                  border: `1px solid ${S.border}`, borderRadius: '6px',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: S.text }}>
+                      {new Date(p.scheduled_at).toLocaleString()}
+                    </div>
+                    {p.note && <div style={{ fontSize: '11px', color: S.textDim }}>{p.note}</div>}
+                  </div>
+                  <button onClick={() => onCancel(p.id)}
+                    style={{
+                      padding: '4px 10px', background: '#fff',
+                      border: `1px solid ${S.border}`, borderRadius: '4px',
+                      color: S.danger, fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >Cancel</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
 // BlockInspector (Phase 2)
 //
 // Rendered on the right panel when the user has selected a block in
@@ -1805,6 +1944,92 @@ export default function SiteContent() {
     saveDraft(liveContent);
   };
 
+  // ---- Phase 6: Scheduled publishes ----------------------------------
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduledPublishes, setScheduledPublishes] = useState([]);
+  const fetchScheduled = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('scheduled_publishes')
+        .select('id, scheduled_at, note, status, created_by_email, created_at')
+        .eq('status', 'pending')
+        .order('scheduled_at', { ascending: true })
+        .limit(50);
+      setScheduledPublishes(data || []);
+    } catch {}
+  }, []);
+  // On every editor load, opportunistically process any pending schedule
+  // whose time has passed. If a Supabase cron is wired up server-side it
+  // will handle ones that fire while no one has the editor open.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        const { data: due } = await supabase
+          .from('scheduled_publishes')
+          .select('id, content, note')
+          .eq('status', 'pending')
+          .lte('scheduled_at', nowIso)
+          .order('scheduled_at', { ascending: true })
+          .limit(10);
+        if (!due || due.length === 0 || cancelled) return;
+        for (const row of due) {
+          try {
+            const { error: liveErr } = await supabase.from('app_settings').upsert({
+              key: LIVE_KEY, value: row.content, updated_at: new Date().toISOString(),
+            }, { onConflict: 'key' });
+            if (liveErr) throw liveErr;
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              await supabase.from('site_content_revisions').insert([{
+                content: row.content,
+                published_by_email: user?.email ? `${user.email} (scheduled)` : 'scheduled',
+                note: row.note || null,
+              }]);
+            } catch {}
+            await supabase.from('scheduled_publishes')
+              .update({ status: 'published', processed_at: new Date().toISOString() })
+              .eq('id', row.id);
+          } catch (err) {
+            await supabase.from('scheduled_publishes')
+              .update({ status: 'failed', processed_at: new Date().toISOString(), error_message: String(err?.message || err) })
+              .eq('id', row.id);
+          }
+        }
+        // Refresh live content after processing
+        const { data: live } = await supabase.from('app_settings').select('value').eq('key', LIVE_KEY).maybeSingle();
+        if (live?.value && !cancelled) {
+          setLiveContent(live.value);
+          setIframeKey(k => k + 1);
+        }
+      } catch {}
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (scheduleModalOpen) fetchScheduled();
+  }, [scheduleModalOpen, fetchScheduled]);
+  const scheduleAt = async (whenIso, note) => {
+    if (autosaveTimerRef.current) { clearTimeout(autosaveTimerRef.current); await saveDraft(draftContent); }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error: err } = await supabase.from('scheduled_publishes').insert([{
+      scheduled_at: whenIso,
+      content: draftContent,
+      note: note || null,
+      created_by_email: user?.email || null,
+    }]);
+    if (err) throw err;
+    fetchScheduled();
+  };
+  const cancelScheduled = async (id) => {
+    await supabase.from('scheduled_publishes')
+      .update({ status: 'cancelled', processed_at: new Date().toISOString() })
+      .eq('id', id);
+    setScheduledPublishes(prev => prev.filter(r => r.id !== id));
+  };
+
   const jumpToSection = (sectionKey) => {
     setActiveSection(sectionKey);
     // Expand the picked section in the right panel, keep any previously
@@ -2235,6 +2460,24 @@ export default function SiteContent() {
       background: S.bg,
       fontFamily: '-apple-system, system-ui, sans-serif',
     }}>
+      {/* ==================== Scheduled publish modal ==================== */}
+      {scheduleModalOpen && (
+        <SchedulePublishModal
+          S={S}
+          onClose={() => setScheduleModalOpen(false)}
+          onSchedule={async (whenIso, note) => {
+            try {
+              await scheduleAt(whenIso, note);
+              setScheduleModalOpen(false);
+            } catch (err) {
+              alert('Failed to schedule: ' + (err.message || err));
+            }
+          }}
+          pending={scheduledPublishes}
+          onCancel={cancelScheduled}
+        />
+      )}
+
       {/* ==================== Revision History modal ==================== */}
       {historyModalOpen && (
         <div
@@ -3176,6 +3419,25 @@ export default function SiteContent() {
           onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
         >📜 History</button>
 
+        {/* Phase 6: schedule publish */}
+        <button
+          onClick={() => setScheduleModalOpen(true)}
+          disabled={!dirty}
+          title={dirty ? 'Schedule the draft to publish at a future time' : 'Edit the draft before scheduling'}
+          style={{
+            padding: '7px 12px',
+            background: 'white',
+            border: `1px solid ${S.border}`,
+            borderRadius: '6px',
+            color: dirty ? S.text : S.textFaint,
+            cursor: dirty ? 'pointer' : 'not-allowed',
+            fontSize: '12px',
+            fontWeight: '600',
+          }}
+          onMouseEnter={e => { if (dirty) e.currentTarget.style.background = S.bg; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}
+        >⏰ Schedule</button>
+
         <button
           onClick={revertDraft}
           disabled={!dirty || pushing}
@@ -3442,6 +3704,142 @@ export default function SiteContent() {
                         {(draftContent?.pages?.[editingPage]?.meta?.description || '').length}/160
                       </div>
                     </div>
+
+                    {/* OG image for social sharing */}
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, display: 'block', marginBottom: '3px' }}>
+                        Share image <span style={{ color: S.textFaint, fontWeight: 400 }}>(og:image · 1200×630)</span>
+                      </label>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={draftContent?.pages?.[editingPage]?.meta?.og_image || ''}
+                          onChange={(e) => {
+                            const og_image = e.target.value;
+                            setDraftContent(prev => {
+                              const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
+                              return {
+                                ...prev,
+                                pages: {
+                                  ...prev.pages,
+                                  [editingPage]: { ...page, meta: { ...(page.meta || {}), og_image } },
+                                },
+                              };
+                            });
+                          }}
+                          placeholder="https://… or pick from library"
+                          style={{
+                            flex: 1, padding: '6px 8px',
+                            background: '#fff', border: `1px solid ${S.border}`,
+                            borderRadius: '4px', fontSize: '11px', color: S.text,
+                            outline: 'none', boxSizing: 'border-box',
+                            fontFamily: 'ui-monospace, monospace',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openMediaLibrary({ onPick: (url) => {
+                            setDraftContent(prev => {
+                              const page = prev.pages?.[editingPage] || { meta: {}, blocks: [] };
+                              return {
+                                ...prev,
+                                pages: {
+                                  ...prev.pages,
+                                  [editingPage]: { ...page, meta: { ...(page.meta || {}), og_image: url } },
+                                },
+                              };
+                            });
+                          }})}
+                          title="Pick from media library"
+                          style={{
+                            padding: '0 8px', height: '26px',
+                            background: S.bg, color: S.text, border: `1px solid ${S.border}`,
+                            borderRadius: '4px', cursor: 'pointer', fontSize: '11px',
+                          }}
+                        >📁</button>
+                      </div>
+                    </div>
+
+                    {/* Google SERP preview */}
+                    {(() => {
+                      const pageMeta = draftContent?.pages?.[editingPage]?.meta || {};
+                      const t = pageMeta.title || 'Page title';
+                      const d = pageMeta.description || 'Your meta description will appear here as a preview in Google search results.';
+                      const pagePath = allPages.find(p => p.key === editingPage)?.path || '/';
+                      const host = 'tapasreadingcafe.com';
+                      return (
+                        <div>
+                          <div style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, marginBottom: '6px' }}>
+                            Google preview
+                          </div>
+                          <div style={{
+                            padding: '10px 12px',
+                            background: '#fff', border: `1px solid ${S.border}`,
+                            borderRadius: '6px',
+                            fontFamily: 'arial, sans-serif',
+                          }}>
+                            <div style={{ fontSize: '11px', color: '#006621', marginBottom: '2px' }}>
+                              {host}{pagePath === '/' ? '' : pagePath}
+                            </div>
+                            <div style={{
+                              fontSize: '15px', color: '#1a0dab', fontWeight: 400, lineHeight: 1.3,
+                              overflow: 'hidden', textOverflow: 'ellipsis',
+                              display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+                            }}>{t}</div>
+                            <div style={{
+                              fontSize: '11px', color: '#545454', marginTop: '2px', lineHeight: 1.4,
+                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}>{d}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Social card (OG) preview */}
+                    {(() => {
+                      const pageMeta = draftContent?.pages?.[editingPage]?.meta || {};
+                      const t = pageMeta.title || 'Page title';
+                      const d = pageMeta.description || 'Your meta description…';
+                      const img = pageMeta.og_image;
+                      return (
+                        <div>
+                          <div style={{ fontSize: '10px', fontWeight: '600', color: S.textDim, marginBottom: '6px' }}>
+                            Social card preview
+                          </div>
+                          <div style={{
+                            background: '#fff', border: `1px solid ${S.border}`,
+                            borderRadius: '8px', overflow: 'hidden',
+                          }}>
+                            <div style={{
+                              width: '100%', aspectRatio: '1200 / 630',
+                              background: img ? `url(${img}) center/cover` : 'linear-gradient(135deg, #667eea, #764ba2)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#fff', fontSize: '11px', fontWeight: 600, letterSpacing: '1px',
+                              textTransform: 'uppercase', opacity: img ? 1 : 0.9,
+                            }}>
+                              {!img && 'No share image set'}
+                            </div>
+                            <div style={{ padding: '10px 12px', borderTop: `1px solid ${S.border}` }}>
+                              <div style={{ fontSize: '10px', color: S.textDim, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                tapasreadingcafe.com
+                              </div>
+                              <div style={{
+                                fontSize: '13px', fontWeight: 700, color: S.text,
+                                marginTop: '3px', lineHeight: 1.3,
+                                overflow: 'hidden', textOverflow: 'ellipsis',
+                                display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+                              }}>{t}</div>
+                              <div style={{
+                                fontSize: '11px', color: S.textDim, marginTop: '2px', lineHeight: 1.4,
+                                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}>{d}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </details>
               </div>

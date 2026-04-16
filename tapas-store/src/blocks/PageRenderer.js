@@ -148,25 +148,48 @@ const RESPONSIVE_CSS = `
 }
 `;
 
-// Applies per-page SEO meta (title + description) to the document &
-// the <head>. Keeps the effect scoped — on unmount the title isn't
-// restored because each route mounts its own <PageRenderer> which
-// overrides it again. Description is upserted rather than duplicated.
+// Upserts a single <meta> tag (name=/property=/whatever) in <head>.
+function upsertMeta(attr, attrValue, content) {
+  if (content === undefined || content === null) return;
+  let tag = document.querySelector(`meta[${attr}="${attrValue}"]`);
+  if (!tag) {
+    tag = document.createElement('meta');
+    tag.setAttribute(attr, attrValue);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute('content', String(content));
+}
+
+// Applies per-page SEO meta (title + description + og_image) to the
+// document & the <head>. Each route's <PageRenderer> overrides the
+// previous route's tags on mount, so we don't need to undo on unmount.
 function usePageMeta(meta) {
   const title = meta?.title;
   const description = meta?.description;
+  const ogImage = meta?.og_image;
   React.useEffect(() => {
     if (title) document.title = title;
     if (typeof description === 'string') {
-      let tag = document.querySelector('meta[name="description"]');
-      if (!tag) {
-        tag = document.createElement('meta');
-        tag.setAttribute('name', 'description');
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute('content', description);
+      upsertMeta('name', 'description', description);
     }
-  }, [title, description]);
+    // Open Graph
+    if (title) upsertMeta('property', 'og:title', title);
+    if (typeof description === 'string') upsertMeta('property', 'og:description', description);
+    if (ogImage) {
+      upsertMeta('property', 'og:image', ogImage);
+      upsertMeta('property', 'og:image:width', '1200');
+      upsertMeta('property', 'og:image:height', '630');
+    }
+    upsertMeta('property', 'og:type', 'website');
+    if (typeof window !== 'undefined') {
+      upsertMeta('property', 'og:url', window.location.href);
+    }
+    // Twitter card
+    upsertMeta('name', 'twitter:card', ogImage ? 'summary_large_image' : 'summary');
+    if (title) upsertMeta('name', 'twitter:title', title);
+    if (typeof description === 'string') upsertMeta('name', 'twitter:description', description);
+    if (ogImage) upsertMeta('name', 'twitter:image', ogImage);
+  }, [title, description, ogImage]);
 }
 
 export default function PageRenderer({ pageKey, fallback = null }) {

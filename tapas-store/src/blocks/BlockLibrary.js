@@ -756,6 +756,12 @@ export function Newsletter({ id, pageKey, props, blockIndex, totalBlocks }) {
         email: email.trim(),
         source_page: pageKey,
       }]);
+      dispatchSubmissionWebhook({
+        source: 'newsletter',
+        page: pageKey,
+        received_at: new Date().toISOString(),
+        fields: { email: email.trim() },
+      });
     } catch {
       // Unique violation / network — still show thanks, don't reveal details
     } finally {
@@ -994,6 +1000,26 @@ export function Countdown({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
+// Phase 6: fire-and-forget POST to the site-wide webhook, if set, after a
+// successful submission. Reads the `integrations.submission_webhook_url`
+// row from app_settings. Errors are swallowed — the form UX should never
+// leak webhook failures to the visitor.
+async function dispatchSubmissionWebhook(payload) {
+  try {
+    const { data } = await supabase
+      .from('app_settings').select('value').eq('key', 'integrations').maybeSingle();
+    const url = data?.value?.submission_webhook_url;
+    if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) return;
+    // fire-and-forget: don't await the fetch promise's response
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
+
 // Default field set when a block hasn't been customized yet. Matches
 // the legacy name/email/message trio so existing pages keep rendering
 // identically.
@@ -1046,6 +1072,12 @@ export function ContactForm({ id, pageKey, props, blockIndex, totalBlocks }) {
       };
       const { error } = await supabase.from('contact_submissions').insert([row]);
       if (error) throw error;
+      dispatchSubmissionWebhook({
+        source: 'contact_form',
+        page: pageKey,
+        received_at: row.created_at,
+        fields: row.fields,
+      });
       setSubmitted(true);
     } catch (err) {
       // Silently fail if table doesn't exist — still show thank-you
