@@ -372,11 +372,19 @@ export default function PageRenderer({ pageKey, fallback = null }) {
   // incrementally without breaking any page that hasn't been migrated.
   if (blocks.length === 0) return fallback;
 
+  // Skip blocks the editor has hidden. Editors can re-show via the 👁
+  // toggle in the Layers panel; we filter here so production visitors
+  // never see them. Hidden blocks remain in `draftContent.pages[*].blocks`
+  // so toggling visibility is just a `props.hidden` flip — no destructive
+  // delete + recreate.
+  const visibleBlocks = blocks.filter(b => !b?.props?.hidden);
+  if (visibleBlocks.length === 0) return fallback;
+
   return (
     <>
       <style>{RESPONSIVE_CSS}</style>
-      {blocks.map((b, idx) => (
-        <BlockView key={b.id} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={blocks.length} editorMode={editorMode} />
+      {visibleBlocks.map((b, idx) => (
+        <BlockView key={b.id} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={visibleBlocks.length} editorMode={editorMode} />
       ))}
     </>
   );
