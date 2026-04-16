@@ -762,8 +762,32 @@ export default function Books() {
                 </label>
                 {formData.is_staff_pick && (
                   <div style={{ marginTop: '8px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#8B6914', marginBottom: '6px' }}>
-                      STAFF PICK BLURB
+                    <label style={{ display: 'flex', justifyContent:'space-between', alignItems:'center', fontSize: '12px', fontWeight: '700', color: '#8B6914', marginBottom: '6px' }}>
+                      <span>STAFF PICK BLURB</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!formData.title) { alert('Enter a title first.'); return; }
+                          try {
+                            const { data, error } = await supabase.functions.invoke('ai-assist', {
+                              body: { task: 'book_blurb', title: formData.title, author: formData.author, genre: formData.category },
+                            });
+                            if (error || !data?.text) throw new Error(data?.error || error?.message || 'AI failed');
+                            const short = String(data.text).slice(0, 280);
+                            setFormData(prev => ({ ...prev, staff_pick_blurb: short }));
+                          } catch (err) {
+                            alert('AI draft failed: ' + (err.message || err));
+                          }
+                        }}
+                        style={{
+                          padding: '3px 10px', fontSize: '11px', fontWeight: 700,
+                          background: '#667eea', color: 'white', border: 'none',
+                          borderRadius: '4px', cursor: 'pointer',
+                        }}
+                        title="Let AI draft a blurb from title / author / genre"
+                      >
+                        ✨ Draft with AI
+                      </button>
                     </label>
                     <textarea
                       name="staff_pick_blurb"

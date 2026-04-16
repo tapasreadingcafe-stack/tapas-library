@@ -35,6 +35,13 @@ function TabBtn({ active, onClick, children }) {
 
 const FINE_RATE_PER_DAY = 10;
 
+function randomReferralCode() {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { member, loading: authLoading, refresh, updateMember } = useAuth();
@@ -46,6 +53,11 @@ export default function Profile() {
   const [borrowed, setBorrowed] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+  const [points, setPoints] = useState(null);
+  const [pointsTx, setPointsTx] = useState([]);
+  const [referral, setReferral] = useState(null);
+  const [referralStats, setReferralStats] = useState({ invited: 0, rewarded: 0 });
+  const [copiedRef, setCopiedRef] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // ---- profile form state ------------------------------------------
@@ -73,7 +85,7 @@ export default function Profile() {
     if (!member) return;
     setLoading(true);
     try {
-      const [ordersRes, borrowedRes, reservRes, wishlistRes] = await Promise.all([
+      const [ordersRes, borrowedRes, reservRes, wishlistRes, pointsRes, txRes, refRes] = await Promise.all([
         supabase
           .from('customer_orders')
           .select('id, order_number, status, total, fulfillment_type, created_at, customer_order_items(id, item_name, quantity, unit_price, total_price)')
@@ -95,17 +107,70 @@ export default function Profile() {
           .select('*, books(id, title, author, genre, quantity_available, sales_price, store_visible)')
           .eq('member_id', member.id)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('loyalty_balances')
+          .select('*')
+          .eq('member_id', member.id)
+          .maybeSingle(),
+        supabase
+          .from('loyalty_transactions')
+          .select('*')
+          .eq('member_id', member.id)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('referrals')
+          .select('id, code, reward_status, to_member_id')
+          .eq('from_member_id', member.id),
       ]);
       setOrders(ordersRes.data || []);
       setBorrowed(borrowedRes.data || []);
       setReservations(reservRes.data || []);
       setWishlist(wishlistRes.data || []);
+      setPoints(pointsRes.data || { balance: 0, lifetime_earned: 0 });
+      setPointsTx(txRes.data || []);
+      const refs = refRes.data || [];
+      setReferral(refs.find(r => r.reward_status !== 'void') || null);
+      setReferralStats({
+        invited: refs.filter(r => r.to_member_id).length,
+        rewarded: refs.filter(r => r.reward_status === 'rewarded').length,
+      });
     } catch (err) {
       console.error('[Profile] fetch error', err);
     } finally {
       setLoading(false);
     }
   }, [member]);
+
+  const ensureReferralCode = async () => {
+    if (referral?.code) return referral.code;
+    for (let i = 0; i < 5; i++) {
+      const code = randomReferralCode();
+      const { data, error } = await supabase
+        .from('referrals')
+        .insert({ code, from_member_id: member.id })
+        .select('id, code, reward_status, to_member_id')
+        .single();
+      if (!error && data) {
+        setReferral(data);
+        return data.code;
+      }
+    }
+    return null;
+  };
+
+  const handleCopyReferral = async () => {
+    const code = await ensureReferralCode();
+    if (!code) return;
+    const url = `${window.location.origin}/?ref=${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedRef(true);
+      setTimeout(() => setCopiedRef(false), 2000);
+    } catch {
+      window.prompt('Copy this link:', url);
+    }
+  };
 
   useEffect(() => {
     if (member) fetchAll();
@@ -213,15 +278,19 @@ export default function Profile() {
         </div>
 
         {/* Quick Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:'16px', marginTop:'24px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px, 1fr))', gap:'16px', marginTop:'24px' }}>
           {[
+            { num: points?.balance || 0, label:'Reward Points', accent: true },
             { num: orders.length,        label:'Online Orders' },
             { num: borrowed.length,      label:'Borrowed' },
             { num: reservations.filter(r => r.status === 'pending').length, label:'Reservations' },
             { num: fines.length,         label:'Overdue', warning: fines.length > 0 },
             { num: wishlist.length,      label:'Wishlist' },
           ].map(s => (
-            <div key={s.label} style={{ background:'rgba(251,251,226,0.06)', borderRadius:'var(--radius-lg, 16px)', padding:'16px', textAlign:'center' }}>
+            <div key={s.label} style={{
+              background: s.accent ? 'rgba(196,144,64,0.18)' : 'rgba(251,251,226,0.06)',
+              borderRadius:'var(--radius-lg, 16px)', padding:'16px', textAlign:'center',
+            }}>
               <div style={{ fontSize:'28px', fontWeight:'600', color: s.warning ? '#FC8181' : 'var(--accent)', fontFamily:'var(--font-display)' }}>{s.num}</div>
               <div style={{ color:'rgba(251,251,226,0.6)', fontSize:'12px', fontFamily:'var(--font-body)' }}>{s.label}</div>
             </div>
@@ -247,6 +316,7 @@ export default function Profile() {
         <div style={{ padding:'4px 16px 0', display:'flex', gap:'4px', overflowX:'auto' }}>
           <TabBtn active={tab==='overview'}     onClick={() => setTab('overview')}>Profile</TabBtn>
           <TabBtn active={tab==='orders'}       onClick={() => setTab('orders')}>Orders ({orders.length})</TabBtn>
+          <TabBtn active={tab==='rewards'}      onClick={() => setTab('rewards')}>✨ Rewards ({points?.balance || 0})</TabBtn>
           <TabBtn active={tab==='borrowed'}     onClick={() => setTab('borrowed')}>Borrowed ({borrowed.length})</TabBtn>
           <TabBtn active={tab==='reservations'} onClick={() => setTab('reservations')}>Reservations ({reservations.length})</TabBtn>
           <TabBtn active={tab==='wishlist'}     onClick={() => setTab('wishlist')}>Wishlist ({wishlist.length})</TabBtn>
@@ -318,6 +388,11 @@ export default function Profile() {
                             <div style={{ textAlign:'right' }}>
                               <div style={{ fontFamily:'var(--font-display)', fontSize:'22px', fontWeight:'600', color:'var(--text)' }}>Rs.{Number(o.total).toFixed(2)}</div>
                               <div style={{ marginTop:'4px' }}>{statusPill(o.status)}</div>
+                              <Link to={`/order/${o.id}/track`} className="tps-btn-tertiary" style={{
+                                display:'inline-block', marginTop:'8px',
+                                color:'var(--secondary)', fontSize:'12px', fontWeight:'600',
+                                textDecoration:'none',
+                              }}>Track →</Link>
                             </div>
                           </div>
                           <div style={{ paddingTop:'12px' }}>
@@ -333,6 +408,115 @@ export default function Profile() {
                                 <span>Rs.{Number(it.total_price).toFixed(2)}</span>
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rewards */}
+              {tab === 'rewards' && (
+                <div>
+                  <h3 style={{ fontFamily:'var(--font-display)', fontSize:'22px', color:'var(--text)', marginBottom:'20px', fontWeight:'600' }}>
+                    Reward Points
+                  </h3>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:'16px', marginBottom:'24px' }}>
+                    <div style={{ background:'linear-gradient(135deg, var(--bg-section), var(--bg-inset))', borderRadius:'var(--radius-lg, 16px)', padding:'20px' }}>
+                      <div style={{ fontSize:'11px', fontWeight:'700', letterSpacing:'2px', textTransform:'uppercase', color:'var(--text-subtle)', marginBottom:'6px' }}>
+                        Balance
+                      </div>
+                      <div style={{ fontFamily:'var(--font-display)', fontSize:'36px', fontWeight:'600', color:'var(--text)' }}>
+                        {points?.balance || 0}
+                        <span style={{ fontSize:'14px', color:'var(--text-subtle)', fontWeight:'400', marginLeft:'6px' }}>pts</span>
+                      </div>
+                      <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop:'4px' }}>
+                        Worth Rs.{points?.balance || 0} at checkout
+                      </div>
+                    </div>
+                    <div style={{ background:'var(--bg-section)', borderRadius:'var(--radius-lg, 16px)', padding:'20px' }}>
+                      <div style={{ fontSize:'11px', fontWeight:'700', letterSpacing:'2px', textTransform:'uppercase', color:'var(--text-subtle)', marginBottom:'6px' }}>
+                        Lifetime earned
+                      </div>
+                      <div style={{ fontFamily:'var(--font-display)', fontSize:'36px', fontWeight:'600', color:'var(--text)' }}>
+                        {points?.lifetime_earned || 0}
+                      </div>
+                      <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop:'4px' }}>
+                        1 pt per ₹10 spent · redeemable at checkout
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Referral card */}
+                  <div style={{
+                    background:'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)',
+                    borderRadius:'var(--radius-2xl, 24px)', padding:'24px', marginBottom:'28px', color:'#fbfbe2',
+                  }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'16px', flexWrap:'wrap', marginBottom:'16px' }}>
+                      <div>
+                        <div style={{ fontSize:'11px', fontWeight:'700', letterSpacing:'2px', textTransform:'uppercase', color:'var(--accent)', marginBottom:'6px' }}>
+                          Invite friends · both earn
+                        </div>
+                        <h4 style={{ fontFamily:'var(--font-display)', fontSize:'20px', fontWeight:'600', color:'#fbfbe2', margin:0 }}>
+                          Get 100 points when a friend places their first order
+                        </h4>
+                        <p style={{ fontSize:'13px', color:'rgba(251,251,226,0.7)', marginTop:'6px', fontFamily:'var(--font-body)' }}>
+                          Your friend also gets a 50-point welcome bonus.
+                        </p>
+                      </div>
+                      <div style={{ textAlign:'right', fontSize:'11px', color:'rgba(251,251,226,0.55)', fontFamily:'var(--font-body)' }}>
+                        <div>{referralStats.invited} invited</div>
+                        <div>{referralStats.rewarded} rewarded</div>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:'10px', flexWrap:'wrap', alignItems:'center' }}>
+                      <button
+                        onClick={handleCopyReferral}
+                        className="tps-btn"
+                        style={{
+                          background:'var(--accent)', color:'var(--primary)',
+                          border:'none', fontWeight:'700', fontSize:'14px',
+                        }}
+                      >
+                        {copiedRef ? '✓ Copied!' : referral?.code ? `Copy link (${referral.code})` : 'Generate invite link'}
+                      </button>
+                      {referral?.code && (
+                        <span style={{ fontSize:'12px', color:'rgba(251,251,226,0.55)', fontFamily:'ui-monospace, monospace' }}>
+                          /?ref={referral.code}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <h4 style={{ fontFamily:'var(--font-display)', fontSize:'16px', color:'var(--text)', marginBottom:'12px', fontWeight:'600' }}>
+                    Recent activity
+                  </h4>
+                  {pointsTx.length === 0 ? (
+                    <div style={{ textAlign:'center', padding:'30px', color:'var(--text-subtle)' }}>
+                      No points activity yet. Place an order to start earning.
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                      {pointsTx.map((t, idx) => (
+                        <div key={t.id} style={{
+                          display:'flex', justifyContent:'space-between', alignItems:'center',
+                          padding:'14px 18px',
+                          background: idx % 2 === 0 ? 'var(--bg-section)' : 'var(--bg-inset)',
+                          borderRadius:'var(--radius-md, 10px)',
+                        }}>
+                          <div>
+                            <div style={{ fontWeight:'600', color:'var(--text)', fontSize:'14px', fontFamily:'var(--font-body)' }}>{t.reason}</div>
+                            <div style={{ fontSize:'12px', color:'var(--text-subtle)', marginTop:'2px' }}>
+                              {new Date(t.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontFamily:'var(--font-display)', fontSize:'20px', fontWeight:'600',
+                            color: t.points > 0 ? 'var(--secondary)' : '#9B2335',
+                          }}>
+                            {t.points > 0 ? '+' : ''}{t.points}
                           </div>
                         </div>
                       ))}

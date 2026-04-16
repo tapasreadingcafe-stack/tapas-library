@@ -7,6 +7,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import StoreEditorSync from './components/StoreEditorSync';
 import HeaderTemplate from './components/HeaderTemplates';
 import FooterTemplate from './components/FooterTemplates';
+import InstallPrompt from './components/InstallPrompt';
 import './App.css';
 
 // Recover from ChunkLoadError by forcing one hard reload. Prevents a
@@ -44,6 +45,7 @@ const Profile         = lazyWithRetry(() => import('./pages/Profile'));
 const Cart            = lazyWithRetry(() => import('./pages/Cart'));
 const Checkout        = lazyWithRetry(() => import('./pages/Checkout'));
 const OrderSuccess    = lazyWithRetry(() => import('./pages/OrderSuccess'));
+const OrderTracking   = lazyWithRetry(() => import('./pages/OrderTracking'));
 const Blog            = lazyWithRetry(() => import('./pages/Blog'));
 const BlogPost        = lazyWithRetry(() => import('./pages/BlogPost'));
 const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
@@ -99,6 +101,7 @@ function AppShell() {
             <Route path="/cart"          element={<Cart />} />
             <Route path="/checkout"      element={<Checkout />} />
             <Route path="/order/:id"     element={<OrderSuccess />} />
+            <Route path="/order/:id/track" element={<OrderTracking />} />
             <Route path="/search"        element={<SearchPage />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
@@ -106,6 +109,7 @@ function AppShell() {
           </Routes>
         </Suspense>
         <FooterTemplate />
+        <InstallPrompt />
       </div>
     </>
   );

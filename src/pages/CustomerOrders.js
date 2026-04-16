@@ -1,6 +1,94 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 
+function ShipmentEditor({ order }) {
+  const [shipment, setShipment] = useState(null);
+  const [form, setForm] = useState({ carrier:'', tracking_number:'', tracking_url:'', estimated_delivery:'' });
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('order_shipments').select('*').eq('order_id', order.id).maybeSingle();
+      if (cancelled) return;
+      setShipment(data || null);
+      if (data) {
+        setForm({
+          carrier: data.carrier || '',
+          tracking_number: data.tracking_number || '',
+          tracking_url: data.tracking_url || '',
+          estimated_delivery: data.estimated_delivery || '',
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [order.id]);
+
+  const save = async (withShip = false) => {
+    setSaving(true);
+    setSavedMsg('');
+    try {
+      const payload = {
+        order_id: order.id,
+        carrier: form.carrier || null,
+        tracking_number: form.tracking_number || null,
+        tracking_url: form.tracking_url || null,
+        estimated_delivery: form.estimated_delivery || null,
+        shipped_at: withShip ? new Date().toISOString() : (shipment?.shipped_at || null),
+      };
+      if (shipment) {
+        const { data } = await supabase.from('order_shipments').update(payload).eq('id', shipment.id).select('*').single();
+        setShipment(data);
+      } else {
+        const { data } = await supabase.from('order_shipments').insert(payload).select('*').single();
+        setShipment(data);
+      }
+      setSavedMsg('Saved');
+      setTimeout(() => setSavedMsg(''), 2000);
+    } catch (err) {
+      setSavedMsg(err.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (order.fulfillment_type !== 'delivery') {
+    return (
+      <div style={{ fontSize:'12px', color:'#8B6914' }}>
+        Pickup order — no shipment details.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'10px' }}>
+        <input placeholder="Carrier" value={form.carrier} onChange={e => setForm(f => ({...f, carrier:e.target.value}))} style={{ padding:'6px 10px', border:'1px solid #dfe4ea', borderRadius:'4px', fontSize:'12px' }} />
+        <input placeholder="Tracking #" value={form.tracking_number} onChange={e => setForm(f => ({...f, tracking_number:e.target.value}))} style={{ padding:'6px 10px', border:'1px solid #dfe4ea', borderRadius:'4px', fontSize:'12px' }} />
+        <input placeholder="Tracking URL" value={form.tracking_url} onChange={e => setForm(f => ({...f, tracking_url:e.target.value}))} style={{ padding:'6px 10px', border:'1px solid #dfe4ea', borderRadius:'4px', fontSize:'12px', gridColumn:'1 / -1' }} />
+        <input type="date" value={form.estimated_delivery} onChange={e => setForm(f => ({...f, estimated_delivery:e.target.value}))} style={{ padding:'6px 10px', border:'1px solid #dfe4ea', borderRadius:'4px', fontSize:'12px' }} />
+      </div>
+      <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+        <button onClick={() => save(false)} disabled={saving} style={{ padding:'6px 12px', background:'#667eea', color:'white', border:'none', borderRadius:'4px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+          Save
+        </button>
+        {!shipment?.shipped_at && (
+          <button onClick={() => save(true)} disabled={saving} style={{ padding:'6px 12px', background:'#48BB78', color:'white', border:'none', borderRadius:'4px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+            🚚 Save & mark shipped
+          </button>
+        )}
+        {savedMsg && <span style={{ fontSize:'12px', color:'#48BB78', fontWeight:'600' }}>{savedMsg}</span>}
+        {shipment?.shipped_at && (
+          <span style={{ fontSize:'11px', color:'#8B6914' }}>
+            Shipped {new Date(shipment.shipped_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // =====================================================================
 // /store/orders — staff view of online customer orders.
 //
@@ -302,6 +390,10 @@ export default function CustomerOrders() {
                                   <div style={{ fontSize: '13px', color: '#5a6c7d' }}>{o.notes}</div>
                                 </>
                               )}
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#8B6914', textTransform: 'uppercase', marginTop: '16px', marginBottom: '6px' }}>
+                                Shipment
+                              </div>
+                              <ShipmentEditor order={o} />
                             </div>
                           </div>
                         </td>

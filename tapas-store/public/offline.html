@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Offline — Tapas Reading Cafe</title>
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root {
+    --bg: #ede8d0;
+    --card: #fbfbe2;
+    --text: #26170c;
+    --muted: #5c4a3a;
+    --accent: #c49040;
+    --secondary: #006a6a;
+  }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    max-width: 440px; width: 100%;
+    background: var(--card);
+    border-radius: 20px;
+    padding: 40px 32px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(38,23,12,0.08);
+  }
+  h1 {
+    margin: 16px 0 8px;
+    font-family: Newsreader, Georgia, serif;
+    font-weight: 500;
+    font-size: 26px;
+  }
+  p { color: var(--muted); line-height: 1.6; font-size: 15px; }
+  .btn {
+    display: inline-block; margin-top: 20px;
+    padding: 10px 24px; border-radius: 10px;
+    background: var(--secondary); color: #fff;
+    text-decoration: none; font-weight: 600; font-size: 14px;
+    border: none; cursor: pointer;
+  }
+  .icon { font-size: 44px; opacity: 0.75; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">☕</div>
+    <h1>You're offline</h1>
+    <p>We couldn't reach the cafe's internet. Pour yourself a cup and try again in a moment.</p>
+    <button class="btn" onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

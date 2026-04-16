@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "name": "Tapas Reading Cafe",
+  "short_name": "Tapas",
+  "description": "Your neighbourhood reading cafe — browse, borrow, and buy books, track orders, and earn rewards.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,41 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#26170c",
+  "background_color": "#ede8d0",
+  "categories": ["books", "shopping", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Browse books",
+      "short_name": "Browse",
+      "url": "/books",
+      "description": "Discover what's on the shelves"
+    },
+    {
+      "name": "My cart",
+      "short_name": "Cart",
+      "url": "/cart",
+      "description": "Continue checking out"
+    },
+    {
+      "name": "My profile",
+      "short_name": "Profile",
+      "url": "/profile",
+      "description": "Orders, rewards, and borrowed books"
+    }
+  ]
 }

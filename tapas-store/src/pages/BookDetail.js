@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../App';
 import { useCart } from '../context/CartContext';
+import ReviewForm from '../components/ReviewForm';
 
 // =====================================================================
 // BookDetail — Modern Heritage design system
@@ -447,14 +448,61 @@ export default function BookDetail() {
         </div>
 
         {/* Reviews */}
-        {reviews.length > 0 && (
-          <section style={{ marginBottom: '96px' }}>
-            <h2 style={{
-              fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: '700',
-              color: 'var(--text)', marginBottom: '36px',
+        <section style={{ marginBottom: '96px' }}>
+          <h2 style={{
+            fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: '700',
+            color: 'var(--text)', marginBottom: '24px',
+          }}>
+            Member reviews
+          </h2>
+
+          {/* AI review digest (cached) */}
+          {book.review_summary && reviews.length >= 5 && (
+            <div style={{
+              padding: '24px 28px',
+              marginBottom: '28px',
+              background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-section) 100%)',
+              borderRadius: 'var(--radius-lg)',
+              borderLeft: '4px solid var(--accent)',
             }}>
-              Member reviews
-            </h2>
+              <div style={{
+                fontSize: '11px', fontWeight: 700, letterSpacing: '2px',
+                textTransform: 'uppercase', color: 'var(--accent)',
+                marginBottom: '10px',
+              }}>
+                ✨ What readers are saying
+              </div>
+              <p style={{
+                color: 'var(--text-muted)', lineHeight: 1.8, fontSize: '15px',
+                margin: 0, fontStyle: 'italic', fontFamily: 'var(--font-display)',
+                whiteSpace: 'pre-line',
+              }}>
+                {book.review_summary}
+              </p>
+            </div>
+          )}
+
+          {/* Write-a-review widget */}
+          <ReviewForm
+            bookId={book.id}
+            member={member}
+            onReviewSaved={(r) => {
+              setReviews(prev => {
+                const without = prev.filter(p => p.id !== r.id);
+                return [r, ...without].slice(0, 10);
+              });
+            }}
+          />
+
+          {reviews.length === 0 ? (
+            <div style={{
+              padding: '40px', textAlign: 'center', color: 'var(--text-subtle)',
+              fontSize: '14px', background: 'var(--bg-section)',
+              borderRadius: 'var(--radius-md)',
+            }}>
+              No reviews yet — be the first.
+            </div>
+          ) : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
@@ -490,8 +538,8 @@ export default function BookDetail() {
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* Similar books */}
         {similar.length > 0 && (

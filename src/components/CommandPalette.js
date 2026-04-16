@@ -42,6 +42,7 @@ const COMMANDS = [
   { label: 'Newsletter subscribers', path: '/store/newsletter',     icon: '💌', keywords: 'emails list subscribers' },
   { label: 'Email campaigns',        path: '/marketing/campaigns',  icon: '✉️', keywords: 'broadcast newsletter send email' },
   { label: 'Store analytics',        path: '/store/analytics',      icon: '📊', keywords: 'stats dashboard revenue' },
+  { label: 'Commerce insights',      path: '/commerce-insights',    icon: '💹', keywords: 'sales cohort ltv inventory abandonment revenue' },
   { label: 'Edit website',           path: '/store/content',        icon: '🎨', keywords: 'site content blocks pages editor' },
   // Marketing
   { label: 'Marketing dashboard',    path: '/marketing-dashboard',  icon: '📣' },
