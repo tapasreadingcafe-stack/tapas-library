@@ -1671,3 +1671,340 @@ export function LogoRow({ id, pageKey, props, blockIndex, totalBlocks }) {
     </BlockFrame>
   );
 }
+
+// ---------------------------------------------------------------------
+// Phase 6: Team members, Announcement bar, Pricing compare, Testimonial carousel
+// ---------------------------------------------------------------------
+
+// Team — grid of portraits + name + role. Optional bio snippet + per-member
+// social links array of { label, href }.
+export function Team({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const members = Array.isArray(p.members) ? p.members : [];
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {(p.eyebrow || p.title || p.subtitle) && (
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          {p.eyebrow && (
+            <div style={{
+              fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+              textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+              marginBottom: '8px',
+            }}>{p.eyebrow}</div>
+          )}
+          {p.title && (
+            <h2 style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: 'var(--tapas-h-l-size, 32px)', margin: 0,
+              color: 'var(--tapas-h-color, #26170c)',
+            }}>{p.title}</h2>
+          )}
+          {p.subtitle && (
+            <p style={{
+              marginTop: '10px',
+              fontSize: '15px', lineHeight: 1.6,
+              color: 'var(--tapas-body-color, #5c3a1e)',
+              maxWidth: '600px', marginLeft: 'auto', marginRight: 'auto',
+            }}>{p.subtitle}</p>
+          )}
+        </div>
+      )}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fit, minmax(${p.min_card_width || 220}px, 1fr))`,
+        gap: '28px',
+      }}>
+        {members.map((m, i) => (
+          <div key={i} style={{ textAlign: 'center' }}>
+            {m.photo && (
+              <div style={{
+                width: '140px', height: '140px',
+                margin: '0 auto 16px',
+                borderRadius: '50%', overflow: 'hidden',
+                background: 'var(--tapas-card-bg, #faf7ed)',
+                boxShadow: '0 4px 16px rgba(38,23,12,0.08)',
+              }}>
+                <img src={m.photo} alt={m.name || 'Team member'} style={{
+                  width: '100%', height: '100%', objectFit: 'cover',
+                  display: 'block',
+                }} />
+              </div>
+            )}
+            <div style={{
+              fontSize: '17px', fontWeight: 700,
+              color: 'var(--tapas-primary, #26170c)',
+              marginBottom: '4px',
+            }}>{m.name}</div>
+            {m.role && (
+              <div style={{
+                fontSize: '12px', fontWeight: 700, letterSpacing: '1px',
+                textTransform: 'uppercase',
+                color: 'var(--tapas-accent, #006a6a)',
+                marginBottom: '10px',
+              }}>{m.role}</div>
+            )}
+            {m.bio && (
+              <p style={{
+                fontSize: '13px', lineHeight: 1.6,
+                color: 'var(--tapas-body-color, #5c3a1e)',
+                margin: '0 0 12px',
+              }}>{m.bio}</p>
+            )}
+            {(m.social_label || m.social_href) && (
+              <a
+                href={m.social_href || '#'}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  fontSize: '12px', fontWeight: 700,
+                  color: 'var(--tapas-accent, #006a6a)',
+                  textDecoration: 'none',
+                }}
+              >{m.social_label || 'Profile'} →</a>
+            )}
+          </div>
+        ))}
+      </div>
+    </BlockFrame>
+  );
+}
+
+// AnnouncementBar — single-row banner for promos / notices. Sits in the
+// normal page flow as a block; for a persistent site-wide banner use the
+// "announcement" header template.
+export function AnnouncementBar({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  if (!p.text && !p.cta_text) return null;
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+      background: p.background_color || 'var(--tapas-accent, #006a6a)',
+      color: p.text_color || '#fff',
+    }}>
+      <div style={{
+        padding: '12px 20px', textAlign: 'center',
+        fontSize: '14px', fontWeight: 500,
+        display: 'flex', flexWrap: 'wrap',
+        gap: '12px', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {p.icon && <span style={{ fontSize: '16px' }}>{p.icon}</span>}
+        <span>{p.text}</span>
+        {p.cta_text && (
+          <a
+            href={p.cta_href || '#'}
+            style={{
+              color: p.text_color || '#fff',
+              textDecoration: 'underline', fontWeight: 700,
+              marginLeft: '4px',
+            }}
+          >{p.cta_text} →</a>
+        )}
+      </div>
+    </BlockFrame>
+  );
+}
+
+// PricingCompare — multi-plan comparison table. Columns are plans, rows
+// are features. Each row has a name + a per-plan value (string, ✓, or ✗).
+export function PricingCompare({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const plans = Array.isArray(p.plans) ? p.plans : [];
+  const features = Array.isArray(p.features) ? p.features : [];
+  const highlightIdx = Math.max(0, plans.findIndex(pl => pl?.highlight));
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>
+      {(p.eyebrow || p.title) && (
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          {p.eyebrow && (
+            <div style={{
+              fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+              textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+              marginBottom: '8px',
+            }}>{p.eyebrow}</div>
+          )}
+          {p.title && (
+            <h2 style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: 'var(--tapas-h-l-size, 32px)', margin: 0,
+              color: 'var(--tapas-h-color, #26170c)',
+            }}>{p.title}</h2>
+          )}
+        </div>
+      )}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{
+          width: '100%', maxWidth: '960px', margin: '0 auto',
+          borderCollapse: 'collapse', fontSize: '14px',
+          color: 'var(--tapas-body-color, #5c3a1e)',
+        }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '16px 12px' }}></th>
+              {plans.map((pl, i) => {
+                const isHi = i === highlightIdx && pl?.highlight;
+                return (
+                  <th key={i} style={{
+                    textAlign: 'center', padding: '20px 12px',
+                    background: isHi ? 'var(--tapas-accent, #006a6a)' : 'transparent',
+                    color: isHi ? '#fff' : 'var(--tapas-primary, #26170c)',
+                    borderTopLeftRadius: '12px', borderTopRightRadius: '12px',
+                    minWidth: '140px',
+                  }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.75, marginBottom: '6px' }}>
+                      {pl.name}
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+                      fontSize: '28px', fontWeight: 600, lineHeight: 1,
+                    }}>{pl.price}</div>
+                    {pl.period && (
+                      <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '3px' }}>{pl.period}</div>
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {features.map((f, rowIdx) => (
+              <tr key={rowIdx} style={{ borderTop: '1px solid rgba(38,23,12,0.08)' }}>
+                <td style={{
+                  padding: '12px', fontWeight: 600,
+                  color: 'var(--tapas-primary, #26170c)',
+                }}>{f.name}</td>
+                {plans.map((_, colIdx) => {
+                  const val = f[`plan_${colIdx}`];
+                  const isBool = val === true || val === 'true' || val === '✓' || val === false || val === 'false' || val === '✗';
+                  const checked = val === true || val === 'true' || val === '✓';
+                  const isHi = colIdx === highlightIdx && plans[colIdx]?.highlight;
+                  return (
+                    <td key={colIdx} style={{
+                      padding: '12px', textAlign: 'center',
+                      background: isHi ? 'rgba(0,106,106,0.06)' : 'transparent',
+                      color: isBool && !checked ? 'rgba(38,23,12,0.3)' : 'var(--tapas-body-color, #5c3a1e)',
+                    }}>
+                      {isBool ? (checked ? '✓' : '—') : (val || '—')}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {/* CTA row */}
+            {plans.some(pl => pl?.cta_text) && (
+              <tr style={{ borderTop: '1px solid rgba(38,23,12,0.08)' }}>
+                <td style={{ padding: '18px 12px' }}></td>
+                {plans.map((pl, i) => (
+                  <td key={i} style={{
+                    padding: '18px 12px', textAlign: 'center',
+                    background: i === highlightIdx && pl?.highlight ? 'rgba(0,106,106,0.06)' : 'transparent',
+                  }}>
+                    {pl.cta_text && (
+                      <Button href={pl.cta_href || '#'} variant={i === highlightIdx && pl?.highlight ? 'primary' : 'secondary'}>
+                        {pl.cta_text}
+                      </Button>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </BlockFrame>
+  );
+}
+
+// TestimonialCarousel — one quote visible at a time, manual prev/next +
+// optional autoplay. Each item is { quote, name, role, photo? }.
+export function TestimonialCarousel({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const items = Array.isArray(p.items) ? p.items : [];
+  const [idx, setIdx] = useState(0);
+  const safeIdx = items.length ? idx % items.length : 0;
+  const active = items[safeIdx];
+  const autoplayMs = Math.max(0, Number(p.autoplay_seconds) || 0) * 1000;
+  useEffect(() => {
+    if (autoplayMs === 0 || items.length < 2) return undefined;
+    const t = setInterval(() => setIdx(i => (i + 1) % items.length), autoplayMs);
+    return () => clearInterval(t);
+  }, [autoplayMs, items.length]);
+  if (!items.length) return null;
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+      background: p.background_color || 'transparent',
+    }}>
+      <div style={{ maxWidth: '780px', margin: '0 auto', textAlign: 'center' }}>
+        {p.eyebrow && (
+          <div style={{
+            fontSize: '13px', fontWeight: 700, letterSpacing: '1.5px',
+            textTransform: 'uppercase', color: 'var(--tapas-accent, #006a6a)',
+            marginBottom: '12px',
+          }}>{p.eyebrow}</div>
+        )}
+        <div style={{
+          fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+          fontSize: 'clamp(22px, 3vw, 30px)',
+          fontWeight: 500, lineHeight: 1.4,
+          color: 'var(--tapas-primary, #26170c)',
+          marginBottom: '28px', fontStyle: 'italic',
+          minHeight: '4.2em',
+        }}>“{active.quote}”</div>
+        {active.photo && (
+          <img src={active.photo} alt={active.name || ''} style={{
+            width: '56px', height: '56px', borderRadius: '50%',
+            objectFit: 'cover', margin: '0 auto 10px', display: 'block',
+          }} />
+        )}
+        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--tapas-primary, #26170c)' }}>{active.name}</div>
+        {active.role && (
+          <div style={{
+            fontSize: '12px', color: 'var(--tapas-body-color, #5c3a1e)',
+            opacity: 0.75, marginTop: '2px',
+          }}>{active.role}</div>
+        )}
+        {items.length > 1 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '18px', marginTop: '28px',
+          }}>
+            <button
+              onClick={() => setIdx(i => (i - 1 + items.length) % items.length)}
+              aria-label="Previous testimonial"
+              style={{
+                width: '36px', height: '36px', borderRadius: '50%',
+                border: '1px solid rgba(38,23,12,0.15)',
+                background: 'transparent', cursor: 'pointer',
+                color: 'var(--tapas-primary, #26170c)',
+                fontSize: '18px',
+              }}
+            >‹</button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {items.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  aria-label={`Go to testimonial ${i + 1}`}
+                  style={{
+                    width: '8px', height: '8px', padding: 0, borderRadius: '50%',
+                    border: 'none', cursor: 'pointer',
+                    background: i === safeIdx ? 'var(--tapas-accent, #006a6a)' : 'rgba(38,23,12,0.15)',
+                    transition: 'background 0.2s',
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => setIdx(i => (i + 1) % items.length)}
+              aria-label="Next testimonial"
+              style={{
+                width: '36px', height: '36px', borderRadius: '50%',
+                border: '1px solid rgba(38,23,12,0.15)',
+                background: 'transparent', cursor: 'pointer',
+                color: 'var(--tapas-primary, #26170c)',
+                fontSize: '18px',
+              }}
+            >›</button>
+          </div>
+        )}
+      </div>
+    </BlockFrame>
+  );
+}

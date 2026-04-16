@@ -26,6 +26,7 @@ import {
   TextImage, Testimonials, Pricing, FAQ, Gallery, Newsletter,
   VideoEmbed, MapEmbed, Countdown, ContactForm,
   Accordion, Tabs, Stats, LogoRow,
+  Team, AnnouncementBar, PricingCompare, TestimonialCarousel,
   BookList, BlogList, EventList,
 } from './BlockLibrary';
 
@@ -391,6 +392,100 @@ export const BLOCK_REGISTRY = {
       { key: 'logo_height',      label: 'Logo height (px)', type: 'number', min: 20, max: 120 },
       { key: 'grayscale',        label: 'Grayscale (color on hover)', type: 'toggle' },
       { key: 'background_color', label: 'Background',      type: 'color' },
+    ],
+  },
+
+  // ---- Phase 6 ------------------------------------------------------
+
+  team: {
+    label: 'Team members',
+    category: 'Content',
+    Renderer: Team,
+    defaultProps: {
+      eyebrow: 'Meet the team',
+      title: 'The humans behind Tapas',
+      subtitle: 'Book lovers, baristas, and storytellers.',
+      min_card_width: 220,
+      members: [
+        { name: 'Jane Doe',  role: 'Founder',     photo: '', bio: 'Started Tapas after a lifetime of bookshop hopping.', social_label: '', social_href: '' },
+        { name: 'Arjun Rao', role: 'Head Barista',photo: '', bio: 'Serves the best pour-over in Nagpur. Fight me.',       social_label: '', social_href: '' },
+        { name: 'Priya Sen', role: 'Librarian',   photo: '', bio: 'Can recommend a book for literally any mood.',          social_label: '', social_href: '' },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow',         label: 'Eyebrow',               type: 'text' },
+      { key: 'title',           label: 'Title',                 type: 'text' },
+      { key: 'subtitle',        label: 'Subtitle',              type: 'textarea' },
+      { key: 'min_card_width',  label: 'Min card width (px)',   type: 'number', min: 160, max: 400 },
+    ],
+  },
+
+  announcement_bar: {
+    label: 'Announcement bar',
+    category: 'Content',
+    Renderer: AnnouncementBar,
+    defaultProps: {
+      icon: '🎉',
+      text: 'Free local delivery this weekend on orders over ₹500.',
+      cta_text: 'Shop now',
+      cta_href: '/books',
+      background_color: '',
+      text_color: '',
+    },
+    schema: [
+      { key: 'icon',             label: 'Icon (emoji)', type: 'text' },
+      { key: 'text',             label: 'Message',      type: 'text' },
+      { key: 'cta_text',         label: 'Link text',    type: 'text' },
+      { key: 'cta_href',         label: 'Link URL',     type: 'text' },
+      { key: 'background_color', label: 'Background',   type: 'color' },
+      { key: 'text_color',       label: 'Text color',   type: 'color' },
+    ],
+  },
+
+  pricing_compare: {
+    label: 'Pricing comparison',
+    category: 'Content',
+    Renderer: PricingCompare,
+    defaultProps: {
+      eyebrow: 'Membership plans',
+      title: 'Pick the plan that fits',
+      plans: [
+        { name: 'Bronze', price: '₹300', period: '/mo', highlight: false, cta_text: 'Join Bronze', cta_href: '/offers' },
+        { name: 'Silver', price: '₹500', period: '/mo', highlight: true,  cta_text: 'Join Silver', cta_href: '/offers' },
+        { name: 'Gold',   price: '₹800', period: '/mo', highlight: false, cta_text: 'Join Gold',   cta_href: '/offers' },
+      ],
+      features: [
+        { name: 'Books borrowed at a time', plan_0: '5',  plan_1: '10', plan_2: 'Unlimited' },
+        { name: 'Borrowing period',          plan_0: '30 days', plan_1: '45 days', plan_2: '60 days' },
+        { name: 'Priority reservations',     plan_0: false, plan_1: true, plan_2: true },
+        { name: 'Early access to new arrivals', plan_0: false, plan_1: true, plan_2: true },
+        { name: 'Free home delivery',        plan_0: false, plan_1: false, plan_2: true },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
+      { key: 'title',   label: 'Title',   type: 'text' },
+    ],
+  },
+
+  testimonial_carousel: {
+    label: 'Testimonial carousel',
+    category: 'Content',
+    Renderer: TestimonialCarousel,
+    defaultProps: {
+      eyebrow: 'What readers are saying',
+      autoplay_seconds: 6,
+      background_color: '',
+      items: [
+        { quote: 'Tapas has the best curated selection I\'ve found in years. The coffee is a bonus.', name: 'Kritika N.', role: 'Silver member', photo: '' },
+        { quote: 'My kid now asks to go to "the book place" every weekend. Thank you, Tapas.',       name: 'Ravi M.',   role: 'Gold member',   photo: '' },
+        { quote: 'A peaceful corner of the city. I get more reading done here than at home.',            name: 'Ananya K.', role: 'Bronze member', photo: '' },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow',          label: 'Eyebrow',             type: 'text' },
+      { key: 'autoplay_seconds', label: 'Autoplay seconds (0 = off)', type: 'number', min: 0, max: 60 },
+      { key: 'background_color', label: 'Background',          type: 'color' },
     ],
   },
 
