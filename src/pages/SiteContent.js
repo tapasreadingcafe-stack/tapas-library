@@ -6,6 +6,7 @@ import {
 } from '../utils/blockRegistryMeta';
 import {
   DndContext, PointerSensor, useSensor, useSensors, closestCenter,
+  useDraggable, useDroppable, DragOverlay,
 } from '@dnd-kit/core';
 import {
   SortableContext, useSortable, arrayMove, verticalListSortingStrategy,
@@ -1677,6 +1678,80 @@ function ElementStyleRow({ field, value, onChange }) {
   );
 }
 
+// ---- DraggableLibraryTile ---------------------------------------------
+// One block-type tile in the Block Library side panel. It does two
+// things: clicking adds the block to the end of the current page (legacy
+// behavior preserved), and dragging it is a @dnd-kit draggable source
+// keyed `lib:<type>` so the parent's onDragEnd can distinguish a
+// library drop from an in-tree reorder.
+function DraggableLibraryTile({ type, meta, onClick, S }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `lib:${type}`,
+    data: { kind: 'library', type },
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'flex-start', gap: '6px',
+        padding: '12px 12px',
+        background: isDragging ? S.accentLight : '#fff',
+        border: `1px solid ${isDragging ? S.accent : S.border}`,
+        borderRadius: '8px',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        textAlign: 'left',
+        opacity: isDragging ? 0.5 : 1,
+        transition: 'background 0.12s, border-color 0.12s',
+        width: '100%', boxSizing: 'border-box',
+      }}
+      onMouseEnter={(e) => {
+        if (isDragging) return;
+        e.currentTarget.style.borderColor = S.accent;
+        e.currentTarget.style.background = S.accentLight;
+      }}
+      onMouseLeave={(e) => {
+        if (isDragging) return;
+        e.currentTarget.style.borderColor = S.border;
+        e.currentTarget.style.background = '#fff';
+      }}
+      title={`Click to add to end · drag to insert at a position`}
+    >
+      <span style={{ fontSize: '20px' }}>{meta.icon || '▫'}</span>
+      <span style={{ fontSize: '11.5px', fontWeight: '700', color: S.text, lineHeight: 1.2 }}>
+        {meta.label}
+      </span>
+    </button>
+  );
+}
+
+// ---- LayersDropZone ----------------------------------------------------
+// The Layers tree's outer container. Registers as a useDroppable target
+// with id "layers-end" so library tiles dropped on empty space (or below
+// the last row) get appended to the page. The wrapper itself does no
+// styling beyond the existing padding; the visual hover state is wired
+// via the parent's activeDragData (a faint accent border when a library
+// item is being dragged).
+function LayersDropZone({ children, S }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'layers-end' });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        padding: '0 8px 12px', flex: 1,
+        background: isOver ? S.accentLight + '40' : 'transparent',
+        borderRadius: '4px',
+        transition: 'background 0.12s',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 // ---- SortableBlockRow --------------------------------------------------
 // One row in the Layers tree. Uses @dnd-kit's useSortable to make the row
 // reorderable via drag-and-drop. The drag handle (⋮⋮) on the left is the
@@ -1967,6 +2042,11 @@ export default function SiteContent() {
   const [designModalTab, setDesignModalTab] = useState('brand');
   // Overflow menu in the toolbar (History / Schedule / Discard).
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  // The block-type currently being dragged from the Library panel, used
+  // by the DragOverlay so the user sees a floating preview that follows
+  // their cursor. Null when no library drag is in progress (in-tree
+  // reorders manage their own visual via SortableBlockRow's transform).
+  const [activeDragLib, setActiveDragLib] = useState(null);
   const [editingPage, setEditingPage] = useState('home');
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   // Phase 4: clipboard for cross-page copy/paste
@@ -3958,154 +4038,10 @@ export default function SiteContent() {
         </div>
       )}
 
-      {/* ==================== Add section picker modal ==================== */}
-      {addPickerOpen && (
-        <div
-          onClick={() => { setAddPickerOpen(false); setAddPickerSearch(''); }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(2px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '40px 20px',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: '720px', maxHeight: '80vh',
-              background: '#fff', borderRadius: '12px',
-              boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
-              display: 'flex', flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <div style={{
-              padding: '18px 24px',
-              borderBottom: `1px solid ${S.border}`,
-              display: 'flex', alignItems: 'center', gap: '12px',
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
-                  Add section to <span style={{ color: S.accent }}>{allPages.find(p => p.key === editingPage)?.label || editingPage}</span>
-                </div>
-                <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
-                  Pick a block type to append to the page.
-                </div>
-              </div>
-              <button
-                onClick={() => { setAddPickerOpen(false); setAddPickerSearch(''); }}
-                style={{
-                  width: '28px', height: '28px',
-                  background: 'transparent', border: `1px solid ${S.border}`,
-                  borderRadius: '6px', cursor: 'pointer',
-                  color: S.textDim, fontSize: '14px',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = S.text; e.currentTarget.style.background = S.bg; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = 'transparent'; }}
-              >✕</button>
-            </div>
-
-            {/* Search bar */}
-            <div style={{
-              padding: '12px 24px',
-              borderBottom: `1px solid ${S.border}`,
-              background: S.bg,
-            }}>
-              <input
-                autoFocus
-                type="text"
-                value={addPickerSearch}
-                onChange={(e) => setAddPickerSearch(e.target.value)}
-                placeholder="🔍 Search blocks…"
-                style={{
-                  width: '100%', padding: '9px 12px',
-                  background: '#fff', border: `1px solid ${S.border}`,
-                  borderRadius: '6px', fontSize: '13px', color: S.text,
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
-              {(() => {
-                const query = addPickerSearch.trim().toLowerCase();
-                const anyMatches = !query || Object.entries(BLOCK_REGISTRY_META).some(
-                  ([type, m]) => type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query)
-                );
-                if (query && !anyMatches) {
-                  return (
-                    <div style={{ padding: '32px', textAlign: 'center', color: S.textDim, fontSize: '13px' }}>
-                      No blocks match "{addPickerSearch}".
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-              {BLOCK_CATEGORIES.map(cat => {
-                const query = addPickerSearch.trim().toLowerCase();
-                const types = Object.entries(BLOCK_REGISTRY_META).filter(([type, m]) => {
-                  if (m.category !== cat) return false;
-                  if (!query) return true;
-                  return type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query);
-                });
-                if (types.length === 0) return null;
-                return (
-                  <div key={cat} style={{ marginBottom: '24px' }}>
-                    <div style={{
-                      fontSize: '10px', fontWeight: '700', color: S.textDim,
-                      textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px',
-                    }}>{cat}</div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '10px',
-                    }}>
-                      {types.map(([type, meta]) => (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            addBlockToPage(editingPage, type);
-                            setAddPickerOpen(false);
-                            setAddPickerSearch('');
-                          }}
-                          style={{
-                            display: 'flex', flexDirection: 'column',
-                            alignItems: 'flex-start', gap: '6px',
-                            padding: '14px 14px',
-                            background: '#fff',
-                            border: `1px solid ${S.border}`,
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            transition: 'all 0.12s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = S.accent;
-                            e.currentTarget.style.background = S.accentLight;
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(13,153,255,0.15)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = S.border;
-                            e.currentTarget.style.background = '#fff';
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
-                        >
-                          <span style={{ fontSize: '22px' }}>{meta.icon || '▫'}</span>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: S.text }}>
-                            {meta.label}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add-section picker is now an inline side panel in the body grid
+          (see LibraryPanel below the left sidebar) — modal removed in
+          favor of a Webflow-style dockable library that supports
+          drag-from-tile to insert at a specific position. */}
 
       {/* ==================== Top toolbar ====================
           Slim Webflow/Figma-style top bar:
@@ -4333,7 +4269,43 @@ export default function SiteContent() {
         </div>
       )}
 
-      {/* ==================== Body: 3 panels ==================== */}
+      {/* ==================== Body: 3 panels (+ drag context) ==================== */}
+      <DndContext
+        sensors={dndSensors}
+        collisionDetection={closestCenter}
+        onDragStart={({ active }) => {
+          const data = active.data?.current;
+          if (data?.kind === 'library') setActiveDragLib({ type: data.type });
+        }}
+        onDragCancel={() => setActiveDragLib(null)}
+        onDragEnd={({ active, over }) => {
+          setActiveDragLib(null);
+          if (!over) return;
+          const data = active.data?.current;
+          const blocks = getBlocks(editingPage);
+
+          // Library → tree drop. Insert at the over-row's index, or
+          // append if dropped on the empty zone.
+          if (data?.kind === 'library') {
+            let insertAt = blocks.length;
+            if (over.id !== 'layers-end') {
+              const idx = blocks.findIndex(b => b.id === over.id);
+              if (idx >= 0) insertAt = idx;
+            }
+            addBlockToPage(editingPage, data.type, insertAt);
+            return;
+          }
+
+          // In-tree reorder (existing behavior).
+          if (active.id !== over.id) {
+            const oldIdx = blocks.findIndex(b => b.id === active.id);
+            const newIdx = blocks.findIndex(b => b.id === over.id);
+            if (oldIdx >= 0 && newIdx >= 0) {
+              mutateBlocks(editingPage, b => arrayMove(b, oldIdx, newIdx));
+            }
+          }
+        }}
+      >
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
         {/* LEFT: pages + sections — hamburger-collapsible */}
@@ -4662,20 +4634,27 @@ export default function SiteContent() {
                 </details>
               </div>
 
-              {/* Add section button */}
+              {/* Add section button — toggles the inline Block Library
+                  panel. When open, button shows "× Close library" so
+                  the user knows the same button dismisses it. */}
               <div style={{ padding: '12px 14px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
-                  onClick={() => setAddPickerOpen(true)}
+                  onClick={() => {
+                    if (addPickerOpen) { setAddPickerOpen(false); setAddPickerSearch(''); }
+                    else setAddPickerOpen(true);
+                  }}
                   style={{
                     flex: 1, minWidth: '120px', padding: '10px 12px',
-                    background: S.accent, color: '#fff',
-                    border: 'none', borderRadius: '4px',
+                    background: addPickerOpen ? S.bg : S.accent,
+                    color: addPickerOpen ? S.text : '#fff',
+                    border: addPickerOpen ? `1px solid ${S.border}` : 'none',
+                    borderRadius: '4px',
                     fontSize: '12px', fontWeight: '700',
                     cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    boxShadow: '0 1px 3px rgba(13,153,255,0.3)',
+                    boxShadow: addPickerOpen ? 'none' : '0 1px 3px rgba(13,153,255,0.3)',
                   }}
-                >+ Add section</button>
+                >{addPickerOpen ? '× Close library' : '+ Add section'}</button>
                 {copiedBlock && (
                   <button
                     onClick={() => {
@@ -4914,26 +4893,15 @@ export default function SiteContent() {
                 </div>
               )}
 
-              {/* Block tree for the current editing page — drag-to-reorder
-                  via @dnd-kit. The drag handle (⋮⋮ on the left of each
-                  row) is the only drag activator; the rest of the row
-                  retains click-to-select. On drop we splice the blocks
-                  array via the existing mutateBlocks path so undo/redo
-                  and autosave keep working. */}
-              <div style={{ padding: '0 8px 12px', flex: 1 }}>
+              {/* Block tree for the current editing page. The DndContext
+                  that powers reordering AND library-to-tree drops lives
+                  one level up (wraps the whole body), so here we only
+                  render the SortableContext + a LayersDropZone wrapper
+                  that catches drops on empty space (used to append new
+                  blocks dragged from the library panel). */}
+              <LayersDropZone S={S}>
                 {(() => {
                   const blocks = getBlocks(editingPage);
-                  if (blocks.length === 0) {
-                    return (
-                      <div style={{
-                        padding: '32px 14px', textAlign: 'center',
-                        color: S.textFaint, fontSize: '11px', lineHeight: 1.55,
-                      }}>
-                        No blocks yet on this page.<br />
-                        This page is rendering its legacy layout. Click <b>+ Add section</b> above to start building with blocks.
-                      </div>
-                    );
-                  }
                   const handleSelect = (b, idx) => (e) => {
                     if (e.shiftKey && selectedBlockId) {
                       const anchorIdx = blocks.findIndex(x => x.id === selectedBlockId);
@@ -4959,51 +4927,171 @@ export default function SiteContent() {
                     setSelectedBlockId(b.id);
                     setMultiSelectedIds(new Set());
                   };
+                  if (blocks.length === 0) {
+                    return (
+                      <div style={{
+                        padding: '32px 14px', textAlign: 'center',
+                        color: S.textFaint, fontSize: '11px', lineHeight: 1.55,
+                      }}>
+                        No blocks yet on this page.<br />
+                        Drag a block from the <b>+ Add</b> library, or click one to append.
+                      </div>
+                    );
+                  }
                   return (
-                    <DndContext
-                      sensors={dndSensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={({ active, over }) => {
-                        if (!over || active.id === over.id) return;
-                        const oldIdx = blocks.findIndex(b => b.id === active.id);
-                        const newIdx = blocks.findIndex(b => b.id === over.id);
-                        if (oldIdx < 0 || newIdx < 0) return;
-                        mutateBlocks(editingPage, (b) => arrayMove(b, oldIdx, newIdx));
-                      }}
-                    >
-                      <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                        {blocks.map((b, idx) => {
-                          const meta = BLOCK_REGISTRY_META[b.type];
-                          const isPrimary = selectedBlockId === b.id;
-                          const isMulti = multiSelectedIds.has(b.id);
-                          const isSelected = isPrimary || isMulti;
-                          return (
-                            <SortableBlockRow
-                              key={b.id}
-                              block={b}
-                              meta={meta}
-                              isPrimary={isPrimary}
-                              isMulti={isMulti}
-                              isSelected={isSelected}
-                              S={S}
-                              onSelect={handleSelect(b, idx)}
-                              onDuplicate={() => duplicateBlock(editingPage, b.id)}
-                              onDelete={() => askConfirm({
-                                title: `Delete ${meta?.label || b.type}?`,
-                                message: 'This removes the block from the draft. You can undo with ⌘Z.',
-                                confirmLabel: 'Delete',
-                                tone: 'danger',
-                                onConfirm: () => deleteBlock(editingPage, b.id),
-                              })}
-                            />
-                          );
-                        })}
-                      </SortableContext>
-                    </DndContext>
+                    <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                      {blocks.map((b, idx) => {
+                        const meta = BLOCK_REGISTRY_META[b.type];
+                        const isPrimary = selectedBlockId === b.id;
+                        const isMulti = multiSelectedIds.has(b.id);
+                        const isSelected = isPrimary || isMulti;
+                        return (
+                          <SortableBlockRow
+                            key={b.id}
+                            block={b}
+                            meta={meta}
+                            isPrimary={isPrimary}
+                            isMulti={isMulti}
+                            isSelected={isSelected}
+                            S={S}
+                            onSelect={handleSelect(b, idx)}
+                            onDuplicate={() => duplicateBlock(editingPage, b.id)}
+                            onDelete={() => askConfirm({
+                              title: `Delete ${meta?.label || b.type}?`,
+                              message: 'This removes the block from the draft. You can undo with ⌘Z.',
+                              confirmLabel: 'Delete',
+                              tone: 'danger',
+                              onConfirm: () => deleteBlock(editingPage, b.id),
+                            })}
+                          />
+                        );
+                      })}
+                    </SortableContext>
                   );
                 })()}
-              </div>
+              </LayersDropZone>
             </div>
+        </aside>
+
+        {/* BLOCK LIBRARY — slide-out panel between the sidebar and the
+            canvas. Click a tile to append; drag a tile onto the Layers
+            tree to insert at a specific position. Width 0 when closed
+            so the canvas reclaims the space. Replaces the old modal. */}
+        <aside style={{
+          width: addPickerOpen ? '300px' : '0px',
+          flexShrink: 0,
+          background: S.panel,
+          borderRight: addPickerOpen ? `1px solid ${S.border}` : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          transition: 'width 0.22s ease',
+        }}>
+          {addPickerOpen && (
+            <>
+              {/* Header */}
+              <div style={{
+                padding: '12px 14px',
+                borderBottom: `1px solid ${S.border}`,
+                display: 'flex', alignItems: 'center', gap: '8px',
+                flexShrink: 0,
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: S.text }}>
+                    Block library
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: S.textDim, marginTop: '1px', lineHeight: 1.3 }}>
+                    Drag onto Layers, or click to append.
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setAddPickerOpen(false); setAddPickerSearch(''); }}
+                  title="Close library"
+                  style={{
+                    width: '24px', height: '24px',
+                    background: 'transparent', border: 'none',
+                    borderRadius: '4px', cursor: 'pointer',
+                    color: S.textDim, fontSize: '16px', lineHeight: 1,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = S.text; e.currentTarget.style.background = S.bg; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = S.textDim; e.currentTarget.style.background = 'transparent'; }}
+                >×</button>
+              </div>
+
+              {/* Search */}
+              <div style={{
+                padding: '10px 14px',
+                borderBottom: `1px solid ${S.border}`,
+                background: S.bg,
+                flexShrink: 0,
+              }}>
+                <input
+                  autoFocus
+                  type="text"
+                  value={addPickerSearch}
+                  onChange={(e) => setAddPickerSearch(e.target.value)}
+                  placeholder="Search blocks…"
+                  style={{
+                    width: '100%', padding: '7px 10px', boxSizing: 'border-box',
+                    background: '#fff', border: `1px solid ${S.border}`,
+                    borderRadius: '5px', fontSize: '12px', color: S.text,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Categorized tile list */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 16px' }}>
+                {(() => {
+                  const query = addPickerSearch.trim().toLowerCase();
+                  const anyMatches = !query || Object.entries(BLOCK_REGISTRY_META).some(
+                    ([type, m]) => type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query)
+                  );
+                  if (query && !anyMatches) {
+                    return (
+                      <div style={{ padding: '24px 0', textAlign: 'center', color: S.textDim, fontSize: '11px' }}>
+                        No blocks match "{addPickerSearch}".
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+                {BLOCK_CATEGORIES.map(cat => {
+                  const query = addPickerSearch.trim().toLowerCase();
+                  const types = Object.entries(BLOCK_REGISTRY_META).filter(([type, m]) => {
+                    if (m.category !== cat) return false;
+                    if (!query) return true;
+                    return type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query);
+                  });
+                  if (types.length === 0) return null;
+                  return (
+                    <div key={cat} style={{ marginBottom: '18px' }}>
+                      <div style={{
+                        fontSize: '10px', fontWeight: '700', color: S.textDim,
+                        textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px',
+                      }}>{cat}</div>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '6px',
+                      }}>
+                        {types.map(([type, meta]) => (
+                          <DraggableLibraryTile
+                            key={type}
+                            type={type}
+                            meta={meta}
+                            S={S}
+                            onClick={() => addBlockToPage(editingPage, type)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </aside>
 
         {/* CENTER: preview */}
@@ -5203,6 +5291,30 @@ export default function SiteContent() {
           )}
         </aside>
       </div>
+      {/* Floating preview that follows the cursor while a library tile
+          is being dragged. Empty when not dragging or when the active
+          drag is an in-tree reorder (those use SortableBlockRow's own
+          transform so we don't need a duplicate ghost). */}
+      <DragOverlay dropAnimation={null}>
+        {activeDragLib ? (() => {
+          const meta = BLOCK_REGISTRY_META[activeDragLib.type];
+          return (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '8px 12px',
+              background: '#fff', border: `1px solid ${S.accent}`,
+              borderRadius: '6px',
+              boxShadow: '0 8px 24px rgba(13,153,255,0.25)',
+              fontSize: '12px', fontWeight: '700', color: S.text,
+              cursor: 'grabbing',
+            }}>
+              <span style={{ fontSize: '16px' }}>{meta?.icon || '▫'}</span>
+              <span>{meta?.label || activeDragLib.type}</span>
+            </div>
+          );
+        })() : null}
+      </DragOverlay>
+      </DndContext>
     </div>
     </MediaLibraryContext.Provider>
   );
