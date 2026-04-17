@@ -4630,12 +4630,10 @@ export default function SiteContent() {
             }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '15px', fontWeight: '700', color: S.text }}>
-                  ⭐ Block Templates
+                  ⭐ Templates
                 </div>
                 <div style={{ fontSize: '12px', color: S.textDim, marginTop: '2px' }}>
-                  {templates.length === 0
-                    ? 'Save a block as a template from the canvas toolbar (⭐ button).'
-                    : `${templates.length} saved. Click to insert into ${allPages.find(p => p.key === editingPage)?.label || editingPage}.`}
+                  Pick a starter variant, or insert one of your saved blocks.
                 </div>
               </div>
               <button
@@ -4652,14 +4650,83 @@ export default function SiteContent() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
-              {templates.length === 0 ? (
-                <div style={{
-                  padding: '48px 20px', textAlign: 'center',
-                  color: S.textDim, fontSize: '13px', lineHeight: 1.6,
-                }}>
-                  No templates saved yet.<br />
-                  Hover over any block on the canvas and click <b>⭐</b> to save it as a template.
+              {/* Starter variants — every preset for every block type
+                  that advertises one. Grouped by block type so the
+                  user can browse "Hero variants / Navbar variants /
+                  Footer variants". Click inserts a fresh block with
+                  the preset's styling defaults applied. */}
+              {Object.entries(BLOCK_REGISTRY_META)
+                .filter(([, meta]) => Array.isArray(meta.presets) && meta.presets.length > 0)
+                .map(([type, meta]) => (
+                  <div key={type} style={{ marginBottom: '24px' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'baseline', gap: '8px',
+                      marginBottom: '10px',
+                    }}>
+                      <span style={{ fontSize: '16px' }}>{meta.icon || '▫'}</span>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: S.text }}>
+                        {meta.label} variants
+                      </div>
+                      <div style={{ fontSize: '11px', color: S.textDim }}>
+                        {meta.presets.length}
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                      gap: '8px',
+                    }}>
+                      {meta.presets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => {
+                            addBlockToPage(editingPage, type, undefined, preset.id);
+                            setTemplatesOpen(false);
+                          }}
+                          title={preset.hint}
+                          style={{
+                            textAlign: 'left', padding: '12px',
+                            background: '#fff', border: `1px solid ${S.border}`,
+                            borderRadius: '8px', cursor: 'pointer',
+                            display: 'flex', flexDirection: 'column', gap: '4px',
+                            transition: 'border-color 0.12s, background 0.12s',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = S.accent; e.currentTarget.style.background = S.accentLight; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = S.border; e.currentTarget.style.background = '#fff'; }}
+                        >
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: S.text }}>
+                            {preset.label}
+                          </div>
+                          {preset.hint && (
+                            <div style={{ fontSize: '10.5px', color: S.textDim, lineHeight: 1.4 }}>
+                              {preset.hint}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              }
+
+              {/* Saved blocks — user-created templates from the canvas
+                  ⭐ button. Rendered below the starter variants so
+                  personal saves don't get lost in the starter grid. */}
+              <div style={{
+                marginTop: '8px', paddingTop: '16px',
+                borderTop: `1px solid ${S.border}`,
+              }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: S.text, marginBottom: '4px' }}>
+                  Your saved blocks
                 </div>
+                <div style={{ fontSize: '11px', color: S.textDim, marginBottom: '12px' }}>
+                  {templates.length === 0
+                    ? 'Hover any block on the canvas and click ⭐ to save it here.'
+                    : `${templates.length} saved — click to insert into ${allPages.find(p => p.key === editingPage)?.label || editingPage}.`}
+                </div>
+              </div>
+              {templates.length === 0 ? (
+                <div style={{ height: '4px' }} />
               ) : (
                 <div style={{
                   display: 'grid',
