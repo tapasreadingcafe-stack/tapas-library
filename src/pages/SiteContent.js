@@ -1303,24 +1303,69 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
         opacity: isLocked ? 0.5 : 1,
         pointerEvents: isLocked ? 'none' : 'auto',
       }}>
-        {/* Variant picker — for blocks that advertise presets, lets the
-            user swap layout/style without losing the rest of their
-            content. Switching just flips `props.preset`; the renderer
-            picks the matching layout. Per-preset content fields stay
-            populated so users can try different looks instantly. */}
-        {Array.isArray(meta.presets) && meta.presets.length > 0 && (
-          <Row label="Variant" iconType="select">
-            <select
-              value={block.props?.preset || meta.defaultProps?.preset || meta.presets[0].id}
-              onChange={(e) => onChangeProp('preset', e.target.value)}
-              style={inputBaseStyle}
-            >
-              {meta.presets.map(p => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-          </Row>
-        )}
+        {/* Variant picker — for blocks that advertise presets, lets
+            the user swap layout/style without losing the rest of the
+            content. Rendered as a chip grid (not a plain dropdown) so
+            all 10 options are visible at once, with the active one
+            highlighted in the accent color. Mirrors the canvas hover
+            chip strip so users see a consistent affordance whether
+            they're on the canvas or in the inspector. */}
+        {Array.isArray(meta.presets) && meta.presets.length > 0 && (() => {
+          const activePreset = block.props?.preset || meta.defaultProps?.preset || meta.presets[0].id;
+          return (
+            <div style={{
+              padding: '14px 16px 10px',
+              borderBottom: `1px solid ${D.divider}`,
+            }}>
+              <div style={{
+                fontSize: '10px', fontWeight: 700, color: D.textDim,
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                marginBottom: '8px',
+              }}>
+                Variant <span style={{ color: D.textFaint, fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>· {meta.presets.length} templates</span>
+              </div>
+              <div
+                role="radiogroup"
+                aria-label="Block variant"
+                style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}
+              >
+                {meta.presets.map(p => {
+                  const active = p.id === activePreset;
+                  return (
+                    <button
+                      key={p.id}
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => onChangeProp('preset', p.id)}
+                      title={p.hint || p.label}
+                      style={{
+                        padding: '6px 10px',
+                        background: active ? D.accent : '#fff',
+                        color: active ? '#fff' : D.text,
+                        border: `1px solid ${active ? D.accent : D.border}`,
+                        borderRadius: '5px',
+                        fontSize: '11.5px', fontWeight: 600,
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                        transition: 'all 0.12s',
+                        outline: 'none',
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 2px ${D.accent}33`; }}
+                      onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+                      onMouseEnter={(e) => {
+                        if (!active) { e.currentTarget.style.borderColor = D.accent; e.currentTarget.style.background = D.accentLight; }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) { e.currentTarget.style.borderColor = D.border; e.currentTarget.style.background = '#fff'; }
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
         {(!meta.schema || meta.schema.length === 0) ? (
           <div style={{ padding: '24px 16px', color: D.textFaint, fontSize: '11px', lineHeight: 1.55, textAlign: 'center' }}>
             This block has no editable fields yet.
