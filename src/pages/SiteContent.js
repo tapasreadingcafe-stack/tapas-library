@@ -607,45 +607,6 @@ function HeaderIconButton({ title, onClick, children }) {
   );
 }
 
-// "Selection colors" footer — Figma shows a compact summary of every
-// color used by the current selection at the bottom of the inspector.
-// We mirror that for the Brand section so the user can see all defined
-// colors at a glance, even when collapsed.
-function SelectionColorsFooter({ colors }) {
-  const entries = Object.entries(colors || {}).filter(([, v]) => v);
-  if (entries.length === 0) return null;
-  return (
-    <div style={{ borderTop: `1px solid ${D.border}`, padding: '12px 14px 16px' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', marginBottom: '10px',
-        fontSize: '11px', fontWeight: '600', color: D.text, letterSpacing: '0.2px',
-      }}>
-        <span style={{ color: D.textDim, fontSize: '9px', marginRight: '8px' }}>▶</span>
-        Selection colors
-      </div>
-      <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {entries.map(([label, value]) => (
-          <div key={label} style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '4px 6px', background: D.input, borderRadius: '2px', height: '26px',
-          }}>
-            <div style={{
-              width: '14px', height: '14px', borderRadius: '2px',
-              background: value, border: `1px solid ${D.border}`,
-              flexShrink: 0,
-            }} />
-            <span style={{
-              fontSize: '11px', fontFamily: 'ui-monospace, monospace',
-              color: D.text, flex: 1, letterSpacing: '0.3px',
-            }}>{value.replace('#', '').toUpperCase().slice(0, 6)}</span>
-            <span style={{ fontSize: '10px', color: D.textFaint }}>100%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // =====================================================================
 // ArrayField (Phase 4)
 //
@@ -4386,19 +4347,6 @@ export default function SiteContent() {
                           <SubSection title="Other" defaultOpen={true}>
                             {other.map(renderField)}
                           </SubSection>
-                        )}
-                        {activeKey === 'brand' && (
-                          <SelectionColorsFooter
-                            colors={{
-                              'Primary':       draftContent[storage]?.primary_color,
-                              'Primary dark':  draftContent[storage]?.primary_color_dark,
-                              'Primary light': draftContent[storage]?.primary_color_light,
-                              'Accent':        draftContent[storage]?.accent_color,
-                              'Accent dark':   draftContent[storage]?.accent_color_dark,
-                              'Cream':         draftContent[storage]?.cream_color,
-                              'Sand':          draftContent[storage]?.sand_color,
-                            }}
-                          />
                         )}
                       </>
                     );
