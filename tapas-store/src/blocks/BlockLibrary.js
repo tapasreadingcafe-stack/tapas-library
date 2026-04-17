@@ -552,7 +552,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
             {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
           </div>
           <div style={{
-            background: p.image_url ? `url("${p.image_url}") center/cover` : 'linear-gradient(135deg, var(--tapas-sand, #d4a574), var(--tapas-accent, #006a6a))',
+            background: p.image_url ? `url("${p.image_url}") center/cover` : 'var(--tapas-accent, #00B9AE)',
             borderRadius: '16px',
             aspectRatio: '4 / 3',
             width: '100%',
@@ -564,9 +564,13 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   }
 
   if (preset === 'gradient') {
+    // "Gradient" is kept as the label for back-compat but the default
+    // is now a SOLID primary-color surface — gradients added visual
+    // noise without doing much, and the new 3-color palette reads
+    // better as flat blocks.
     return (
       <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
-        background: 'linear-gradient(135deg, var(--tapas-accent, #006a6a) 0%, var(--tapas-primary, #26170c) 100%)',
+        background: 'var(--tapas-primary, #037171)',
         color: '#fff',
         minHeight: '60vh',
         display: 'flex', alignItems: 'center',
@@ -588,7 +592,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
         position: 'relative',
         background: p.background_image
           ? `linear-gradient(rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay})), url("${p.background_image}") center/cover`
-          : 'linear-gradient(135deg, #0d0d0d, #2a1a0c)',
+          : '#037171',
         color: '#fff',
         minHeight: '85vh',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -648,7 +652,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
           gap: '48px', alignItems: 'center', width: '100%',
         }}>
           <div style={{
-            background: p.image_url ? `url("${p.image_url}") center/cover` : 'linear-gradient(135deg, var(--tapas-accent, #006a6a), var(--tapas-sand, #d4a574))',
+            background: p.image_url ? `url("${p.image_url}") center/cover` : 'var(--tapas-accent, #00B9AE)',
             borderRadius: '16px',
             aspectRatio: '4 / 3',
             width: '100%',
@@ -669,8 +673,8 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   if (preset === 'dual_cta') {
     return (
       <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
-        background: 'linear-gradient(180deg, var(--tapas-cream, #fbfbe2) 0%, #fff 100%)',
-        color: 'var(--tapas-h-color, #26170c)',
+        background: 'var(--tapas-cream, #E6CCBE)',
+        color: 'var(--tapas-h-color, #037171)',
         minHeight: '60vh',
         display: 'flex', alignItems: 'center',
       }}>
@@ -699,8 +703,8 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
     const stats = Array.isArray(p.stats) ? p.stats : [];
     return (
       <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
-        background: 'linear-gradient(135deg, var(--tapas-primary, #26170c), var(--tapas-primary-dark, #1a0f08))',
-        color: '#f5f5dc',
+        background: 'var(--tapas-primary, #037171)',
+        color: '#fff',
         minHeight: '60vh',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '48px',
       }}>
@@ -799,8 +803,8 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: p.background_image
         ? `linear-gradient(rgba(0,0,0,${p.overlay_opacity ?? 0.4}), rgba(0,0,0,${p.overlay_opacity ?? 0.4})), url("${p.background_image}") center/cover`
-        : 'linear-gradient(135deg, var(--tapas-primary, #26170c), var(--tapas-primary-dark, #1a0f08))',
-      color: p.background_image ? '#fff' : '#f5f5dc',
+        : 'var(--tapas-primary, #037171)',
+      color: '#fff',
       minHeight: '60vh',
       display: 'flex', alignItems: 'center',
     }}>
@@ -1213,7 +1217,7 @@ export function Footer({ id, pageKey, props, blockIndex, totalBlocks }) {
   const preset = p.preset || 'columns';
   const columns = Array.isArray(p.columns) ? p.columns : [];
   const bg = p.background_color || 'var(--tapas-primary-dark, #1a0f08)';
-  const copyright = p.copyright || `© ${new Date().getFullYear()} Tapas Reading Cafe`;
+  const copyright = p.copyright || `© ${new Date().getFullYear()} Your brand`;
 
   if (preset === 'minimal') {
     return (
@@ -1882,7 +1886,7 @@ export function VideoEmbed({ id, pageKey, props, blockIndex, totalBlocks }) {
 
 export function MapEmbed({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
-  const query = encodeURIComponent(p.address || 'Tapas Reading Cafe');
+  const query = encodeURIComponent(p.address || 'Your brand');
   const src = `https://www.google.com/maps?q=${query}&output=embed`;
   return (
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks}>

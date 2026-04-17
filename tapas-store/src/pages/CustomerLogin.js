@@ -122,7 +122,7 @@ export default function CustomerLogin() {
           <div style={{ textAlign:'center', marginBottom:'32px' }}>
             <div style={{ fontSize:'52px', marginBottom:'10px', lineHeight:1 }}>&#128218;</div>
             <h1 style={{ fontFamily:'var(--font-display)', fontSize:'26px', fontWeight:'600', color:'var(--text)', marginBottom:'6px' }}>
-              Tapas Reading Cafe
+              Welcome back
             </h1>
             <p style={{ color:'var(--text-subtle)', fontSize:'14px', fontFamily:'var(--font-body)' }}>
               Member Login

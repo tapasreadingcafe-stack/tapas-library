@@ -263,7 +263,7 @@ export default function Checkout() {
         amount: createData.amount,
         currency: createData.currency || 'INR',
         order_id: createData.razorpay_order_id,
-        name: 'Tapas Reading Cafe',
+        name: 'Your brand',
         description: `Order #${createData.order_number}`,
         prefill: {
           name: createData.member?.name || member.name || '',
@@ -371,7 +371,7 @@ export default function Checkout() {
                     In-store Pickup
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted, #5c4a3a)' }}>
-                    Collect your order at Tapas Reading Cafe. We'll notify you when it's ready.
+                    Collect your order in-store. We'll notify you when it's ready.
                   </div>
                 </div>
               </label>
@@ -693,7 +693,7 @@ export default function Checkout() {
             }}>
               {fulfillment === 'delivery'
                 ? 'We\'ll ship your order and send a tracking link.'
-                : <>We'll hold your books at Tapas Reading Cafe.<br />Pay cash or UPI when you collect them.</>
+                : <>We'll hold your order in-store.<br />Pay cash or UPI when you collect.</>
               }
             </p>
 

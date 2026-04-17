@@ -138,7 +138,7 @@ export const BLOCK_REGISTRY = {
         { title: 'About',  links: [{ label: 'Our story', href: '/about' }, { label: 'Contact', href: '/contact' }] },
         { title: 'Visit',  links: [{ label: 'Events',    href: '/events' }, { label: 'Blog',    href: '/blog' }] },
       ],
-      copyright: `© ${new Date().getFullYear()} Tapas Reading Cafe`,
+      copyright: `© ${new Date().getFullYear()} Your brand`,
       background_color: '',
       tagline: '',
     },
@@ -280,7 +280,7 @@ export const BLOCK_REGISTRY = {
     Renderer: MapEmbed,
     defaultProps: {
       title: 'Find us',
-      address: 'Tapas Reading Cafe',
+      address: '',
       address_text: '',
       height: '400px',
       max_width: '100%',
