@@ -3124,6 +3124,36 @@ export default function SiteContent() {
     });
   };
 
+  // Reset — blow away both draft AND live back to the bundled
+  // DEFAULT_CONTENT. Used for "start fresh from the blank palette"
+  // after branding has been stripped from the code. Very destructive
+  // — asks for explicit confirmation, then writes a clean slate to
+  // both app_settings rows in one transaction (well, two upserts).
+  const resetToDefaults = () => {
+    askConfirm({
+      title: 'Reset site to blank template?',
+      message: 'Every page, block, color override, and piece of copy will be replaced with the default blank template. The live site updates immediately. This cannot be undone — export your content first if you want a backup.',
+      confirmLabel: 'Reset site',
+      tone: 'danger',
+      onConfirm: async () => {
+        setSaving(true); setError('');
+        try {
+          const fresh = JSON.parse(JSON.stringify(DEFAULT_CONTENT));
+          const updatedAt = new Date().toISOString();
+          await Promise.all([
+            supabase.from('app_settings').upsert({ key: DRAFT_KEY, value: fresh, updated_at: updatedAt }, { onConflict: 'key' }),
+            supabase.from('app_settings').upsert({ key: LIVE_KEY,  value: fresh, updated_at: updatedAt }, { onConflict: 'key' }),
+          ]);
+          setDraftContent(fresh);
+          setLiveContent(fresh);
+          setToast({ message: 'Site reset to blank template. Live site is updated.' });
+        } catch (err) {
+          setError(err.message || 'Failed to reset.');
+        } finally { setSaving(false); }
+      },
+    });
+  };
+
   // ---- Phase 6: Scheduled publishes ----------------------------------
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   // The Cmd+K palette commands need scheduleModalOpen and history modal
@@ -4886,6 +4916,7 @@ export default function SiteContent() {
                   { label: 'Schedule publish', icon: CalendarClock, onClick: () => { setScheduleModalOpen(true); setOverflowMenuOpen(false); }, disabled: !dirty, disabledTip: 'Edit the draft first' },
                   { sep: true },
                   { label: 'Discard changes', icon: Trash2, danger: true, onClick: () => { revertDraft(); setOverflowMenuOpen(false); }, disabled: !dirty || pushing, disabledTip: 'Nothing to discard' },
+                  { label: 'Reset site to blank',    icon: RotateCcw, danger: true, onClick: () => { resetToDefaults(); setOverflowMenuOpen(false); }, disabled: pushing },
                 ].map((item, idx) => {
                   if (item.sep) return <div key={idx} style={{ height: '1px', background: S.border, margin: '4px 6px' }} />;
                   const Icon = item.icon;

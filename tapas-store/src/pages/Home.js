@@ -5,7 +5,7 @@ import { useSiteContent } from '../context/SiteContent';
 import { useAuth } from '../context/AuthContext';
 import HeroCarousel from '../components/HeroCarousel';
 import PageRenderer from '../blocks/PageRenderer';
-import { findPageByPath, NotFound } from '../utils/findPage';
+import { findPageByPath } from '../utils/findPage';
 
 // =====================================================================
 // Home — "The Digital Curator's Study"
@@ -112,14 +112,15 @@ function GridBookCard({ book }) {
   );
 }
 
-// Webflow-style block system shim. The route is mounted at "/", but
-// the user can rename or delete any page in the editor — so we look up
-// whatever page currently claims this slug instead of assuming "home".
-//   - Page found with blocks → PageRenderer
-//   - Page found, no blocks, default key → legacy hardcoded JSX (so
-//     un-migrated sites keep their existing look)
-//   - Page found, no blocks, user-created → blank
-//   - No page maps here → 404
+// Webflow-style block system shim. The route is mounted at "/" — the
+// one URL that must ALWAYS render something, even if the user deleted
+// the home page. Resolution order:
+//   - Some page claims slug "/" with blocks → render it via PageRenderer
+//   - Some page claims "/" but is empty → legacy JSX (so un-migrated
+//     sites keep their look)
+//   - No page maps to "/" → legacy JSX anyway (last-resort so the
+//     root URL never 404s). Other routes (/about, /blog, …) DO show
+//     NotFound when their page is gone; the root is special.
 export default function Home() {
   const content = useSiteContent();
   const matchKey = findPageByPath(content?.pages, '/');
@@ -131,7 +132,7 @@ export default function Home() {
     if (matchKey === 'home') return <LegacyHome />;
     return null;
   }
-  return <NotFound path="/" />;
+  return <LegacyHome />;
 }
 
 function LegacyHome() {
