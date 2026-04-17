@@ -458,7 +458,7 @@ function FooterMapEmbed({ brand, footer, contact, header }) {
       <FooterResponsiveStyles />
       <div className="tapas-foot-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', maxWidth:'1300px', margin:'0 auto' }}>
         <iframe
-          title="Tapas Reading Cafe location"
+          title="Map location"
           src={`https://www.google.com/maps?q=${mapQ}&output=embed`}
           style={{ width:'100%', minHeight:'320px', border:'none', filter:'grayscale(0.4) contrast(0.95) brightness(0.85)' }}
           loading="lazy"

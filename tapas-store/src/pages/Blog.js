@@ -70,7 +70,7 @@ function LegacyBlog() {
           color: 'rgba(251,251,226,0.75)', fontSize: '17px',
           maxWidth: '520px', margin: '0 auto', lineHeight: 1.7,
         }}>
-          Dispatches from the Tapas Reading Cafe team — book reviews, event recaps, author interviews, and the occasional recipe.
+          News, updates, and stories from our team.
         </p>
       </header>
 
