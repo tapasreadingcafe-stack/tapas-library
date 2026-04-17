@@ -1,14 +1,45 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { SiteContentProvider } from './context/SiteContent';
+import { SiteContentProvider, useSiteContent } from './context/SiteContent';
 import { ThemeProvider } from './context/ThemeContext';
 import StoreEditorSync from './components/StoreEditorSync';
 import HeaderTemplate from './components/HeaderTemplates';
 import FooterTemplate from './components/FooterTemplates';
 import InstallPrompt from './components/InstallPrompt';
+import { findPageByPath } from './utils/findPage';
 import './App.css';
+
+// When the current page has a Navbar/Footer block in its block tree,
+// the global app-chrome Header/Footer should get out of the way — we'd
+// otherwise render two navbars or two footers, one from the app shell
+// and one from the block. These helpers check the current URL against
+// content.pages and hide the global chrome if a block version exists.
+function currentPageBlocks(content, pathname) {
+  const matchKey = findPageByPath(content?.pages, pathname);
+  if (!matchKey) return [];
+  const blocks = content.pages[matchKey]?.blocks;
+  return Array.isArray(blocks) ? blocks : [];
+}
+
+function GlobalHeader() {
+  const location = useLocation();
+  const content = useSiteContent();
+  const blocks = currentPageBlocks(content, location.pathname);
+  const hasBlockNavbar = blocks.some(b => b?.type === 'navbar' && !b?.props?.hidden);
+  if (hasBlockNavbar) return null;
+  return <HeaderTemplate />;
+}
+
+function GlobalFooter() {
+  const location = useLocation();
+  const content = useSiteContent();
+  const blocks = currentPageBlocks(content, location.pathname);
+  const hasBlockFooter = blocks.some(b => b?.type === 'footer' && !b?.props?.hidden);
+  if (hasBlockFooter) return null;
+  return <FooterTemplate />;
+}
 
 // Recover from ChunkLoadError by forcing one hard reload. Prevents a
 // stale browser tab from being stuck after a dev rebuild or deploy.
@@ -84,7 +115,7 @@ function AppShell() {
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Lato:wght@300;400;600;700&display=swap" />
       <StoreEditorSync />
       <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', transition:'background 200ms, color 200ms' }}>
-        <HeaderTemplate />
+        <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/"              element={<Home />} />
@@ -108,7 +139,7 @@ function AppShell() {
             <Route path="*"              element={<CustomPage />} />
           </Routes>
         </Suspense>
-        <FooterTemplate />
+        <GlobalFooter />
         <InstallPrompt />
       </div>
     </>
