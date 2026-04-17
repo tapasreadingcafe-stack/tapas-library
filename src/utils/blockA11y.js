@@ -63,6 +63,18 @@ function readProp(props, defaults, key) {
   return undefined;
 }
 
+// Schema fields can declare `usedBy`/`hideFor` to gate themselves to
+// specific presets. A11y checks must respect that gating — otherwise
+// we warn about fields that the active variant doesn't even render
+// (e.g. "Secondary button text has no label" on a Hero with the
+// Centered preset, which doesn't show a secondary button at all).
+function isFieldActive(field, activePreset) {
+  if (!field) return true;
+  if (Array.isArray(field.usedBy) && activePreset && !field.usedBy.includes(activePreset)) return false;
+  if (Array.isArray(field.hideFor) && activePreset && field.hideFor.includes(activePreset)) return false;
+  return true;
+}
+
 // Check 1 — image without alt text. We only warn when the schema or
 // defaults actually define a corresponding alt key, so blocks that
 // never had an alt field stay silent (no spurious warnings).
@@ -70,8 +82,10 @@ function checkImageAlts(block, meta, warnings) {
   const props = block.props || {};
   const defaults = meta.defaultProps || {};
   const schema = meta.schema || [];
+  const activePreset = props.preset || defaults.preset;
   for (const field of schema) {
     if (field.type !== 'image') continue;
+    if (!isFieldActive(field, activePreset)) continue;
     const value = readProp(props, defaults, field.key);
     if (!value) continue; // image not set → not a problem
     // Try a few alt naming conventions.
@@ -105,10 +119,12 @@ function checkButtonNames(block, meta, warnings) {
   const props = block.props || {};
   const defaults = meta.defaultProps || {};
   const schema = meta.schema || [];
+  const activePreset = props.preset || defaults.preset;
   const isButtonText = (key) => /(_text|_label)$/.test(key) &&
     (key.startsWith('cta_') || key.startsWith('button_') || key.startsWith('link_') || key === 'cta_label');
   for (const field of schema) {
     if (!isButtonText(field.key)) continue;
+    if (!isFieldActive(field, activePreset)) continue;
     const value = readProp(props, defaults, field.key);
     if (value && String(value).trim()) continue;
     // Find a paired URL — if one is set, this button is broken.

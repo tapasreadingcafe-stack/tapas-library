@@ -1326,20 +1326,32 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
             This block has no editable fields yet.
           </div>
         ) : (
-          meta.schema.map(field => {
-            const Renderer = FIELD_RENDERERS[field.type] || TextField;
-            const value = (block.props && field.key in block.props)
-              ? block.props[field.key]
-              : (meta.defaultProps ? meta.defaultProps[field.key] : undefined);
-            return (
-              <Renderer
-                key={field.key}
-                field={field}
-                value={value}
-                onChange={(v) => onChangeProp(field.key, v)}
-              />
-            );
-          })
+          meta.schema
+            .filter(field => {
+              // Per-preset gating: fields with `usedBy` only show when
+              // the active preset is in the list; fields with `hideFor`
+              // hide when the active preset is in the list. Fields
+              // without either always render. Lets us tailor the
+              // inspector per variant without 30 separate schemas.
+              const activePreset = block.props?.preset || meta.defaultProps?.preset;
+              if (Array.isArray(field.usedBy) && activePreset && !field.usedBy.includes(activePreset)) return false;
+              if (Array.isArray(field.hideFor) && activePreset && field.hideFor.includes(activePreset)) return false;
+              return true;
+            })
+            .map(field => {
+              const Renderer = FIELD_RENDERERS[field.type] || TextField;
+              const value = (block.props && field.key in block.props)
+                ? block.props[field.key]
+                : (meta.defaultProps ? meta.defaultProps[field.key] : undefined);
+              return (
+                <Renderer
+                  key={field.key}
+                  field={field}
+                  value={value}
+                  onChange={(v) => onChangeProp(field.key, v)}
+                />
+              );
+            })
         )}
 
         {/* Phase 4: Responsive visibility — available on every block
@@ -2426,6 +2438,15 @@ export default function SiteContent() {
   const [pushing, setPushing]   = useState(false);
   const [pushedAt, setPushedAt] = useState(null);
   const [error,   setError]     = useState('');
+  // Transient toast: { message, actionLabel?, onAction?, expiresAt }.
+  // Auto-dismisses after 4s; "Undo" lets the user revert the last
+  // canvas variant swap without remembering ⌘Z.
+  const [toast,   setToast]     = useState(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
   const [activeSection, setActiveSection] = useState('brand');
   // Selected element on the canvas (fieldPath string). When set, the
   // right panel shows an Element Inspector with CSS overrides.
@@ -3581,6 +3602,13 @@ export default function SiteContent() {
               },
             },
           };
+        });
+        // Surface a toast so users notice the swap and know they can
+        // undo it. Hooks into the existing Cmd+Z history.
+        setToast({
+          message: `Variant swapped to ${msg.presetId.replace(/_/g, ' ')}`,
+          actionLabel: 'Undo',
+          onAction: () => undo(),
         });
         return;
       }
@@ -5406,7 +5434,7 @@ export default function SiteContent() {
                     Block library
                   </div>
                   <div style={{ fontSize: '10.5px', color: S.textDim, marginTop: '1px', lineHeight: 1.3 }}>
-                    Drag onto Layers, or click to append.
+                    Click to add a section, or drag it where you want.
                   </div>
                 </div>
                 <button
@@ -5717,6 +5745,44 @@ export default function SiteContent() {
           )}
         </aside>
       </div>
+      {/* ==================== Toast (variant swap, etc.) ==================== */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', alignItems: 'center', gap: '14px',
+            padding: '10px 16px',
+            background: '#0f172a', color: '#fff',
+            borderRadius: '8px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+            fontSize: '13px', fontWeight: 500,
+            zIndex: 250,
+          }}
+        >
+          <span>{toast.message}</span>
+          {toast.actionLabel && (
+            <button
+              onClick={() => { toast.onAction && toast.onAction(); setToast(null); }}
+              style={{
+                background: 'transparent', color: '#93c5fd',
+                border: 'none', cursor: 'pointer',
+                fontSize: '13px', fontWeight: 700, padding: '4px 8px',
+              }}
+            >{toast.actionLabel}</button>
+          )}
+          <button
+            onClick={() => setToast(null)}
+            aria-label="Dismiss"
+            style={{
+              background: 'transparent', color: '#94a3b8',
+              border: 'none', cursor: 'pointer',
+              fontSize: '16px', lineHeight: 1, padding: '0 4px',
+            }}
+          >×</button>
+        </div>
+      )}
       {/* ==================== Cmd+K command palette ==================== */}
       {paletteOpen && (
         <div
