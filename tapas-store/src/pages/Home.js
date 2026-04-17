@@ -11,7 +11,6 @@ import { findPageByPath } from '../utils/findPage';
 // =====================================================================
 
 const LIME = '#CFF389';
-const LIME_DARK = '#A8D964';
 const PINK = '#EF3D7B';
 const PINK_DARK = '#D02A65';
 const INK = '#1F2937';
