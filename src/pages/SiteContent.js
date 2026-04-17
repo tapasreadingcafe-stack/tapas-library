@@ -2074,6 +2074,8 @@ function PageSettingsPanel({
   onDelete,
   openMediaLibrary,
   onOpenDesignSystem,
+  brand,
+  onChangeBrand,
 }) {
   // Dismissible canvas-editing tip. Persisted in localStorage so the
   // "click any text on the preview" hint disappears after first dismiss
@@ -2399,31 +2401,44 @@ function PageSettingsPanel({
         </div>
       </SubSection>
 
-      {/* Footer link to Design System */}
-      <div style={{ padding: '20px 16px 0', marginTop: '16px', borderTop: `1px solid ${D.divider}` }}>
-        <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '14px', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Global design
+      {/* Brand colors — inline so the most-edited tokens don't require
+          opening the Design System modal. Typography / buttons / images
+          and extra color shades still live in the modal. */}
+      <SubSection title="Brand colors" defaultOpen={true}>
+        <ColorField
+          field={{ key: 'primary_color', label: 'Primary' }}
+          value={brand?.primary_color}
+          onChange={(v) => onChangeBrand('primary_color', v)}
+        />
+        <ColorField
+          field={{ key: 'accent_color', label: 'Accent' }}
+          value={brand?.accent_color}
+          onChange={(v) => onChangeBrand('accent_color', v)}
+        />
+        <ColorField
+          field={{ key: 'cream_color', label: 'Background' }}
+          value={brand?.cream_color}
+          onChange={(v) => onChangeBrand('cream_color', v)}
+        />
+        <div style={{ padding: '8px 16px 4px' }}>
+          <button
+            onClick={onOpenDesignSystem}
+            style={{
+              width: '100%', padding: '7px 10px',
+              background: 'transparent', color: D.textDim,
+              border: `1px dashed ${D.border}`, borderRadius: '4px',
+              cursor: 'pointer', fontSize: '10.5px', fontWeight: '500',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = D.panelAlt; e.currentTarget.style.color = D.text; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = D.textDim; }}
+          >
+            <span>🎨</span>
+            <span>All design settings</span>
+            <span>→</span>
+          </button>
         </div>
-        <button
-          onClick={onOpenDesignSystem}
-          style={{
-            width: '100%', padding: '9px 12px',
-            background: D.panelAlt, color: D.text,
-            border: `1px solid ${D.border}`, borderRadius: '4px',
-            cursor: 'pointer', fontSize: '11px', fontWeight: '600',
-            display: 'flex', alignItems: 'center', gap: '8px',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = D.inputHover; }}
-          onMouseLeave={e => { e.currentTarget.style.background = D.panelAlt; }}
-        >
-          <span>🎨</span>
-          <span style={{ flex: 1, textAlign: 'left' }}>Open Design System</span>
-          <span style={{ color: D.textFaint }}>→</span>
-        </button>
-        <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '6px', lineHeight: 1.5 }}>
-          Site-wide brand, typography, buttons, and images.
-        </div>
-      </div>
+      </SubSection>
     </div>
   );
 }
@@ -5832,6 +5847,8 @@ export default function SiteContent() {
               })}
               openMediaLibrary={openMediaLibrary}
               onOpenDesignSystem={() => setDesignModalOpen(true)}
+              brand={draftContent?.brand || {}}
+              onChangeBrand={(key, value) => updateField('brand', key, value)}
             />
           )}
         </aside>
