@@ -41,55 +41,7 @@ function isEditorMode() {
   }
 }
 
-// Variant labels per block type — used by BlockFrame to render the
-// canvas chip strip when the user hovers a block with presets. Mirrors
-// the `presets` arrays in the editor's BLOCK_REGISTRY_META.
-export const BLOCK_PRESETS = {
-  hero: [
-    { id: 'centered',     label: 'Centered' },
-    { id: 'split',        label: 'Split image' },
-    { id: 'gradient',     label: 'Gradient' },
-    { id: 'video_bg',     label: 'Video bg' },
-    { id: 'minimal',      label: 'Minimal' },
-    { id: 'side_image',   label: 'Image left' },
-    { id: 'dual_cta',     label: 'Two buttons' },
-    { id: 'stat_strip',   label: 'With stats' },
-    { id: 'announcement', label: 'Announcement' },
-    { id: 'with_chips',   label: 'With chips' },
-  ],
-  navbar: [
-    { id: 'classic',      label: 'Classic' },
-    { id: 'centered',     label: 'Centered' },
-    { id: 'minimal',      label: 'Minimal' },
-    { id: 'split',        label: 'Split' },
-    { id: 'pill',         label: 'Pill nav' },
-    { id: 'transparent',  label: 'Transparent' },
-    { id: 'accent_bar',   label: 'Accent bar' },
-    { id: 'announcement', label: 'Announcement' },
-    { id: 'double_cta',   label: 'Two CTAs' },
-    { id: 'tagline',      label: 'Tagline' },
-  ],
-  footer: [
-    { id: 'columns',       label: 'Columns' },
-    { id: 'minimal',       label: 'Minimal' },
-    { id: 'tagline_split', label: 'Tagline split' },
-    { id: 'centered',      label: 'Centered brand' },
-    { id: 'newsletter',    label: 'Newsletter' },
-    { id: 'social_strip',  label: 'Social strip' },
-    { id: 'mega',          label: 'Mega' },
-    { id: 'dark_band',     label: 'Dark band' },
-    { id: 'logo_only',     label: 'Logo only' },
-    { id: 'tagline_below', label: 'Tagline below' },
-  ],
-};
-
-// Context: PageRenderer sets the current block's type + preset so
-// BlockFrame can render the variants chip strip without every
-// renderer having to thread those props through manually.
-export const BlockMetaCtx = React.createContext({ blockType: null, currentPreset: null });
-
 function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlocks }) {
-  const { blockType, currentPreset } = React.useContext(BlockMetaCtx);
   const selector = `pages.${pageKey || 'unknown'}.blocks.${id}`;
   const editorMode = isEditorMode();
   const [isHovered, setIsHovered] = useState(false);
@@ -132,12 +84,6 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
   const handleMoveDown = (e) => { e?.stopPropagation?.(); sendMessage('move-block', { direction: 'down' }); };
   const handleSaveTemplate = (e) => { e?.stopPropagation?.(); sendMessage('save-template'); };
   const handleCopy = (e) => { e?.stopPropagation?.(); sendMessage('copy-block'); };
-  const handleSetPreset = (presetId, e) => { e?.stopPropagation?.(); sendMessage('set-preset', { presetId }); };
-
-  // Variants chip strip — only blocks whose type appears in BLOCK_PRESETS
-  // get one. Shown in editor mode on hover so the user can swap layouts
-  // without round-tripping through the right inspector.
-  const presetsForType = blockType && BLOCK_PRESETS[blockType];
 
   const handleDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -164,73 +110,6 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
     >
       {full ? children : (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>{children}</div>
-      )}
-
-      {/* Variants chip strip — floats just above the block on hover
-          so short blocks (announcement bar, minimal navbar) aren't
-          covered by it. Arrow keys move focus between chips, Enter
-          activates, Escape closes and restores focus. */}
-      {editorMode && isHovered && presetsForType && (
-        <div
-          role="toolbar"
-          aria-label="Variant picker"
-          onMouseEnter={handleMouseEnter}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') { setIsHovered(false); return; }
-            const buttons = Array.from(e.currentTarget.querySelectorAll('button[data-variant-chip]'));
-            const idx = buttons.indexOf(document.activeElement);
-            if (idx === -1) return;
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-              e.preventDefault();
-              buttons[(idx + 1) % buttons.length]?.focus();
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-              e.preventDefault();
-              buttons[(idx - 1 + buttons.length) % buttons.length]?.focus();
-            }
-          }}
-          style={{
-            position: 'absolute',
-            top: '-44px', left: '50%', transform: 'translateX(-50%)',
-            display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '92%',
-            padding: '6px',
-            background: 'rgba(15,23,42,0.96)',
-            border: '1px solid #374151',
-            borderRadius: '8px',
-            zIndex: 9999,
-            boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
-            justifyContent: 'center',
-          }}
-        >
-          {presetsForType.map(preset => {
-            const active = (currentPreset || presetsForType[0].id) === preset.id;
-            return (
-              <button
-                key={preset.id}
-                data-variant-chip
-                onClick={(e) => handleSetPreset(preset.id, e)}
-                title={`Switch to ${preset.label}`}
-                aria-label={`Switch to ${preset.label} variant`}
-                aria-pressed={active}
-                style={{
-                  padding: '5px 11px',
-                  background: active ? 'var(--tapas-accent, #c49040)' : '#374151',
-                  color: active ? '#1a0f08' : '#e5e7eb',
-                  border: 'none', borderRadius: '5px',
-                  fontSize: '11.5px', fontWeight: 600,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'background 0.15s',
-                  outline: 'none',
-                }}
-                onFocus={(e) => { if (!active) e.currentTarget.style.background = '#4b5563'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(196,144,64,0.6)'; }}
-                onBlur={(e) => { if (!active) e.currentTarget.style.background = '#374151'; e.currentTarget.style.boxShadow = 'none'; }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#4b5563'; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = '#374151'; }}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
-        </div>
       )}
 
       {/* Floating toolbar (visible on hover, editor-only) */}

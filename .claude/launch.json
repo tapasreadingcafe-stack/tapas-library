@@ -5,13 +5,15 @@
       "name": "staff-app",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
-      "port": 3000
+      "port": 3000,
+      "autoPort": true
     },
     {
       "name": "tapas-store",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "tapas-store", "start"],
-      "port": 3001
+      "port": 3001,
+      "autoPort": true
     }
   ]
 }
