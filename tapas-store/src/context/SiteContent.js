@@ -44,7 +44,7 @@ function loadFromCache() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
-    return deepMerge(DEFAULT_CONTENT, parsed);
+    return stripDeletedPages(deepMerge(DEFAULT_CONTENT, parsed));
   } catch {
     return null;
   }
@@ -60,6 +60,18 @@ const SiteContentCtx = createContext(DEFAULT_CONTENT);
 
 export function useSiteContent() {
   return useContext(SiteContentCtx);
+}
+
+// Pages a user deleted are tracked in `_deleted_pages` on the content
+// blob so the deep-merge with DEFAULT_CONTENT doesn't resurrect them.
+// Strip them after every merge.
+function stripDeletedPages(content) {
+  const deleted = content?._deleted_pages;
+  if (!Array.isArray(deleted) || deleted.length === 0) return content;
+  if (!content?.pages) return content;
+  const nextPages = { ...content.pages };
+  for (const k of deleted) delete nextPages[k];
+  return { ...content, pages: nextPages };
 }
 
 // Deep merge of two plain objects. Right side wins. Arrays are replaced.
@@ -207,7 +219,7 @@ export function SiteContentProvider({ children }) {
         return;
       }
       try {
-        const merged = deepMerge(DEFAULT_CONTENT, msg.content);
+        const merged = stripDeletedPages(deepMerge(DEFAULT_CONTENT, msg.content));
         setContent(merged);
         applyTheme(merged);
         if (merged.brand?.heading_font) loadGoogleFont(merged.brand.heading_font);
@@ -234,7 +246,7 @@ export function SiteContentProvider({ children }) {
         if (!mounted) return;
         if (data?.value) {
           const raw = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-          const merged = deepMerge(DEFAULT_CONTENT, raw);
+          const merged = stripDeletedPages(deepMerge(DEFAULT_CONTENT, raw));
           // Only update state if the DB actually differs from what we're
           // already showing. Avoids a pointless re-render for returning
           // visitors whose cache matches production.

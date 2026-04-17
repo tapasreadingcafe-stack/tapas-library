@@ -22,7 +22,7 @@
 // =====================================================================
 
 import {
-  Hero, CTA, FeatureGrid, Footer,
+  Hero, Navbar, CTA, FeatureGrid, Footer,
   TextImage, Testimonials, Pricing, FAQ, Gallery, Newsletter,
   VideoEmbed, MapEmbed, Countdown, ContactForm,
   Accordion, Tabs, Stats, LogoRow,
@@ -37,6 +37,7 @@ export const BLOCK_REGISTRY = {
     category: 'Content',
     Renderer: Hero,
     defaultProps: {
+      preset: 'centered',
       eyebrow: 'New arrival',
       headline: 'Your headline here',
       subheadline: '',
@@ -46,6 +47,7 @@ export const BLOCK_REGISTRY = {
       align: 'center',
       background_image: '',
       overlay_opacity: 0.4,
+      image_url: '',
     },
     schema: [
       { key: 'eyebrow',          label: 'Eyebrow',      type: 'text' },
@@ -105,11 +107,32 @@ export const BLOCK_REGISTRY = {
     ],
   },
 
+  navbar: {
+    label: 'Navbar',
+    category: 'Content',
+    Renderer: Navbar,
+    defaultProps: {
+      preset: 'classic',
+      brand_name: 'Your brand',
+      links: [
+        { label: 'Home',    href: '/' },
+        { label: 'About',   href: '/about' },
+        { label: 'Pricing', href: '/offers' },
+        { label: 'Contact', href: '/about' },
+      ],
+      cta_text: 'Sign up',
+      cta_href: '/',
+      background_color: '',
+      text_color: '',
+    },
+  },
+
   footer: {
     label: 'Footer',
     category: 'Content',
     Renderer: Footer,
     defaultProps: {
+      preset: 'columns',
       columns: [
         { title: 'Shop',   links: [{ label: 'All books', href: '/books' }, { label: 'Offers', href: '/offers' }] },
         { title: 'About',  links: [{ label: 'Our story', href: '/about' }, { label: 'Contact', href: '/contact' }] },
@@ -117,9 +140,11 @@ export const BLOCK_REGISTRY = {
       ],
       copyright: `© ${new Date().getFullYear()} Tapas Reading Cafe`,
       background_color: '',
+      tagline: '',
     },
     schema: [
       { key: 'copyright', label: 'Copyright text', type: 'text' },
+      { key: 'tagline',   label: 'Tagline',        type: 'text' },
       { key: 'background_color', label: 'Background', type: 'color' },
     ],
   },

@@ -28,14 +28,28 @@ import { logAbConversions } from './PageRenderer';
 // Shared wrapper every block uses. Provides the data-editable attribute
 // the canvas selector keys off, plus sensible max-width + padding so
 // blocks look presentable out of the box. Also provides floating toolbar
-// on hover with delete, duplicate, and move actions (Phase 3).
+// on hover with delete, duplicate, and move actions (Phase 3) — but
+// ONLY in editor mode (inside the dashboard iframe or with
+// ?preview=draft). Public visitors must never see the toolbar.
+function isEditorMode() {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.self !== window.top) return true;
+    return /[?&]preview=draft\b/.test(window.location.search || '');
+  } catch {
+    return false;
+  }
+}
+
 function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlocks }) {
   const selector = `pages.${pageKey || 'unknown'}.blocks.${id}`;
+  const editorMode = isEditorMode();
   const [isHovered, setIsHovered] = useState(false);
   const [toolbarPos, setToolbarPos] = useState(null);
   const sectionRef = React.useRef(null);
 
   const handleMouseEnter = () => {
+    if (!editorMode) return;
     setIsHovered(true);
     if (sectionRef.current) {
       const rect = sectionRef.current.getBoundingClientRect();
@@ -44,6 +58,7 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
   };
 
   const handleMouseLeave = () => {
+    if (!editorMode) return;
     setIsHovered(false);
   };
 
@@ -80,8 +95,8 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
     <section
       ref={sectionRef}
       data-editable={selector}
-      draggable
-      onDragStart={handleDragStart}
+      draggable={editorMode}
+      onDragStart={editorMode ? handleDragStart : undefined}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{
@@ -89,7 +104,7 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
         padding: full ? 0 : 'clamp(48px, 8vw, 96px) clamp(20px, 5vw, 64px)',
         boxSizing: 'border-box',
         position: 'relative',
-        cursor: 'grab',
+        cursor: editorMode ? 'grab' : 'default',
         ...(style || {}),
       }}
     >
@@ -97,8 +112,8 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>{children}</div>
       )}
 
-      {/* Floating toolbar (visible on hover) */}
-      {isHovered && (
+      {/* Floating toolbar (visible on hover, editor-only) */}
+      {editorMode && isHovered && (
         <div
           style={{
             position: 'fixed',
@@ -342,8 +357,110 @@ function Button({ href, children, variant = 'primary' }) {
 // Static blocks
 // ---------------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// Hero — three preset layouts share the same prop set; the renderer
+// dispatches on `props.preset`. New variants get added by extending
+// the switch and bumping the `presets` array in blockRegistryMeta.
+// ---------------------------------------------------------------------
+
+function HeroEyebrow({ p, color }) {
+  if (!p.eyebrow) return null;
+  return (
+    <div style={{
+      fontSize: 'var(--tapas-eyebrow-size, 11px)',
+      letterSpacing: 'var(--tapas-eyebrow-tracking, 2.5px)',
+      textTransform: 'uppercase', fontWeight: '700',
+      marginBottom: '18px', opacity: 0.8, color,
+    }}>{p.eyebrow}</div>
+  );
+}
+
+function HeroHeadline({ p }) {
+  return (
+    <h1 style={{
+      fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+      fontSize: 'var(--tapas-h-xxl-size, 72px)',
+      fontWeight: 'var(--tapas-h-weight, 800)',
+      lineHeight: 1.05, margin: '0 0 20px',
+    }}>
+      {p.headline || 'Your headline here'}
+      {p.subheadline && (
+        <span style={{ display: 'block', fontStyle: 'italic', fontWeight: 500, opacity: 0.9 }}>
+          {p.subheadline}
+        </span>
+      )}
+    </h1>
+  );
+}
+
+function HeroDescription({ p, centered }) {
+  if (!p.description) return null;
+  return (
+    <p style={{
+      fontSize: '18px', lineHeight: 1.65, margin: '0 0 32px',
+      maxWidth: '620px',
+      marginLeft: centered ? 'auto' : 0,
+      marginRight: centered ? 'auto' : 0,
+      opacity: 0.88,
+    }}>{p.description}</p>
+  );
+}
+
 export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
+  const preset = p.preset || 'centered';
+
+  if (preset === 'split') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'var(--tapas-cream, #fbfbe2)',
+        color: 'var(--tapas-h-color, #26170c)',
+        minHeight: '60vh',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '48px', alignItems: 'center', width: '100%',
+        }}>
+          <div style={{ textAlign: 'left' }}>
+            <HeroEyebrow p={p} color="var(--tapas-accent, #006a6a)" />
+            <HeroHeadline p={p} />
+            <HeroDescription p={p} centered={false} />
+            {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+          </div>
+          <div style={{
+            background: p.image_url ? `url("${p.image_url}") center/cover` : 'linear-gradient(135deg, var(--tapas-sand, #d4a574), var(--tapas-accent, #006a6a))',
+            borderRadius: '16px',
+            aspectRatio: '4 / 3',
+            width: '100%',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+          }} />
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'gradient') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'linear-gradient(135deg, var(--tapas-accent, #006a6a) 0%, var(--tapas-primary, #26170c) 100%)',
+        color: '#fff',
+        minHeight: '60vh',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto' }}>
+          <HeroEyebrow p={p} color="rgba(255,255,255,0.85)" />
+          <HeroHeadline p={p} />
+          <HeroDescription p={p} centered={true} />
+          {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  // 'centered' (default) — keeps the original look so existing pages
+  // render unchanged.
   return (
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: p.background_image
@@ -351,42 +468,99 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
         : 'linear-gradient(135deg, var(--tapas-primary, #26170c), var(--tapas-primary-dark, #1a0f08))',
       color: p.background_image ? '#fff' : '#f5f5dc',
       minHeight: '60vh',
-      display: 'flex',
-      alignItems: 'center',
+      display: 'flex', alignItems: 'center',
     }}>
       <div style={{ textAlign: p.align || 'center', maxWidth: '800px', margin: '0 auto' }}>
-        {p.eyebrow && (
-          <div style={{
-            fontSize: 'var(--tapas-eyebrow-size, 11px)',
-            letterSpacing: 'var(--tapas-eyebrow-tracking, 2.5px)',
-            textTransform: 'uppercase', fontWeight: '700',
-            marginBottom: '18px', opacity: 0.8,
-          }}>{p.eyebrow}</div>
-        )}
-        <h1 style={{
-          fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
-          fontSize: 'var(--tapas-h-xxl-size, 72px)',
-          fontWeight: 'var(--tapas-h-weight, 800)',
-          lineHeight: 1.05, margin: '0 0 20px',
-        }}>
-          {p.headline || 'Your headline here'}
-          {p.subheadline && (
-            <span style={{ display: 'block', fontStyle: 'italic', fontWeight: 500, opacity: 0.9 }}>
-              {p.subheadline}
-            </span>
-          )}
-        </h1>
-        {p.description && (
-          <p style={{
-            fontSize: '18px', lineHeight: 1.65, margin: '0 0 32px',
-            maxWidth: '620px', marginLeft: p.align === 'center' ? 'auto' : 0, marginRight: p.align === 'center' ? 'auto' : 0,
-            opacity: 0.88,
-          }}>{p.description}</p>
-        )}
-        {p.cta_text && (
-          <Button href={p.cta_href}>{p.cta_text}</Button>
-        )}
+        <HeroEyebrow p={p} />
+        <HeroHeadline p={p} />
+        <HeroDescription p={p} centered={p.align === 'center'} />
+        {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
       </div>
+    </BlockFrame>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Navbar — block-level navbar with 3 layout presets. Distinct from the
+// global Header (HeaderTemplates.js) — this one renders inside a page's
+// block stack, so users can drop a custom navbar on a specific page or
+// landing variant.
+// ---------------------------------------------------------------------
+export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
+  const p = props || {};
+  const preset = p.preset || 'classic';
+  const links = Array.isArray(p.links) ? p.links : [];
+  const bg   = p.background_color || 'var(--tapas-primary, #26170c)';
+  const text = p.text_color || '#fbfbe2';
+
+  const linkStyle = {
+    color: text, textDecoration: 'none', fontSize: '14px',
+    fontWeight: 600, opacity: 0.85,
+  };
+
+  if (preset === 'centered') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '20px 24px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+      }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+          {p.cta_text && <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, color: 'var(--tapas-accent, #c49040)' }}>{p.cta_text}</Link>}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'minimal') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '16px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ fontSize: '18px', fontWeight: 700 }}>{p.brand_name || 'Your brand'}</div>
+        {p.cta_text && (
+          <Link to={p.cta_href || '#'} style={{
+            ...linkStyle, opacity: 1,
+            padding: '8px 18px',
+            background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
+            borderRadius: '999px',
+          }}>{p.cta_text}</Link>
+        )}
+      </BlockFrame>
+    );
+  }
+
+  // classic — brand left · links center · CTA right
+  return (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+      background: bg, color: text,
+      padding: '16px 32px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+    }}>
+      <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+        {p.brand_name || 'Your brand'}
+      </div>
+      <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
+        {links.map((lnk, i) => (
+          <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+        ))}
+      </div>
+      {p.cta_text && (
+        <Link to={p.cta_href || '#'} style={{
+          ...linkStyle, opacity: 1,
+          padding: '8px 18px',
+          background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
+          borderRadius: '999px',
+        }}>{p.cta_text}</Link>
+      )}
     </BlockFrame>
   );
 }
@@ -464,13 +638,90 @@ export function FeatureGrid({ id, pageKey, props, blockIndex, totalBlocks }) {
   );
 }
 
+// ---------------------------------------------------------------------
+// Footer — three preset layouts. The columns array drives links in
+// 'columns' and 'tagline_split'; 'minimal' ignores them and shows
+// only the copyright line.
+// ---------------------------------------------------------------------
+
+function FooterColumn({ col }) {
+  return (
+    <div>
+      {col.title && (
+        <h4 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '2px', margin: '0 0 16px', opacity: 0.7 }}>
+          {col.title}
+        </h4>
+      )}
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {(col.links || []).map((lnk, j) => (
+          <li key={j} style={{ marginBottom: '8px' }}>
+            <Link to={lnk.href || '#'} style={{ color: '#f5f5dc', textDecoration: 'none', fontSize: '14px', opacity: 0.85 }}>
+              {lnk.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function Footer({ id, pageKey, props, blockIndex, totalBlocks }) {
   const p = props || {};
+  const preset = p.preset || 'columns';
   const columns = Array.isArray(p.columns) ? p.columns : [];
+  const bg = p.background_color || 'var(--tapas-primary-dark, #1a0f08)';
+  const copyright = p.copyright || `© ${new Date().getFullYear()} Tapas Reading Cafe`;
+
+  if (preset === 'minimal') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '32px 20px',
+        textAlign: 'center', fontSize: '13px', opacity: 0.85,
+      }}>
+        {copyright}
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'tagline_split') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '60px 20px 32px',
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(220px, 1fr) 2fr',
+            gap: '48px', marginBottom: '40px', alignItems: 'start',
+          }}>
+            <div style={{ fontSize: '17px', lineHeight: 1.55, opacity: 0.9, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)', fontStyle: 'italic' }}>
+              {p.tagline || 'A short tagline for your brand.'}
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: '32px',
+            }}>
+              {columns.map((col, i) => <FooterColumn key={i} col={col} />)}
+            </div>
+          </div>
+          <div style={{
+            borderTop: '1px solid rgba(245,245,220,0.15)',
+            paddingTop: '24px', fontSize: '13px', opacity: 0.7,
+          }}>
+            {copyright}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  // 'columns' (default) — original layout, preserved for un-migrated pages.
   return (
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
-      background: p.background_color || 'var(--tapas-primary-dark, #1a0f08)',
-      color: '#f5f5dc',
+      background: bg, color: '#f5f5dc',
       padding: '60px 20px 32px',
     }} full>
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
@@ -479,28 +730,13 @@ export function Footer({ id, pageKey, props, blockIndex, totalBlocks }) {
           gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`,
           gap: '40px', marginBottom: '40px',
         }}>
-          {columns.map((col, i) => (
-            <div key={i}>
-              <h4 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '2px', margin: '0 0 16px', opacity: 0.7 }}>
-                {col.title}
-              </h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {(col.links || []).map((lnk, j) => (
-                  <li key={j} style={{ marginBottom: '8px' }}>
-                    <Link to={lnk.href || '#'} style={{ color: '#f5f5dc', textDecoration: 'none', fontSize: '14px', opacity: 0.85 }}>
-                      {lnk.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {columns.map((col, i) => <FooterColumn key={i} col={col} />)}
         </div>
         <div style={{
           borderTop: '1px solid rgba(245,245,220,0.15)',
           paddingTop: '24px', fontSize: '13px', opacity: 0.7, textAlign: 'center',
         }}>
-          {p.copyright || `© ${new Date().getFullYear()} Tapas Reading Cafe`}
+          {copyright}
         </div>
       </div>
     </BlockFrame>

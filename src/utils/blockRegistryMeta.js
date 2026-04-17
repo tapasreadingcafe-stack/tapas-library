@@ -25,6 +25,7 @@ export const BLOCK_REGISTRY_META = {
     category: 'Content',
     icon: '🎯',
     defaultProps: {
+      preset: 'centered',
       eyebrow: 'New arrival',
       headline: 'Your headline here',
       subheadline: '',
@@ -34,7 +35,28 @@ export const BLOCK_REGISTRY_META = {
       align: 'center',
       background_image: '',
       overlay_opacity: 0.4,
+      image_url: '',
     },
+    presets: [
+      {
+        id: 'centered',
+        label: 'Centered',
+        hint: 'Big headline, centered text, single CTA.',
+        defaultProps: { preset: 'centered', align: 'center' },
+      },
+      {
+        id: 'split',
+        label: 'Split image',
+        hint: 'Text on the left, image on the right.',
+        defaultProps: { preset: 'split', align: 'left', image_url: '' },
+      },
+      {
+        id: 'gradient',
+        label: 'Gradient',
+        hint: 'Bold gradient background with eyebrow + headline.',
+        defaultProps: { preset: 'gradient', align: 'center', background_image: '' },
+      },
+    ],
     schema: [
       { key: 'eyebrow',          label: 'Eyebrow',      type: 'text' },
       { key: 'headline',         label: 'Headline',     type: 'text' },
@@ -45,8 +67,64 @@ export const BLOCK_REGISTRY_META = {
       { key: 'align',            label: 'Alignment',    type: 'select', options: [
         { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' },
       ]},
-      { key: 'background_image', label: 'Background',   type: 'image' },
+      { key: 'background_image', label: 'Background',   type: 'image', hint: 'Used by Centered preset.' },
       { key: 'overlay_opacity',  label: 'Overlay',      type: 'number', min: 0, max: 1 },
+      { key: 'image_url',        label: 'Image (split)', type: 'image', hint: 'Used by Split preset.' },
+    ],
+  },
+
+  navbar: {
+    label: 'Navbar',
+    category: 'Content',
+    icon: '☰',
+    defaultProps: {
+      preset: 'classic',
+      brand_name: 'Your brand',
+      links: [
+        { label: 'Home',    href: '/' },
+        { label: 'About',   href: '/about' },
+        { label: 'Pricing', href: '/offers' },
+        { label: 'Contact', href: '/about' },
+      ],
+      cta_text: 'Sign up',
+      cta_href: '/',
+      background_color: '',
+      text_color: '',
+    },
+    presets: [
+      {
+        id: 'classic',
+        label: 'Classic',
+        hint: 'Brand left, links center, CTA right.',
+        defaultProps: { preset: 'classic' },
+      },
+      {
+        id: 'centered',
+        label: 'Centered',
+        hint: 'Brand centered above link row.',
+        defaultProps: { preset: 'centered' },
+      },
+      {
+        id: 'minimal',
+        label: 'Minimal',
+        hint: 'Just brand and a single CTA — no link list.',
+        defaultProps: { preset: 'minimal' },
+      },
+    ],
+    schema: [
+      { key: 'brand_name',       label: 'Brand name',  type: 'text' },
+      { key: 'cta_text',         label: 'Button text', type: 'text' },
+      { key: 'cta_href',         label: 'Button link', type: 'text' },
+      { key: 'background_color', label: 'Background',  type: 'color' },
+      { key: 'text_color',       label: 'Text color',  type: 'color' },
+      {
+        key: 'links', label: 'Nav links', type: 'array',
+        itemDefaults: { label: 'New link', href: '/' },
+        itemFields: [
+          { key: 'label', label: 'Label', type: 'text' },
+          { key: 'href',  label: 'URL',   type: 'text' },
+        ],
+      },
     ],
   },
 
@@ -106,6 +184,7 @@ export const BLOCK_REGISTRY_META = {
     category: 'Content',
     icon: '⎯',
     defaultProps: {
+      preset: 'columns',
       columns: [
         { title: 'Shop',  links: [{ label: 'All books', href: '/books' }, { label: 'Offers', href: '/offers' }] },
         { title: 'About', links: [{ label: 'Our story', href: '/about' }, { label: 'Contact', href: '/contact' }] },
@@ -113,9 +192,31 @@ export const BLOCK_REGISTRY_META = {
       ],
       copyright: `© ${new Date().getFullYear()} Tapas Reading Cafe`,
       background_color: '',
+      tagline: '',
     },
+    presets: [
+      {
+        id: 'columns',
+        label: 'Columns',
+        hint: 'Multi-column links with copyright row.',
+        defaultProps: { preset: 'columns' },
+      },
+      {
+        id: 'minimal',
+        label: 'Minimal',
+        hint: 'Single centered copyright line — no columns.',
+        defaultProps: { preset: 'minimal' },
+      },
+      {
+        id: 'tagline_split',
+        label: 'Tagline + links',
+        hint: 'Brand tagline on the left, link columns on the right.',
+        defaultProps: { preset: 'tagline_split', tagline: 'Books and good coffee, in one quiet room.' },
+      },
+    ],
     schema: [
       { key: 'copyright',        label: 'Copyright text', type: 'text' },
+      { key: 'tagline',          label: 'Tagline',        type: 'text', hint: 'Used by the Tagline preset.' },
       { key: 'background_color', label: 'Background',     type: 'color' },
     ],
   },
@@ -736,16 +837,22 @@ export const BLOCK_REGISTRY_META = {
 export const BLOCK_CATEGORIES = ['Content', 'Media', 'Dynamic'];
 
 // Fresh block factory. Mirrors makeBlock() in tapas-store/src/blocks/index.js.
+// When `presetId` is provided, the preset's defaultProps are merged on
+// top of the block type's defaultProps so the new block opens with the
+// preset's specific styling.
 let _blockIdCounter = 0;
-export function makeBlock(type) {
+export function makeBlock(type, presetId) {
   const entry = BLOCK_REGISTRY_META[type];
   if (!entry) throw new Error(`Unknown block type: ${type}`);
   const id = `b_${Date.now().toString(36)}_${(_blockIdCounter++).toString(36)}`;
-  return {
-    id,
-    type,
-    props: JSON.parse(JSON.stringify(entry.defaultProps || {})),
-  };
+  const baseProps = JSON.parse(JSON.stringify(entry.defaultProps || {}));
+  if (presetId && Array.isArray(entry.presets)) {
+    const preset = entry.presets.find(p => p.id === presetId);
+    if (preset && preset.defaultProps) {
+      Object.assign(baseProps, JSON.parse(JSON.stringify(preset.defaultProps)));
+    }
+  }
+  return { id, type, props: baseProps };
 }
 
 // Ordered list of all pages the editor can manage. Must align with
