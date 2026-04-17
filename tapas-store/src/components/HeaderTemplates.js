@@ -238,7 +238,6 @@ function ResponsiveStyles() {
 const baseNav = (brand) => ({
   position:'sticky', top:0, zIndex:1000,
   background:`linear-gradient(135deg, ${brand.primary_color} 0%, ${brand.primary_color_light} 100%)`,
-  boxShadow:'0 2px 20px rgba(0,0,0,0.35)',
   fontFamily:'var(--tapas-body-font, Lato), sans-serif',
 });
 
