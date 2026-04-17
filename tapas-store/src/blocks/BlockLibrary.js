@@ -41,7 +41,55 @@ function isEditorMode() {
   }
 }
 
+// Variant labels per block type — used by BlockFrame to render the
+// canvas chip strip when the user hovers a block with presets. Mirrors
+// the `presets` arrays in the editor's BLOCK_REGISTRY_META.
+export const BLOCK_PRESETS = {
+  hero: [
+    { id: 'centered',     label: 'Centered' },
+    { id: 'split',        label: 'Split image' },
+    { id: 'gradient',     label: 'Gradient' },
+    { id: 'video_bg',     label: 'Video bg' },
+    { id: 'minimal',      label: 'Minimal' },
+    { id: 'side_image',   label: 'Image left' },
+    { id: 'dual_cta',     label: 'Two buttons' },
+    { id: 'stat_strip',   label: 'With stats' },
+    { id: 'announcement', label: 'Announcement' },
+    { id: 'with_chips',   label: 'With chips' },
+  ],
+  navbar: [
+    { id: 'classic',      label: 'Classic' },
+    { id: 'centered',     label: 'Centered' },
+    { id: 'minimal',      label: 'Minimal' },
+    { id: 'split',        label: 'Split' },
+    { id: 'pill',         label: 'Pill nav' },
+    { id: 'transparent',  label: 'Transparent' },
+    { id: 'accent_bar',   label: 'Accent bar' },
+    { id: 'announcement', label: 'Announcement' },
+    { id: 'double_cta',   label: 'Two CTAs' },
+    { id: 'tagline',      label: 'Tagline' },
+  ],
+  footer: [
+    { id: 'columns',       label: 'Columns' },
+    { id: 'minimal',       label: 'Minimal' },
+    { id: 'tagline_split', label: 'Tagline split' },
+    { id: 'centered',      label: 'Centered brand' },
+    { id: 'newsletter',    label: 'Newsletter' },
+    { id: 'social_strip',  label: 'Social strip' },
+    { id: 'mega',          label: 'Mega' },
+    { id: 'dark_band',     label: 'Dark band' },
+    { id: 'logo_only',     label: 'Logo only' },
+    { id: 'tagline_below', label: 'Tagline below' },
+  ],
+};
+
+// Context: PageRenderer sets the current block's type + preset so
+// BlockFrame can render the variants chip strip without every
+// renderer having to thread those props through manually.
+export const BlockMetaCtx = React.createContext({ blockType: null, currentPreset: null });
+
 function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlocks }) {
+  const { blockType, currentPreset } = React.useContext(BlockMetaCtx);
   const selector = `pages.${pageKey || 'unknown'}.blocks.${id}`;
   const editorMode = isEditorMode();
   const [isHovered, setIsHovered] = useState(false);
@@ -84,6 +132,12 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
   const handleMoveDown = (e) => { e?.stopPropagation?.(); sendMessage('move-block', { direction: 'down' }); };
   const handleSaveTemplate = (e) => { e?.stopPropagation?.(); sendMessage('save-template'); };
   const handleCopy = (e) => { e?.stopPropagation?.(); sendMessage('copy-block'); };
+  const handleSetPreset = (presetId, e) => { e?.stopPropagation?.(); sendMessage('set-preset', { presetId }); };
+
+  // Variants chip strip — only blocks whose type appears in BLOCK_PRESETS
+  // get one. Shown in editor mode on hover so the user can swap layouts
+  // without round-tripping through the right inspector.
+  const presetsForType = blockType && BLOCK_PRESETS[blockType];
 
   const handleDragStart = (e) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -110,6 +164,50 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
     >
       {full ? children : (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>{children}</div>
+      )}
+
+      {/* Variants chip strip — top-center of the block on hover. Each
+          chip is a button that switches the block's preset prop in
+          place; the active preset is highlighted. */}
+      {editorMode && isHovered && presetsForType && (
+        <div
+          onMouseEnter={handleMouseEnter}
+          style={{
+            position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '90%',
+            padding: '6px',
+            background: 'rgba(15,23,42,0.95)',
+            border: '1px solid #374151',
+            borderRadius: '8px',
+            zIndex: 9999,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+          }}
+        >
+          {presetsForType.map(preset => {
+            const active = (currentPreset || presetsForType[0].id) === preset.id;
+            return (
+              <button
+                key={preset.id}
+                onClick={(e) => handleSetPreset(preset.id, e)}
+                title={`Switch to ${preset.label}`}
+                style={{
+                  padding: '5px 11px',
+                  background: active ? 'var(--tapas-accent, #c49040)' : '#374151',
+                  color: active ? '#1a0f08' : '#e5e7eb',
+                  border: 'none', borderRadius: '5px',
+                  fontSize: '11.5px', fontWeight: 600,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#4b5563'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = '#374151'; }}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* Floating toolbar (visible on hover, editor-only) */}
@@ -459,6 +557,218 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
     );
   }
 
+  if (preset === 'video_bg') {
+    const overlay = p.overlay_opacity ?? 0.55;
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        position: 'relative',
+        background: p.background_image
+          ? `linear-gradient(rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay})), url("${p.background_image}") center/cover`
+          : 'linear-gradient(135deg, #0d0d0d, #2a1a0c)',
+        color: '#fff',
+        minHeight: '85vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'clamp(60px, 10vw, 120px) clamp(20px, 5vw, 64px)',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '880px', margin: '0 auto' }}>
+          <HeroEyebrow p={p} color="rgba(255,255,255,0.9)" />
+          <HeroHeadline p={p} />
+          <HeroDescription p={p} centered={true} />
+          {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'minimal') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'var(--tapas-cream, #fbfbe2)',
+        color: 'var(--tapas-h-color, #26170c)',
+        minHeight: '50vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'clamp(80px, 12vw, 160px) clamp(20px, 5vw, 64px)',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '720px' }}>
+          <h1 style={{
+            fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'clamp(40px, 6vw, 64px)',
+            fontWeight: 500, lineHeight: 1.1, margin: '0 0 32px',
+            letterSpacing: '-0.02em',
+          }}>{p.headline || 'Your headline here'}</h1>
+          {p.cta_text && (
+            <a href={p.cta_href || '#'} style={{
+              fontSize: '15px', fontWeight: 600,
+              color: 'var(--tapas-accent, #006a6a)',
+              textDecoration: 'none',
+              borderBottom: '2px solid currentColor',
+              paddingBottom: '2px',
+            }}>{p.cta_text} →</a>
+          )}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'side_image') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'var(--tapas-cream, #fbfbe2)',
+        color: 'var(--tapas-h-color, #26170c)',
+        minHeight: '60vh',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '48px', alignItems: 'center', width: '100%',
+        }}>
+          <div style={{
+            background: p.image_url ? `url("${p.image_url}") center/cover` : 'linear-gradient(135deg, var(--tapas-accent, #006a6a), var(--tapas-sand, #d4a574))',
+            borderRadius: '16px',
+            aspectRatio: '4 / 3',
+            width: '100%',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+            order: -1,
+          }} />
+          <div style={{ textAlign: 'left' }}>
+            <HeroEyebrow p={p} color="var(--tapas-accent, #006a6a)" />
+            <HeroHeadline p={p} />
+            <HeroDescription p={p} centered={false} />
+            {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'dual_cta') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'linear-gradient(180deg, var(--tapas-cream, #fbfbe2) 0%, #fff 100%)',
+        color: 'var(--tapas-h-color, #26170c)',
+        minHeight: '60vh',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '760px', margin: '0 auto' }}>
+          <HeroEyebrow p={p} color="var(--tapas-accent, #006a6a)" />
+          <HeroHeadline p={p} />
+          <HeroDescription p={p} centered={true} />
+          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+            {p.cta_secondary_text && (
+              <a href={p.cta_secondary_href || '#'} style={{
+                padding: '14px 28px',
+                background: 'transparent', color: 'var(--tapas-h-color, #26170c)',
+                border: '1.5px solid currentColor', borderRadius: '999px',
+                textDecoration: 'none', fontSize: '15px', fontWeight: 600,
+                display: 'inline-block',
+              }}>{p.cta_secondary_text}</a>
+            )}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'stat_strip') {
+    const stats = Array.isArray(p.stats) ? p.stats : [];
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'linear-gradient(135deg, var(--tapas-primary, #26170c), var(--tapas-primary-dark, #1a0f08))',
+        color: '#f5f5dc',
+        minHeight: '60vh',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '48px',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto' }}>
+          <HeroEyebrow p={p} />
+          <HeroHeadline p={p} />
+          <HeroDescription p={p} centered={true} />
+          {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${Math.min(stats.length || 3, 4)}, 1fr)`,
+          gap: '32px', maxWidth: '900px', margin: '0 auto', width: '100%',
+        }}>
+          {stats.map((s, i) => (
+            <div key={i} style={{ textAlign: 'center' }}>
+              <div style={{
+                fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+                fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 700,
+                color: 'var(--tapas-accent, #c49040)', lineHeight: 1,
+              }}>{s.value}</div>
+              <div style={{ fontSize: '13px', opacity: 0.75, marginTop: '8px', letterSpacing: '0.5px' }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'announcement') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: 'var(--tapas-accent, #006a6a)',
+        color: '#fff',
+        padding: '24px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px',
+        flexWrap: 'wrap',
+      }}>
+        {p.eyebrow && (
+          <span style={{
+            fontSize: '11px', fontWeight: 700, letterSpacing: '2px',
+            textTransform: 'uppercase', opacity: 0.85,
+            padding: '4px 10px', background: 'rgba(255,255,255,0.15)', borderRadius: '999px',
+          }}>{p.eyebrow}</span>
+        )}
+        <span style={{ fontSize: '17px', fontWeight: 600 }}>
+          {p.headline || 'Something exciting is happening'}
+        </span>
+        {p.cta_text && (
+          <a href={p.cta_href || '#'} style={{
+            color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '15px',
+            borderBottom: '2px solid rgba(255,255,255,0.6)',
+          }}>{p.cta_text} →</a>
+        )}
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'with_chips') {
+    const chips = Array.isArray(p.chips) ? p.chips : [];
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
+        background: 'var(--tapas-cream, #fbfbe2)',
+        color: 'var(--tapas-h-color, #26170c)',
+        minHeight: '60vh',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '780px', margin: '0 auto' }}>
+          {chips.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '20px' }}>
+              {chips.map((c, i) => (
+                <span key={i} style={{
+                  padding: '6px 14px',
+                  background: '#fff',
+                  border: '1px solid rgba(38,23,12,0.12)',
+                  borderRadius: '999px',
+                  fontSize: '12px', fontWeight: 600,
+                  color: 'var(--tapas-h-color, #26170c)',
+                }}>{c.label}</span>
+              ))}
+            </div>
+          )}
+          <HeroHeadline p={p} />
+          <HeroDescription p={p} centered={true} />
+          {p.cta_text && <Button href={p.cta_href}>{p.cta_text}</Button>}
+        </div>
+      </BlockFrame>
+    );
+  }
+
   // 'centered' (default) — keeps the original look so existing pages
   // render unchanged.
   return (
@@ -533,6 +843,195 @@ export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
             background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
             borderRadius: '999px',
           }}>{p.cta_text}</Link>
+        )}
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'split') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '16px 32px',
+        display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px',
+      }}>
+        <div style={{ display: 'flex', gap: '24px', justifyContent: 'flex-start' }}>
+          {links.slice(0, Math.ceil(links.length / 2)).map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+        </div>
+        <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)', textAlign: 'center' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ display: 'flex', gap: '24px', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {links.slice(Math.ceil(links.length / 2)).map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+          {p.cta_text && (
+            <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 16px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
+          )}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'pill') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '20px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+      }}>
+        <div style={{ fontSize: '18px', fontWeight: 700 }}>{p.brand_name || 'Your brand'}</div>
+        <div style={{
+          display: 'flex', gap: '4px',
+          padding: '6px',
+          background: 'rgba(255,255,255,0.08)',
+          borderRadius: '999px',
+          border: '1px solid rgba(255,255,255,0.12)',
+        }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={{
+              ...linkStyle, padding: '6px 14px', borderRadius: '999px', opacity: 1,
+            }}>{lnk.label}</Link>
+          ))}
+        </div>
+        {p.cta_text && (
+          <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
+        )}
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'transparent') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: 'transparent', color: text,
+        padding: '20px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+        position: 'relative', zIndex: 5,
+      }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+        </div>
+        {p.cta_text && (
+          <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', border: '1.5px solid currentColor', borderRadius: '999px' }}>{p.cta_text}</Link>
+        )}
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'accent_bar') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '16px 32px 16px 28px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+        borderLeft: '6px solid var(--tapas-accent, #c49040)',
+      }}>
+        <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+        </div>
+        {p.cta_text && (
+          <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '4px' }}>{p.cta_text}</Link>
+        )}
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'announcement') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+      }}>
+        <div style={{
+          background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
+          padding: '8px 32px', textAlign: 'center',
+          fontSize: '13px', fontWeight: 600,
+        }}>
+          {p.announcement_text || '🎉 Limited-time announcement.'}
+        </div>
+        <div style={{
+          padding: '16px 32px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+        }}>
+          <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+            {p.brand_name || 'Your brand'}
+          </div>
+          <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
+            {links.map((lnk, i) => (
+              <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+            ))}
+          </div>
+          {p.cta_text && (
+            <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
+          )}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'double_cta') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '16px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+      }}>
+        <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {p.cta_secondary_text && (
+            <Link to={p.cta_secondary_href || '#'} style={{ ...linkStyle, opacity: 1 }}>{p.cta_secondary_text}</Link>
+          )}
+          {p.cta_text && (
+            <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
+          )}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'tagline') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: text,
+        padding: '16px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+      }}>
+        <div>
+          <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+            {p.brand_name || 'Your brand'}
+          </div>
+          {p.tagline && (
+            <div style={{ fontSize: '11px', opacity: 0.7, letterSpacing: '0.5px', marginTop: '2px' }}>
+              {p.tagline}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+          ))}
+        </div>
+        {p.cta_text && (
+          <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
         )}
       </BlockFrame>
     );
@@ -712,6 +1211,218 @@ export function Footer({ id, pageKey, props, blockIndex, totalBlocks }) {
             paddingTop: '24px', fontSize: '13px', opacity: 0.7,
           }}>
             {copyright}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'centered') {
+    const allLinks = columns.flatMap(c => c.links || []);
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '48px 20px',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)', marginBottom: '20px' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '24px' }}>
+          {allLinks.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} style={{ color: '#f5f5dc', textDecoration: 'none', fontSize: '14px', opacity: 0.85 }}>
+              {lnk.label}
+            </Link>
+          ))}
+        </div>
+        <div style={{ fontSize: '13px', opacity: 0.6 }}>{copyright}</div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'newsletter') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '60px 20px 32px',
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(280px, 1fr) 1fr',
+            gap: '48px', marginBottom: '40px', alignItems: 'start',
+          }}>
+            <div>
+              <h3 style={{ fontFamily: 'var(--tapas-heading-font, Newsreader, serif)', fontSize: '24px', margin: '0 0 12px', fontWeight: 600 }}>
+                {p.newsletter_headline || 'Stay in the loop'}
+              </h3>
+              <form onSubmit={(e) => e.preventDefault()} style={{ display: 'flex', gap: '8px', maxWidth: '420px' }}>
+                <input
+                  type="email"
+                  placeholder={p.newsletter_placeholder || 'you@email.com'}
+                  style={{
+                    flex: 1, padding: '12px 16px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(245,245,220,0.2)',
+                    borderRadius: '6px', color: '#f5f5dc',
+                    fontSize: '14px',
+                  }}
+                />
+                <button type="submit" style={{
+                  padding: '12px 20px',
+                  background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
+                  border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer',
+                  fontSize: '14px',
+                }}>{p.newsletter_button || 'Subscribe'}</button>
+              </form>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '32px',
+            }}>
+              {columns.map((col, i) => <FooterColumn key={i} col={col} />)}
+            </div>
+          </div>
+          <div style={{
+            borderTop: '1px solid rgba(245,245,220,0.15)',
+            paddingTop: '24px', fontSize: '13px', opacity: 0.7, textAlign: 'center',
+          }}>
+            {copyright}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'social_strip') {
+    const socials = Array.isArray(p.socials) ? p.socials : [];
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '24px 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px',
+      }}>
+        <div style={{ fontSize: '13px', opacity: 0.75 }}>{copyright}</div>
+        <div style={{ display: 'flex', gap: '20px' }}>
+          {socials.map((s, i) => (
+            <a key={i} href={s.href || '#'} style={{ color: '#f5f5dc', textDecoration: 'none', fontSize: '13px', opacity: 0.85 }}>
+              {s.label}
+            </a>
+          ))}
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'mega') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '80px 20px 36px',
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(280px, 1.4fr) 3fr',
+            gap: '64px', marginBottom: '56px', alignItems: 'start',
+          }}>
+            <div>
+              <div style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)', marginBottom: '16px' }}>
+                {p.brand_name || 'Your brand'}
+              </div>
+              {p.tagline && (
+                <div style={{ fontSize: '15px', lineHeight: 1.6, opacity: 0.8, maxWidth: '320px' }}>
+                  {p.tagline}
+                </div>
+              )}
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '32px',
+            }}>
+              {columns.map((col, i) => <FooterColumn key={i} col={col} />)}
+            </div>
+          </div>
+          <div style={{
+            borderTop: '1px solid rgba(245,245,220,0.15)',
+            paddingTop: '24px', fontSize: '13px', opacity: 0.7,
+          }}>
+            {copyright}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'dark_band') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: '#0a0604', color: '#f5f5dc',
+        padding: '60px 20px 32px',
+        borderTop: '4px solid var(--tapas-accent, #c49040)',
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`,
+            gap: '40px', marginBottom: '40px',
+          }}>
+            {columns.map((col, i) => <FooterColumn key={i} col={col} />)}
+          </div>
+          <div style={{
+            borderTop: '1px solid rgba(245,245,220,0.1)',
+            paddingTop: '24px', fontSize: '13px', opacity: 0.6, textAlign: 'center',
+          }}>
+            {copyright}
+          </div>
+        </div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'logo_only') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '48px 20px',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '28px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)', marginBottom: '12px' }}>
+          {p.brand_name || 'Your brand'}
+        </div>
+        <div style={{ fontSize: '13px', opacity: 0.6 }}>{copyright}</div>
+      </BlockFrame>
+    );
+  }
+
+  if (preset === 'tagline_below') {
+    return (
+      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+        background: bg, color: '#f5f5dc',
+        padding: '60px 20px 32px',
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`,
+            gap: '40px', marginBottom: '40px',
+          }}>
+            {columns.map((col, i) => <FooterColumn key={i} col={col} />)}
+          </div>
+          <div style={{
+            borderTop: '1px solid rgba(245,245,220,0.15)',
+            paddingTop: '24px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px',
+          }}>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+                {p.brand_name || 'Your brand'}
+              </div>
+              {p.tagline && <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '2px' }}>{p.tagline}</div>}
+            </div>
+            <div style={{ fontSize: '13px', opacity: 0.7 }}>{copyright}</div>
           </div>
         </div>
       </BlockFrame>

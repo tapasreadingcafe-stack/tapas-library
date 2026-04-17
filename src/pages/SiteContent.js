@@ -3560,6 +3560,30 @@ export default function SiteContent() {
         });
         return;
       }
+      if (msg.type === 'tapas:set-preset' && msg.blockId && msg.pageKey && msg.presetId) {
+        // Canvas variant chip swap. Just flips the block's `preset`
+        // prop in place — content fields stay populated so swapping is
+        // reversible without losing the user's text/media.
+        setDraftContent(prev => {
+          const page = prev.pages?.[msg.pageKey];
+          if (!page || !Array.isArray(page.blocks)) return prev;
+          return {
+            ...prev,
+            pages: {
+              ...prev.pages,
+              [msg.pageKey]: {
+                ...page,
+                blocks: page.blocks.map(b => (
+                  b.id === msg.blockId
+                    ? { ...b, props: { ...(b.props || {}), preset: msg.presetId } }
+                    : b
+                )),
+              },
+            },
+          };
+        });
+        return;
+      }
       if (msg.type === 'tapas:copy-block' && msg.blockId && msg.pageKey) {
         const page = draftContentRef.current?.pages?.[msg.pageKey];
         const block = page?.blocks?.find(b => b.id === msg.blockId);
