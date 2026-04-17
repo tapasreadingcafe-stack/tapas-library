@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContent';
 import PageRenderer from '../blocks/PageRenderer';
+import { findPageByPath, NotFound } from '../utils/findPage';
 
 // =====================================================================
 // About — editorial story + visit info + contact.
@@ -12,11 +13,16 @@ import PageRenderer from '../blocks/PageRenderer';
 
 export default function About() {
   const content = useSiteContent();
-  const blocks = content?.pages?.about?.blocks;
-  if (Array.isArray(blocks) && blocks.length > 0) {
-    return <PageRenderer pageKey="about" />;
+  const matchKey = findPageByPath(content?.pages, '/about');
+  if (matchKey) {
+    const blocks = content.pages[matchKey].blocks;
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      return <PageRenderer pageKey={matchKey} />;
+    }
+    if (matchKey === 'about') return <LegacyAbout />;
+    return null;
   }
-  return <LegacyAbout />;
+  return <NotFound path="/about" />;
 }
 
 function LegacyAbout() {

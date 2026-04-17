@@ -5,6 +5,7 @@ import { useSiteContent } from '../context/SiteContent';
 import { useAuth } from '../context/AuthContext';
 import HeroCarousel from '../components/HeroCarousel';
 import PageRenderer from '../blocks/PageRenderer';
+import { findPageByPath, NotFound } from '../utils/findPage';
 
 // =====================================================================
 // Home — "The Digital Curator's Study"
@@ -111,17 +112,26 @@ function GridBookCard({ book }) {
   );
 }
 
-// Webflow-style block system shim. When `content.pages.home.blocks`
-// has entries, the storefront renders via <PageRenderer>. Otherwise
-// we fall through to the legacy hardcoded Home page below so nothing
-// breaks during Phase 1 rollout.
+// Webflow-style block system shim. The route is mounted at "/", but
+// the user can rename or delete any page in the editor — so we look up
+// whatever page currently claims this slug instead of assuming "home".
+//   - Page found with blocks → PageRenderer
+//   - Page found, no blocks, default key → legacy hardcoded JSX (so
+//     un-migrated sites keep their existing look)
+//   - Page found, no blocks, user-created → blank
+//   - No page maps here → 404
 export default function Home() {
   const content = useSiteContent();
-  const blocks = content?.pages?.home?.blocks;
-  if (Array.isArray(blocks) && blocks.length > 0) {
-    return <PageRenderer pageKey="home" />;
+  const matchKey = findPageByPath(content?.pages, '/');
+  if (matchKey) {
+    const blocks = content.pages[matchKey].blocks;
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      return <PageRenderer pageKey={matchKey} />;
+    }
+    if (matchKey === 'home') return <LegacyHome />;
+    return null;
   }
-  return <LegacyHome />;
+  return <NotFound path="/" />;
 }
 
 function LegacyHome() {

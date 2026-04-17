@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { useCart } from '../context/CartContext';
 import { useSiteContent } from '../context/SiteContent';
 import PageRenderer from '../blocks/PageRenderer';
+import { findPageByPath, NotFound } from '../utils/findPage';
 
 // =====================================================================
 // Catalog — Modern Heritage design system
@@ -136,11 +137,16 @@ function BookTileSkeleton() {
 
 export default function Catalog() {
   const content = useSiteContent();
-  const blocks = content?.pages?.catalog?.blocks;
-  if (Array.isArray(blocks) && blocks.length > 0) {
-    return <PageRenderer pageKey="catalog" />;
+  const matchKey = findPageByPath(content?.pages, '/books');
+  if (matchKey) {
+    const blocks = content.pages[matchKey].blocks;
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      return <PageRenderer pageKey={matchKey} />;
+    }
+    if (matchKey === 'catalog') return <LegacyCatalog />;
+    return null;
   }
-  return <LegacyCatalog />;
+  return <NotFound path="/books" />;
 }
 
 function LegacyCatalog() {

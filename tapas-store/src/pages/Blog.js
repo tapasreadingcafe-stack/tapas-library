@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useSiteContent } from '../context/SiteContent';
 import PageRenderer from '../blocks/PageRenderer';
+import { findPageByPath, NotFound } from '../utils/findPage';
 
 // =====================================================================
 // Blog listing — reads from public.blog_posts (managed in dashboard
@@ -12,11 +13,16 @@ import PageRenderer from '../blocks/PageRenderer';
 
 export default function Blog() {
   const content = useSiteContent();
-  const blocks = content?.pages?.blog?.blocks;
-  if (Array.isArray(blocks) && blocks.length > 0) {
-    return <PageRenderer pageKey="blog" />;
+  const matchKey = findPageByPath(content?.pages, '/blog');
+  if (matchKey) {
+    const blocks = content.pages[matchKey].blocks;
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      return <PageRenderer pageKey={matchKey} />;
+    }
+    if (matchKey === 'blog') return <LegacyBlog />;
+    return null;
   }
-  return <LegacyBlog />;
+  return <NotFound path="/blog" />;
 }
 
 function LegacyBlog() {
