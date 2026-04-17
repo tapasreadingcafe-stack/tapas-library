@@ -353,6 +353,33 @@ function isEditorMode() {
   }
 }
 
+// Editor-only empty state. Real visitors never reach this branch
+// because we route around it (see PageRenderer below). The hint asks
+// the user to drag a block in from the Block Library on the left.
+function EmptyPageState({ pageKey, allHidden }) {
+  return (
+    <div style={{
+      minHeight: '60vh',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '60px 24px', textAlign: 'center',
+      color: '#5c3a1e', background: 'rgba(38,23,12,0.03)',
+      backgroundImage: 'repeating-linear-gradient(45deg, rgba(38,23,12,0.04) 0 1px, transparent 1px 12px)',
+    }}>
+      <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.6 }}>
+        {allHidden ? '👁' : '✨'}
+      </div>
+      <div style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px' }}>
+        {allHidden ? 'Every block on this page is hidden' : 'This page is empty'}
+      </div>
+      <div style={{ fontSize: '14px', maxWidth: '420px', lineHeight: 1.55, opacity: 0.75 }}>
+        {allHidden
+          ? 'Toggle the 👁 in the Layers panel to show a block again.'
+          : 'Open the Block Library on the left and click a section to add it. You can drag to reorder, hover for variant chips, and click any text to edit it.'}
+      </div>
+    </div>
+  );
+}
+
 export default function PageRenderer({ pageKey, fallback = null }) {
   const content = useSiteContent();
   const page = content?.pages?.[pageKey];
@@ -373,7 +400,11 @@ export default function PageRenderer({ pageKey, fallback = null }) {
   // caller passed as `fallback` — typically the legacy JSX of the
   // original hardcoded page. This lets us ship the block system
   // incrementally without breaking any page that hasn't been migrated.
-  if (blocks.length === 0) return fallback;
+  // In editor mode, show an inviting empty state instead of falling
+  // back so new pages don't look broken.
+  if (blocks.length === 0) {
+    return editorMode ? <EmptyPageState pageKey={pageKey} /> : fallback;
+  }
 
   // Skip blocks the editor has hidden. Editors can re-show via the 👁
   // toggle in the Layers panel; we filter here so production visitors
@@ -381,7 +412,9 @@ export default function PageRenderer({ pageKey, fallback = null }) {
   // so toggling visibility is just a `props.hidden` flip — no destructive
   // delete + recreate.
   const visibleBlocks = blocks.filter(b => !b?.props?.hidden);
-  if (visibleBlocks.length === 0) return fallback;
+  if (visibleBlocks.length === 0) {
+    return editorMode ? <EmptyPageState pageKey={pageKey} allHidden /> : fallback;
+  }
 
   return (
     <>

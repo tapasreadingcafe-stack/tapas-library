@@ -166,21 +166,38 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>{children}</div>
       )}
 
-      {/* Variants chip strip — top-center of the block on hover. Each
-          chip is a button that switches the block's preset prop in
-          place; the active preset is highlighted. */}
+      {/* Variants chip strip — floats just above the block on hover
+          so short blocks (announcement bar, minimal navbar) aren't
+          covered by it. Arrow keys move focus between chips, Enter
+          activates, Escape closes and restores focus. */}
       {editorMode && isHovered && presetsForType && (
         <div
+          role="toolbar"
+          aria-label="Variant picker"
           onMouseEnter={handleMouseEnter}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { setIsHovered(false); return; }
+            const buttons = Array.from(e.currentTarget.querySelectorAll('button[data-variant-chip]'));
+            const idx = buttons.indexOf(document.activeElement);
+            if (idx === -1) return;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              buttons[(idx + 1) % buttons.length]?.focus();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              buttons[(idx - 1 + buttons.length) % buttons.length]?.focus();
+            }
+          }}
           style={{
-            position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)',
-            display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '90%',
+            position: 'absolute',
+            top: '-44px', left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '92%',
             padding: '6px',
-            background: 'rgba(15,23,42,0.95)',
+            background: 'rgba(15,23,42,0.96)',
             border: '1px solid #374151',
             borderRadius: '8px',
             zIndex: 9999,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
             justifyContent: 'center',
           }}
         >
@@ -189,8 +206,11 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
             return (
               <button
                 key={preset.id}
+                data-variant-chip
                 onClick={(e) => handleSetPreset(preset.id, e)}
                 title={`Switch to ${preset.label}`}
+                aria-label={`Switch to ${preset.label} variant`}
+                aria-pressed={active}
                 style={{
                   padding: '5px 11px',
                   background: active ? 'var(--tapas-accent, #c49040)' : '#374151',
@@ -199,7 +219,10 @@ function BlockFrame({ id, pageKey, children, full, style, blockIndex, totalBlock
                   fontSize: '11.5px', fontWeight: 600,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                   transition: 'background 0.15s',
+                  outline: 'none',
                 }}
+                onFocus={(e) => { if (!active) e.currentTarget.style.background = '#4b5563'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(196,144,64,0.6)'; }}
+                onBlur={(e) => { if (!active) e.currentTarget.style.background = '#374151'; e.currentTarget.style.boxShadow = 'none'; }}
                 onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#4b5563'; }}
                 onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = '#374151'; }}
               >
@@ -477,9 +500,10 @@ function HeroHeadline({ p }) {
   return (
     <h1 style={{
       fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
-      fontSize: 'var(--tapas-h-xxl-size, 72px)',
+      fontSize: 'clamp(32px, 6vw, var(--tapas-h-xxl-size, 72px))',
       fontWeight: 'var(--tapas-h-weight, 800)',
       lineHeight: 1.05, margin: '0 0 20px',
+      overflowWrap: 'anywhere',
     }}>
       {p.headline || 'Your headline here'}
       {p.subheadline && (
@@ -518,7 +542,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
       }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
           gap: '48px', alignItems: 'center', width: '100%',
         }}>
           <div style={{ textAlign: 'left' }}>
@@ -620,7 +644,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
       }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
           gap: '48px', alignItems: 'center', width: '100%',
         }}>
           <div style={{
@@ -802,59 +826,140 @@ export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
   const links = Array.isArray(p.links) ? p.links : [];
   const bg   = p.background_color || 'var(--tapas-primary, #26170c)';
   const text = p.text_color || '#fbfbe2';
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const linkStyle = {
     color: text, textDecoration: 'none', fontSize: '14px',
     fontWeight: 600, opacity: 0.85,
   };
 
-  if (preset === 'centered') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '20px 24px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+  // Shared mobile bits — every variant injects this CSS + DOM. The
+  // CSS hides the desktop layout and shows the hamburger row on
+  // narrow viewports. `data-editable` matches BlockFrame's section.
+  const breakpoint = 760;
+  const navStyles = (
+    <style>{`
+      @media (max-width: ${breakpoint}px) {
+        [data-editable="pages.${pageKey || 'unknown'}.blocks.${id}"] .tapas-nav-desktop { display: none !important; }
+        [data-editable="pages.${pageKey || 'unknown'}.blocks.${id}"] .tapas-nav-mobile { display: flex !important; }
+      }
+      @media (min-width: ${breakpoint + 1}px) {
+        [data-editable="pages.${pageKey || 'unknown'}.blocks.${id}"] .tapas-nav-mobile { display: none !important; }
+      }
+    `}</style>
+  );
+
+  const mobileBits = (
+    <>
+      <div className="tapas-nav-mobile" style={{
+        display: 'none', justifyContent: 'space-between', alignItems: 'center',
+        padding: '14px 20px',
       }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+        <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
           {p.brand_name || 'Your brand'}
         </div>
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          style={{
+            background: 'transparent', border: '1px solid currentColor', color: text,
+            width: '38px', height: '38px', borderRadius: '8px', cursor: 'pointer',
+            fontSize: '18px', lineHeight: 1, padding: 0,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >{menuOpen ? '✕' : '☰'}</button>
+      </div>
+      {menuOpen && (
+        <div className="tapas-nav-mobile" style={{
+          display: 'none', flexDirection: 'column', gap: '4px',
+          padding: '8px 16px 20px',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          {links.map((lnk, i) => (
+            <Link key={i} to={lnk.href || '#'} onClick={() => setMenuOpen(false)} style={{
+              ...linkStyle, padding: '12px 8px', display: 'block', opacity: 1,
+            }}>{lnk.label}</Link>
+          ))}
+          {p.cta_secondary_text && (
+            <Link to={p.cta_secondary_href || '#'} onClick={() => setMenuOpen(false)} style={{
+              ...linkStyle, padding: '12px 8px', display: 'block', opacity: 1, marginTop: '4px',
+            }}>{p.cta_secondary_text}</Link>
+          )}
+          {p.cta_text && (
+            <Link to={p.cta_href || '#'} onClick={() => setMenuOpen(false)} style={{
+              ...linkStyle, opacity: 1, padding: '14px 18px', display: 'block', textAlign: 'center',
+              background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
+              borderRadius: '8px', marginTop: '8px',
+            }}>{p.cta_text}</Link>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  // Helper: every variant calls this to render its desktop layout
+  // wrapped in the .tapas-nav-desktop class (so the mobile CSS can
+  // hide it) plus the shared mobile bits.
+  const renderNav = (frameStyle, desktopLayoutStyle, desktopChildren) => (
+    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
+      background: bg, color: text,
+      ...frameStyle,
+    }}>
+      {navStyles}
+      <div className="tapas-nav-desktop" style={desktopLayoutStyle}>
+        {desktopChildren}
+      </div>
+      {mobileBits}
+    </BlockFrame>
+  );
+
+  const brandStrong = (
+    <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
+      {p.brand_name || 'Your brand'}
+    </div>
+  );
+  const brandPlain = (
+    <div style={{ fontSize: '18px', fontWeight: 700 }}>{p.brand_name || 'Your brand'}</div>
+  );
+  const linkRow = (style) => (
+    <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1, ...style }}>
+      {links.map((lnk, i) => (
+        <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
+      ))}
+    </div>
+  );
+  const ctaPill = p.cta_text && (
+    <Link to={p.cta_href || '#'} style={{
+      ...linkStyle, opacity: 1, padding: '8px 18px',
+      background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
+      borderRadius: '999px',
+    }}>{p.cta_text}</Link>
+  );
+
+  if (preset === 'centered') {
+    return renderNav({}, { padding: '20px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }, (
+      <>
+        {brandStrong}
         <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {links.map((lnk, i) => (
             <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
           ))}
           {p.cta_text && <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, color: 'var(--tapas-accent, #c49040)' }}>{p.cta_text}</Link>}
         </div>
-      </BlockFrame>
-    );
+      </>
+    ));
   }
 
   if (preset === 'minimal') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '16px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ fontSize: '18px', fontWeight: 700 }}>{p.brand_name || 'Your brand'}</div>
-        {p.cta_text && (
-          <Link to={p.cta_href || '#'} style={{
-            ...linkStyle, opacity: 1,
-            padding: '8px 18px',
-            background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
-            borderRadius: '999px',
-          }}>{p.cta_text}</Link>
-        )}
-      </BlockFrame>
-    );
+    return renderNav({}, { padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }, (
+      <>{brandPlain}{ctaPill}</>
+    ));
   }
 
   if (preset === 'split') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '16px 32px',
-        display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px',
-      }}>
+    return renderNav({}, { padding: '16px 32px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px' }, (
+      <>
         <div style={{ display: 'flex', gap: '24px', justifyContent: 'flex-start' }}>
           {links.slice(0, Math.ceil(links.length / 2)).map((lnk, i) => (
             <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
@@ -867,25 +972,18 @@ export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
           {links.slice(Math.ceil(links.length / 2)).map((lnk, i) => (
             <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
           ))}
-          {p.cta_text && (
-            <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 16px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
-          )}
+          {ctaPill}
         </div>
-      </BlockFrame>
-    );
+      </>
+    ));
   }
 
   if (preset === 'pill') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '20px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
-      }}>
-        <div style={{ fontSize: '18px', fontWeight: 700 }}>{p.brand_name || 'Your brand'}</div>
+    return renderNav({}, { padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }, (
+      <>
+        {brandPlain}
         <div style={{
-          display: 'flex', gap: '4px',
-          padding: '6px',
+          display: 'flex', gap: '4px', padding: '6px',
           background: 'rgba(255,255,255,0.08)',
           borderRadius: '999px',
           border: '1px solid rgba(255,255,255,0.12)',
@@ -896,64 +994,51 @@ export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
             }}>{lnk.label}</Link>
           ))}
         </div>
-        {p.cta_text && (
-          <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
-        )}
-      </BlockFrame>
-    );
+        {ctaPill}
+      </>
+    ));
   }
 
   if (preset === 'transparent') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: 'transparent', color: text,
-        padding: '20px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
-        position: 'relative', zIndex: 5,
-      }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
-          {p.brand_name || 'Your brand'}
-        </div>
-        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
-          {links.map((lnk, i) => (
-            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
-          ))}
-        </div>
+    // In the editor, a transparent navbar with nothing behind it
+    // looks broken (just a translucent gray bar over the canvas).
+    // Show a checkered placeholder so it's obvious the bar is meant
+    // to overlay another block's image/gradient.
+    const editorBg = isEditorMode()
+      ? 'repeating-conic-gradient(rgba(0,0,0,0.06) 0% 25%, transparent 0% 50%) 50% / 16px 16px'
+      : 'transparent';
+    return renderNav({ background: editorBg, position: 'relative', zIndex: 5 }, {
+      padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+    }, (
+      <>
+        {brandStrong}
+        {linkRow()}
         {p.cta_text && (
           <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', border: '1.5px solid currentColor', borderRadius: '999px' }}>{p.cta_text}</Link>
         )}
-      </BlockFrame>
-    );
+      </>
+    ));
   }
 
   if (preset === 'accent_bar') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '16px 32px 16px 28px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
-        borderLeft: '6px solid var(--tapas-accent, #c49040)',
-      }}>
+    return renderNav({ borderLeft: '6px solid var(--tapas-accent, #c49040)' }, {
+      padding: '16px 32px 16px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+    }, (
+      <>
         <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
           {p.brand_name || 'Your brand'}
         </div>
-        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
-          {links.map((lnk, i) => (
-            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
-          ))}
-        </div>
+        {linkRow()}
         {p.cta_text && (
           <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '4px' }}>{p.cta_text}</Link>
         )}
-      </BlockFrame>
-    );
+      </>
+    ));
   }
 
   if (preset === 'announcement') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-      }}>
+    return renderNav({}, { display: 'flex', flexDirection: 'column' }, (
+      <>
         <div style={{
           background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
           padding: '8px 32px', textAlign: 'center',
@@ -968,53 +1053,33 @@ export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
           <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
             {p.brand_name || 'Your brand'}
           </div>
-          <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
-            {links.map((lnk, i) => (
-              <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
-            ))}
-          </div>
-          {p.cta_text && (
-            <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
-          )}
+          {linkRow()}
+          {ctaPill}
         </div>
-      </BlockFrame>
-    );
+      </>
+    ));
   }
 
   if (preset === 'double_cta') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '16px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
-      }}>
+    return renderNav({}, { padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }, (
+      <>
         <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
           {p.brand_name || 'Your brand'}
         </div>
-        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
-          {links.map((lnk, i) => (
-            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
-          ))}
-        </div>
+        {linkRow()}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {p.cta_secondary_text && (
             <Link to={p.cta_secondary_href || '#'} style={{ ...linkStyle, opacity: 1 }}>{p.cta_secondary_text}</Link>
           )}
-          {p.cta_text && (
-            <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
-          )}
+          {ctaPill}
         </div>
-      </BlockFrame>
-    );
+      </>
+    ));
   }
 
   if (preset === 'tagline') {
-    return (
-      <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-        background: bg, color: text,
-        padding: '16px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
-      }}>
+    return renderNav({}, { padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }, (
+      <>
         <div>
           <div style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
             {p.brand_name || 'Your brand'}
@@ -1025,43 +1090,22 @@ export function Navbar({ id, pageKey, props, blockIndex, totalBlocks }) {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
-          {links.map((lnk, i) => (
-            <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
-          ))}
-        </div>
-        {p.cta_text && (
-          <Link to={p.cta_href || '#'} style={{ ...linkStyle, opacity: 1, padding: '8px 18px', background: 'var(--tapas-accent, #c49040)', color: '#1a0f08', borderRadius: '999px' }}>{p.cta_text}</Link>
-        )}
-      </BlockFrame>
-    );
+        {linkRow()}
+        {ctaPill}
+      </>
+    ));
   }
 
   // classic — brand left · links center · CTA right
-  return (
-    <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
-      background: bg, color: text,
-      padding: '16px 32px',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
-    }}>
+  return renderNav({}, { padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }, (
+    <>
       <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)' }}>
         {p.brand_name || 'Your brand'}
       </div>
-      <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', justifyContent: 'center', flex: 1 }}>
-        {links.map((lnk, i) => (
-          <Link key={i} to={lnk.href || '#'} style={linkStyle}>{lnk.label}</Link>
-        ))}
-      </div>
-      {p.cta_text && (
-        <Link to={p.cta_href || '#'} style={{
-          ...linkStyle, opacity: 1,
-          padding: '8px 18px',
-          background: 'var(--tapas-accent, #c49040)', color: '#1a0f08',
-          borderRadius: '999px',
-        }}>{p.cta_text}</Link>
-      )}
-    </BlockFrame>
-  );
+      {linkRow()}
+      {ctaPill}
+    </>
+  ));
 }
 
 export function CTA({ id, pageKey, props, blockIndex, totalBlocks }) {
