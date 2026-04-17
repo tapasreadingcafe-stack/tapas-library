@@ -17,6 +17,7 @@ import React from 'react';
 import { useSiteContent } from '../context/SiteContent';
 import { supabase } from '../utils/supabase';
 import { BLOCK_REGISTRY } from './index';
+import { BlockMetaCtx } from './BlockLibrary';
 
 // ---------------------------------------------------------------------
 // Phase 7: A/B testing. Blocks with an `ab_variant` prop (values 'A' or
@@ -272,7 +273,9 @@ export function BlockView({ block, pageKey, blockIndex, totalBlocks, editorMode 
           </div>
         )}
         <div style={!scheduled && editorMode ? { opacity: 0.45, pointerEvents: 'auto' } : {}}>
-          <Renderer id={block.id} pageKey={pageKey} props={p} blockIndex={blockIndex} totalBlocks={totalBlocks} />
+          <BlockMetaCtx.Provider value={{ blockType: block.type, currentPreset: p.preset }}>
+            <Renderer id={block.id} pageKey={pageKey} props={p} blockIndex={blockIndex} totalBlocks={totalBlocks} />
+          </BlockMetaCtx.Provider>
         </div>
       </div>
     </BlockErrorBoundary>
