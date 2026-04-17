@@ -116,6 +116,18 @@ function deepMerge(base, override) {
   return out;
 }
 
+// Pages a user deleted are kept as a tombstone in `_deleted_pages` on
+// the content blob so the deep-merge with DEFAULT_CONTENT doesn't
+// resurrect them. This helper strips them after every merge.
+function stripDeletedPages(content) {
+  const deleted = content?._deleted_pages;
+  if (!Array.isArray(deleted) || deleted.length === 0) return content;
+  if (!content?.pages) return content;
+  const nextPages = { ...content.pages };
+  for (const k of deleted) delete nextPages[k];
+  return { ...content, pages: nextPages };
+}
+
 // ---- Styling tokens (Figma-like neutrals) -----------------------------
 
 // Figma-ish neutral palette.
@@ -1291,6 +1303,24 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
         opacity: isLocked ? 0.5 : 1,
         pointerEvents: isLocked ? 'none' : 'auto',
       }}>
+        {/* Variant picker — for blocks that advertise presets, lets the
+            user swap layout/style without losing the rest of their
+            content. Switching just flips `props.preset`; the renderer
+            picks the matching layout. Per-preset content fields stay
+            populated so users can try different looks instantly. */}
+        {Array.isArray(meta.presets) && meta.presets.length > 0 && (
+          <Row label="Variant" iconType="select">
+            <select
+              value={block.props?.preset || meta.defaultProps?.preset || meta.presets[0].id}
+              onChange={(e) => onChangeProp('preset', e.target.value)}
+              style={inputBaseStyle}
+            >
+              {meta.presets.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </Row>
+        )}
         {(!meta.schema || meta.schema.length === 0) ? (
           <div style={{ padding: '24px 16px', color: D.textFaint, fontSize: '11px', lineHeight: 1.55, textAlign: 'center' }}>
             This block has no editable fields yet.
@@ -1783,11 +1813,17 @@ function ElementStyleRow({ field, value, onChange }) {
 // behavior preserved), and dragging it is a @dnd-kit draggable source
 // keyed `lib:<type>` so the parent's onDragEnd can distinguish a
 // library drop from an in-tree reorder.
-function DraggableLibraryTile({ type, meta, onClick, S }) {
+function DraggableLibraryTile({ type, meta, preset, onClick, S }) {
+  // Each tile is a unique draggable. For preset tiles the id encodes
+  // both the block type and the preset id so the drop handler can
+  // create the right variant.
+  const dragId = preset ? `lib:${type}:${preset.id}` : `lib:${type}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `lib:${type}`,
-    data: { kind: 'library', type },
+    id: dragId,
+    data: { kind: 'library', type, presetId: preset?.id },
   });
+  const label = preset ? preset.label : meta.label;
+  const subtitle = preset ? meta.label : null;
   return (
     <button
       ref={setNodeRef}
@@ -1817,12 +1853,17 @@ function DraggableLibraryTile({ type, meta, onClick, S }) {
         e.currentTarget.style.borderColor = S.border;
         e.currentTarget.style.background = '#fff';
       }}
-      title={`Click to add to end · drag to insert at a position`}
+      title={preset?.hint || `Click to add to end · drag to insert at a position`}
     >
       <span style={{ fontSize: '20px' }}>{meta.icon || '▫'}</span>
       <span style={{ fontSize: '11.5px', fontWeight: '700', color: S.text, lineHeight: 1.2 }}>
-        {meta.label}
+        {label}
       </span>
+      {subtitle && (
+        <span style={{ fontSize: '10px', color: S.textDim, lineHeight: 1.2 }}>
+          {subtitle}
+        </span>
+      )}
     </button>
   );
 }
@@ -2007,7 +2048,6 @@ function PageSettingsPanel({
   page,
   pageMeta,
   blocksCount,
-  isCustom,
   reservedPaths,
   takenPaths,
   onChangeMeta,
@@ -2113,62 +2153,49 @@ function PageSettingsPanel({
         Click any block on the canvas to edit its properties.
       </div>
 
-      {/* Page details — name + slug. Read-only labels for fixed pages
-          (home/books/about/offers); editable for custom pages. */}
+      {/* Page details — name + slug. Editable for every page. */}
       <SubSection title="Page details" defaultOpen={true}>
         <div style={{ padding: '0 16px 8px' }}>
           <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
-            Page name {!isCustom && <span style={{ color: D.textFaint, fontWeight: 400 }}>(fixed)</span>}
+            Page name
           </label>
-          {isCustom ? (
-            <input
-              type="text"
-              value={pageMeta.label || page.label}
-              onChange={(e) => onChangeMeta('label', e.target.value)}
-              placeholder="e.g. Our Team"
-              style={{
-                width: '100%', padding: '6px 8px', boxSizing: 'border-box',
-                background: '#fff', border: `1px solid ${D.border}`,
-                borderRadius: '4px', fontSize: '11.5px', color: D.text,
-                outline: 'none',
-              }}
-            />
-          ) : (
-            <div style={{ fontSize: '11.5px', color: D.text, padding: '6px 0' }}>{page.label}</div>
-          )}
+          <input
+            type="text"
+            value={pageMeta.label || page.label}
+            onChange={(e) => onChangeMeta('label', e.target.value)}
+            placeholder="e.g. Our Team"
+            style={{
+              width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+              background: '#fff', border: `1px solid ${D.border}`,
+              borderRadius: '4px', fontSize: '11.5px', color: D.text,
+              outline: 'none',
+            }}
+          />
         </div>
         <div style={{ padding: '0 16px 4px' }}>
           <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
-            URL path {!isCustom && <span style={{ color: D.textFaint, fontWeight: 400 }}>(fixed)</span>}
+            URL path
           </label>
-          {isCustom ? (
-            <>
-              <input
-                type="text"
-                value={pathDraft}
-                onChange={(e) => { setPathDraft(e.target.value); if (pathError) setPathError(''); }}
-                onBlur={commitPath}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitPath(); e.currentTarget.blur(); } }}
-                placeholder="/our-team"
-                style={{
-                  width: '100%', padding: '6px 8px', boxSizing: 'border-box',
-                  background: '#fff',
-                  border: `1px solid ${pathError ? D.danger : D.border}`,
-                  borderRadius: '4px', fontSize: '11.5px', color: D.text,
-                  outline: 'none', fontFamily: 'ui-monospace, monospace',
-                }}
-              />
-              {pathError ? (
-                <div style={{ fontSize: '10px', color: D.danger, marginTop: '4px' }}>{pathError}</div>
-              ) : (
-                <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
-                  Renaming the slug will 404 the old URL once published.
-                </div>
-              )}
-            </>
+          <input
+            type="text"
+            value={pathDraft}
+            onChange={(e) => { setPathDraft(e.target.value); if (pathError) setPathError(''); }}
+            onBlur={commitPath}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitPath(); e.currentTarget.blur(); } }}
+            placeholder="/our-team"
+            style={{
+              width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+              background: '#fff',
+              border: `1px solid ${pathError ? D.danger : D.border}`,
+              borderRadius: '4px', fontSize: '11.5px', color: D.text,
+              outline: 'none', fontFamily: 'ui-monospace, monospace',
+            }}
+          />
+          {pathError ? (
+            <div style={{ fontSize: '10px', color: D.danger, marginTop: '4px' }}>{pathError}</div>
           ) : (
-            <div style={{ fontSize: '11.5px', color: D.text, padding: '6px 0', fontFamily: 'ui-monospace, monospace' }}>
-              {page.path}
+            <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
+              Renaming the slug will 404 the old URL once published.
             </div>
           )}
         </div>
@@ -2308,7 +2335,7 @@ function PageSettingsPanel({
         </div>
       </SubSection>
 
-      {/* Page actions — duplicate any page; delete only for custom pages.
+      {/* Page actions — duplicate or delete any page.
           Delete is below a divider so it's harder to mis-click. */}
       <SubSection title="Page actions" defaultOpen={true}>
         <div style={{ padding: '0 16px 8px' }}>
@@ -2328,32 +2355,30 @@ function PageSettingsPanel({
             <span style={{ flex: 1, textAlign: 'left' }}>Duplicate page</span>
           </button>
           <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
-            Creates a custom copy with all blocks. You'll be switched to the new page.
+            Creates a copy with all blocks. You'll be switched to the new page.
           </div>
         </div>
-        {isCustom && (
-          <div style={{ padding: '8px 16px 4px', borderTop: `1px solid ${D.divider}`, marginTop: '8px' }}>
-            <button
-              onClick={onDelete}
-              style={{
-                width: '100%', padding: '8px 12px',
-                background: 'transparent', color: D.danger,
-                border: `1px solid ${D.danger}55`, borderRadius: '4px',
-                cursor: 'pointer', fontSize: '11.5px', fontWeight: '600',
-                display: 'flex', alignItems: 'center', gap: '8px',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.borderColor = D.danger; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = D.danger + '55'; }}
-            >
-              <Trash2 size={13} strokeWidth={2.25} />
-              <span style={{ flex: 1, textAlign: 'left' }}>Delete page</span>
-            </button>
-            <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
-              Removes the page and its {blocksCount} block{blocksCount === 1 ? '' : 's'} from the draft.
-              The URL will 404 once published.
-            </div>
+        <div style={{ padding: '8px 16px 4px', borderTop: `1px solid ${D.divider}`, marginTop: '8px' }}>
+          <button
+            onClick={onDelete}
+            style={{
+              width: '100%', padding: '8px 12px',
+              background: 'transparent', color: D.danger,
+              border: `1px solid ${D.danger}55`, borderRadius: '4px',
+              cursor: 'pointer', fontSize: '11.5px', fontWeight: '600',
+              display: 'flex', alignItems: 'center', gap: '8px',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.borderColor = D.danger; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = D.danger + '55'; }}
+          >
+            <Trash2 size={13} strokeWidth={2.25} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Delete page</span>
+          </button>
+          <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '4px' }}>
+            Removes the page and its {blocksCount} block{blocksCount === 1 ? '' : 's'} from the draft.
+            The URL will 404 once published.
           </div>
-        )}
+        </div>
       </SubSection>
 
       {/* Footer link to Design System */}
@@ -2618,9 +2643,9 @@ export default function SiteContent() {
         ? (typeof draftRes.data.value === 'string' ? JSON.parse(draftRes.data.value) : draftRes.data.value)
         : null;
 
-      const live  = liveRaw  ? deepMerge(DEFAULT_CONTENT, liveRaw)  : DEFAULT_CONTENT;
+      const live  = stripDeletedPages(liveRaw  ? deepMerge(DEFAULT_CONTENT, liveRaw)  : DEFAULT_CONTENT);
       // If there's no draft yet, initialise it from live.
-      const draft = draftRaw ? deepMerge(DEFAULT_CONTENT, draftRaw) : live;
+      const draft = stripDeletedPages(draftRaw ? deepMerge(DEFAULT_CONTENT, draftRaw) : live);
 
       setLiveContent(live);
       setDraftContent(draft);
@@ -2752,8 +2777,8 @@ export default function SiteContent() {
     });
   }, []);
 
-  const addBlockToPage = useCallback((pageKey, type, atIndex) => {
-    const fresh = makeBlock(type);
+  const addBlockToPage = useCallback((pageKey, type, atIndex, presetId) => {
+    const fresh = makeBlock(type, presetId);
     mutateBlocks(pageKey, (blocks) => {
       const idx = typeof atIndex === 'number' ? atIndex : blocks.length;
       const next = [...blocks];
@@ -2852,16 +2877,15 @@ export default function SiteContent() {
     return blocks.find(b => b.id === selectedBlockId) || null;
   }, [selectedBlockId, editingPage, getBlocks]);
 
-  // Phase 5: Custom pages. The 6 "fixed" pages from EDITABLE_PAGES
-  // always exist. Custom pages are any page in draftContent.pages that
-  // has meta.custom === true — created by the staff via the "+ New
-  // page" button. They're merged here and used everywhere a page list
-  // is rendered (picker, SEO, store-url navigation).
-  // Reserved URL paths that custom pages can't claim. Mirrors the
-  // checks the New Page modal does so the slug-edit field rejects the
-  // same set. Keep in sync if you add new top-level routes.
+  // All pages are uniform: any page in draftContent.pages can be
+  // renamed, slugged, or deleted. EDITABLE_PAGES is just a seed list of
+  // default keys/labels/paths used as fallback metadata when the data
+  // doesn't override.
+  // Reserved URL paths the slug-edit field and New Page modal reject —
+  // app routes (cart, checkout, etc.) that don't belong to user pages.
+  // Default page paths are NOT reserved: the user is free to delete the
+  // default Home page and create a new one at "/".
   const RESERVED_PATHS = useMemo(() => new Set([
-    '/', '/books', '/about', '/offers', '/blog', '/events',
     '/cart', '/checkout', '/login', '/profile', '/order', '/member',
   ]), []);
 
@@ -2881,26 +2905,35 @@ export default function SiteContent() {
     });
   }, []);
 
+  // Resolve every page in draftContent.pages into a uniform entry with
+  // label + path, falling back to EDITABLE_PAGES defaults when meta
+  // doesn't override. Default pages keep their seed order; everything
+  // else is appended alphabetically.
   const allPages = useMemo(() => {
     const pages = draftContent?.pages || {};
-    const customEntries = Object.entries(pages)
-      .filter(([, p]) => p?.meta?.custom)
-      .map(([key, p]) => ({
+    const defaultsByKey = new Map(EDITABLE_PAGES.map(p => [p.key, p]));
+    const entries = Object.entries(pages).map(([key, p]) => {
+      const seed = defaultsByKey.get(key);
+      return {
         key,
-        label: p.meta?.label || key,
-        path: p.meta?.path || `/${key}`,
-        custom: true,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return [...EDITABLE_PAGES, ...customEntries];
+        label: p?.meta?.label || seed?.label || key,
+        path: p?.meta?.path || seed?.path || `/${key}`,
+      };
+    });
+    const seedOrder = new Map(EDITABLE_PAGES.map((p, i) => [p.key, i]));
+    return entries.sort((a, b) => {
+      const ai = seedOrder.has(a.key) ? seedOrder.get(a.key) : Infinity;
+      const bi = seedOrder.has(b.key) ? seedOrder.get(b.key) : Infinity;
+      if (ai !== bi) return ai - bi;
+      return a.label.localeCompare(b.label);
+    });
   }, [draftContent]);
-  const currentPageEntry = allPages.find(p => p.key === editingPage) || EDITABLE_PAGES[0];
+  const currentPageEntry = allPages.find(p => p.key === editingPage) || allPages[0] || { key: editingPage, label: editingPage, path: '/' };
 
-  // Duplicate the currently-edited page. Always produces a custom page
-  // (so fixed pages get cloned safely without breaking core routes).
-  // Generates a fresh slug by appending "-copy" / "-copy-2" / etc until
-  // it doesn't collide with an existing path. Block ids are regenerated
-  // so the copy is independent of the original.
+  // Duplicate the currently-edited page. Generates a fresh slug by
+  // appending "-copy" / "-copy-2" / etc until it doesn't collide with
+  // an existing path. Block ids are regenerated so the copy is
+  // independent of the original.
   const duplicateCurrentPage = useCallback(() => {
     const source = draftContent?.pages?.[editingPage];
     if (!source) return;
@@ -2914,7 +2947,7 @@ export default function SiteContent() {
       suffix += 1;
       candidate = `${baseSlug}-copy-${suffix}`;
     }
-    const newKey = 'custom_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    const newKey = 'page_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     const newBlocks = (Array.isArray(source.blocks) ? source.blocks : []).map(b => ({
       ...JSON.parse(JSON.stringify(b)),
       id: `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`,
@@ -2926,10 +2959,9 @@ export default function SiteContent() {
         [newKey]: {
           meta: {
             ...(source.meta || {}),
-            custom: true,
             label: `${baseLabel} (Copy)`,
             path: candidate,
-            title: source.meta?.title ? `${source.meta.title} (Copy)` : `${baseLabel} (Copy) — Tapas Library`,
+            title: source.meta?.title ? `${source.meta.title} (Copy)` : `${baseLabel} (Copy)`,
           },
           blocks: newBlocks,
         },
@@ -2940,18 +2972,26 @@ export default function SiteContent() {
     setSelectedBlockId(null);
   }, [draftContent, editingPage, currentPageEntry, allPages, RESERVED_PATHS]);
 
-  // Delete the currently-edited custom page. Fixed pages are guarded at
-  // the call site (the Delete button only renders for custom pages).
+  // Delete the currently-edited page (any page — defaults included).
+  // For default pages, the deep-merge with DEFAULT_CONTENT would
+  // resurrect them, so we also record the key in `_deleted_pages` as
+  // a tombstone. stripDeletedPages() removes them after every merge.
   const deleteCurrentPage = useCallback(() => {
     setDraftContent(prev => {
-      const next = { ...(prev.pages || {}) };
-      delete next[editingPage];
-      return { ...prev, pages: next };
+      const nextPages = { ...(prev.pages || {}) };
+      delete nextPages[editingPage];
+      const tombstones = new Set(Array.isArray(prev._deleted_pages) ? prev._deleted_pages : []);
+      tombstones.add(editingPage);
+      return { ...prev, pages: nextPages, _deleted_pages: Array.from(tombstones) };
     });
-    setEditingPage('home');
+    const remaining = allPages.filter(p => p.key !== editingPage);
+    const fallback = remaining[0];
+    if (fallback) {
+      setEditingPage(fallback.key);
+      setIframePath(fallback.path);
+    }
     setSelectedBlockId(null);
-    setIframePath('/');
-  }, [editingPage]);
+  }, [editingPage, allPages]);
 
   // Update a single CSS property on the currently selected element.
   // Empty string clears the override.
@@ -4409,7 +4449,7 @@ export default function SiteContent() {
                 }}
               />
               <div style={{ fontSize: '11px', color: S.textFaint, marginTop: '4px' }}>
-                Must start with "/". Reserved paths (/, /books, /about, /offers, /blog, /events, /cart, /checkout, /login, /profile) can't be used.
+                Must start with "/". App routes (/cart, /checkout, /login, /profile, /order, /member) and detail routes (/books/*, /blog/*) are reserved.
               </div>
             </div>
             {newPageError && (
@@ -4442,21 +4482,20 @@ export default function SiteContent() {
                     setNewPageError('URL path may only contain lowercase letters, digits, and dashes (e.g. /our-team).');
                     return;
                   }
-                  const RESERVED = new Set(['/', '/books', '/about', '/offers', '/blog', '/events', '/cart', '/checkout', '/login', '/profile', '/order', '/member']);
-                  if (RESERVED.has(path) || path.startsWith('/books/') || path.startsWith('/blog/') || path.startsWith('/order/')) {
+                  if (RESERVED_PATHS.has(path) || path.startsWith('/books/') || path.startsWith('/blog/') || path.startsWith('/order/')) {
                     setNewPageError(`"${path}" is reserved. Pick a different path.`);
                     return;
                   }
-                  // Make sure no existing page (fixed or custom) uses this path
+                  // Make sure no existing page already uses this path.
                   const pathTaken = allPages.some(p => p.path === path);
                   if (pathTaken) { setNewPageError(`A page already uses "${path}".`); return; }
-                  const key = 'custom_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+                  const key = 'page_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
                   setDraftContent(prev => ({
                     ...prev,
                     pages: {
                       ...(prev.pages || {}),
                       [key]: {
-                        meta: { custom: true, label, path, title: label + ' — Tapas Library', description: '' },
+                        meta: { label, path, title: label, description: '' },
                         blocks: [],
                       },
                     },
@@ -4678,18 +4717,9 @@ export default function SiteContent() {
               flexShrink: 0,
             }}
           >
-            <optgroup label="Fixed pages">
-              {EDITABLE_PAGES.map(p => (
-                <option key={p.key} value={p.key}>{p.label}</option>
-              ))}
-            </optgroup>
-            {allPages.some(p => p.custom) && (
-              <optgroup label="Custom pages">
-                {allPages.filter(p => p.custom).map(p => (
-                  <option key={p.key} value={p.key}>{p.label}</option>
-                ))}
-              </optgroup>
-            )}
+            {allPages.map(p => (
+              <option key={p.key} value={p.key}>{p.label}</option>
+            ))}
           </select>
 
           {/* Status: a single colored dot + short label.
@@ -4881,14 +4911,16 @@ export default function SiteContent() {
           const blocks = getBlocks(editingPage);
 
           // Library → tree drop. Insert at the over-row's index, or
-          // append if dropped on the empty zone.
+          // append if dropped on the empty zone. Preset tiles forward
+          // their presetId so the new block opens with the variant's
+          // styling defaults already applied.
           if (data?.kind === 'library') {
             let insertAt = blocks.length;
             if (over.id !== 'layers-end') {
               const idx = blocks.findIndex(b => b.id === over.id);
               if (idx >= 0) insertAt = idx;
             }
-            addBlockToPage(editingPage, data.type, insertAt);
+            addBlockToPage(editingPage, data.type, insertAt, data.presetId);
             return;
           }
 
@@ -4962,18 +4994,9 @@ export default function SiteContent() {
                     cursor: 'pointer', outline: 'none',
                   }}
                 >
-                  <optgroup label="Fixed pages">
-                    {EDITABLE_PAGES.map(p => (
-                      <option key={p.key} value={p.key}>{p.label}</option>
-                    ))}
-                  </optgroup>
-                  {allPages.some(p => p.custom) && (
-                    <optgroup label="Custom pages">
-                      {allPages.filter(p => p.custom).map(p => (
-                        <option key={p.key} value={p.key}>{p.label}</option>
-                      ))}
-                    </optgroup>
-                  )}
+                  {allPages.map(p => (
+                    <option key={p.key} value={p.key}>{p.label}</option>
+                  ))}
                 </select>
                 {/* Slug for custom pages + delete + SEO previously
                     lived here. They're all in the right-panel Page
@@ -5420,9 +5443,27 @@ export default function SiteContent() {
                   const types = Object.entries(BLOCK_REGISTRY_META).filter(([type, m]) => {
                     if (m.category !== cat) return false;
                     if (!query) return true;
-                    return type.toLowerCase().includes(query) || (m.label || '').toLowerCase().includes(query);
+                    if (type.toLowerCase().includes(query)) return true;
+                    if ((m.label || '').toLowerCase().includes(query)) return true;
+                    if (Array.isArray(m.presets) && m.presets.some(p => (p.label || '').toLowerCase().includes(query))) return true;
+                    return false;
                   });
                   if (types.length === 0) return null;
+                  // Expand each type into one tile per preset (or a
+                  // single tile if the type has no presets). Preset
+                  // tiles let users pick a styled variant directly
+                  // from the library, the same way Webflow surfaces
+                  // hero/footer/navbar styles.
+                  const tiles = [];
+                  for (const [type, meta] of types) {
+                    if (Array.isArray(meta.presets) && meta.presets.length > 0) {
+                      for (const preset of meta.presets) {
+                        tiles.push({ type, meta, preset });
+                      }
+                    } else {
+                      tiles.push({ type, meta, preset: null });
+                    }
+                  }
                   return (
                     <div key={cat} style={{ marginBottom: '18px' }}>
                       <div style={{
@@ -5434,13 +5475,14 @@ export default function SiteContent() {
                         gridTemplateColumns: '1fr 1fr',
                         gap: '6px',
                       }}>
-                        {types.map(([type, meta]) => (
+                        {tiles.map(({ type, meta, preset }) => (
                           <DraggableLibraryTile
-                            key={type}
+                            key={preset ? `${type}:${preset.id}` : type}
                             type={type}
                             meta={meta}
+                            preset={preset}
                             S={S}
-                            onClick={() => addBlockToPage(editingPage, type)}
+                            onClick={() => addBlockToPage(editingPage, type, undefined, preset?.id)}
                           />
                         ))}
                       </div>
@@ -5642,7 +5684,6 @@ export default function SiteContent() {
               page={currentPageEntry}
               pageMeta={draftContent?.pages?.[editingPage]?.meta || {}}
               blocksCount={(draftContent?.pages?.[editingPage]?.blocks || []).length}
-              isCustom={!!currentPageEntry.custom}
               reservedPaths={RESERVED_PATHS}
               takenPaths={allPages.filter(p => p.key !== editingPage).map(p => p.path)}
               onChangeMeta={(key, value) => updatePageMeta(editingPage, key, value)}
