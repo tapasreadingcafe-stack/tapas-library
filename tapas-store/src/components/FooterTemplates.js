@@ -2,6 +2,16 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContent';
 
+function BrandLogo({ size = 32 }) {
+  return (
+    <img
+      src={`${process.env.PUBLIC_URL || ''}/logo%20v2.png`}
+      alt="Tapas reading cafe"
+      style={{ height: `${size + 8}px`, width: 'auto', display: 'block' }}
+    />
+  );
+}
+
 // =====================================================================
 // FooterTemplates — 10 swappable footer layouts.
 //

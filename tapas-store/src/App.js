@@ -112,7 +112,14 @@ function PageLoader() {
 function AppShell() {
   return (
     <>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Lato:wght@300;400;600;700&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" />
+      <style>{`
+        :root {
+          --tapas-heading-font: 'Poppins', system-ui, sans-serif;
+          --tapas-body-font: 'Poppins', system-ui, sans-serif;
+        }
+        body, html { font-family: 'Poppins', system-ui, sans-serif; }
+      `}</style>
       <StoreEditorSync />
       <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', transition:'background 200ms, color 200ms' }}>
         <GlobalHeader />

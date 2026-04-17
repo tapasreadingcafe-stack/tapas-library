@@ -1,38 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useSiteContent } from '../context/SiteContent';
-import { useTheme } from '../context/ThemeContext';
 
-function ThemeToggle({ brand }) {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === 'dark';
-  return (
-    <button
-      onClick={toggleTheme}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={isDark ? 'Light mode' : 'Dark mode'}
-      style={{
-        background: 'rgba(255,255,255,0.08)',
-        border: '1px solid rgba(255,255,255,0.15)',
-        color: brand?.sand_color || '#F5DEB3',
-        cursor: 'pointer',
-        fontSize: '16px',
-        padding: '6px 10px',
-        borderRadius: '99px',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'transform 200ms, background 200ms',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.transform = 'rotate(12deg)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'rotate(0)'; }}
-    >
-      {isDark ? '☀️' : '🌙'}
-    </button>
-  );
+// Pick black or original light text based on the bg luminance. Threshold
+// 0.6 = anything brighter than mid-gray gets dark text.
+function pickContrastText(bg, fallbackLight) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(bg || '');
+  if (!m) return fallbackLight;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#1a2e0a' : fallbackLight;
 }
 
 // =====================================================================
@@ -69,18 +50,15 @@ function useHeaderState() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const ss = content.section_styles || {};
-  // Apply per-section overrides by merging into the brand colors the
-  // header templates read. Empty string = keep brand default.
+  // sand_color drives navbar text. Auto-contrast against the navbar bg
+  // so a light primary_color flips text to dark instead of unreadable cream.
+  const navBg = ss.header_bg_color || content.brand?.primary_color;
+  const autoText = pickContrastText(navBg, content.brand?.sand_color);
   const brand = {
     ...content.brand,
-    // The header templates use primary_color / primary_color_light for
-    // their background gradient. Override both with the section bg so
-    // the whole navbar recolours.
     primary_color:       ss.header_bg_color || content.brand?.primary_color,
     primary_color_light: ss.header_bg_color || content.brand?.primary_color_light,
-    // sand_color drives brand name + nav link color in all templates.
-    sand_color:          ss.header_text_color || content.brand?.sand_color,
-    // accent_color drives active link color + tagline.
+    sand_color:          ss.header_text_color || autoText,
     accent_color:        ss.header_link_active_color || content.brand?.accent_color,
   };
   const header = content.header || {};
@@ -133,13 +111,11 @@ function useHeaderState() {
 function Logo({ brand, header, size = 18, gap = 10, compact = false }) {
   return (
     <Link to="/" style={{ textDecoration:'none', display:'flex', alignItems:'center', gap: `${gap}px` }}>
-      <span style={{ fontSize: `${size + 10}px` }}>{header.logo_emoji || '📚'}</span>
-      {!compact && (
-        <div>
-          <div style={{ color:brand.sand_color, fontFamily:'var(--tapas-heading-font, "Playfair Display"), serif', fontSize:`${size}px`, fontWeight:'700', lineHeight:'1.1' }}>{brand.name}</div>
-          <div style={{ color:brand.accent_color, fontSize:`${size - 7}px`, letterSpacing:'2px' }}>{brand.tagline}</div>
-        </div>
-      )}
+      <img
+        src={`${process.env.PUBLIC_URL || ''}/logo%20v2.png`}
+        alt={brand.name || 'Tapas reading cafe'}
+        style={{ height: `${size + 24}px`, width: 'auto', display: 'block' }}
+      />
     </Link>
   );
 }
@@ -201,7 +177,6 @@ function AuthActions({ member, header, brand, handleLogout }) {
 function IconsRow({ wishlistCount, itemCount, brand, searchOpen, setSearchOpen, searchTerm, setSearchTerm, handleSearch, placeholder }) {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-      <ThemeToggle brand={brand} />
       {searchOpen ? (
         <form onSubmit={handleSearch} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
           <input autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -213,14 +188,6 @@ function IconsRow({ wishlistCount, itemCount, brand, searchOpen, setSearchOpen, 
       ) : (
         <button onClick={() => setSearchOpen(true)} style={{ background:'none', border:'none', color:brand.sand_color, cursor:'pointer', fontSize:'20px', padding:'4px' }}>🔍</button>
       )}
-      <Link to="/profile?tab=wishlist" style={{ position:'relative', textDecoration:'none', color:brand.sand_color, fontSize:'20px', padding:'4px' }}>
-        ❤️
-        {wishlistCount > 0 && (
-          <span style={{ position:'absolute', top:'-4px', right:'-4px', background:brand.accent_color, color:brand.primary_color, borderRadius:'50%', width:'16px', height:'16px', fontSize:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold' }}>
-            {wishlistCount}
-          </span>
-        )}
-      </Link>
       <Link to="/cart" style={{ position:'relative', textDecoration:'none', color:brand.sand_color, fontSize:'20px', padding:'4px' }}>
         🛒
         {itemCount > 0 && (
@@ -584,11 +551,34 @@ export default function HeaderTemplate() {
   const template = state.header.template || 'classic';
   const Component = TEMPLATES[template] || HeaderClassic;
   const ss = state.content?.section_styles || {};
+
+  // Transparent-over-hero nav: flip to opaque once the user scrolls past
+  // a few px. Uses a body data attribute so we don't have to thread a
+  // scrolled prop through every one of the 10 header templates.
+  useEffect(() => {
+    const onScroll = () => {
+      document.body.dataset.navScrolled = window.scrollY > 24 ? 'true' : 'false';
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const cssOverrides = `
     ${ss.header_link_color ? `.tapas-header-root nav a { color: ${ss.header_link_color} !important; }` : ''}
+    /* Transparent-at-top behaviour */
+    body:not([data-nav-scrolled="true"]) .tapas-header-root > nav,
+    body[data-nav-scrolled="false"] .tapas-header-root > nav {
+      background: transparent !important;
+      box-shadow: none !important;
+      transition: background 220ms ease, box-shadow 220ms ease;
+    }
+    body[data-nav-scrolled="true"] .tapas-header-root > nav {
+      transition: background 220ms ease, box-shadow 220ms ease;
+    }
   `;
   return (
-    <div className="tapas-header-root">
+    <div className="tapas-header-root" style={{ display: 'contents' }}>
       <style>{cssOverrides}</style>
       <Component {...state} />
     </div>

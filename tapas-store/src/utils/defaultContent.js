@@ -19,15 +19,15 @@ export const DEFAULT_CONTENT = {
   brand: {
     name: 'Your brand',
     tagline: '',
-    primary_color: '#037171',        // darker teal — headlines, navbar
-    primary_color_dark: '#025555',
-    primary_color_light: '#0a8a8a',
+    primary_color: '#CFF389',        // light lime — headlines, navbar
+    primary_color_dark: '#A8D964',
+    primary_color_light: '#DEFAA8',
     accent_color: '#00B9AE',         // bright teal — primary CTAs, links
     accent_color_dark: '#00A09A',
     cream_color: '#E6CCBE',          // warm cream — neutral surfaces
     sand_color: '#F5E9DD',
-    heading_font: 'Space Grotesk',
-    body_font: 'Inter',
+    heading_font: 'Poppins',
+    body_font: 'Poppins',
   },
   contact: {
     phone: '',

@@ -1,126 +1,488 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../utils/supabase';
 import { useSiteContent } from '../context/SiteContent';
-import { useAuth } from '../context/AuthContext';
-import HeroCarousel from '../components/HeroCarousel';
 import PageRenderer from '../blocks/PageRenderer';
 import { findPageByPath } from '../utils/findPage';
 
 // =====================================================================
-// Home — "The Digital Curator's Study"
-// Modern Heritage design: parchment surfaces, truffle tones, teal
-// accents, editorial typography (Newsreader + Plus Jakarta Sans),
-// no-border cards with tonal layering.
+// Home — Tapas reading cafe landing page (Figma conversion).
+// Sections: Hero (lime wave + library photo), Services (3 cards),
+// New Arrivals (4 product cards), Room inspiration, Testimonials.
 // =====================================================================
 
-const GENRES = [
-  { icon: '📖', label: 'Fiction' },
-  { icon: '🧠', label: 'Non-Fiction' },
-  { icon: '🔬', label: 'Science' },
-  { icon: '📜', label: 'History' },
-  { icon: '🧒', label: 'Children' },
-  { icon: '💼', label: 'Business' },
-  { icon: '🌍', label: 'Travel' },
-  { icon: '🎨', label: 'Arts' },
-];
+const LIME = '#CFF389';
+const LIME_DARK = '#A8D964';
+const PINK = '#EF3D7B';
+const PINK_DARK = '#D02A65';
+const INK = '#1F2937';
+const INK_DIM = '#4B5563';
+const INK_FAINT = '#9CA3AF';
+const PURPLE = '#7E22CE';
 
-function BookCover({ book, size = 200 }) {
-  const src = book.book_image || book.cover_image;
+// ---------------------------------------------------------------------
+// Public asset helper. Drop real images into tapas-store/public/ to
+// replace the placeholders — names are documented next to each <img>.
+// ---------------------------------------------------------------------
+const asset = (name) => `${process.env.PUBLIC_URL || ''}/${name}`;
+
+// SVG silhouette placeholder for missing imagery so the layout still
+// reads clearly when there's no asset on disk.
+function Placeholder({ ratio = '4 / 3', label, bg = '#E5E7EB' }) {
   return (
     <div style={{
-      width: size, height: size * 1.4,
-      borderRadius: 'var(--radius-md)',
-      overflow: 'hidden',
-      background: 'linear-gradient(145deg, #ede8d0, #d4c9a8)',
-      boxShadow: '0 16px 48px rgba(38,23,12,0.18)',
-      flexShrink: 0,
+      width: '100%', aspectRatio: ratio, background: bg,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: INK_FAINT, fontSize: '12px', letterSpacing: '0.5px',
+      textTransform: 'uppercase', fontWeight: 600,
+      borderRadius: '8px', overflow: 'hidden',
     }}>
-      {src ? (
-        <img src={src} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <div style={{ fontSize: size * 0.2, marginBottom: '8px' }}>📖</div>
-          <div style={{ fontSize: '10px', color: 'var(--on-surface-subtle)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            {book.genre || 'Book'}
-          </div>
-        </div>
-      )}
+      {label}
     </div>
   );
 }
 
-function StaffPickCard({ book }) {
-  const forSale = Number(book.sales_price || 0) > 0;
+function ImageOrPlaceholder({ src, ratio, label, bg }) {
+  const [failed, setFailed] = React.useState(false);
+  if (failed || !src) return <Placeholder ratio={ratio} label={label} bg={bg} />;
   return (
-    <Link to={`/books/${book.id}`} className="tps-card tps-card-interactive" style={{
-      textDecoration: 'none', color: 'inherit',
-      display: 'flex', flexDirection: 'column', gap: '16px',
-      padding: '28px', height: '100%',
+    <img
+      src={src}
+      alt={label}
+      onError={() => setFailed(true)}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------
+// 1. Hero
+// ---------------------------------------------------------------------
+function Hero() {
+  return (
+    <section style={{
+      position: 'relative', overflow: 'hidden', background: LIME,
+      marginTop: '-64px',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <BookCover book={book} size={150} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div className="tps-eyebrow" style={{ marginBottom: '8px', color: 'var(--accent)' }}>
-          ★ Staff Pick
+      <style>{`
+        @keyframes tapas-fade-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        .tapas-hero-wrap { display: grid; grid-template-columns: 0.9fr 1.3fr; min-height: 720px; }
+        .tapas-hero-photo { position: relative; }
+        @media (max-width: 900px) {
+          .tapas-hero-wrap { grid-template-columns: 1fr; min-height: auto; }
+          .tapas-hero-photo { aspect-ratio: 4 / 3; }
+        }
+      `}</style>
+      <div className="tapas-hero-wrap">
+        {/* Left: lime block + copy */}
+        <div style={{
+          background: LIME, position: 'relative',
+          padding: 'clamp(40px, 6vw, 96px) clamp(20px, 6vw, 80px)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          animation: 'tapas-fade-up 600ms ease-out',
+        }}>
+          <h1 style={{
+            margin: 0, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'clamp(34px, 4.5vw, 58px)', lineHeight: 1.05,
+            color: INK, fontWeight: 700, letterSpacing: '-0.01em',
+          }}>
+            Discover Our<br />New Collection
+          </h1>
+          <p style={{
+            marginTop: '18px', maxWidth: '440px',
+            color: INK_DIM, fontSize: '15px', lineHeight: 1.65,
+          }}>
+            Curated reads from our shelves — fresh fiction, deep non-fiction,
+            and the year's most-talked-about titles, all under one roof.
+          </p>
+          <div style={{ marginTop: '28px' }}>
+            <Link
+              to="/books"
+              style={{
+                display: 'inline-block',
+                padding: '14px 30px', borderRadius: '999px',
+                background: PINK, color: '#fff',
+                fontWeight: 700, fontSize: '14px', letterSpacing: '0.5px',
+                textDecoration: 'none', textTransform: 'uppercase',
+                boxShadow: '0 8px 20px rgba(239,61,123,0.35)',
+                transition: 'transform 200ms, box-shadow 200ms',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = PINK_DARK; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = PINK; e.currentTarget.style.transform = 'none'; }}
+            >
+              Join now!
+            </Link>
+          </div>
         </div>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: '700', color: 'var(--text)', lineHeight: 1.25, marginBottom: '4px' }}>
-          {book.title}
-        </h3>
-        <p style={{ fontSize: '13px', color: 'var(--text-subtle)', fontStyle: 'italic' }}>by {book.author}</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: '1.6', marginTop: '10px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {book.staff_pick_blurb || book.description || ''}
-        </p>
+
+        {/* Right: library photo — lime bleeds through the PNG's transparent
+            wave so the curve reads as one continuous shape. */}
+        <div className="tapas-hero-photo" style={{ background: LIME }}>
+          <ImageOrPlaceholder
+            src={asset('HERO-LIBRARY.png')}
+            ratio="auto"
+            label="Hero photo (HERO-LIBRARY.png)"
+            bg="transparent"
+          />
+        </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '14px' }}>
-        {forSale ? (
-          <span style={{ color: 'var(--accent)', fontWeight: '800', fontSize: '20px', fontFamily: 'var(--font-display)' }}>₹{book.sales_price}</span>
-        ) : (
-          <span className="tps-chip tps-chip-teal">Borrow</span>
-        )}
-        <span style={{ color: 'var(--secondary)', fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-display)', borderBottom: '2px solid var(--secondary-fixed)' }}>
-          View →
-        </span>
-      </div>
-    </Link>
+
+      {/* Decorative wave — only on desktop, sits right on the column boundary */}
+      <svg
+        viewBox="0 0 160 600" preserveAspectRatio="none" aria-hidden="true"
+        className="tapas-hero-wave"
+        style={{
+          position: 'absolute', top: 0, left: '50%', height: '100%',
+          width: '120px', transform: 'translateX(-60px)', display: 'block',
+          pointerEvents: 'none',
+        }}
+      >
+        <path d="M 0,0 L 40,0 C 80,150 20,300 90,450 C 120,540 60,580 40,600 L 0,600 Z" fill={LIME} />
+      </svg>
+      <style>{`@media (max-width: 900px) { .tapas-hero-wave { display: none !important; } }`}</style>
+    </section>
   );
 }
 
-function GridBookCard({ book }) {
-  const forSale = Number(book.sales_price || 0) > 0;
+// ---------------------------------------------------------------------
+// 2. Services
+// ---------------------------------------------------------------------
+const SERVICES = [
+  {
+    icon: '📚',
+    title: 'Buying Books',
+    body: 'Browse our curated catalogue and take new titles home — from indie debuts to global bestsellers.',
+    href: '/books',
+  },
+  {
+    icon: '🪪',
+    title: 'Lending Books',
+    body: 'Become a member and borrow up to four books at a time. Renewals are free, late fees are gentle.',
+    href: '/profile',
+  },
+  {
+    icon: '🎤',
+    title: 'Events',
+    body: 'Author readings, book clubs, and quiet study evenings — there is always something on the calendar.',
+    href: '/blog',
+  },
+];
+
+function Services() {
   return (
-    <Link to={`/books/${book.id}`} className="tps-card-interactive" style={{
-      textDecoration: 'none', color: 'inherit',
-      display: 'flex', flexDirection: 'column', gap: '12px',
-      padding: '12px', borderRadius: 'var(--radius-lg)',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <BookCover book={book} size={140} />
+    <section style={{ background: LIME, padding: 'clamp(60px, 8vw, 110px) 20px' }}>
+      <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '54px' }}>
+          <div style={{
+            color: PURPLE, fontWeight: 700, fontSize: '12px',
+            letterSpacing: '2.5px', textTransform: 'uppercase',
+          }}>
+            Our Services
+          </div>
+          <h2 style={{
+            marginTop: '12px', fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'clamp(28px, 3.6vw, 40px)', color: INK, fontWeight: 700,
+            lineHeight: 1.2, maxWidth: '720px', marginInline: 'auto',
+          }}>
+            We provide great services for our customers based on
+          </h2>
+        </div>
+
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '24px',
+        }}>
+          {SERVICES.map((s) => (
+            <ServiceCard key={s.title} {...s} />
+          ))}
+        </div>
       </div>
-      <div>
-        <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', lineHeight: 1.3, marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {book.title}
-        </h4>
-        <p style={{ fontSize: '12px', color: 'var(--text-subtle)', fontStyle: 'italic' }}>{book.author}</p>
-        {forSale && (
-          <span style={{ color: 'var(--accent)', fontWeight: '700', fontSize: '15px', fontFamily: 'var(--font-display)', marginTop: '6px', display: 'block' }}>₹{book.sales_price}</span>
-        )}
-      </div>
-    </Link>
+    </section>
   );
 }
 
-// Webflow-style block system shim. The route is mounted at "/" — the
-// one URL that must ALWAYS render something, even if the user deleted
-// the home page. Resolution order:
-//   - Some page claims slug "/" with blocks → render it via PageRenderer
-//   - Some page claims "/" but is empty → legacy JSX (so un-migrated
-//     sites keep their look)
-//   - No page maps to "/" → legacy JSX anyway (last-resort so the
-//     root URL never 404s). Other routes (/about, /blog, …) DO show
-//     NotFound when their page is gone; the root is special.
+function ServiceCard({ icon, title, body, href }) {
+  return (
+    <div style={{
+      background: '#fff', borderRadius: '12px', padding: '36px 28px 28px',
+      textAlign: 'center', boxShadow: '0 8px 30px rgba(31,41,55,0.08)',
+      transition: 'transform 250ms, box-shadow 250ms',
+    }}
+    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 16px 40px rgba(31,41,55,0.14)'; }}
+    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 30px rgba(31,41,55,0.08)'; }}
+    >
+      <div style={{ fontSize: '64px', lineHeight: 1, marginBottom: '20px' }}>{icon}</div>
+      <h3 style={{
+        margin: 0, fontSize: '17px', fontWeight: 700, color: INK,
+        letterSpacing: '0.5px', textTransform: 'uppercase',
+      }}>
+        {title}
+      </h3>
+      <p style={{
+        marginTop: '14px', color: INK_DIM, fontSize: '14px',
+        lineHeight: 1.6, minHeight: '64px',
+      }}>
+        {body}
+      </p>
+      <Link to={href} style={{
+        display: 'inline-flex', alignItems: 'center', gap: '6px',
+        marginTop: '18px', color: PURPLE, fontWeight: 700,
+        fontSize: '13px', textDecoration: 'none',
+      }}>
+        Learn more <span aria-hidden="true">→</span>
+      </Link>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// 3. New Arrivals
+// ---------------------------------------------------------------------
+const ARRIVALS = [
+  { title: 'Syltherine', sub: 'Stylish café chair',  price: 'Rp 2.500.000', strike: 'Rp 3.500.000', badge: '-30%', img: 'arrival-1.jpg' },
+  { title: 'Leviosa',    sub: 'Stylish café chair',  price: 'Rp 2.500.000', strike: null,           badge: null,    img: 'arrival-2.jpg' },
+  { title: 'Lolito',     sub: 'Luxury big sofa',     price: 'Rp 7.000.000', strike: 'Rp 14.000.000', badge: '-50%', img: 'arrival-3.jpg' },
+  { title: 'Respira',    sub: 'Outdoor bar table and stool', price: 'Rp 500.000', strike: null,    badge: 'New',   img: 'arrival-4.jpg' },
+];
+
+function NewArrivals() {
+  return (
+    <section style={{ background: LIME, padding: '0 20px clamp(60px, 8vw, 110px)' }}>
+      <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '38px' }}>
+          <div style={{
+            color: PURPLE, fontWeight: 700, fontSize: '12px',
+            letterSpacing: '2.5px', textTransform: 'uppercase',
+          }}>
+            New Arrivals
+          </div>
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '20px',
+        }}>
+          {ARRIVALS.map((a) => <ArrivalCard key={a.title} {...a} />)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ArrivalCard({ title, sub, price, strike, badge, img }) {
+  const [hovered, setHovered] = React.useState(false);
+  const badgeColor = badge === 'New' ? '#2BB673' : PINK;
+  return (
+    <article
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: '#fff', borderRadius: '4px', overflow: 'hidden',
+        position: 'relative', cursor: 'pointer',
+        boxShadow: hovered ? '0 14px 30px rgba(31,41,55,0.16)' : '0 4px 14px rgba(31,41,55,0.06)',
+        transition: 'box-shadow 200ms',
+      }}>
+      <div style={{ position: 'relative' }}>
+        <ImageOrPlaceholder src={asset(img)} ratio="1 / 1" label={img} bg="#E5E7EB" />
+        {badge && (
+          <span style={{
+            position: 'absolute', top: '14px', right: '14px',
+            background: badgeColor, color: '#fff',
+            width: '46px', height: '46px', borderRadius: '50%',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '12px', fontWeight: 700,
+          }}>{badge}</span>
+        )}
+        {hovered && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(31,41,55,0.55)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: '14px', animation: 'tapas-fade-up 220ms ease-out',
+          }}>
+            <button style={{
+              background: '#fff', color: PINK, border: 'none',
+              padding: '12px 32px', fontWeight: 700, fontSize: '13px',
+              cursor: 'pointer', letterSpacing: '0.5px',
+            }}>Add to cart</button>
+            <div style={{ display: 'flex', gap: '18px', color: '#fff', fontSize: '12px', fontWeight: 600 }}>
+              <span>↗ Share</span>
+              <span>⇄ Compare</span>
+              <span>♡ Like</span>
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '16px 18px 22px' }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, color: INK }}>{title}</div>
+        <div style={{ marginTop: '4px', fontSize: '13px', color: INK_FAINT }}>{sub}</div>
+        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+          <span style={{ fontSize: '17px', fontWeight: 700, color: INK }}>{price}</span>
+          {strike && (
+            <span style={{ fontSize: '12px', color: INK_FAINT, textDecoration: 'line-through' }}>{strike}</span>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------
+// 4. Room inspiration
+// ---------------------------------------------------------------------
+function RoomInspiration() {
+  return (
+    <section style={{ background: '#FBF8EE', padding: 'clamp(60px, 8vw, 100px) 20px' }}>
+      <style>{`
+        .tapas-rooms { display: grid; grid-template-columns: 1fr 1.4fr; gap: clamp(24px, 4vw, 60px); align-items: center; max-width: 1180px; margin: 0 auto; }
+        @media (max-width: 900px) { .tapas-rooms { grid-template-columns: 1fr; } }
+      `}</style>
+      <div className="tapas-rooms">
+        <div>
+          <h2 style={{
+            margin: 0, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+            fontSize: 'clamp(28px, 3.6vw, 40px)', color: INK,
+            fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em',
+          }}>
+            50+ Beautiful rooms<br />inspiration
+          </h2>
+          <p style={{ marginTop: '14px', color: INK_DIM, fontSize: '14px', lineHeight: 1.65, maxWidth: '320px' }}>
+            Our designers have already arranged a lot of beautiful prototypes
+            of reading nooks that inspire us.
+          </p>
+          <Link to="/blog" style={{
+            display: 'inline-block', marginTop: '24px',
+            padding: '12px 26px', borderRadius: '6px',
+            background: PINK, color: '#fff', fontWeight: 700, fontSize: '13px',
+            textDecoration: 'none', letterSpacing: '0.5px', textTransform: 'uppercase',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = PINK_DARK; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = PINK; }}
+          >
+            Explore More
+          </Link>
+        </div>
+
+        <div style={{ display: 'flex', gap: '20px', overflow: 'hidden', position: 'relative' }}>
+          <div style={{ flex: '0 0 60%', position: 'relative' }}>
+            <ImageOrPlaceholder src={asset('room-1.jpg')} ratio="3 / 4" label="room-1.jpg" bg="#EAE3D2" />
+            <div style={{
+              position: 'absolute', bottom: '16px', left: '16px',
+              background: 'rgba(255,255,255,0.92)', padding: '14px 18px',
+              borderRadius: '6px',
+            }}>
+              <div style={{ fontSize: '11px', color: INK_FAINT, letterSpacing: '1px' }}>01 — Bed Room</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: INK }}>Inner Peace</div>
+            </div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <ImageOrPlaceholder src={asset('room-2.jpg')} ratio="3 / 4" label="room-2.jpg" bg="#F0EAD8" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// 5. Testimonials
+// ---------------------------------------------------------------------
+const REVIEWS = [
+  { quote: 'You made it so simple.',  body: 'My new shelf is so much faster and easier to browse than my old library app.', author: 'Corey Valdez', role: 'Founder at Zenix' },
+  { quote: 'Simply the best.',         body: "Better than all the rest. I'd recommend this place to beginners.", author: 'Ian Klein', role: 'Digital Marketer' },
+];
+
+function Testimonials() {
+  return (
+    <section style={{ background: LIME, padding: 'clamp(60px, 8vw, 100px) 20px' }}>
+      <div style={{
+        maxWidth: '1080px', margin: '0 auto',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: '40px', textAlign: 'center',
+      }}>
+        {REVIEWS.map((r) => (
+          <div key={r.author}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%',
+              background: '#D1D5DB', margin: '0 auto 18px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#6B7280', fontSize: '28px',
+            }}>👤</div>
+            <div style={{
+              fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+              fontSize: '20px', fontWeight: 700, color: INK,
+            }}>
+              "{r.quote}"
+            </div>
+            <p style={{ marginTop: '10px', color: INK_DIM, fontSize: '14px', lineHeight: 1.6, maxWidth: '320px', marginInline: 'auto' }}>
+              {r.body}
+            </p>
+            <div style={{ marginTop: '18px', fontWeight: 700, color: INK, fontSize: '14px' }}>{r.author}</div>
+            <div style={{ color: INK_FAINT, fontSize: '12px' }}>{r.role}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// 6. Newsletter strip (dark)
+// ---------------------------------------------------------------------
+function Newsletter() {
+  return (
+    <section style={{ background: '#1F1F1F', padding: '34px 20px' }}>
+      <div style={{
+        maxWidth: '1180px', margin: '0 auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: '24px', flexWrap: 'wrap', color: '#fff',
+      }}>
+        <div>
+          <div style={{ fontSize: '18px', fontWeight: 700 }}>✉ Subscribe to our Newsletter</div>
+          <div style={{ fontSize: '12px', color: '#A0A0A0', marginTop: '4px' }}>
+            Monthly book picks, member events, and quiet announcements.
+          </div>
+        </div>
+        <form
+          onSubmit={(e) => e.preventDefault()}
+          style={{ display: 'flex', gap: '8px', flex: '1 1 320px', maxWidth: '520px' }}
+        >
+          <input
+            type="email" placeholder="Your email address"
+            style={{
+              flex: 1, padding: '12px 16px', border: 'none',
+              background: '#2A2A2A', color: '#fff',
+              borderRadius: '4px', fontSize: '14px', outline: 'none',
+            }}
+          />
+          <button style={{
+            padding: '12px 24px', border: 'none',
+            background: PINK, color: '#fff',
+            borderRadius: '4px', fontWeight: 700, fontSize: '13px',
+            cursor: 'pointer', letterSpacing: '0.5px',
+          }}>Subscribe</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Compose
+// ---------------------------------------------------------------------
+function LegacyHome() {
+  return (
+    <>
+      <Hero />
+      <Services />
+      <NewArrivals />
+      <RoomInspiration />
+      <Testimonials />
+      <Newsletter />
+    </>
+  );
+}
+
+// Public Home — defer to draft block tree if the user customised the page
+// in the editor; otherwise render the LegacyHome layout above.
 export default function Home() {
   const content = useSiteContent();
   const matchKey = findPageByPath(content?.pages, '/');
@@ -133,294 +495,4 @@ export default function Home() {
     return null;
   }
   return <LegacyHome />;
-}
-
-function LegacyHome() {
-  const content = useSiteContent();
-  const home = content.home;
-  const newsletter = content.newsletter;
-  const images = content.images || {};
-  const visibility = content.visibility || {};
-  const layout = content.layout || {};
-  const sectionStyles = content.section_styles || {};
-
-  const bgOverlay = 'linear-gradient(135deg, rgba(38,23,12,0.88) 0%, rgba(61,43,31,0.78) 100%)';
-  const resolveBg = (imgUrl, solidColor, fallbackImgUrl, defaultBg) => {
-    if (imgUrl) return `${bgOverlay}, url("${imgUrl}") center/cover`;
-    if (solidColor) return solidColor;
-    if (fallbackImgUrl) return `${bgOverlay}, url("${fallbackImgUrl}") center/cover`;
-    return defaultBg;
-  };
-
-  const orderArr = (layout.home_section_order || 'hero,genres,staff_picks,recommended,new_arrivals,cafe_story,newsletter')
-    .split(',').map(s => s.trim()).filter(Boolean);
-  const getOrder = (id) => {
-    const idx = orderArr.indexOf(id);
-    return idx === -1 ? 999 : idx;
-  };
-
-  const { member } = useAuth();
-
-  const [staffPicks, setStaffPicks] = useState([]);
-  const [newArrivals, setNewArrivals] = useState([]);
-  const [recommended, setRecommended] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [subscribed, setSubscribed] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, [member?.id]);
-
-  const fetchRecommended = async () => {
-    if (!member) return [];
-    // Derive genres from wishlist + borrow history + order history.
-    const [wlRes, circRes, orderItRes] = await Promise.all([
-      supabase.from('wishlists').select('books(id, genre)').eq('member_id', member.id).limit(20),
-      supabase.from('circulation').select('books(id, genre)').eq('member_id', member.id).limit(20),
-      supabase.from('customer_order_items')
-        .select('book_id, books(id, genre), customer_orders!inner(member_id)')
-        .eq('customer_orders.member_id', member.id)
-        .limit(20),
-    ]);
-    const seenIds = new Set();
-    const genreCounts = {};
-    const collect = (rows, pickBook) => {
-      for (const r of (rows || [])) {
-        const b = pickBook(r);
-        if (!b?.id) continue;
-        seenIds.add(b.id);
-        if (b.genre) genreCounts[b.genre] = (genreCounts[b.genre] || 0) + 1;
-      }
-    };
-    collect(wlRes.data, r => r.books);
-    collect(circRes.data, r => r.books);
-    collect(orderItRes.data, r => r.books);
-
-    const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
-    if (topGenres.length === 0) return [];
-
-    // OR query across genres
-    const filters = topGenres.map(g => `genre.ilike.%${g}%`).join(',');
-    const { data } = await supabase.from('books').select('*')
-      .eq('store_visible', true)
-      .gt('quantity_available', 0)
-      .or(filters)
-      .order('created_at', { ascending: false })
-      .limit(16);
-    const filtered = (data || []).filter(b => !seenIds.has(b.id)).slice(0, 6);
-    return filtered;
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [flaggedRes, newRes, recRes] = await Promise.all([
-        supabase.from('books').select('*').eq('store_visible', true).eq('is_staff_pick', true).order('created_at', { ascending: false }).limit(5),
-        supabase.from('books').select('*').eq('store_visible', true).order('created_at', { ascending: false }).limit(10),
-        fetchRecommended(),
-      ]);
-      let picks = flaggedRes.data || [];
-      const newest = newRes.data || [];
-      if (picks.length === 0) {
-        // Fallback: no staff picks flagged yet — show newest in-stock books.
-        // (Was ordering by `rating` which doesn't exist on books; rating
-        // lives in the reviews table.)
-        const { data } = await supabase.from('books').select('*').eq('store_visible', true).gt('quantity_available', 0).order('created_at', { ascending: false }).limit(5);
-        picks = data || [];
-      }
-      setStaffPicks(picks.slice(0, 4));
-      setNewArrivals(newest.slice(0, 8));
-      setRecommended(recRes || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  };
-
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    if (emailInput.trim()) setSubscribed(true);
-  };
-
-  return (
-    <div style={{ fontFamily: 'var(--font-body)', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-
-      {/* 1. HERO — Full carousel */}
-      {visibility.home_hero !== false && (
-        <div style={{ order: getOrder('hero') }}>
-          <HeroCarousel home={home} sectionStyles={sectionStyles} />
-        </div>
-      )}
-
-      {/* 2. GENRES — Tapas chips */}
-      {visibility.home_genres !== false && (
-      <section className="tps-section" style={{ order: getOrder('genres'), background: 'var(--bg-section)' }}>
-        <div className="tps-container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '36px', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <div className="tps-eyebrow" style={{ marginBottom: '10px' }}>Explore</div>
-              <h2 className="tps-h2">Browse by genre</h2>
-            </div>
-            <Link to="/books" className="tps-btn-tertiary">See all categories →</Link>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            {GENRES.map(g => (
-              <Link key={g.label} to={`/books?genre=${encodeURIComponent(g.label)}`} className="tps-chip tps-chip-truffle tps-card-interactive" style={{
-                padding: '12px 22px', fontSize: '14px', textDecoration: 'none',
-              }}>
-                <span>{g.icon}</span> {g.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-      )}
-
-      {/* 3. STAFF PICKS — Editorial cards */}
-      {visibility.home_staff_picks !== false && (
-      <section data-editable-section="home" style={{
-        order: getOrder('staff_picks'),
-        background: 'var(--bg)',
-        padding: `${sectionStyles.home_staff_picks_padding_top ?? 96}px 24px ${sectionStyles.home_staff_picks_padding_bottom ?? 96}px`,
-      }}>
-        <div className="tps-container">
-          <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-            <div data-editable="home.staff_picks_eyebrow" className="tps-eyebrow" style={{ marginBottom: '14px', color: 'var(--accent)' }}>
-              {home.staff_picks_eyebrow}
-            </div>
-            <h2 data-editable="home.staff_picks_title" className="tps-h2" style={{ marginBottom: '16px' }}>
-              {home.staff_picks_title}
-            </h2>
-            <p data-editable="home.staff_picks_subtitle" style={{ color: 'var(--text-muted)', fontSize: '16px', maxWidth: '580px', margin: '0 auto', lineHeight: '1.7' }}>
-              {home.staff_picks_subtitle}
-            </p>
-          </div>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-subtle)' }}>Loading picks…</div>
-          ) : staffPicks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-subtle)' }}>
-              Staff picks coming soon. <Link to="/books" style={{ color: 'var(--secondary)', fontWeight: '700' }}>Browse the catalog</Link>.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
-              {staffPicks.map(book => <StaffPickCard key={book.id} book={book} />)}
-            </div>
-          )}
-        </div>
-      </section>
-      )}
-
-      {/* 3b. RECOMMENDED FOR YOU — signed-in members only */}
-      {member && recommended.length > 0 && visibility.home_recommended !== false && (
-        <section style={{
-          order: getOrder('recommended'),
-          background: 'var(--bg)',
-          padding: '72px 24px',
-        }}>
-          <div className="tps-container">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '36px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <div className="tps-eyebrow" style={{ marginBottom: '10px', color: 'var(--accent)' }}>
-                  ✨ For {member.name?.split(' ')[0] || 'you'}
-                </div>
-                <h2 className="tps-h2">Picked based on your reading</h2>
-              </div>
-              <Link to="/books" className="tps-btn-tertiary">Discover more →</Link>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-              {recommended.map(book => <GridBookCard key={book.id} book={book} />)}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 4. NEW ARRIVALS */}
-      {visibility.home_new_arrivals !== false && (
-      <section className="tps-section" style={{ order: getOrder('new_arrivals'), background: 'var(--bg-section)' }}>
-        <div className="tps-container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '36px', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <div className="tps-eyebrow" style={{ marginBottom: '10px' }}>Just in</div>
-              <h2 className="tps-h2">New &amp; noteworthy</h2>
-            </div>
-            <Link to="/books?sort=newest" className="tps-btn-tertiary">View all →</Link>
-          </div>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-subtle)' }}>Loading…</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-              {newArrivals.map(book => <GridBookCard key={book.id} book={book} />)}
-            </div>
-          )}
-        </div>
-      </section>
-      )}
-
-      {/* 5. CAFE STORY */}
-      {visibility.home_cafe_story !== false && (
-      <section data-editable-section="home" style={{
-        order: getOrder('cafe_story'),
-        background: resolveBg(sectionStyles.home_cafe_story_bg_image, sectionStyles.home_cafe_story_bg_color, images.cafe_story_bg_url, 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)'),
-        color: 'var(--surface-warm)',
-        padding: `${sectionStyles.home_cafe_story_padding_top ?? 112}px 24px ${sectionStyles.home_cafe_story_padding_bottom ?? 112}px`,
-        position: 'relative',
-      }}>
-        <div className="tps-container-narrow" style={{ textAlign: 'center', position: 'relative' }}>
-          <div style={{ fontSize: '52px', marginBottom: '20px' }}>☕</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 52px)', fontWeight: '800', color: 'var(--surface-warm)', marginBottom: '28px', lineHeight: 1.08, letterSpacing: '-0.02em' }}>
-            <span data-editable="home.cafe_story_headline_line1">{home.cafe_story_headline_line1}</span><br />
-            <span data-editable="home.cafe_story_headline_line2" style={{ color: 'var(--accent)', fontStyle: 'italic' }}>{home.cafe_story_headline_line2}</span>
-          </h2>
-          <p data-editable="home.cafe_story_body" style={{ color: 'rgba(245,245,220,0.82)', fontSize: '17px', lineHeight: '1.85', maxWidth: '680px', margin: '0 auto 40px' }}>
-            {home.cafe_story_body}
-          </p>
-          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/about" className="tps-btn tps-btn-teal tps-btn-lg">Our story →</Link>
-            <Link to="/login?mode=signup" className="tps-btn tps-btn-lg" style={{ background: 'transparent', border: '2px solid rgba(245,245,220,0.5)', color: 'var(--surface-warm)' }}>
-              Join the circle
-            </Link>
-          </div>
-        </div>
-      </section>
-      )}
-
-      {/* 6. NEWSLETTER */}
-      {visibility.home_newsletter !== false && (
-      <section data-editable-section="newsletter" className="tps-section" style={{ order: getOrder('newsletter') }}>
-        <div className="tps-container-narrow">
-          <div style={{
-            background: 'var(--bg-card)',
-            borderRadius: 'var(--radius-2xl)',
-            padding: '64px 48px',
-            textAlign: 'center',
-            boxShadow: 'var(--shadow-ambient)',
-          }}>
-            <div data-editable="newsletter.eyebrow" style={{ fontSize: '40px', marginBottom: '14px' }}>{newsletter.eyebrow}</div>
-            <h2 data-editable="newsletter.headline" className="tps-h3" style={{ marginBottom: '14px' }}>
-              {newsletter.headline}
-            </h2>
-            <p data-editable="newsletter.description" style={{ color: 'var(--text-muted)', fontSize: '15px', marginBottom: '32px', maxWidth: '460px', margin: '0 auto 32px', lineHeight: '1.7' }}>
-              {newsletter.description}
-            </p>
-            {subscribed ? (
-              <div className="tps-chip tps-chip-teal" style={{ padding: '12px 24px', fontSize: '14px' }}>
-                ✓ You're on the list!
-              </div>
-            ) : (
-              <form onSubmit={handleSubscribe} style={{ display: 'flex', gap: '10px', maxWidth: '440px', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <input
-                  type="email" required
-                  value={emailInput}
-                  onChange={e => setEmailInput(e.target.value)}
-                  placeholder="your@email.com"
-                  className="tps-input"
-                  style={{ flex: '1 1 240px', minWidth: 0, borderRadius: 'var(--radius-md)' }}
-                />
-                <button type="submit" className="tps-btn tps-btn-primary">Subscribe</button>
-              </form>
-            )}
-          </div>
-        </div>
-      </section>
-      )}
-    </div>
-  );
 }
