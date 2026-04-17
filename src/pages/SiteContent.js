@@ -5469,25 +5469,14 @@ export default function SiteContent() {
                     if (!query) return true;
                     if (type.toLowerCase().includes(query)) return true;
                     if ((m.label || '').toLowerCase().includes(query)) return true;
-                    if (Array.isArray(m.presets) && m.presets.some(p => (p.label || '').toLowerCase().includes(query))) return true;
                     return false;
                   });
                   if (types.length === 0) return null;
-                  // Expand each type into one tile per preset (or a
-                  // single tile if the type has no presets). Preset
-                  // tiles let users pick a styled variant directly
-                  // from the library, the same way Webflow surfaces
-                  // hero/footer/navbar styles.
-                  const tiles = [];
-                  for (const [type, meta] of types) {
-                    if (Array.isArray(meta.presets) && meta.presets.length > 0) {
-                      for (const preset of meta.presets) {
-                        tiles.push({ type, meta, preset });
-                      }
-                    } else {
-                      tiles.push({ type, meta, preset: null });
-                    }
-                  }
+                  // One tile per block type. After insertion users pick
+                  // a layout variant from the canvas chip strip (hover
+                  // the block) or the right-panel Variant dropdown.
+                  // Showing every preset as its own tile here drowned
+                  // the picker.
                   return (
                     <div key={cat} style={{ marginBottom: '18px' }}>
                       <div style={{
@@ -5499,14 +5488,13 @@ export default function SiteContent() {
                         gridTemplateColumns: '1fr 1fr',
                         gap: '6px',
                       }}>
-                        {tiles.map(({ type, meta, preset }) => (
+                        {types.map(([type, meta]) => (
                           <DraggableLibraryTile
-                            key={preset ? `${type}:${preset.id}` : type}
+                            key={type}
                             type={type}
                             meta={meta}
-                            preset={preset}
                             S={S}
-                            onClick={() => addBlockToPage(editingPage, type, undefined, preset?.id)}
+                            onClick={() => addBlockToPage(editingPage, type)}
                           />
                         ))}
                       </div>
