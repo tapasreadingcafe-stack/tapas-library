@@ -261,6 +261,16 @@ export function SiteContentProvider({ children }) {
           // Cache the raw DB value (not the merged one) so we can re-merge
           // against future DEFAULT_CONTENT changes on next load.
           saveToCache(raw);
+        } else {
+          // No DB row — reset to DEFAULT_CONTENT and clear any stale cache
+          // so a returning visitor doesn't see content from a deleted row.
+          try { localStorage.removeItem(CACHE_KEY); } catch {}
+          const currentStr = JSON.stringify(content);
+          const defaultStr = JSON.stringify(DEFAULT_CONTENT);
+          if (currentStr !== defaultStr) {
+            setContent(DEFAULT_CONTENT);
+            applyTheme(DEFAULT_CONTENT);
+          }
         }
       } catch (err) {
         console.warn('[SiteContent] load failed, using cached/defaults:', err?.message || err);
