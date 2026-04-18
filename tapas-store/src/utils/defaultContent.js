@@ -17,7 +17,7 @@
 
 export const DEFAULT_CONTENT = {
   brand: {
-    name: 'Your brand',
+    name: 'TAPAS reading cafe',
     tagline: '',
     primary_color: '#CFF389',        // light lime — headlines, navbar
     primary_color_dark: '#A8D964',
@@ -142,8 +142,8 @@ export const DEFAULT_CONTENT = {
     header_subtitle_suffix: '',
   },
   footer: {
-    template: 'classic',
-    tagline: '',
+    template: 'modern_dark',
+    tagline: 'Where words brew and stories come alive. Your community bookstore and reading sanctuary.',
     copyright_text: 'All rights reserved.',
     quick_links_heading: 'Quick Links',
     hours_heading: 'Opening Hours',

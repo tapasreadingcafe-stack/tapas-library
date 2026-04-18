@@ -493,6 +493,135 @@ function FooterMapEmbed({ brand, footer, contact, header }) {
 }
 
 // =====================================================================
+// F11 Modern dark — rounded-top dark card, lime wordmark, pink section
+// headings, 4 columns: Brand / Navigation / Support / Contact.
+// =====================================================================
+function FooterModernDark({ brand, footer, contact }) {
+  const LIME = '#CFF389';
+  const PINK = '#EF3D7B';
+  const MUTED = '#9CA3AF';
+  const BG = '#151515';
+  const headingStyle = {
+    color: PINK, fontSize: '13px', fontWeight: 700,
+    letterSpacing: '2px', textTransform: 'uppercase',
+    marginBottom: '24px',
+  };
+  const linkStyle = {
+    display: 'block', color: '#D1D5DB', textDecoration: 'none',
+    fontSize: '15px', marginBottom: '14px',
+  };
+  const navLinks = [
+    ['About Us',        '/about'],
+    ['Shop',            '/books'],
+    ['Lending Library', '/borrow'],
+    ['Events',          '/events'],
+  ];
+  const supportLinks = [
+    ['Contact Us',       '/about'],
+    ['Blogs',            '/blog'],
+    ['Privacy Policy',   '/privacy'],
+    ['Terms of Service', '/terms'],
+  ];
+  const SocialBtn = ({ label, href, children }) => (
+    <a href={href} aria-label={label} target="_blank" rel="noreferrer" style={{
+      width: '40px', height: '40px', borderRadius: '50%',
+      background: 'rgba(255,255,255,0.06)',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      color: '#E5E7EB', textDecoration: 'none',
+      border: '1px solid rgba(255,255,255,0.08)',
+    }}>{children}</a>
+  );
+  return (
+    <div style={{ padding: '40px 16px 0', background: 'transparent' }}>
+      <footer style={{
+        background: BG, color: '#E5E7EB',
+        borderTopLeftRadius: '32px', borderTopRightRadius: '32px',
+        fontFamily: 'var(--tapas-body-font, Lato), sans-serif',
+        overflow: 'hidden',
+      }}>
+        <FooterResponsiveStyles />
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '64px 48px 0' }}>
+          <div className="tapas-foot-grid" style={{
+            display: 'grid',
+            gridTemplateColumns: '1.4fr 1fr 1fr 1.1fr',
+            gap: '48px', paddingBottom: '56px',
+          }}>
+            <div>
+              <div style={{
+                fontFamily: 'var(--tapas-heading-font, "Playfair Display"), serif',
+                fontSize: '26px', fontWeight: 700, color: LIME, marginBottom: '18px',
+                lineHeight: 1.2,
+              }}>
+                {brand.name || 'TAPAS reading cafe'}
+              </div>
+              <p style={{ color: MUTED, fontSize: '15px', lineHeight: 1.6, marginBottom: '28px', maxWidth: '320px' }}>
+                {footer.tagline || 'Where words brew and stories come alive. Your community bookstore and reading sanctuary.'}
+              </p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <SocialBtn label="Instagram" href="https://instagram.com/">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                </SocialBtn>
+                <SocialBtn label="Facebook" href="https://facebook.com/">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+                </SocialBtn>
+                <SocialBtn label="Twitter" href="https://twitter.com/">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+                </SocialBtn>
+              </div>
+            </div>
+
+            <div>
+              <h4 style={headingStyle}>Navigation</h4>
+              {navLinks.map(([label, to]) => (
+                <Link key={to} to={to} style={linkStyle}>{label}</Link>
+              ))}
+            </div>
+
+            <div>
+              <h4 style={headingStyle}>Support</h4>
+              {supportLinks.map(([label, to]) => (
+                <Link key={to} to={to} style={linkStyle}>{label}</Link>
+              ))}
+            </div>
+
+            <div>
+              <h4 style={headingStyle}>Contact</h4>
+              {contact.address && (
+                <p style={{ color: MUTED, fontSize: '15px', lineHeight: 1.6, marginBottom: '20px' }}>
+                  {contact.address}
+                </p>
+              )}
+              {contact.email && (
+                <div style={{ color: '#E5E7EB', fontSize: '15px', fontWeight: 600, marginBottom: '6px' }}>
+                  {contact.email}
+                </div>
+              )}
+              {contact.phone && (
+                <div style={{ color: '#E5E7EB', fontSize: '15px', fontWeight: 600 }}>
+                  {contact.phone}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            padding: '24px 0',
+            textAlign: 'center',
+            color: MUTED,
+            fontSize: '12px',
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase',
+          }}>
+            © {new Date().getFullYear()} {brand.name || 'Tapas reading cafe'}. {footer.copyright_text || 'All rights reserved.'}
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// =====================================================================
 // Registry + default
 // =====================================================================
 const TEMPLATES = {
@@ -506,6 +635,7 @@ const TEMPLATES = {
   three_column:     FooterThreeColumn,
   social_first:     FooterSocialFirst,
   map_embed:        FooterMapEmbed,
+  modern_dark:      FooterModernDark,
 };
 
 export const FOOTER_TEMPLATE_OPTIONS = [
@@ -519,12 +649,13 @@ export const FOOTER_TEMPLATE_OPTIONS = [
   { value: 'three_column',     label: '8. Three-column compact' },
   { value: 'social_first',     label: '9. Social / contact pills top' },
   { value: 'map_embed',        label: '10. Map embed (Google Maps)' },
+  { value: 'modern_dark',      label: '11. Modern dark (rounded card, lime wordmark)' },
 ];
 
 export default function FooterTemplate() {
   const state = useFooterState();
-  const template = state.footer.template || 'classic';
-  const Component = TEMPLATES[template] || FooterClassic;
+  const template = state.footer.template || 'modern_dark';
+  const Component = TEMPLATES[template] || FooterModernDark;
   const ss = state.sectionStyles || {};
   // Section-level CSS overrides applied to the whole footer block. This
   // layers on top of the inline styles each template uses, using high
