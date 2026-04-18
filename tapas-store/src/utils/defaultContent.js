@@ -156,7 +156,7 @@ export const DEFAULT_CONTENT = {
     nav_books: 'Shop',
     nav_offers: 'Offers',
     nav_about: 'About',
-    login_label: 'Login',
+    login_label: 'Sign In',
     signup_label: 'Sign Up',
     search_placeholder: 'Search…',
   },

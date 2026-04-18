@@ -158,15 +158,15 @@ function AuthActions({ member, header, brand, handleLogout }) {
   return (
     <>
       <Link to="/login" style={{
-        color:brand.sand_color, textDecoration:'none', padding:'8px 14px', borderRadius:'20px',
-        fontWeight:'600', fontSize:'14px', border:`1px solid ${brand.sand_color}55`
+        color:'#1F2937', textDecoration:'underline', textUnderlineOffset:'4px',
+        padding:'8px 4px', fontWeight:'500', fontSize:'15px',
       }}>
-        {header.login_label || 'Login'}
+        {header.login_label || 'Sign In'}
       </Link>
       <Link to="/login?mode=signup" style={{
-        background:`linear-gradient(135deg, ${brand.accent_color}, ${brand.accent_color_dark})`, color:brand.primary_color,
-        textDecoration:'none', padding:'8px 18px', borderRadius:'20px',
-        fontWeight:'700', fontSize:'14px', boxShadow:'0 2px 8px rgba(212,168,83,0.4)'
+        background:'#EF3D7B', color:'#FFFFFF',
+        textDecoration:'none', padding:'12px 28px', borderRadius:'999px',
+        fontWeight:'600', fontSize:'15px',
       }}>
         {header.signup_label || 'Sign Up'}
       </Link>
