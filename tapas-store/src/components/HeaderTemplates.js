@@ -158,7 +158,7 @@ function AuthActions({ member, header, brand, handleLogout }) {
   return (
     <>
       <Link to="/login" style={{
-        color:'#1F2937', textDecoration:'underline', textUnderlineOffset:'4px',
+        color:'#FFFFFF', textDecoration:'underline', textUnderlineOffset:'4px',
         padding:'8px 4px', fontWeight:'500', fontSize:'15px',
       }}>
         {header.login_label || 'Sign In'}
@@ -175,23 +175,33 @@ function AuthActions({ member, header, brand, handleLogout }) {
 }
 
 function IconsRow({ wishlistCount, itemCount, brand, searchOpen, setSearchOpen, searchTerm, setSearchTerm, handleSearch, placeholder }) {
+  const iconBtn = {
+    background:'none', border:'none', color:'#FFFFFF', cursor:'pointer',
+    padding:'6px', display:'inline-flex', alignItems:'center', justifyContent:'center',
+  };
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
       {searchOpen ? (
         <form onSubmit={handleSearch} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
           <input autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             placeholder={placeholder || 'Search books…'}
-            style={{ padding:'6px 12px', borderRadius:'20px', border:'none', background:'rgba(255,255,255,0.15)', color:'white', outline:'none', width:'200px', fontSize:'14px' }} />
-          <button type="submit" style={{ background:'none', border:'none', color:brand.accent_color, cursor:'pointer', fontSize:'18px' }}>🔍</button>
-          <button type="button" onClick={() => setSearchOpen(false)} style={{ background:'none', border:'none', color:brand.sand_color, cursor:'pointer', fontSize:'16px' }}>✕</button>
+            style={{ padding:'6px 12px', borderRadius:'20px', border:'none', background:'rgba(255,255,255,0.15)', color:'#fff', outline:'none', width:'200px', fontSize:'14px' }} />
+          <button type="submit" style={iconBtn} aria-label="Search">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <button type="button" onClick={() => setSearchOpen(false)} style={iconBtn} aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </form>
       ) : (
-        <button onClick={() => setSearchOpen(true)} style={{ background:'none', border:'none', color:brand.sand_color, cursor:'pointer', fontSize:'20px', padding:'4px' }}>🔍</button>
+        <button onClick={() => setSearchOpen(true)} style={iconBtn} aria-label="Search">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
       )}
-      <Link to="/cart" style={{ position:'relative', textDecoration:'none', color:brand.sand_color, fontSize:'20px', padding:'4px' }}>
-        🛒
+      <Link to="/cart" style={{ ...iconBtn, position:'relative', textDecoration:'none' }} aria-label="Cart">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
         {itemCount > 0 && (
-          <span style={{ position:'absolute', top:'-4px', right:'-4px', background:brand.accent_color, color:brand.primary_color, borderRadius:'50%', minWidth:'16px', height:'16px', padding:'0 4px', fontSize:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold' }}>
+          <span style={{ position:'absolute', top:'-2px', right:'-2px', background:'#EF3D7B', color:'#fff', borderRadius:'50%', minWidth:'16px', height:'16px', padding:'0 4px', fontSize:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold' }}>
             {itemCount}
           </span>
         )}
