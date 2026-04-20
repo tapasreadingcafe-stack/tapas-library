@@ -309,10 +309,398 @@ function compileTapasNewsletter(props = {}) {
   return { root, classes };
 }
 
-// Minimal stub — enough to not crash the migration. Real handlers for
-// tapas_new_arrivals, tapas_inspiration, tapas_testimonials land in
-// session two of Phase 0. Every unhandled block becomes a placeholder
-// div that's visually distinct in the editor so staff notice it.
+function compileTapasNewArrivals(props = {}) {
+  const { eyebrow = 'New Arrivals', items = [] } = props;
+  const classes = {
+    ...cls('tapas-arrivals', { background: LIME, padding: '0 20px clamp(60px, 8vw, 110px)' }),
+    ...cls('tapas-arrivals-inner', { 'max-width': '1180px', margin: '0 auto' }),
+    ...cls('tapas-arrivals-header', { 'text-align': 'center', 'margin-bottom': '38px' }),
+    ...cls('tapas-arrivals-eyebrow', {
+      color: '#7E22CE', 'font-weight': '700', 'font-size': '12px',
+      'letter-spacing': '2.5px', 'text-transform': 'uppercase',
+    }),
+    ...cls('tapas-arrivals-grid', {
+      display: 'grid',
+      'grid-template-columns': 'repeat(auto-fit, minmax(220px, 1fr))',
+      gap: '20px',
+    }),
+    ...cls('tapas-arrival-card', {
+      background: '#fff', 'border-radius': '4px', overflow: 'hidden',
+      position: 'relative', cursor: 'pointer',
+      'box-shadow': '0 4px 14px rgba(31,41,55,0.06)',
+    }),
+    ...cls('tapas-arrival-media', { position: 'relative' }),
+    ...cls('tapas-arrival-img', {
+      width: '100%', height: '100%', 'aspect-ratio': '1 / 1',
+      'object-fit': 'cover', display: 'block', background: '#E5E7EB',
+    }),
+    ...cls('tapas-arrival-badge', {
+      position: 'absolute', top: '14px', right: '14px',
+      background: PINK, color: '#fff',
+      width: '46px', height: '46px', 'border-radius': '50%',
+      display: 'inline-flex', 'align-items': 'center', 'justify-content': 'center',
+      'font-size': '12px', 'font-weight': '700',
+    }),
+    ...cls('tapas-arrival-badge-new', {
+      background: '#2BB673',
+    }),
+    ...cls('tapas-arrival-body', { padding: '16px 18px 22px' }),
+    ...cls('tapas-arrival-title', { 'font-size': '20px', 'font-weight': '700', color: INK }),
+    ...cls('tapas-arrival-sub', { 'margin-top': '4px', 'font-size': '13px', color: '#9CA3AF' }),
+    ...cls('tapas-arrival-price-row', {
+      'margin-top': '10px', display: 'flex',
+      'align-items': 'baseline', gap: '10px',
+    }),
+    ...cls('tapas-arrival-price', { 'font-size': '17px', 'font-weight': '700', color: INK }),
+    ...cls('tapas-arrival-strike', {
+      'font-size': '12px', color: '#9CA3AF', 'text-decoration': 'line-through',
+    }),
+  };
+
+  const cardNodes = items.map((a) => {
+    const badgeClasses = ['tapas-arrival-badge'];
+    if (a.badge === 'New') badgeClasses.push('tapas-arrival-badge-new');
+    return makeNode({
+      tag: 'article', classes: ['tapas-arrival-card'],
+      children: [
+        makeNode({
+          tag: 'div', classes: ['tapas-arrival-media'],
+          children: [
+            makeNode({
+              tag: 'img', classes: ['tapas-arrival-img'],
+              attributes: { src: a.image_url || '', alt: a.title || '' },
+            }),
+            a.badge
+              ? makeNode({ tag: 'span', classes: badgeClasses, textContent: a.badge })
+              : null,
+          ].filter(Boolean),
+        }),
+        makeNode({
+          tag: 'div', classes: ['tapas-arrival-body'],
+          children: [
+            makeNode({ tag: 'div', classes: ['tapas-arrival-title'], textContent: a.title || '' }),
+            makeNode({ tag: 'div', classes: ['tapas-arrival-sub'], textContent: a.sub || '' }),
+            makeNode({
+              tag: 'div', classes: ['tapas-arrival-price-row'],
+              children: [
+                makeNode({ tag: 'span', classes: ['tapas-arrival-price'], textContent: a.price || '' }),
+                a.strike
+                  ? makeNode({ tag: 'span', classes: ['tapas-arrival-strike'], textContent: a.strike })
+                  : null,
+              ].filter(Boolean),
+            }),
+          ],
+        }),
+      ],
+    });
+  });
+
+  const root = makeNode({
+    tag: 'section', classes: ['tapas-arrivals'],
+    children: [
+      makeNode({
+        tag: 'div', classes: ['tapas-arrivals-inner'],
+        children: [
+          makeNode({
+            tag: 'div', classes: ['tapas-arrivals-header'],
+            children: [
+              makeNode({ tag: 'div', classes: ['tapas-arrivals-eyebrow'], textContent: eyebrow }),
+            ],
+          }),
+          makeNode({ tag: 'div', classes: ['tapas-arrivals-grid'], children: cardNodes }),
+        ],
+      }),
+    ],
+  });
+
+  return { root, classes };
+}
+
+function compileTapasInspiration(props = {}) {
+  const {
+    heading_line1 = '50+ Beautiful rooms',
+    heading_line2 = 'inspiration',
+    description = '',
+    cta_text = 'Explore More',
+    cta_href = '/blog',
+    image_1_url = 'room-1.jpg',
+    image_2_url = 'room-2.jpg',
+    badge_eyebrow = '',
+    badge_title = '',
+    background_color = '#FBF8EE',
+  } = props;
+
+  const classes = {
+    ...cls('tapas-inspiration', {
+      background: background_color, padding: 'clamp(60px, 8vw, 100px) 20px',
+    }),
+    ...cls('tapas-inspiration-grid', {
+      display: 'grid', 'grid-template-columns': '1fr 1.4fr',
+      gap: 'clamp(24px, 4vw, 60px)', 'align-items': 'center',
+      'max-width': '1180px', margin: '0 auto',
+    }),
+    ...cls('tapas-inspiration-heading', {
+      margin: '0', 'font-family': 'var(--tapas-heading-font, Newsreader, serif)',
+      'font-size': 'clamp(28px, 3.6vw, 40px)', color: INK,
+      'font-weight': '700', 'line-height': '1.2', 'letter-spacing': '-0.01em',
+    }),
+    ...cls('tapas-inspiration-desc', {
+      'margin-top': '14px', color: INK_DIM,
+      'font-size': '14px', 'line-height': '1.65', 'max-width': '320px',
+    }),
+    ...cls('tapas-inspiration-cta', {
+      display: 'inline-block', 'margin-top': '24px',
+      padding: '12px 26px', 'border-radius': '6px',
+      background: PINK, color: '#fff', 'font-weight': '700',
+      'font-size': '13px', 'text-decoration': 'none',
+      'letter-spacing': '0.5px', 'text-transform': 'uppercase',
+    }),
+    ...cls('tapas-inspiration-images', {
+      display: 'flex', gap: '20px', overflow: 'hidden', position: 'relative',
+    }),
+    ...cls('tapas-inspiration-big', { flex: '0 0 60%', position: 'relative' }),
+    ...cls('tapas-inspiration-big-img', {
+      width: '100%', 'aspect-ratio': '3 / 4',
+      'object-fit': 'cover', display: 'block', background: '#EAE3D2',
+    }),
+    ...cls('tapas-inspiration-badge', {
+      position: 'absolute', bottom: '16px', left: '16px',
+      background: 'rgba(255,255,255,0.92)',
+      padding: '14px 18px', 'border-radius': '6px',
+    }),
+    ...cls('tapas-inspiration-badge-eyebrow', {
+      'font-size': '11px', color: '#9CA3AF', 'letter-spacing': '1px',
+    }),
+    ...cls('tapas-inspiration-badge-title', {
+      'font-size': '18px', 'font-weight': '700', color: INK,
+    }),
+    ...cls('tapas-inspiration-side', { flex: '1' }),
+    ...cls('tapas-inspiration-side-img', {
+      width: '100%', 'aspect-ratio': '3 / 4',
+      'object-fit': 'cover', display: 'block', background: '#F0EAD8',
+    }),
+  };
+
+  const badgeNode = (badge_eyebrow || badge_title)
+    ? makeNode({
+        tag: 'div', classes: ['tapas-inspiration-badge'],
+        children: [
+          makeNode({ tag: 'div', classes: ['tapas-inspiration-badge-eyebrow'], textContent: badge_eyebrow }),
+          makeNode({ tag: 'div', classes: ['tapas-inspiration-badge-title'], textContent: badge_title }),
+        ],
+      })
+    : null;
+
+  const root = makeNode({
+    tag: 'section', classes: ['tapas-inspiration'],
+    children: [
+      makeNode({
+        tag: 'div', classes: ['tapas-inspiration-grid'],
+        children: [
+          makeNode({
+            tag: 'div',
+            children: [
+              makeNode({
+                tag: 'h2', classes: ['tapas-inspiration-heading'],
+                textContent: `${heading_line1}\n${heading_line2}`,
+              }),
+              makeNode({ tag: 'p', classes: ['tapas-inspiration-desc'], textContent: description }),
+              cta_text
+                ? makeNode({
+                    tag: 'a', classes: ['tapas-inspiration-cta'],
+                    attributes: { href: cta_href },
+                    textContent: cta_text,
+                  })
+                : null,
+            ].filter(Boolean),
+          }),
+          makeNode({
+            tag: 'div', classes: ['tapas-inspiration-images'],
+            children: [
+              makeNode({
+                tag: 'div', classes: ['tapas-inspiration-big'],
+                children: [
+                  makeNode({
+                    tag: 'img', classes: ['tapas-inspiration-big-img'],
+                    attributes: { src: image_1_url, alt: 'inspiration-1' },
+                  }),
+                  badgeNode,
+                ].filter(Boolean),
+              }),
+              makeNode({
+                tag: 'div', classes: ['tapas-inspiration-side'],
+                children: [
+                  makeNode({
+                    tag: 'img', classes: ['tapas-inspiration-side-img'],
+                    attributes: { src: image_2_url, alt: 'inspiration-2' },
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+
+  return { root, classes };
+}
+
+function compileTapasTestimonials(props = {}) {
+  const { items = [], background_color = LIME } = props;
+  const classes = {
+    ...cls('tapas-testimonials', {
+      background: background_color, padding: 'clamp(60px, 8vw, 100px) 20px',
+    }),
+    ...cls('tapas-testimonials-grid', {
+      'max-width': '1080px', margin: '0 auto',
+      display: 'grid',
+      'grid-template-columns': 'repeat(auto-fit, minmax(320px, 1fr))',
+      gap: '40px', 'text-align': 'center',
+    }),
+    ...cls('tapas-testimonial-avatar', {
+      width: '64px', height: '64px', 'border-radius': '50%',
+      background: '#D1D5DB', margin: '0 auto 18px',
+      display: 'flex', 'align-items': 'center', 'justify-content': 'center',
+      color: '#6B7280', 'font-size': '28px',
+    }),
+    ...cls('tapas-testimonial-quote', {
+      'font-family': 'var(--tapas-heading-font, Newsreader, serif)',
+      'font-size': '20px', 'font-weight': '700', color: INK,
+    }),
+    ...cls('tapas-testimonial-body', {
+      'margin-top': '10px', color: INK_DIM,
+      'font-size': '14px', 'line-height': '1.6',
+      'max-width': '320px', 'margin-inline': 'auto',
+    }),
+    ...cls('tapas-testimonial-author', {
+      'margin-top': '18px', 'font-weight': '700', color: INK, 'font-size': '14px',
+    }),
+    ...cls('tapas-testimonial-role', { color: '#9CA3AF', 'font-size': '12px' }),
+  };
+
+  const cardNodes = items.map((r) =>
+    makeNode({
+      tag: 'div',
+      children: [
+        makeNode({ tag: 'div', classes: ['tapas-testimonial-avatar'], textContent: '👤' }),
+        makeNode({ tag: 'div', classes: ['tapas-testimonial-quote'], textContent: `"${r.quote || ''}"` }),
+        makeNode({ tag: 'p', classes: ['tapas-testimonial-body'], textContent: r.body || '' }),
+        makeNode({ tag: 'div', classes: ['tapas-testimonial-author'], textContent: r.author || '' }),
+        makeNode({ tag: 'div', classes: ['tapas-testimonial-role'], textContent: r.role || '' }),
+      ],
+    })
+  );
+
+  const root = makeNode({
+    tag: 'section', classes: ['tapas-testimonials'],
+    children: [
+      makeNode({ tag: 'div', classes: ['tapas-testimonials-grid'], children: cardNodes }),
+    ],
+  });
+
+  return { root, classes };
+}
+
+function compileTapasSection(props = {}) {
+  const {
+    eyebrow = '',
+    heading = 'Section heading',
+    subtext = '',
+    text_color = INK,
+    background_color = '#FBF8EE',
+    padding_y = 80,
+    max_width = 960,
+    align = 'center',
+  } = props;
+  const textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+  const classes = {
+    ...cls('tapas-section', {
+      background: background_color, padding: `${padding_y}px 20px`,
+    }),
+    ...cls('tapas-section-inner', {
+      'max-width': `${max_width}px`, margin: textAlign === 'center' ? '0 auto' : '0',
+      'text-align': textAlign,
+    }),
+    ...cls('tapas-section-eyebrow', {
+      color: '#7E22CE', 'font-weight': '700', 'font-size': '12px',
+      'letter-spacing': '2.5px', 'text-transform': 'uppercase',
+      'margin-bottom': '14px',
+    }),
+    ...cls('tapas-section-heading', {
+      margin: '0', 'font-family': 'var(--tapas-heading-font, Newsreader, serif)',
+      'font-size': 'clamp(28px, 3.6vw, 44px)', color: text_color,
+      'font-weight': '700', 'line-height': '1.2', 'letter-spacing': '-0.01em',
+    }),
+    ...cls('tapas-section-subtext', {
+      'margin-top': '18px', color: text_color, opacity: '0.75',
+      'font-size': '16px', 'line-height': '1.7',
+      'max-width': textAlign === 'center' ? '640px' : '100%',
+      margin: textAlign === 'center' ? '18px auto 0' : '18px 0 0',
+    }),
+  };
+  const root = makeNode({
+    tag: 'section', classes: ['tapas-section'],
+    children: [
+      makeNode({
+        tag: 'div', classes: ['tapas-section-inner'],
+        children: [
+          eyebrow ? makeNode({ tag: 'div', classes: ['tapas-section-eyebrow'], textContent: eyebrow }) : null,
+          makeNode({ tag: 'h2', classes: ['tapas-section-heading'], textContent: heading }),
+          subtext ? makeNode({ tag: 'p', classes: ['tapas-section-subtext'], textContent: subtext }) : null,
+        ].filter(Boolean),
+      }),
+    ],
+  });
+  return { root, classes };
+}
+
+function compileTapasGroup(props = {}) {
+  const {
+    children: groupChildren = [],
+    background_color = 'transparent',
+    padding_y = 0, padding_x = 0,
+    max_width = 0,
+    align = 'stretch',
+    direction = 'column',
+    gap = 0,
+  } = props;
+  const classes = {
+    ...cls('tapas-group', {
+      background: background_color,
+      padding: `${padding_y || 0}px ${padding_x || 0}px`,
+    }),
+    ...cls('tapas-group-inner', {
+      display: 'flex',
+      'flex-direction': direction === 'row' ? 'row' : 'column',
+      'align-items':
+        align === 'stretch' ? 'stretch' :
+        align === 'center' ? 'center' :
+        align === 'end' ? 'flex-end' : 'flex-start',
+      gap: `${gap || 0}px`,
+      ...(max_width > 0 ? { 'max-width': `${max_width}px`, margin: '0 auto' } : {}),
+    }),
+  };
+  // Recursively compile each child block. Any classes the children emit
+  // merge into the caller's class map — walkTree at migration time
+  // ensures no duplicates.
+  const childResults = (groupChildren || []).map(compileBlock);
+  const mergedClasses = childResults.reduce(
+    (acc, r) => Object.assign(acc, r.classes || {}),
+    classes
+  );
+  const root = makeNode({
+    tag: 'section', classes: ['tapas-group'],
+    children: [
+      makeNode({
+        tag: 'div', classes: ['tapas-group-inner'],
+        children: childResults.map(r => r.root),
+      }),
+    ],
+  });
+  return { root, classes: mergedClasses };
+}
+
 function compilePlaceholder(block) {
   const classes = cls('tapas-compile-placeholder', {
     padding: '40px 20px', background: '#FEF3C7',
@@ -328,9 +716,14 @@ function compilePlaceholder(block) {
 }
 
 const COMPILERS = {
-  tapas_hero:        compileTapasHero,
-  tapas_services:    compileTapasServices,
-  tapas_newsletter:  compileTapasNewsletter,
+  tapas_hero:         compileTapasHero,
+  tapas_services:     compileTapasServices,
+  tapas_new_arrivals: compileTapasNewArrivals,
+  tapas_inspiration:  compileTapasInspiration,
+  tapas_testimonials: compileTapasTestimonials,
+  tapas_newsletter:   compileTapasNewsletter,
+  tapas_section:      compileTapasSection,
+  tapas_group:        compileTapasGroup,
 };
 
 // Compile a single block to a { root, classes } bundle.
