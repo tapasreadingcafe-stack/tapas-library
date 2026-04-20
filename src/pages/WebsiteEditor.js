@@ -13,10 +13,14 @@
 // is under construction.
 // =====================================================================
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { Node as TreeNode } from './WebsiteEditor.node';
 import { compileClassesToCSS } from './WebsiteEditor.css';
+import {
+  flattenTree, pathToNode, findNode, parentOf, firstChildOf,
+  prevInFlat, nextInFlat, labelOf,
+} from './WebsiteEditor.tree';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -49,7 +53,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, page, onPageChange, pages }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, pages }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -89,18 +93,28 @@ function TopBar({ breadcrumb, page, onPageChange, pages }) {
         {breadcrumb.length === 0 && (
           <span style={{ color: W.textFaint, fontSize: '11px' }}>(no selection)</span>
         )}
-        {breadcrumb.map((seg, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <span style={{ color: W.textFaint }}>›</span>}
-            <span style={{
-              padding: '3px 7px', borderRadius: '3px',
-              background: i === breadcrumb.length - 1 ? W.accentDim : 'transparent',
-              color: i === breadcrumb.length - 1 ? W.accent : W.textDim,
-              fontFamily: 'ui-monospace, monospace',
-              whiteSpace: 'nowrap',
-            }}>{seg}</span>
-          </React.Fragment>
-        ))}
+        {breadcrumb.map((seg, i) => {
+          const isLast = i === breadcrumb.length - 1;
+          return (
+            <React.Fragment key={seg.id || i}>
+              {i > 0 && <span style={{ color: W.textFaint }}>›</span>}
+              <button
+                onClick={() => onBreadcrumbClick && onBreadcrumbClick(seg.id)}
+                style={{
+                  padding: '3px 7px', borderRadius: '3px',
+                  background: isLast ? W.accentDim : 'transparent',
+                  color: isLast ? W.accent : W.textDim,
+                  fontFamily: 'ui-monospace, monospace',
+                  whiteSpace: 'nowrap',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: '11px',
+                }}
+                onMouseEnter={(e) => { if (!isLast) e.currentTarget.style.color = W.text; }}
+                onMouseLeave={(e) => { if (!isLast) e.currentTarget.style.color = W.textDim; }}
+              >{seg.label}</button>
+            </React.Fragment>
+          );
+        })}
       </div>
       {/* Right cluster */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 12px' }}>
@@ -203,18 +217,16 @@ function LeftRail({ active, onChange }) {
 // Navigator  —  spec § 1: 240 px, element tree. Phase 1 = read-only.
 // =====================================================================
 function Navigator({ tree, selectedId, onSelect }) {
-  // Flatten the tree to a list of { node, depth } in pre-order so we
-  // can render with indent.
-  const rows = useMemo(() => {
-    const out = [];
-    const rec = (n, depth) => {
-      if (!n) return;
-      out.push({ node: n, depth });
-      for (const c of n.children || []) rec(c, depth + 1);
-    };
-    rec(tree, 0);
-    return out;
-  }, [tree]);
+  const rows = useMemo(() => flattenTree(tree), [tree]);
+  const selectedRef = useRef(null);
+
+  // Scroll the selected row into view whenever selection changes —
+  // covers clicks on canvas and Esc/Enter/Arrow key moves.
+  useEffect(() => {
+    if (selectedId && selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedId]);
 
   return (
     <div style={{
@@ -245,6 +257,7 @@ function Navigator({ tree, selectedId, onSelect }) {
           const label = node.classes?.[0] || node.tag || 'unnamed';
           return (
             <button key={node.id}
+              ref={isSelected ? selectedRef : null}
               onClick={() => onSelect(node.id)}
               style={{
                 width: '100%', height: '26px',
@@ -299,8 +312,10 @@ const DEVICES = [
 function Canvas({ tree, classes, selectedId, onSelect }) {
   const [device, setDevice] = useState('desktop');
   const [zoom, setZoom] = useState(100);
+  const [hoverId, setHoverId] = useState(null);
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
+  const surfaceRef = useRef(null);
 
   return (
     <div style={{
@@ -350,30 +365,136 @@ function Canvas({ tree, classes, selectedId, onSelect }) {
         <button style={toolbarBtn(W)} title="Grid overlay">▦</button>
       </div>
       {/* Canvas surface */}
-      <div style={{
-        flex: 1, overflow: 'auto',
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-        padding: '24px',
-      }}>
+      <div
+        ref={surfaceRef}
+        style={{
+          flex: 1, overflow: 'auto', position: 'relative',
+          display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+          padding: '24px',
+        }}
+      >
         <div style={{
           width: vp.width, maxWidth: '100%',
           transform: `scale(${zoom / 100})`, transformOrigin: 'top center',
           background: '#fff', minHeight: '80vh',
           boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)',
           transition: 'width 0.15s ease',
+          position: 'relative',
         }}>
-          {/* Stylesheet compiled from Class definitions. Scoped to this
-              canvas via a unique id so multiple canvases in dev mode
-              don't bleed into each other. */}
           <style>{cssText}</style>
           <CanvasSelectionShell
             tree={tree}
             selectedId={selectedId}
             onSelect={onSelect}
+            onHover={setHoverId}
           />
         </div>
+        {/* Overlays live in surface space so they scroll with the
+            canvas. Rect measurements already account for the zoom
+            transform because getBoundingClientRect returns visual
+            pixels. */}
+        <SelectionOverlay
+          targetId={selectedId}
+          surfaceRef={surfaceRef}
+          tree={tree}
+          kind="selected"
+        />
+        <SelectionOverlay
+          targetId={hoverId && hoverId !== selectedId ? hoverId : null}
+          surfaceRef={surfaceRef}
+          tree={tree}
+          kind="hover"
+        />
       </div>
     </div>
+  );
+}
+
+// =====================================================================
+// Selection / hover overlay  —  spec § 2
+// A 1px outline positioned absolutely over the canvas surface. Uses
+// getBoundingClientRect on a data-tapas-node-id element, converted into
+// surface-local coords. Re-measures on scroll, resize, and whenever the
+// target changes.
+// =====================================================================
+function SelectionOverlay({ targetId, surfaceRef, tree, kind }) {
+  const [rect, setRect] = useState(null);
+  const [nodeLabel, setNodeLabel] = useState('');
+
+  const measure = useCallback(() => {
+    if (!targetId || !surfaceRef.current) { setRect(null); return; }
+    const el = surfaceRef.current.querySelector(
+      `[data-tapas-node-id="${targetId}"]`
+    );
+    if (!el) { setRect(null); return; }
+    const er = el.getBoundingClientRect();
+    const sr = surfaceRef.current.getBoundingClientRect();
+    setRect({
+      top: er.top - sr.top + surfaceRef.current.scrollTop,
+      left: er.left - sr.left + surfaceRef.current.scrollLeft,
+      width: er.width,
+      height: er.height,
+    });
+    const n = findNode(tree, targetId);
+    setNodeLabel(n ? labelOf(n) : '');
+  }, [targetId, surfaceRef, tree]);
+
+  useLayoutEffect(() => { measure(); }, [measure]);
+
+  useEffect(() => {
+    if (!targetId) return;
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const onScroll = () => measure();
+    surface.addEventListener('scroll', onScroll);
+    window.addEventListener('resize', measure);
+    // Re-measure after layout settles — fonts, images, etc.
+    const t = setTimeout(measure, 50);
+    return () => {
+      surface.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', measure);
+      clearTimeout(t);
+    };
+  }, [targetId, surfaceRef, measure]);
+
+  if (!rect) return null;
+
+  const color = '#146ef5';
+  const isSelected = kind === 'selected';
+
+  return (
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: rect.top, left: rect.left,
+          width: rect.width, height: rect.height,
+          outline: `1px ${isSelected ? 'solid' : 'dashed'} ${color}`,
+          outlineOffset: '-1px',
+          pointerEvents: 'none',
+          zIndex: 10,
+        }}
+      />
+      {isSelected && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: rect.top - 18, left: rect.left,
+            background: color, color: '#fff',
+            fontSize: '11px', fontWeight: 500,
+            letterSpacing: '0.01em',
+            padding: '2px 6px',
+            borderRadius: '2px 2px 0 0',
+            fontFamily: 'ui-monospace, monospace',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 11,
+          }}
+        >{nodeLabel || 'element'}</div>
+      )}
+    </>
   );
 }
 
@@ -386,25 +507,30 @@ function toolbarBtn(W) {
   };
 }
 
-// Thin wrapper that catches canvas clicks and dispatches onSelect by
-// traversing up from the event target to the nearest node with a
-// data-tapas-node-id. Selection UX specifics (outline, label tab,
-// hover outline) land in Phase 2 per the spec.
-function CanvasSelectionShell({ tree, selectedId, onSelect }) {
-  const onClick = (e) => {
-    let el = e.target;
-    while (el && el !== e.currentTarget) {
-      if (el.dataset?.tapasNodeId) {
-        onSelect(el.dataset.tapasNodeId);
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
+// Canvas click/hover dispatcher. Walks up from the event target to the
+// nearest element with data-tapas-node-id; reports click → onSelect,
+// mouseover → onHover, and null-out on mouseleave so the dashed overlay
+// disappears when the cursor leaves the canvas.
+function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
+  const nearestNodeId = (target, stopAt) => {
+    let el = target;
+    while (el && el !== stopAt) {
+      if (el.dataset?.tapasNodeId) return el.dataset.tapasNodeId;
       el = el.parentElement;
     }
+    return null;
   };
+  const onClick = (e) => {
+    const id = nearestNodeId(e.target, e.currentTarget);
+    if (id) { onSelect(id); e.preventDefault(); e.stopPropagation(); }
+  };
+  const onMouseOver = (e) => {
+    const id = nearestNodeId(e.target, e.currentTarget);
+    if (onHover) onHover(id);
+  };
+  const onMouseLeave = () => { if (onHover) onHover(null); };
   return (
-    <div onClick={onClick}>
+    <div onClick={onClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave}>
       <TreeNode node={tree} selectedId={selectedId} />
     </div>
   );
@@ -508,32 +634,45 @@ export default function WebsiteEditor() {
   const tree = content?.pages?.[pageKey]?.tree || null;
   const classes = content?.classes || {};
 
-  // Build breadcrumb from the selected node by walking the tree.
-  const breadcrumb = useMemo(() => {
-    if (!tree || !selectedId) return [];
-    const path = [];
-    const rec = (n, acc) => {
-      if (!n) return false;
-      const next = [...acc, labelFor(n)];
-      if (n.id === selectedId) { path.push(...next); return true; }
-      for (const c of n.children || []) if (rec(c, next)) return true;
-      return false;
-    };
-    rec(tree, []);
-    return path;
-  }, [tree, selectedId]);
+  const breadcrumb = useMemo(
+    () => pathToNode(tree, selectedId),
+    [tree, selectedId]
+  );
+  const selectedNode = useMemo(
+    () => findNode(tree, selectedId),
+    [tree, selectedId]
+  );
+  const flat = useMemo(() => flattenTree(tree), [tree]);
 
-  const selectedNode = useMemo(() => {
-    if (!tree || !selectedId) return null;
-    let hit = null;
-    const rec = (n) => {
-      if (hit) return;
-      if (n.id === selectedId) { hit = n; return; }
-      for (const c of n.children || []) rec(c);
+  // Keyboard — spec § 2. Selection-only moves ship here; mutation
+  // shortcuts (Cmd+D duplicate, Delete, Cmd+Shift+D reset) land with
+  // the write pipeline in Phase 3.
+  useEffect(() => {
+    if (!tree) return;
+    const onKey = (e) => {
+      // Don't hijack keys while the user is typing in an input.
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        return;
+      }
+      if (!selectedId) return;
+      if (e.key === 'Escape') {
+        const p = parentOf(tree, selectedId);
+        if (p) { setSelectedId(p.id); e.preventDefault(); }
+      } else if (e.key === 'Enter') {
+        const c = firstChildOf(tree, selectedId);
+        if (c) { setSelectedId(c.id); e.preventDefault(); }
+      } else if (e.key === 'ArrowUp') {
+        const p = prevInFlat(flat, selectedId);
+        if (p) { setSelectedId(p.id); e.preventDefault(); }
+      } else if (e.key === 'ArrowDown') {
+        const n = nextInFlat(flat, selectedId);
+        if (n) { setSelectedId(n.id); e.preventDefault(); }
+      }
     };
-    rec(tree);
-    return hit;
-  }, [tree, selectedId]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tree, flat, selectedId]);
 
   if (loading) {
     return <div style={fullScreenMessage(W, 'Loading v2 content…')} />;
@@ -544,13 +683,14 @@ export default function WebsiteEditor() {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0,
+      position: 'fixed', inset: 0, zIndex: 2001,
       display: 'flex', flexDirection: 'column',
       background: W.canvasBg, color: W.text,
       fontFamily: '-apple-system, BlinkMacSystemFont, Inter, sans-serif',
     }}>
       <TopBar
         breadcrumb={breadcrumb}
+        onBreadcrumbClick={(id) => setSelectedId(id)}
         page={pageKey}
         onPageChange={(k) => { setPageKey(k); setSelectedId(null); }}
         pages={pages}
@@ -563,12 +703,6 @@ export default function WebsiteEditor() {
       </div>
     </div>
   );
-}
-
-function labelFor(n) {
-  if (!n) return '';
-  if (n.classes?.length) return `.${n.classes[0]}`;
-  return n.tag || '?';
 }
 
 function fullScreenMessage(W, msg) {
