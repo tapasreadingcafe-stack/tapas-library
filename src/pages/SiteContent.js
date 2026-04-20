@@ -1287,7 +1287,7 @@ function SchedulePublishModal({ S, onClose, onSchedule, pending, onCancel }) {
 // so dark-theme styling and inline validation all come along for
 // free.
 // =====================================================================
-function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplicate, isLocked, onToggleLocked }) {
+function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplicate, isLocked, onToggleLocked, onDetachComponent, componentUsageCount }) {
   // Accessibility warnings — recomputed per render. Cheap (pure
   // synchronous loops over the schema). Empty array when the block
   // looks fine; a yellow banner appears below the header otherwise.
@@ -1374,6 +1374,40 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
               cursor: 'pointer',
             }}
           >Unlock</button>
+        </div>
+      )}
+
+      {/* Phase 6: Component-ref banner. When the selected block is a
+          reference to a shared component, surface the link + a detach
+          action so staff know they're editing a linked instance. */}
+      {block.type === 'component_ref' && (
+        <div style={{
+          padding: '10px 14px',
+          background: D.accentLight || '#EEF2FF',
+          borderBottom: `1px solid ${D.accent}22`,
+          display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: '14px', color: D.accent }}>◈</span>
+          <div style={{ flex: 1, fontSize: '11px', color: D.text, lineHeight: 1.5, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, marginBottom: '2px' }}>
+              Linked to <code style={{ fontFamily: 'ui-monospace, monospace', background: '#fff', padding: '1px 5px', borderRadius: '3px' }}>{block.props?.name || '(unnamed)'}</code>
+            </div>
+            <div style={{ color: D.textDim }}>
+              {componentUsageCount && componentUsageCount > 1
+                ? `Editing the definition updates ${componentUsageCount} instances.`
+                : 'Edits to the component will propagate here.'}
+            </div>
+          </div>
+          <button
+            onClick={onDetachComponent}
+            title="Replace this reference with an independent copy"
+            style={{
+              padding: '4px 10px', fontSize: '11px', fontWeight: 600,
+              background: '#fff', color: D.text,
+              border: `1px solid ${D.border}`, borderRadius: '3px',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >Detach</button>
         </div>
       )}
 
@@ -3341,6 +3375,102 @@ export default function SiteContent() {
     return fresh.id;
   }, [mutateBlocks]);
 
+  // Phase 6: Components / Symbols — reusable block trees stored once
+  // at draftContent.components[name]. Pages insert a tiny
+  // { type: 'component_ref', props: { name } } stub; the storefront
+  // resolves the reference and renders the component's blocks. Editing
+  // the definition updates every instance.
+
+  // Turn an existing block into a component. Moves its data under
+  // components[name] and replaces the original block in-place with a
+  // component_ref.
+  const saveBlockAsComponent = useCallback((pageKey, blockId, componentName) => {
+    const name = (componentName || '').trim();
+    if (!name) return;
+    setDraftContent(prev => {
+      const pages = prev.pages || {};
+      const page = pages[pageKey];
+      if (!page) return prev;
+      const blocks = Array.isArray(page.blocks) ? page.blocks : [];
+      const idx = blocks.findIndex(b => b.id === blockId);
+      if (idx < 0) return prev;
+      const src = blocks[idx];
+      // Component definition holds an array of blocks so a group can
+      // be saved as a single component with many children.
+      const defTree = src.type === 'tapas_group'
+        ? (src.props?.children || [])
+        : [JSON.parse(JSON.stringify(src))];
+      const components = { ...(prev.components || {}) };
+      if (components[name]) {
+        // Don't overwrite an existing component silently. Bail; caller
+        // should've confirmed.
+        return prev;
+      }
+      components[name] = { blocks: defTree, meta: { created_at: new Date().toISOString() } };
+      const refBlock = {
+        id: `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e5).toString(36)}`,
+        type: 'component_ref',
+        props: { name },
+      };
+      const nextBlocks = [...blocks];
+      nextBlocks.splice(idx, 1, refBlock);
+      return {
+        ...prev,
+        components,
+        pages: { ...pages, [pageKey]: { ...page, blocks: nextBlocks } },
+      };
+    });
+  }, []);
+
+  // Replace a component_ref with a fresh copy of the component's
+  // current blocks, breaking the live link. The original component
+  // definition is left intact for other references.
+  const detachComponentInstance = useCallback((pageKey, blockId) => {
+    setDraftContent(prev => {
+      const pages = prev.pages || {};
+      const page = pages[pageKey];
+      if (!page) return prev;
+      const blocks = Array.isArray(page.blocks) ? page.blocks : [];
+      const idx = blocks.findIndex(b => b.id === blockId);
+      if (idx < 0) return prev;
+      const ref = blocks[idx];
+      if (ref.type !== 'component_ref') return prev;
+      const def = prev.components?.[ref.props?.name];
+      if (!def || !Array.isArray(def.blocks) || def.blocks.length === 0) return prev;
+      // Deep-clone and give every cloned block a fresh id to avoid
+      // collisions with other copies of the component.
+      const clones = def.blocks.map(b => ({
+        ...JSON.parse(JSON.stringify(b)),
+        id: `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e7).toString(36)}`,
+      }));
+      const nextBlocks = [...blocks];
+      nextBlocks.splice(idx, 1, ...clones);
+      return {
+        ...prev,
+        pages: { ...pages, [pageKey]: { ...page, blocks: nextBlocks } },
+      };
+    });
+  }, []);
+
+  // Insert a new component_ref for an existing component at a target
+  // page index. Used by the component library picker (future work).
+  const insertComponentRef = useCallback((pageKey, componentName, atIndex) => {
+    if (!componentName) return;
+    const ref = {
+      id: `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e5).toString(36)}`,
+      type: 'component_ref',
+      props: { name: componentName },
+    };
+    mutateBlocks(pageKey, (blocks) => {
+      const idx = typeof atIndex === 'number' ? atIndex : blocks.length;
+      const next = [...blocks];
+      next.splice(idx, 0, ref);
+      return next;
+    });
+    setSelectedBlockId(ref.id);
+    return ref.id;
+  }, [mutateBlocks]);
+
   // Insert a new block as a child of an existing tapas_group. Used when
   // a library tile is dropped onto a group row in the Layers tree.
   const addBlockAsChild = useCallback((pageKey, parentId, type, presetId) => {
@@ -4388,6 +4518,29 @@ export default function SiteContent() {
       });
     }
     cmds.push({ id: 'styles',     label: 'Open Design System',          kind: 'Action', run: () => setDesignModalOpen(true) });
+    // Phase 6: Component commands. Operate on the currently selected
+    // block. Save turns the block into a reusable component; Insert
+    // drops a reference to an existing component onto the page.
+    if (selectedBlockId) {
+      cmds.push({
+        id: 'save-as-component',
+        label: 'Save selected block as component…',
+        kind: 'Component',
+        run: () => {
+          const name = window.prompt('Component name (e.g. site-footer):', '');
+          if (name && name.trim()) saveBlockAsComponent(editingPage, selectedBlockId, name.trim());
+        },
+      });
+    }
+    const components = draftContent.components || {};
+    for (const cname of Object.keys(components)) {
+      cmds.push({
+        id: `insert-component-${cname}`,
+        label: `Insert component: ${cname}`,
+        kind: 'Component',
+        run: () => insertComponentRef(editingPage, cname),
+      });
+    }
     cmds.push({ id: 'view-d',     label: 'View: Desktop',               kind: 'View',   run: () => setViewport('desktop') });
     cmds.push({ id: 'view-t',     label: 'View: Tablet',                kind: 'View',   run: () => setViewport('tablet') });
     cmds.push({ id: 'view-m',     label: 'View: Mobile',                kind: 'View',   run: () => setViewport('mobile') });
@@ -6590,6 +6743,19 @@ export default function SiteContent() {
                   onConfirm: () => deleteBlock(editingPage, selectedBlock.id),
                 });
               }}
+              onDetachComponent={() => detachComponentInstance(editingPage, selectedBlock.id)}
+              componentUsageCount={(() => {
+                if (selectedBlock.type !== 'component_ref') return 0;
+                const name = selectedBlock.props?.name;
+                if (!name) return 0;
+                let count = 0;
+                for (const pg of Object.values(draftContent.pages || {})) {
+                  for (const b of (pg.blocks || [])) {
+                    if (b.type === 'component_ref' && b.props?.name === name) count++;
+                  }
+                }
+                return count;
+              })()}
             />
           ) : (
             // Nothing selected → Page Settings (Webflow/Figma style).

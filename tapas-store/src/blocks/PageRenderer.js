@@ -173,6 +173,48 @@ function isWithinSchedule(p, now) {
   return true;
 }
 
+// Phase 6: Component reference — looks up a named component in
+// content.components and renders its block tree. The definition is
+// stored once on draftContent.components; every instance on the page
+// is a tiny `{ type: 'component_ref', props: { name } }` stub, so
+// editing the definition updates every instance at once.
+export function ComponentRef({ props = {}, pageKey }) {
+  const content = useSiteContent();
+  const name = props?.name;
+  const def = name ? content?.components?.[name] : null;
+  const blocks = Array.isArray(def?.blocks) ? def.blocks : [];
+  const editorMode = typeof window !== 'undefined' && /[?&]preview=draft\b/.test(window.location.search || '');
+  if (!def) {
+    // Dev / editor fallback so staff can recognize a broken reference.
+    if (editorMode) {
+      return (
+        <div style={{
+          margin: '12px', padding: '14px 18px',
+          background: '#fef3c7', border: '1px solid #fde68a',
+          color: '#92400e', borderRadius: '8px', fontSize: '13px',
+        }}>
+          Unknown component: <code>{String(name) || '(unnamed)'}</code>
+        </div>
+      );
+    }
+    return null;
+  }
+  return (
+    <>
+      {blocks.map((child, idx) => (
+        <BlockView
+          key={child.id || idx}
+          block={child}
+          pageKey={pageKey}
+          blockIndex={idx}
+          totalBlocks={blocks.length}
+          editorMode={editorMode}
+        />
+      ))}
+    </>
+  );
+}
+
 // Tapas Group container — renders nested child blocks via BlockView.
 // Defined here (not in TapasFigmaBlocks.js) so it has direct access to
 // BlockView without a require() that breaks CRA's module resolution.

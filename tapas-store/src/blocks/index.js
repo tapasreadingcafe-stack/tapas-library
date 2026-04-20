@@ -34,7 +34,7 @@ import {
   TapasHero, TapasServices, TapasNewArrivals, TapasInspiration,
   TapasTestimonials, TapasNewsletter, TapasSection,
 } from './TapasFigmaBlocks';
-import { TapasGroup } from './PageRenderer';
+import { TapasGroup, ComponentRef } from './PageRenderer';
 
 export const BLOCK_REGISTRY = {
   hero: {
@@ -771,6 +771,16 @@ export const BLOCK_REGISTRY = {
           { key: 'role',   label: 'Role',   type: 'text' },
         ],
       },
+    ],
+  },
+
+  component_ref: {
+    label: 'Component reference',
+    category: 'Content',
+    Renderer: ComponentRef,
+    defaultProps: { name: '' },
+    schema: [
+      { key: 'name', label: 'Component name', type: 'text', hint: 'Must match an entry in Components.' },
     ],
   },
 

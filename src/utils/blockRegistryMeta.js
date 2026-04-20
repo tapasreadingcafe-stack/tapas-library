@@ -1057,6 +1057,16 @@ export const BLOCK_REGISTRY_META = {
     ],
   },
 
+  component_ref: {
+    label: 'Component reference',
+    category: 'Content',
+    icon: '◈',
+    defaultProps: { name: '' },
+    schema: [
+      { key: 'name', label: 'Component name', type: 'text', hint: 'Must match an entry in Components.' },
+    ],
+  },
+
   tapas_group: {
     label: 'Tapas Group (container with children)',
     category: 'Content',
