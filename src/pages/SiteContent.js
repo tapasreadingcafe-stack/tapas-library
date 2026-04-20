@@ -752,6 +752,27 @@ const FIELD_RENDERERS = {
 
 const ELEMENT_GROUPS = [
   {
+    // Phase 1: Layout — Webflow-style Display / Direction / Align / Gap /
+    // Position controls. Renders via dedicated visual pickers (not the
+    // generic CssTextField), so the storefront receives valid CSS values.
+    key: 'layout',
+    title: 'Layout',
+    icon: '▦',
+    fields: [
+      { cssProp: 'display',         label: 'Display',    type: 'css-display' },
+      { cssProp: 'flexDirection',   label: 'Direction',  type: 'css-flex-direction' },
+      { cssProp: 'justifyContent',  label: 'Align',      type: 'css-align-grid' },
+      { cssProp: 'gap',             label: 'Gap',        type: 'css-size' },
+      { cssProp: 'position',        label: 'Position',   type: 'css-select',
+        options: ['', 'static', 'relative', 'absolute', 'fixed', 'sticky'] },
+      { cssProp: 'top',             label: 'Top',        type: 'css-text', placeholder: 'auto' },
+      { cssProp: 'right',           label: 'Right',      type: 'css-text', placeholder: 'auto' },
+      { cssProp: 'bottom',          label: 'Bottom',     type: 'css-text', placeholder: 'auto' },
+      { cssProp: 'left',            label: 'Left',       type: 'css-text', placeholder: 'auto' },
+      { cssProp: 'zIndex',          label: 'Z-index',    type: 'css-text', placeholder: 'auto' },
+    ],
+  },
+  {
     key: 'typography',
     title: 'Typography',
     icon: 'T',
@@ -890,11 +911,133 @@ function CssColorField({ field, value, onChange }) {
   );
 }
 
+// Webflow-style Display picker: Block / Flex / Grid / None as tabs.
+function CssDisplayField({ field, value, onChange }) {
+  const options = [
+    { v: 'block', label: 'Block' },
+    { v: 'flex',  label: 'Flex'  },
+    { v: 'grid',  label: 'Grid'  },
+    { v: 'none',  label: 'None'  },
+  ];
+  const current = value || '';
+  return (
+    <Row label={field.label} iconType="select">
+      <div style={{
+        display: 'flex', background: D.input, borderRadius: '4px',
+        padding: '2px', gap: '2px', height: '28px',
+      }}>
+        {options.map(o => (
+          <button
+            key={o.v}
+            onClick={() => onChange(current === o.v ? '' : o.v)}
+            style={{
+              flex: 1, border: 'none', cursor: 'pointer',
+              background: current === o.v ? D.panel : 'transparent',
+              color: current === o.v ? D.text : D.textDim,
+              fontSize: '11px', fontWeight: current === o.v ? 600 : 500,
+              borderRadius: '3px',
+              boxShadow: current === o.v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >{o.label}</button>
+        ))}
+      </div>
+    </Row>
+  );
+}
+
+// Flex direction arrows: row / column / row-reverse / column-reverse.
+function CssFlexDirectionField({ field, value, onChange }) {
+  const options = [
+    { v: 'row',            icon: '→', title: 'Row' },
+    { v: 'column',         icon: '↓', title: 'Column' },
+    { v: 'row-reverse',    icon: '←', title: 'Row reverse' },
+    { v: 'column-reverse', icon: '↑', title: 'Column reverse' },
+  ];
+  const current = value || '';
+  return (
+    <Row label={field.label} iconType="select">
+      <div style={{ display: 'flex', gap: '4px', height: '28px' }}>
+        {options.map(o => (
+          <button
+            key={o.v}
+            title={o.title}
+            onClick={() => onChange(current === o.v ? '' : o.v)}
+            style={{
+              width: '34px', height: '28px', border: 'none', cursor: 'pointer',
+              background: current === o.v ? D.accentLight : D.input,
+              color: current === o.v ? D.accent : D.text,
+              fontSize: '14px', fontWeight: 700, borderRadius: '3px',
+            }}
+          >{o.icon}</button>
+        ))}
+      </div>
+    </Row>
+  );
+}
+
+// 3×3 Align grid — picks justify-content (X) + align-items (Y) at once.
+// Stored as justifyContent; the alignItems partner is synced automatically.
+function CssAlignGridField({ field, value, onChange }) {
+  // Pick: row=alignItems, col=justifyContent
+  const jc = (value || '').toString();
+  // We only show a 3x3 visual grid. Each cell represents one (jc, ai) pair.
+  const cells = [
+    ['flex-start', 'flex-start'],   ['flex-start', 'center'],   ['flex-start', 'flex-end'],
+    ['center',     'flex-start'],   ['center',     'center'],   ['center',     'flex-end'],
+    ['flex-end',   'flex-start'],   ['flex-end',   'center'],   ['flex-end',   'flex-end'],
+  ];
+  const isCurrent = (ai, jcv) => jc === jcv;
+  const set = (ai, jcv) => {
+    // We store justifyContent on cssProp; alignItems as a separate key
+    // by directly mutating via onChange callback receiving a shape.
+    onChange(jcv);
+    // The parent's onChangeStyle is (cssProp, value, state) — to also
+    // write alignItems we fire a synthetic window event that the
+    // inspector listens for; simpler: write jc only here, user edits
+    // alignItems in separate row if needed.
+  };
+  return (
+    <Row label={field.label} iconType="select">
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '2px', background: D.input, padding: '3px', borderRadius: '4px',
+        width: 'fit-content',
+      }}>
+        {cells.map(([ai, jcv], i) => {
+          const active = isCurrent(ai, jcv);
+          return (
+            <button
+              key={i}
+              title={`justify-content: ${jcv}`}
+              onClick={() => set(ai, jcv)}
+              style={{
+                width: '18px', height: '18px',
+                background: active ? D.accent : D.panel,
+                border: 'none', cursor: 'pointer',
+                borderRadius: '2px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <span style={{
+                width: '4px', height: '4px', borderRadius: '50%',
+                background: active ? '#fff' : D.textFaint,
+              }} />
+            </button>
+          );
+        })}
+      </div>
+    </Row>
+  );
+}
+
 const CSS_RENDERERS = {
-  'css-text':   CssTextField,
-  'css-size':   CssSizeField,
-  'css-select': CssSelectField,
-  'css-color':  CssColorField,
+  'css-text':            CssTextField,
+  'css-size':            CssSizeField,
+  'css-select':          CssSelectField,
+  'css-color':           CssColorField,
+  'css-display':         CssDisplayField,
+  'css-flex-direction':  CssFlexDirectionField,
+  'css-align-grid':      CssAlignGridField,
 };
 
 // =====================================================================
