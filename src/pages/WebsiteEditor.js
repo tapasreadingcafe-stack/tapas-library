@@ -21,6 +21,10 @@ import {
   flattenTree, pathToNode, findNode, parentOf, firstChildOf,
   prevInFlat, nextInFlat, labelOf,
 } from './WebsiteEditor.tree';
+import {
+  ensureNodeClass, setClassStyle, renameClass,
+} from './WebsiteEditor.mutations';
+import StylePanel from './WebsiteEditor.style';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -538,9 +542,13 @@ function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
 
 // =====================================================================
 // Right panel  —  spec § 1: 280 px, Style / Settings / Interactions tabs
-// Phase 1 stubs each tab with a "coming in phase N" placeholder.
+// Style tab is live in Phase 3. Settings + Interactions still stubbed.
 // =====================================================================
-function RightPanel({ selectedNode }) {
+function RightPanel({
+  selectedNode, className, classDef,
+  state, onStateChange,
+  onCreateClass, onRenameClass, onSetStyle,
+}) {
   const [tab, setTab] = useState('style');
   const tabs = [
     { key: 'style',        label: 'Style' },
@@ -584,11 +592,30 @@ function RightPanel({ selectedNode }) {
           ? <>{selectedNode.tag}{selectedNode.classes?.[0] ? `.${selectedNode.classes[0]}` : ''}</>
           : <span style={{ color: W.textFaint }}>Select an element on the canvas</span>}
       </div>
-      {/* Tab body — stubs for Phase 1 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px', color: W.textDim, fontSize: '11px', lineHeight: 1.6 }}>
-        {tab === 'style'        && <div>Selector, Variable modes, Layout, Spacing, Size, Position, Typography, Backgrounds, Borders, Effects land in <b style={{ color: W.text }}>Phase 3–4</b>.</div>}
-        {tab === 'settings'     && <div>Tag, ID, attributes, ARIA, link, embed fields land in <b style={{ color: W.text }}>Phase 5</b>.</div>}
-        {tab === 'interactions' && <div>Trigger + timeline editor lands in <b style={{ color: W.text }}>Phase 8</b>.</div>}
+      {/* Tab body */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {tab === 'style' && (
+          <StylePanel
+            node={selectedNode}
+            className={className}
+            classDef={classDef}
+            state={state}
+            onStateChange={onStateChange}
+            onCreateClass={onCreateClass}
+            onRenameClass={onRenameClass}
+            onSetStyle={onSetStyle}
+          />
+        )}
+        {tab === 'settings' && (
+          <div style={{ padding: '14px 12px', color: W.textDim, fontSize: '11px', lineHeight: 1.6 }}>
+            Tag, ID, attributes, ARIA, link, embed fields land in <b style={{ color: W.text }}>Phase 5</b>.
+          </div>
+        )}
+        {tab === 'interactions' && (
+          <div style={{ padding: '14px 12px', color: W.textDim, fontSize: '11px', lineHeight: 1.6 }}>
+            Trigger + timeline editor lands in <b style={{ color: W.text }}>Phase 8</b>.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -603,9 +630,15 @@ export default function WebsiteEditor() {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [pageKey, setPageKey] = useState('home');
   const [selectedId, setSelectedId] = useState(null);
   const [railActive, setRailActive] = useState('navigator');
+  const [styleState, setStyleState] = useState('base');
+
+  const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
+  const saveTimerRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -618,6 +651,7 @@ export default function WebsiteEditor() {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
         setContent(data.value);
+        loadedRef.current = data.value;
       } catch (err) {
         setError(err.message || String(err));
       } finally {
@@ -625,6 +659,30 @@ export default function WebsiteEditor() {
       }
     })();
   }, []);
+
+  // --- Autosave: debounced upsert back to app_settings.store_content_v2 --
+  // Mirrors the legacy editor's pattern: 900 ms after the last edit, push
+  // the whole blob. Skips if we haven't drifted from what we loaded.
+  useEffect(() => {
+    if (loading || !content) return;
+    if (content === loadedRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaving(true); setSaveError('');
+      try {
+        const { error: err } = await supabase.from('app_settings').upsert({
+          key: V2_KEY, value: content, updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+        if (err) throw err;
+        loadedRef.current = content;
+      } catch (err) {
+        setSaveError(err.message || 'Failed to save.');
+      } finally {
+        setSaving(false);
+      }
+    }, 900);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [content, loading]);
 
   const pages = useMemo(() => {
     if (!content?.pages) return [];
@@ -643,6 +701,37 @@ export default function WebsiteEditor() {
     [tree, selectedId]
   );
   const flat = useMemo(() => flattenTree(tree), [tree]);
+
+  // The Style panel edits the primary class on the selected node. If
+  // there isn't one yet, the Selector shows a "give this element a
+  // class" CTA (handled below via handleCreateClass).
+  const primaryClass = selectedNode?.classes?.[0] || null;
+  const classDef = primaryClass ? classes[primaryClass] : null;
+
+  const handleCreateClass = useCallback(() => {
+    if (!selectedId) return;
+    setContent((c) => {
+      const { content: next } = ensureNodeClass(c, pageKey, selectedId);
+      return next;
+    });
+  }, [selectedId, pageKey]);
+
+  const handleRenameClass = useCallback((newName) => {
+    if (!primaryClass || !newName) return;
+    setContent((c) => renameClass(c, primaryClass, newName));
+  }, [primaryClass]);
+
+  // onSet from Layout/Spacing: routes the CSS property/value through
+  // the class-only pipeline. Auto-creates a class on the selected node
+  // if this is the first style edit (spec § 7).
+  const handleSetStyle = useCallback((prop, value) => {
+    if (!selectedId) return;
+    setContent((c) => {
+      const { content: withClass, className } = ensureNodeClass(c, pageKey, selectedId);
+      if (!className) return c;
+      return setClassStyle(withClass, className, styleState, prop, value);
+    });
+  }, [selectedId, pageKey, styleState]);
 
   // Keyboard — spec § 2. Selection-only moves ship here; mutation
   // shortcuts (Cmd+D duplicate, Delete, Cmd+Shift+D reset) land with
@@ -699,8 +788,30 @@ export default function WebsiteEditor() {
         <LeftRail active={railActive} onChange={setRailActive} />
         <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />
         <Canvas tree={tree} classes={classes} selectedId={selectedId} onSelect={setSelectedId} />
-        <RightPanel selectedNode={selectedNode} />
+        <RightPanel
+          selectedNode={selectedNode}
+          className={primaryClass}
+          classDef={classDef}
+          state={styleState}
+          onStateChange={setStyleState}
+          onCreateClass={handleCreateClass}
+          onRenameClass={handleRenameClass}
+          onSetStyle={handleSetStyle}
+        />
       </div>
+      {(saving || saveError) && (
+        <div style={{
+          position: 'absolute', bottom: 8, right: 12,
+          padding: '6px 10px', borderRadius: '4px',
+          background: saveError ? '#4b1d1d' : '#1d2a3a',
+          color: saveError ? '#ff9a9a' : '#9ccfff',
+          fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+          border: `1px solid ${saveError ? '#7a2d2d' : '#2a5a8a'}`,
+          zIndex: 20,
+        }}>
+          {saveError ? `⚠ ${saveError}` : 'Saving…'}
+        </div>
+      )}
     </div>
   );
 }
