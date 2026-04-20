@@ -105,6 +105,7 @@ const KioskMode             = lazyWithRetry(() => import('./pages/KioskMode'));
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
 const CustomerOrders        = lazyWithRetry(() => import('./pages/CustomerOrders'));
 const SiteContent           = lazyWithRetry(() => import('./pages/SiteContent'));
+const WebsiteEditor         = lazyWithRetry(() => import('./pages/WebsiteEditor'));
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
 const StoreAnalytics        = lazyWithRetry(() => import('./pages/StoreAnalytics'));
@@ -768,6 +769,7 @@ function DashboardShell() {
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/commerce-insights"                  element={<CommerceInsights />} />
             <Route path="/store/content"                      element={<SiteContent />} />
+            <Route path="/store/content-v2"                   element={<WebsiteEditor />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
             {/* Marketing */}
