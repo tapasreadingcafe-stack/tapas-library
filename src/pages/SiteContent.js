@@ -1827,16 +1827,31 @@ function SpacingBoxDiagram({ styles }) {
   );
 }
 
-function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup, savedStyles, onSaveStyle, onApplyStyle }) {
+function ElementInspector({
+  path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup,
+  savedStyles, onSaveStyle, onApplyStyle,
+  className, classesMap, classUsageCount,
+  onSetClassName, onCreateClass, onRenameClass,
+}) {
+  // Resolve effective styles = class styles merged with element-specific
+  // styles. Class wins for unset keys; element-specific still overrides
+  // when set. But for UI we PREFER editing the class when one is
+  // attached, and show the element overrides as "local".
+  const classStyles = className ? (classesMap?.[className] || {}) : null;
+  const editingClass = !!className;
   const shortPath = path.split('.').slice(-1)[0].replace(/_/g, ' ');
   // Which interaction state the user is currently editing. Normal
   // writes to styles[prop]; Hover writes to styles._hover[prop]; Active
   // writes to styles._active[prop]. The tapas-store compiler translates
   // these into :hover and :active pseudo rules.
   const [stateTab, setStateTab] = useState('normal');
+  // When a class is attached, edits target the class's style map so
+  // every element using the class updates together. Otherwise edits
+  // land on the element's own styles map (the pre-Phase-3 behavior).
+  const activeStyles = editingClass ? classStyles : styles;
   const stateStyles = stateTab === 'normal'
-    ? styles
-    : styles?.[`_${stateTab}`];
+    ? activeStyles
+    : activeStyles?.[`_${stateTab}`];
   const stateHasValues = stateStyles && Object.keys(stateStyles).length > 0;
   const TABS = [
     { key: 'normal', label: 'Normal' },
@@ -1902,6 +1917,92 @@ function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expand
         >
           ↺
         </button>
+      </div>
+
+      {/* Phase 3: Class picker. When a class is attached, the style
+          controls below edit the CLASS so every element using the same
+          class updates at once. Create-new uses the element's current
+          styles as a seed so staff can "promote local → class" in one
+          step. Empty value detaches. */}
+      <div style={{
+        padding: '10px 14px', borderBottom: `1px solid ${D.border}`,
+        background: D.panelAlt,
+      }}>
+        <div style={{
+          fontSize: '10px', fontWeight: 600, color: D.textDim,
+          textTransform: 'uppercase', letterSpacing: '0.6px',
+          marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          <span>Class</span>
+          {editingClass && (
+            <span style={{
+              padding: '1px 6px', borderRadius: '8px',
+              background: D.accentLight, color: D.accent,
+              fontSize: '9px', fontWeight: 700, letterSpacing: '0.3px',
+            }}>{classUsageCount || 1} element{(classUsageCount || 1) === 1 ? '' : 's'}</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {editingClass ? (
+            <>
+              <input
+                type="text"
+                value={className}
+                onChange={(e) => onRenameClass?.(className, e.target.value)}
+                style={{
+                  flex: 1, padding: '4px 8px', fontSize: '11px',
+                  background: '#fff', border: `1px solid ${D.border}`,
+                  borderRadius: '3px', color: D.text,
+                  fontFamily: 'ui-monospace, monospace', outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => onSetClassName?.('')}
+                title="Detach class (element keeps local styles)"
+                style={{
+                  padding: '4px 8px', fontSize: '11px',
+                  background: 'transparent', color: D.textDim,
+                  border: `1px solid ${D.border}`, borderRadius: '3px',
+                  cursor: 'pointer',
+                }}
+              >✕</button>
+            </>
+          ) : (
+            <>
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) onSetClassName?.(e.target.value); }}
+                style={{
+                  flex: 1, padding: '4px 6px', fontSize: '11px',
+                  background: '#fff', border: `1px solid ${D.border}`,
+                  borderRadius: '3px', color: D.text, cursor: 'pointer',
+                }}
+              >
+                <option value="" disabled>Pick existing class…</option>
+                {Object.keys(classesMap || {}).map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const n = window.prompt('New class name (e.g. btn-primary):', '');
+                  if (n && n.trim()) onCreateClass?.(n.trim(), styles);
+                }}
+                title="Create a new class from this element's styles"
+                style={{
+                  padding: '4px 10px', fontSize: '11px', fontWeight: 600,
+                  background: D.accent, color: '#fff',
+                  border: 'none', borderRadius: '3px', cursor: 'pointer',
+                }}
+              >+ New</button>
+            </>
+          )}
+        </div>
+        {editingClass && (
+          <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '5px', lineHeight: 1.4 }}>
+            Editing the class. Changes apply to every element using <code style={{ fontFamily: 'ui-monospace, monospace' }}>{className}</code>.
+          </div>
+        )}
       </div>
 
       {/* Interaction-state tabs (Normal / Hover / Active). Each tab
@@ -3445,6 +3546,84 @@ export default function SiteContent() {
       ...prev,
       saved_styles: { ...(prev.saved_styles || {}), [name]: JSON.parse(JSON.stringify(styleObj)) },
     }));
+  };
+
+  // Phase 3: Class system — the Webflow pattern. Elements can reference
+  // a named class; all styles are stored on the class itself so one
+  // edit updates every element that uses it. Data model:
+  //   draftContent.classes         = { [name]: { cssProps, _hover, _active } }
+  //   draftContent.element_classes = { [fieldPath]: className }
+  // The store merges class styles into per-path rules in applyElementStyles.
+
+  // Attach an existing class to an element, or detach when `name` is empty.
+  const setElementClassName = (path, name) => {
+    setDraftContent(prev => {
+      const map = { ...(prev.element_classes || {}) };
+      if (!name) delete map[path];
+      else map[path] = name;
+      return { ...prev, element_classes: map };
+    });
+  };
+
+  // Create a new class, optionally seeding it with the element's current
+  // styles so "promote inline → class" is one step. Attaches the new
+  // class to the element too.
+  const createClassFromElement = (path, name, seedStyles) => {
+    if (!name || !name.trim()) return;
+    const clean = name.trim();
+    setDraftContent(prev => {
+      const existing = prev.classes?.[clean];
+      const nextClasses = { ...(prev.classes || {}) };
+      if (!existing) {
+        nextClasses[clean] = seedStyles ? JSON.parse(JSON.stringify(seedStyles)) : {};
+      }
+      const nextEC = { ...(prev.element_classes || {}) };
+      nextEC[path] = clean;
+      return { ...prev, classes: nextClasses, element_classes: nextEC };
+    });
+  };
+
+  // Rename a class (and every element reference). No-op on collision.
+  const renameClass = (oldName, newName) => {
+    const clean = (newName || '').trim();
+    if (!clean || clean === oldName) return;
+    setDraftContent(prev => {
+      if (prev.classes?.[clean]) return prev;
+      const nextClasses = { ...(prev.classes || {}) };
+      nextClasses[clean] = nextClasses[oldName];
+      delete nextClasses[oldName];
+      const nextEC = { ...(prev.element_classes || {}) };
+      for (const k of Object.keys(nextEC)) if (nextEC[k] === oldName) nextEC[k] = clean;
+      return { ...prev, classes: nextClasses, element_classes: nextEC };
+    });
+  };
+
+  // Update a single CSS property on a named class. Mirrors
+  // updateElementStyle but writes to the class, so every element using
+  // the class gets the new style on next render.
+  const updateClassStyle = (className, cssProp, value, state = 'normal') => {
+    if (!className) return;
+    const clearing = value === '' || value === null || value === undefined;
+    setDraftContent(prev => {
+      const currentMap = prev.classes || {};
+      const currentCls = currentMap[className] || {};
+      let nextCls;
+      if (state === 'normal') {
+        nextCls = { ...currentCls };
+        if (clearing) delete nextCls[cssProp];
+        else nextCls[cssProp] = value;
+      } else {
+        const key = `_${state}`;
+        const sub = currentCls[key] || {};
+        const nextSub = { ...sub };
+        if (clearing) delete nextSub[cssProp];
+        else nextSub[cssProp] = value;
+        nextCls = { ...currentCls };
+        if (Object.keys(nextSub).length === 0) delete nextCls[key];
+        else nextCls[key] = nextSub;
+      }
+      return { ...prev, classes: { ...currentMap, [className]: nextCls } };
+    });
   };
 
   // Replace the selected element's styles with a saved shared style.
@@ -6319,10 +6498,25 @@ export default function SiteContent() {
               styles={draftContent.element_styles?.[selectedElement]}
               expandedGroups={expandedGroups}
               toggleGroup={toggleGroup}
-              onChangeStyle={(cssProp, value, state) => updateElementStyle(selectedElement, cssProp, value, state)}
+              onChangeStyle={(cssProp, value, state) => {
+                const cls = draftContent.element_classes?.[selectedElement];
+                if (cls) updateClassStyle(cls, cssProp, value, state);
+                else updateElementStyle(selectedElement, cssProp, value, state);
+              }}
               savedStyles={draftContent.saved_styles}
               onSaveStyle={saveSharedStyle}
               onApplyStyle={(name) => applySharedStyle(selectedElement, name)}
+              className={draftContent.element_classes?.[selectedElement] || ''}
+              classesMap={draftContent.classes}
+              classUsageCount={(() => {
+                const cls = draftContent.element_classes?.[selectedElement];
+                if (!cls) return 0;
+                const ec = draftContent.element_classes || {};
+                return Object.values(ec).filter(v => v === cls).length;
+              })()}
+              onSetClassName={(name) => setElementClassName(selectedElement, name)}
+              onCreateClass={(name, seedStyles) => createClassFromElement(selectedElement, name, seedStyles)}
+              onRenameClass={(oldName, newName) => renameClass(oldName, newName)}
               onClear={() => clearElementStyles(selectedElement)}
               onBack={clearSelection}
             />

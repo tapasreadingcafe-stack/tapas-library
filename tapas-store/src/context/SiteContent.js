@@ -95,10 +95,15 @@ function deepMerge(base, override) {
 // uses !important so it wins over inline styles hardcoded in JSX.
 // Supports reserved sub-keys `_hover` and `_active` which emit
 // `:hover` and `:active` pseudo-class rules respectively.
-function applyElementStyles(elementStyles) {
+//
+// Phase 3: Also supports named classes. `classes[name]` holds styles
+// shared across many elements; `elementClasses[path]` maps each path
+// to its class name. The class's styles are merged UNDER the element's
+// own styles (element wins on conflicts) so staff can fine-tune one
+// instance without detaching from the class.
+function applyElementStyles(elementStyles, classes, elementClasses) {
   const existing = document.getElementById('tapas-element-styles');
   if (existing) existing.remove();
-  if (!elementStyles || typeof elementStyles !== 'object') return;
 
   const buildDecls = (props) => Object.entries(props)
     .filter(([k, v]) => !k.startsWith('_') && v !== undefined && v !== null && v !== '')
@@ -108,18 +113,34 @@ function applyElementStyles(elementStyles) {
     })
     .join('; ');
 
+  // For each path we may have BOTH class styles and element styles.
+  // Merge them so a path under class `btn-primary` with an element
+  // override of `color: red` still gets the class's padding + radius.
+  const paths = new Set([
+    ...Object.keys(elementStyles || {}),
+    ...Object.keys(elementClasses || {}),
+  ]);
+
   const rules = [];
-  for (const [path, props] of Object.entries(elementStyles)) {
-    if (!props || typeof props !== 'object') continue;
+  for (const path of paths) {
+    const className = elementClasses?.[path];
+    const classStyle = className ? (classes?.[className] || {}) : {};
+    const ownStyle   = elementStyles?.[path] || {};
+    // Normal = class ∪ own (own wins)
+    const normalMerged = { ...classStyle, ...ownStyle };
+    // Pseudo states are merged per-key too.
+    const hoverMerged = { ...(classStyle._hover || {}), ...(ownStyle._hover || {}) };
+    const activeMerged = { ...(classStyle._active || {}), ...(ownStyle._active || {}) };
+
     const safePath = String(path).replace(/"/g, '\\"');
-    const normalDecls = buildDecls(props);
+    const normalDecls = buildDecls(normalMerged);
     if (normalDecls) rules.push(`[data-editable="${safePath}"] { ${normalDecls}; }`);
-    if (props._hover && typeof props._hover === 'object') {
-      const hoverDecls = buildDecls(props._hover);
+    if (Object.keys(hoverMerged).length) {
+      const hoverDecls = buildDecls(hoverMerged);
       if (hoverDecls) rules.push(`[data-editable="${safePath}"]:hover { ${hoverDecls}; }`);
     }
-    if (props._active && typeof props._active === 'object') {
-      const activeDecls = buildDecls(props._active);
+    if (Object.keys(activeMerged).length) {
+      const activeDecls = buildDecls(activeMerged);
       if (activeDecls) rules.push(`[data-editable="${safePath}"]:active { ${activeDecls}; }`);
     }
   }
@@ -171,7 +192,7 @@ function applyTheme(content) {
   }
 
   // Per-element overrides (rendered from [data-editable] attributes).
-  applyElementStyles(content?.element_styles);
+  applyElementStyles(content?.element_styles, content?.classes, content?.element_classes);
 }
 
 // Load any Google Fonts the user has picked that aren't already loaded.
