@@ -173,6 +173,52 @@ function isWithinSchedule(p, now) {
   return true;
 }
 
+// Tapas Group container — renders nested child blocks via BlockView.
+// Defined here (not in TapasFigmaBlocks.js) so it has direct access to
+// BlockView without a require() that breaks CRA's module resolution.
+export function TapasGroup({ props = {}, pageKey }) {
+  const {
+    children = [],
+    background_color = 'transparent',
+    padding_y = 0,
+    padding_x = 0,
+    max_width = 0,
+    align = 'stretch',
+    direction = 'column',
+    gap = 0,
+  } = props;
+  const kids = Array.isArray(children) ? children.filter(Boolean) : [];
+  const editorMode = typeof window !== 'undefined' && /[?&]preview=draft\b/.test(window.location.search || '');
+  const wrapperStyle = {
+    background: background_color,
+    padding: `${padding_y || 0}px ${padding_x || 0}px`,
+  };
+  const innerStyle = {
+    display: 'flex',
+    flexDirection: direction === 'row' ? 'row' : 'column',
+    alignItems: align === 'stretch' ? 'stretch' : align === 'center' ? 'center' : align === 'end' ? 'flex-end' : 'flex-start',
+    gap: `${gap || 0}px`,
+    maxWidth: max_width > 0 ? `${max_width}px` : undefined,
+    margin: max_width > 0 ? '0 auto' : undefined,
+  };
+  return (
+    <section style={wrapperStyle}>
+      <div style={innerStyle}>
+        {kids.map((child, idx) => (
+          <BlockView
+            key={child.id || idx}
+            block={child}
+            pageKey={pageKey}
+            blockIndex={idx}
+            totalBlocks={kids.length}
+            editorMode={editorMode}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // Renders one block by dispatching to its registry entry. Exposed as a
 // separate component so the on-canvas toolbar (Phase 3) can
 // decorate individual blocks without touching PageRenderer.

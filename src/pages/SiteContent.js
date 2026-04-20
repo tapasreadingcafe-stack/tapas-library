@@ -6101,9 +6101,13 @@ export default function SiteContent() {
                   ? <PanelLeftOpen size={15} strokeWidth={2.25} />
                   : <PanelLeftClose size={15} strokeWidth={2.25} />}
               </button>
+              {/* Webflow-style breadcrumb: DRAFT · /path · Block type ·
+                  Element — clicking the block crumb deselects the
+                  element; clicking the path crumb deselects everything. */}
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 fontSize: '11px', color: S.textDim, minWidth: 0,
+                flexWrap: 'wrap',
               }}>
                 <span style={{
                   padding: '2px 8px',
@@ -6111,11 +6115,43 @@ export default function SiteContent() {
                   borderRadius: '10px', fontSize: '10px', fontWeight: '700',
                   flexShrink: 0,
                 }}>DRAFT</span>
-                <span style={{
-                  fontFamily: 'ui-monospace, monospace', fontWeight: '600', color: S.text,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  maxWidth: '300px',
-                }}>{iframePath}</span>
+                <button
+                  onClick={() => { setSelectedBlockId(null); setSelectedElement(null); }}
+                  style={{
+                    fontFamily: 'ui-monospace, monospace', fontWeight: '600',
+                    color: (selectedBlockId || selectedElement) ? S.textDim : S.text,
+                    background: 'transparent', border: 'none', padding: 0,
+                    cursor: (selectedBlockId || selectedElement) ? 'pointer' : 'default',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    maxWidth: '120px',
+                  }}
+                >{iframePath}</button>
+                {selectedBlock && (
+                  <>
+                    <span style={{ color: S.textFaint, fontSize: '10px' }}>›</span>
+                    <button
+                      onClick={() => setSelectedElement(null)}
+                      style={{
+                        fontWeight: '600',
+                        color: selectedElement ? S.textDim : S.text,
+                        background: 'transparent', border: 'none', padding: 0,
+                        cursor: selectedElement ? 'pointer' : 'default',
+                      }}
+                    >
+                      {BLOCK_REGISTRY_META[selectedBlock.type]?.label || selectedBlock.type}
+                    </button>
+                  </>
+                )}
+                {selectedElement && (
+                  <>
+                    <span style={{ color: S.textFaint, fontSize: '10px' }}>›</span>
+                    <span style={{
+                      color: S.text, fontWeight: '600', textTransform: 'capitalize',
+                    }}>
+                      {selectedElement.split('.').slice(-1)[0].replace(/_/g, ' ')}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

@@ -1057,6 +1057,39 @@ export const BLOCK_REGISTRY_META = {
     ],
   },
 
+  tapas_group: {
+    label: 'Tapas Group (container with children)',
+    category: 'Content',
+    icon: '◫',
+    defaultProps: {
+      children: [],
+      background_color: 'transparent',
+      padding_y: 0,
+      padding_x: 0,
+      max_width: 0,
+      align: 'stretch',
+      direction: 'column',
+      gap: 0,
+    },
+    schema: [
+      { key: 'background_color', label: 'Background color',        type: 'color' },
+      { key: 'padding_y',        label: 'Vertical padding (px)',   type: 'number', min: 0, max: 200 },
+      { key: 'padding_x',        label: 'Horizontal padding (px)', type: 'number', min: 0, max: 200 },
+      { key: 'max_width',        label: 'Max width (px, 0 = no limit)', type: 'number', min: 0, max: 1600 },
+      { key: 'direction',        label: 'Direction',           type: 'select', options: [
+        { value: 'column', label: 'Column (stack)' },
+        { value: 'row',    label: 'Row (inline)'  },
+      ]},
+      { key: 'align',            label: 'Align children',      type: 'select', options: [
+        { value: 'stretch', label: 'Stretch' },
+        { value: 'start',   label: 'Start' },
+        { value: 'center',  label: 'Center' },
+        { value: 'end',     label: 'End' },
+      ]},
+      { key: 'gap',              label: 'Gap between children (px)', type: 'number', min: 0, max: 120 },
+    ],
+  },
+
   tapas_section: {
     label: 'Tapas Section (heading + subtext)',
     category: 'Content',

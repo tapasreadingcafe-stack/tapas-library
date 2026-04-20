@@ -107,14 +107,15 @@ function ImageOrPlaceholder({ src, ratio, label, bg }) {
 // ---------------------------------------------------------------------
 // 1. Hero — lime wave + photo on the right
 // ---------------------------------------------------------------------
-export function TapasHero({
-  headline_line1 = 'Discover Our',
-  headline_line2 = 'New Collection',
-  description = 'Curated reads from our shelves — fresh fiction, deep non-fiction, and the year\'s most-talked-about titles, all under one roof.',
-  cta_text = 'Join now!',
-  cta_href = '/books',
-  image_url = 'HERO-LIBRARY.png',
-}) {
+export function TapasHero({ props = {} }) {
+  const {
+    headline_line1 = 'Discover Our',
+    headline_line2 = 'New Collection',
+    description = 'Curated reads from our shelves — fresh fiction, deep non-fiction, and the year\'s most-talked-about titles, all under one roof.',
+    cta_text = 'Join now!',
+    cta_href = '/books',
+    image_url = 'HERO-LIBRARY.png',
+  } = props;
   return (
     <section style={{ position: 'relative', overflow: 'hidden', background: LIME, marginTop: '-64px' }}>
       <style>{`
@@ -184,15 +185,16 @@ export function TapasHero({
 // ---------------------------------------------------------------------
 // 2. Services — 3 cards (icon, title, body, link)
 // ---------------------------------------------------------------------
-export function TapasServices({
-  eyebrow = 'Our Services',
-  heading = 'We provide great services for our customers based on',
-  items = [
-    { icon: '📚', title: 'Buying Books', body: 'Browse our curated catalogue and take new titles home — from indie debuts to global bestsellers.', cta_text: 'Learn more', cta_href: '/books' },
-    { icon: '🪪', title: 'Lending Books', body: 'Become a member and borrow up to four books at a time. Renewals are free, late fees are gentle.', cta_text: 'Learn more', cta_href: '/profile' },
-    { icon: '🎤', title: 'Events', body: 'Author readings, book clubs, and quiet study evenings — there is always something on the calendar.', cta_text: 'Learn more', cta_href: '/blog' },
-  ],
-}) {
+export function TapasServices({ props = {} }) {
+  const {
+    eyebrow = 'Our Services',
+    heading = 'We provide great services for our customers based on',
+    items = [
+      { icon: '📚', title: 'Buying Books', body: 'Browse our curated catalogue and take new titles home — from indie debuts to global bestsellers.', cta_text: 'Learn more', cta_href: '/books' },
+      { icon: '🪪', title: 'Lending Books', body: 'Become a member and borrow up to four books at a time. Renewals are free, late fees are gentle.', cta_text: 'Learn more', cta_href: '/profile' },
+      { icon: '🎤', title: 'Events', body: 'Author readings, book clubs, and quiet study evenings — there is always something on the calendar.', cta_text: 'Learn more', cta_href: '/blog' },
+    ],
+  } = props;
   return (
     <section style={{ background: LIME, padding: 'clamp(60px, 8vw, 110px) 20px' }}>
       <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
@@ -252,15 +254,16 @@ function ServiceCard({ icon, title, body, cta_text, cta_href }) {
 // ---------------------------------------------------------------------
 // 3. New Arrivals — 4 product cards
 // ---------------------------------------------------------------------
-export function TapasNewArrivals({
-  eyebrow = 'New Arrivals',
-  items = [
-    { title: 'Syltherine', sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: 'Rp 3.500.000', badge: '-30%', image_url: 'arrival-1.jpg' },
-    { title: 'Leviosa',    sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: '',              badge: '',     image_url: 'arrival-2.jpg' },
-    { title: 'Lolito',     sub: 'Luxury big sofa',    price: 'Rp 7.000.000', strike: 'Rp 14.000.000', badge: '-50%', image_url: 'arrival-3.jpg' },
-    { title: 'Respira',    sub: 'Outdoor bar table',  price: 'Rp 500.000',   strike: '',              badge: 'New',  image_url: 'arrival-4.jpg' },
-  ],
-}) {
+export function TapasNewArrivals({ props = {} }) {
+  const {
+    eyebrow = 'New Arrivals',
+    items = [
+      { title: 'Syltherine', sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: 'Rp 3.500.000', badge: '-30%', image_url: 'arrival-1.jpg' },
+      { title: 'Leviosa',    sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: '',              badge: '',     image_url: 'arrival-2.jpg' },
+      { title: 'Lolito',     sub: 'Luxury big sofa',    price: 'Rp 7.000.000', strike: 'Rp 14.000.000', badge: '-50%', image_url: 'arrival-3.jpg' },
+      { title: 'Respira',    sub: 'Outdoor bar table',  price: 'Rp 500.000',   strike: '',              badge: 'New',  image_url: 'arrival-4.jpg' },
+    ],
+  } = props;
   return (
     <section style={{ background: LIME, padding: '0 20px clamp(60px, 8vw, 110px)' }}>
       <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
@@ -318,18 +321,19 @@ function ArrivalCard({ title, sub, price, strike, badge, image_url }) {
 // ---------------------------------------------------------------------
 // 4. Room Inspiration — split layout with 2 images + CTA
 // ---------------------------------------------------------------------
-export function TapasInspiration({
-  heading_line1 = '50+ Beautiful rooms',
-  heading_line2 = 'inspiration',
-  description = 'Our designers have already arranged a lot of beautiful prototypes of reading nooks that inspire us.',
-  cta_text = 'Explore More',
-  cta_href = '/blog',
-  image_1_url = 'room-1.jpg',
-  image_2_url = 'room-2.jpg',
-  badge_eyebrow = '01 — Bed Room',
-  badge_title = 'Inner Peace',
-  background_color = '#FBF8EE',
-}) {
+export function TapasInspiration({ props = {} }) {
+  const {
+    heading_line1 = '50+ Beautiful rooms',
+    heading_line2 = 'inspiration',
+    description = 'Our designers have already arranged a lot of beautiful prototypes of reading nooks that inspire us.',
+    cta_text = 'Explore More',
+    cta_href = '/blog',
+    image_1_url = 'room-1.jpg',
+    image_2_url = 'room-2.jpg',
+    badge_eyebrow = '01 — Bed Room',
+    badge_title = 'Inner Peace',
+    background_color = '#FBF8EE',
+  } = props;
   return (
     <section style={{ background: background_color, padding: 'clamp(60px, 8vw, 100px) 20px' }}>
       <style>{`
@@ -386,13 +390,14 @@ export function TapasInspiration({
 // ---------------------------------------------------------------------
 // 5. Testimonials — centered quote grid
 // ---------------------------------------------------------------------
-export function TapasTestimonials({
-  items = [
-    { quote: 'You made it so simple.', body: 'My new shelf is so much faster and easier to browse than my old library app.', author: 'Corey Valdez', role: 'Founder at Zenix' },
-    { quote: 'Simply the best.',        body: "Better than all the rest. I'd recommend this place to beginners.", author: 'Ian Klein', role: 'Digital Marketer' },
-  ],
-  background_color = LIME,
-}) {
+export function TapasTestimonials({ props = {} }) {
+  const {
+    items = [
+      { quote: 'You made it so simple.', body: 'My new shelf is so much faster and easier to browse than my old library app.', author: 'Corey Valdez', role: 'Founder at Zenix' },
+      { quote: 'Simply the best.',        body: "Better than all the rest. I'd recommend this place to beginners.", author: 'Ian Klein', role: 'Digital Marketer' },
+    ],
+    background_color = LIME,
+  } = props;
   return (
     <section style={{ background: background_color, padding: 'clamp(60px, 8vw, 100px) 20px' }}>
       <div style={{
@@ -427,16 +432,17 @@ export function TapasTestimonials({
 // visual divider / colored band between other blocks. Full-bleed
 // background so adjacent sections can use different colors.
 // ---------------------------------------------------------------------
-export function TapasSection({
-  eyebrow = '',
-  heading = 'Section heading',
-  subtext = '',
-  text_color = INK,
-  background_color = '#FBF8EE',
-  padding_y = 80,
-  max_width = 960,
-  align = 'center',
-}) {
+export function TapasSection({ props = {} }) {
+  const {
+    eyebrow = '',
+    heading = 'Section heading',
+    subtext = '',
+    text_color = INK,
+    background_color = '#FBF8EE',
+    padding_y = 80,
+    max_width = 960,
+    align = 'center',
+  } = props;
   const textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
   const inlineAlign = textAlign === 'center' ? '0 auto' : textAlign === 'right' ? '0 0 0 auto' : '0';
   return (
@@ -476,13 +482,14 @@ export function TapasSection({
 // ---------------------------------------------------------------------
 // 6. Newsletter strip — dark bg
 // ---------------------------------------------------------------------
-export function TapasNewsletter({
-  headline = '✉ Subscribe to our Newsletter',
-  subtext = 'Monthly book picks, member events, and quiet announcements.',
-  placeholder = 'Your email address',
-  button_text = 'Subscribe',
-  background_color = '#1F1F1F',
-}) {
+export function TapasNewsletter({ props = {} }) {
+  const {
+    headline = '✉ Subscribe to our Newsletter',
+    subtext = 'Monthly book picks, member events, and quiet announcements.',
+    placeholder = 'Your email address',
+    button_text = 'Subscribe',
+    background_color = '#1F1F1F',
+  } = props;
   return (
     <section style={{ background: background_color, padding: '34px 20px' }}>
       <div style={{
@@ -517,3 +524,4 @@ export function TapasNewsletter({
     </section>
   );
 }
+
