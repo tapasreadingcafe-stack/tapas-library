@@ -32,7 +32,7 @@ import {
 } from './BlockLibrary';
 import {
   TapasHero, TapasServices, TapasNewArrivals, TapasInspiration,
-  TapasTestimonials, TapasNewsletter,
+  TapasTestimonials, TapasNewsletter, TapasSection,
 } from './TapasFigmaBlocks';
 
 export const BLOCK_REGISTRY = {
@@ -770,6 +770,36 @@ export const BLOCK_REGISTRY = {
           { key: 'role',   label: 'Role',   type: 'text' },
         ],
       },
+    ],
+  },
+
+  tapas_section: {
+    label: 'Tapas Section (heading + subtext)',
+    category: 'Content',
+    Renderer: TapasSection,
+    defaultProps: {
+      eyebrow: '',
+      heading: 'Section heading',
+      subtext: '',
+      text_color: '#1F2937',
+      background_color: '#FBF8EE',
+      padding_y: 80,
+      max_width: 960,
+      align: 'center',
+    },
+    schema: [
+      { key: 'eyebrow',          label: 'Eyebrow',          type: 'text' },
+      { key: 'heading',          label: 'Heading',          type: 'text' },
+      { key: 'subtext',          label: 'Subtext',          type: 'textarea' },
+      { key: 'align',            label: 'Alignment',        type: 'select', options: [
+        { value: 'left',   label: 'Left' },
+        { value: 'center', label: 'Center' },
+        { value: 'right',  label: 'Right' },
+      ]},
+      { key: 'text_color',       label: 'Text color',       type: 'color' },
+      { key: 'background_color', label: 'Background color', type: 'color' },
+      { key: 'padding_y',        label: 'Vertical padding (px)', type: 'number', min: 0, max: 200 },
+      { key: 'max_width',        label: 'Content max width (px)', type: 'number', min: 320, max: 1600 },
     ],
   },
 

@@ -1684,7 +1684,7 @@ function SpacingBoxDiagram({ styles }) {
   );
 }
 
-function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup }) {
+function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup, savedStyles, onSaveStyle, onApplyStyle }) {
   const shortPath = path.split('.').slice(-1)[0].replace(/_/g, ' ');
   // Which interaction state the user is currently editing. Normal
   // writes to styles[prop]; Hover writes to styles._hover[prop]; Active
@@ -1721,6 +1721,36 @@ function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expand
             {shortPath}
           </div>
         </div>
+        {/* Save current styles as a named shared style */}
+        <button
+          onClick={() => {
+            if (!styles || Object.keys(styles).length === 0) return;
+            const name = window.prompt('Save these styles under what name?', '');
+            if (name && name.trim()) onSaveStyle?.(name.trim(), styles);
+          }}
+          disabled={!styles || Object.keys(styles).length === 0}
+          title="Save current styles as a reusable shared style"
+          style={{ background: 'transparent', border: 'none', color: D.textDim, fontSize: '12px', cursor: 'pointer', padding: '4px 6px', borderRadius: '2px' }}
+        >📎</button>
+        {/* Apply a saved style onto this element */}
+        {savedStyles && Object.keys(savedStyles).length > 0 && (
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) onApplyStyle?.(e.target.value); e.target.value = ''; }}
+            title="Apply a saved shared style"
+            style={{
+              background: 'transparent', border: `1px solid ${D.border}`,
+              color: D.textDim, fontSize: '10px', cursor: 'pointer',
+              padding: '2px 4px', borderRadius: '2px',
+              maxWidth: '90px',
+            }}
+          >
+            <option value="" disabled>📥 Apply…</option>
+            {Object.keys(savedStyles).map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        )}
         <button
           onClick={onClear}
           disabled={!styles || Object.keys(styles).length === 0}
@@ -3250,6 +3280,28 @@ export default function SiteContent() {
     }
     setSelectedBlockId(null);
   }, [editingPage, allPages]);
+
+  // Save the element's current styles under a shared name so they can
+  // be reapplied to other elements later. Stored in draftContent.saved_styles.
+  const saveSharedStyle = (name, styleObj) => {
+    if (!name || !styleObj) return;
+    setDraftContent(prev => ({
+      ...prev,
+      saved_styles: { ...(prev.saved_styles || {}), [name]: JSON.parse(JSON.stringify(styleObj)) },
+    }));
+  };
+
+  // Replace the selected element's styles with a saved shared style.
+  const applySharedStyle = (path, name) => {
+    if (!path || !name) return;
+    setDraftContent(prev => {
+      const saved = prev.saved_styles?.[name];
+      if (!saved) return prev;
+      const nextMap = { ...(prev.element_styles || {}) };
+      nextMap[path] = JSON.parse(JSON.stringify(saved));
+      return { ...prev, element_styles: nextMap };
+    });
+  };
 
   // Update a single CSS property on the currently selected element.
   // Empty string clears the override.
@@ -6031,6 +6083,9 @@ export default function SiteContent() {
               expandedGroups={expandedGroups}
               toggleGroup={toggleGroup}
               onChangeStyle={(cssProp, value, state) => updateElementStyle(selectedElement, cssProp, value, state)}
+              savedStyles={draftContent.saved_styles}
+              onSaveStyle={saveSharedStyle}
+              onApplyStyle={(name) => applySharedStyle(selectedElement, name)}
               onClear={() => clearElementStyles(selectedElement)}
               onBack={clearSelection}
             />

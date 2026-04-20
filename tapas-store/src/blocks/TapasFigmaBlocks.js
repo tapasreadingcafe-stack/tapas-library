@@ -423,6 +423,57 @@ export function TapasTestimonials({
 }
 
 // ---------------------------------------------------------------------
+// 7. Section — styled wrapper with heading + subtext. Acts as a
+// visual divider / colored band between other blocks. Full-bleed
+// background so adjacent sections can use different colors.
+// ---------------------------------------------------------------------
+export function TapasSection({
+  eyebrow = '',
+  heading = 'Section heading',
+  subtext = '',
+  text_color = INK,
+  background_color = '#FBF8EE',
+  padding_y = 80,
+  max_width = 960,
+  align = 'center',
+}) {
+  const textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+  const inlineAlign = textAlign === 'center' ? '0 auto' : textAlign === 'right' ? '0 0 0 auto' : '0';
+  return (
+    <section style={{ background: background_color, padding: `${padding_y}px 20px` }}>
+      <div style={{ maxWidth: `${max_width}px`, margin: inlineAlign, textAlign }}>
+        {eyebrow && (
+          <div style={{
+            color: PURPLE, fontWeight: 700, fontSize: '12px',
+            letterSpacing: '2.5px', textTransform: 'uppercase',
+            marginBottom: '14px',
+          }}>
+            {eyebrow}
+          </div>
+        )}
+        <h2 style={{
+          margin: 0, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
+          fontSize: 'clamp(28px, 3.6vw, 44px)', color: text_color,
+          fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em',
+        }}>
+          {MD(heading)}
+        </h2>
+        {subtext && (
+          <p style={{
+            marginTop: '18px', color: text_color, opacity: 0.75,
+            fontSize: '16px', lineHeight: 1.7,
+            maxWidth: textAlign === 'center' ? '640px' : '100%',
+            margin: textAlign === 'center' ? '18px auto 0' : '18px 0 0',
+          }}>
+            {MD(subtext)}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
 // 6. Newsletter strip — dark bg
 // ---------------------------------------------------------------------
 export function TapasNewsletter({
