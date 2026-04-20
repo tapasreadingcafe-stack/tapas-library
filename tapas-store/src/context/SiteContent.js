@@ -231,6 +231,7 @@ function applyElementAnimations(elementStyles, classes, elementClasses) {
       });
     }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
   }
+  const observer = tapasAnimObserver;
 
   for (const path of allPaths) {
     const cfg = resolvePath(path);
@@ -242,7 +243,7 @@ function applyElementAnimations(elementStyles, classes, elementClasses) {
         if (cfg.duration) el.style.setProperty('--tapas-anim-duration', `${cfg.duration}ms`);
         if (cfg.delay)    el.style.setProperty('--tapas-anim-delay',    `${cfg.delay}ms`);
         if (cfg.easing)   el.style.setProperty('--tapas-anim-easing',   cfg.easing);
-        if (tapasAnimObserver) tapasAnimObserver.observe(el);
+        if (observer) observer.observe(el);
       }
       if (cfg.hover) el.setAttribute('data-tapas-hover', cfg.hover);
     });
