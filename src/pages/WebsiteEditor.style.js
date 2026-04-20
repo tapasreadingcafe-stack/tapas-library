@@ -147,6 +147,43 @@ function DimensionInput({ value, onChange, placeholder }) {
   );
 }
 
+// Color picker — native swatch + hex text input. Accepts any CSS color
+// string on read, round-trips hex to the swatch and leaves other forms
+// (rgba, hsl, var(…), named) untouched in the text input.
+function ColorInput({ value, onChange }) {
+  // The native swatch only understands #rrggbb. If the current value
+  // isn't that form, fall back to #000000 for the swatch but preserve
+  // the real value in the text input.
+  const hex = /^#[0-9a-fA-F]{6}$/.test((value || '').trim()) ? value.trim() : '#000000';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <input
+        type="color"
+        value={hex}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: '22px', height: '22px', padding: 0,
+          background: W.input, border: `1px solid ${W.inputBorder}`,
+          borderRadius: '3px', cursor: 'pointer',
+        }}
+      />
+      <input
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#000000"
+        style={{
+          flex: 1, height: '22px',
+          padding: '0 5px',
+          background: W.input, color: W.text,
+          border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+          fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+          outline: 'none',
+        }}
+      />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // Selector (spec § 3.1)
 // ---------------------------------------------------------------------
@@ -541,6 +578,420 @@ function SideCell({ position, value, onChange }) {
 }
 
 // ---------------------------------------------------------------------
+// Typography (spec § 3.7)
+// ---------------------------------------------------------------------
+// Common font stacks. Users can type anything here — the Select just
+// offers one-click defaults, the text input is the source of truth.
+const FONT_FAMILIES = [
+  'Inter, sans-serif',
+  'system-ui, sans-serif',
+  'Georgia, serif',
+  'ui-monospace, monospace',
+  'Helvetica, Arial, sans-serif',
+  'Playfair Display, serif',
+];
+
+function Typography({ styles, onSet }) {
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <Field label="Font">
+        <select
+          value={styles['font-family'] || ''}
+          onChange={(e) => onSet('font-family', e.target.value)}
+          style={{
+            width: '100%', height: '24px',
+            padding: '0 4px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          <option value="">Inherit</option>
+          {FONT_FAMILIES.map((f) => (
+            <option key={f} value={f}>{f.split(',')[0]}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Weight">
+        <SegButtons
+          value={String(styles['font-weight'] || '400')}
+          onChange={(v) => onSet('font-weight', v === '400' ? '' : v)}
+          options={[
+            { label: '300', value: '300' },
+            { label: '400', value: '400' },
+            { label: '500', value: '500' },
+            { label: '600', value: '600' },
+            { label: '700', value: '700' },
+            { label: '800', value: '800' },
+          ]}
+        />
+      </Field>
+      <Field label="Size">
+        <DimensionInput value={styles['font-size'] || ''} onChange={(v) => onSet('font-size', v)} placeholder="16px" />
+      </Field>
+      <Field label="Line">
+        <DimensionInput value={styles['line-height'] || ''} onChange={(v) => onSet('line-height', v)} placeholder="1.5" />
+      </Field>
+      <Field label="Letter">
+        <DimensionInput value={styles['letter-spacing'] || ''} onChange={(v) => onSet('letter-spacing', v)} placeholder="0" />
+      </Field>
+      <Field label="Color">
+        <ColorInput value={styles.color || ''} onChange={(v) => onSet('color', v)} />
+      </Field>
+      <Field label="Align">
+        <SegButtons
+          value={styles['text-align'] || 'left'}
+          onChange={(v) => onSet('text-align', v === 'left' ? '' : v)}
+          options={[
+            { label: '⇤', value: 'left',    title: 'Left' },
+            { label: '↔', value: 'center',  title: 'Center' },
+            { label: '⇥', value: 'right',   title: 'Right' },
+            { label: '≡', value: 'justify', title: 'Justify' },
+          ]}
+        />
+      </Field>
+      <Field label="Style">
+        <SegButtons
+          value={styles['font-style'] || 'normal'}
+          onChange={(v) => onSet('font-style', v === 'normal' ? '' : v)}
+          options={[
+            { label: 'N', value: 'normal', title: 'Normal' },
+            { label: 'I', value: 'italic', title: 'Italic' },
+          ]}
+        />
+      </Field>
+      <Field label="Decor">
+        <SegButtons
+          value={styles['text-decoration'] || 'none'}
+          onChange={(v) => onSet('text-decoration', v === 'none' ? '' : v)}
+          options={[
+            { label: '–',  value: 'none',         title: 'None' },
+            { label: 'U',  value: 'underline',    title: 'Underline' },
+            { label: 'S',  value: 'line-through', title: 'Strike' },
+            { label: 'O',  value: 'overline',     title: 'Overline' },
+          ]}
+        />
+      </Field>
+      <Field label="Case">
+        <SegButtons
+          value={styles['text-transform'] || 'none'}
+          onChange={(v) => onSet('text-transform', v === 'none' ? '' : v)}
+          options={[
+            { label: '—',   value: 'none',       title: 'As-is' },
+            { label: 'AA',  value: 'uppercase',  title: 'UPPER' },
+            { label: 'aa',  value: 'lowercase',  title: 'lower' },
+            { label: 'Aa',  value: 'capitalize', title: 'Capitalize' },
+          ]}
+        />
+      </Field>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Backgrounds (spec § 3.8, single-layer MVP)
+// Multi-layer gradient editor lands in Phase 4b — this form edits only
+// background-color + a single background-image URL + its sizing.
+// ---------------------------------------------------------------------
+function Backgrounds({ styles, onSet }) {
+  // Detect `url(...)` form so users see just the URL, not the wrapper.
+  const bgImageRaw = styles['background-image'] || '';
+  const m = /^url\((['"]?)(.*)\1\)$/.exec(bgImageRaw.trim());
+  const bgImageUrl = m ? m[2] : bgImageRaw;
+  const onBgImageChange = (v) => {
+    const trimmed = (v || '').trim();
+    if (!trimmed) onSet('background-image', '');
+    else if (/^(url\(|linear-gradient\(|radial-gradient\()/.test(trimmed)) {
+      onSet('background-image', trimmed);
+    } else onSet('background-image', `url("${trimmed}")`);
+  };
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <Field label="Color">
+        <ColorInput
+          value={styles['background-color'] || ''}
+          onChange={(v) => onSet('background-color', v)}
+        />
+      </Field>
+      <Field label="Image">
+        <TextInput
+          value={bgImageUrl}
+          onChange={onBgImageChange}
+          onCommit={() => {}}
+          placeholder="https://…/image.jpg"
+        />
+      </Field>
+      <Field label="Size">
+        <SegButtons
+          value={styles['background-size'] || 'auto'}
+          onChange={(v) => onSet('background-size', v === 'auto' ? '' : v)}
+          options={[
+            { label: 'Auto',    value: 'auto' },
+            { label: 'Cover',   value: 'cover' },
+            { label: 'Contain', value: 'contain' },
+          ]}
+        />
+      </Field>
+      <Field label="Position">
+        <SegButtons
+          value={styles['background-position'] || 'center'}
+          onChange={(v) => onSet('background-position', v === 'center' ? '' : v)}
+          options={[
+            { label: 'Left',   value: 'left' },
+            { label: 'Center', value: 'center' },
+            { label: 'Right',  value: 'right' },
+          ]}
+        />
+      </Field>
+      <Field label="Repeat">
+        <SegButtons
+          value={styles['background-repeat'] || 'repeat'}
+          onChange={(v) => onSet('background-repeat', v === 'repeat' ? '' : v)}
+          options={[
+            { label: 'Repeat', value: 'repeat'    },
+            { label: 'None',   value: 'no-repeat' },
+            { label: 'X',      value: 'repeat-x'  },
+            { label: 'Y',      value: 'repeat-y'  },
+          ]}
+        />
+      </Field>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Borders (spec § 3.9) — per-side width, per-corner radius
+// ---------------------------------------------------------------------
+function Borders({ styles, onSet }) {
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <Field label="Color">
+        <ColorInput
+          value={styles['border-color'] || ''}
+          onChange={(v) => onSet('border-color', v)}
+        />
+      </Field>
+      <Field label="Style">
+        <SegButtons
+          value={styles['border-style'] || 'none'}
+          onChange={(v) => onSet('border-style', v === 'none' ? '' : v)}
+          options={[
+            { label: 'None',   value: 'none' },
+            { label: 'Solid',  value: 'solid' },
+            { label: 'Dashed', value: 'dashed' },
+            { label: 'Dotted', value: 'dotted' },
+          ]}
+        />
+      </Field>
+      {/* Per-side width — 4-edge diagram */}
+      <div style={{ padding: '8px 12px' }}>
+        <div style={{
+          position: 'relative',
+          padding: '28px', borderRadius: '3px',
+          background: '#1e1e1e', border: `1px dashed #555`,
+        }}>
+          <BoxLabel text="BORDER WIDTH" />
+          <SideCell position="top"    value={styles['border-top-width']    || ''} onChange={(v) => onSet('border-top-width', v)} />
+          <SideCell position="right"  value={styles['border-right-width']  || ''} onChange={(v) => onSet('border-right-width', v)} />
+          <SideCell position="bottom" value={styles['border-bottom-width'] || ''} onChange={(v) => onSet('border-bottom-width', v)} />
+          <SideCell position="left"   value={styles['border-left-width']   || ''} onChange={(v) => onSet('border-left-width', v)} />
+          <div style={{
+            height: '20px', borderRadius: '2px',
+            background: '#2a2a2a',
+          }} />
+        </div>
+      </div>
+      {/* Per-corner radius — 2×2 grid */}
+      <Field label="Radius">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput
+            value={styles['border-top-left-radius']     || ''}
+            onChange={(v) => onSet('border-top-left-radius', v)}
+            placeholder="TL"
+          />
+          <DimensionInput
+            value={styles['border-top-right-radius']    || ''}
+            onChange={(v) => onSet('border-top-right-radius', v)}
+            placeholder="TR"
+          />
+          <DimensionInput
+            value={styles['border-bottom-left-radius']  || ''}
+            onChange={(v) => onSet('border-bottom-left-radius', v)}
+            placeholder="BL"
+          />
+          <DimensionInput
+            value={styles['border-bottom-right-radius'] || ''}
+            onChange={(v) => onSet('border-bottom-right-radius', v)}
+            placeholder="BR"
+          />
+        </div>
+      </Field>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Effects (spec § 3.10, MVP) — opacity, box-shadow, transform, transition
+// Multi-layer shadow / filters / 3D transforms land in Phase 4b.
+// ---------------------------------------------------------------------
+//
+// Box-shadow is stored as a single composed string in the base CSS
+// property. We parse it back into its 5 parts so the form can edit
+// each independently, then recompose on write.
+function parseShadow(s) {
+  if (!s) return { x: '', y: '', blur: '', spread: '', color: '', inset: false };
+  const inset = /\binset\b/.test(s);
+  const body = s.replace(/\binset\b/, '').trim();
+  // Color is either #hex, rgb(…), rgba(…), hsl(…), hsla(…), or a named color.
+  const colorMatch = body.match(/(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))/);
+  const color = colorMatch ? colorMatch[0] : '';
+  const rest = (colorMatch ? body.replace(colorMatch[0], '') : body).trim().split(/\s+/);
+  return {
+    x:      rest[0] || '',
+    y:      rest[1] || '',
+    blur:   rest[2] || '',
+    spread: rest[3] || '',
+    color,
+    inset,
+  };
+}
+function composeShadow({ x, y, blur, spread, color, inset }) {
+  const parts = [];
+  if (inset) parts.push('inset');
+  parts.push(x || '0', y || '0');
+  if (blur || spread) parts.push(blur || '0');
+  if (spread) parts.push(spread);
+  if (color) parts.push(color);
+  if (!x && !y && !blur && !spread && !color) return '';
+  return parts.join(' ');
+}
+
+// Transform is similarly composed. We only support translate X/Y and
+// rotate in this MVP; scale / skew / 3D belong in Phase 4b.
+function parseTransform(s) {
+  const out = { tx: '', ty: '', rot: '' };
+  if (!s) return out;
+  const tr = /translate(?:X|3d)?\(([^)]+)\)/.exec(s);
+  if (tr) {
+    const parts = tr[1].split(',').map((p) => p.trim());
+    out.tx = parts[0] || '';
+    out.ty = parts[1] || '';
+  }
+  const ro = /rotate\(([^)]+)\)/.exec(s);
+  if (ro) out.rot = ro[1].trim();
+  return out;
+}
+function composeTransform({ tx, ty, rot }) {
+  const parts = [];
+  if (tx || ty) parts.push(`translate(${tx || '0'}, ${ty || '0'})`);
+  if (rot) parts.push(`rotate(${rot})`);
+  return parts.join(' ');
+}
+
+function Effects({ styles, onSet }) {
+  const shadow = parseShadow(styles['box-shadow'] || '');
+  const setShadow = (patch) => {
+    const next = composeShadow({ ...shadow, ...patch });
+    onSet('box-shadow', next);
+  };
+  const xform = parseTransform(styles.transform || '');
+  const setXform = (patch) => {
+    const next = composeTransform({ ...xform, ...patch });
+    onSet('transform', next);
+  };
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <Field label="Opacity">
+        <DimensionInput value={styles.opacity || ''} onChange={(v) => onSet('opacity', v)} placeholder="1" />
+      </Field>
+
+      {/* Shadow */}
+      <div style={{ padding: '6px 12px', color: W.textFaint, fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+        Shadow
+      </div>
+      <Field label="Offset">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput value={shadow.x} onChange={(v) => setShadow({ x: v })} placeholder="X" />
+          <DimensionInput value={shadow.y} onChange={(v) => setShadow({ y: v })} placeholder="Y" />
+        </div>
+      </Field>
+      <Field label="Blur">
+        <DimensionInput value={shadow.blur} onChange={(v) => setShadow({ blur: v })} placeholder="0" />
+      </Field>
+      <Field label="Spread">
+        <DimensionInput value={shadow.spread} onChange={(v) => setShadow({ spread: v })} placeholder="0" />
+      </Field>
+      <Field label="Color">
+        <ColorInput value={shadow.color} onChange={(v) => setShadow({ color: v })} />
+      </Field>
+      <Field label="Inset">
+        <SegButtons
+          value={shadow.inset ? 'on' : 'off'}
+          onChange={(v) => setShadow({ inset: v === 'on' })}
+          options={[
+            { label: 'Off', value: 'off' },
+            { label: 'On',  value: 'on' },
+          ]}
+        />
+      </Field>
+
+      {/* Transform */}
+      <div style={{ padding: '6px 12px', color: W.textFaint, fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+        Transform
+      </div>
+      <Field label="Translate">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput value={xform.tx} onChange={(v) => setXform({ tx: v })} placeholder="X" />
+          <DimensionInput value={xform.ty} onChange={(v) => setXform({ ty: v })} placeholder="Y" />
+        </div>
+      </Field>
+      <Field label="Rotate">
+        <DimensionInput value={xform.rot} onChange={(v) => setXform({ rot: v })} placeholder="0deg" />
+      </Field>
+
+      {/* Transition */}
+      <div style={{ padding: '6px 12px', color: W.textFaint, fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+        Transition
+      </div>
+      <Field label="Property">
+        <TextInput
+          value={styles['transition-property'] || ''}
+          onChange={(v) => onSet('transition-property', v)}
+          onCommit={() => {}}
+          placeholder="all"
+        />
+      </Field>
+      <Field label="Duration">
+        <DimensionInput
+          value={styles['transition-duration'] || ''}
+          onChange={(v) => onSet('transition-duration', v)}
+          placeholder="0.2s"
+        />
+      </Field>
+      <Field label="Easing">
+        <select
+          value={styles['transition-timing-function'] || ''}
+          onChange={(e) => onSet('transition-timing-function', e.target.value)}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          <option value="">ease</option>
+          <option value="linear">linear</option>
+          <option value="ease-in">ease-in</option>
+          <option value="ease-out">ease-out</option>
+          <option value="ease-in-out">ease-in-out</option>
+          <option value="cubic-bezier(0.4, 0, 0.2, 1)">standard</option>
+        </select>
+      </Field>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
 // StylePanel — top-level composition
 // ---------------------------------------------------------------------
 export default function StylePanel({
@@ -553,7 +1004,10 @@ export default function StylePanel({
   onRenameClass,
   onSetStyle,
 }) {
-  const [open, setOpen] = useState({ layout: true, spacing: true, size: true, position: true });
+  const [open, setOpen] = useState({
+    layout: true, spacing: true, size: true, position: true,
+    typography: true, backgrounds: true, borders: true, effects: true,
+  });
 
   if (!node) {
     return (
@@ -614,11 +1068,40 @@ export default function StylePanel({
       />
       {open.position && <Position styles={styles} onSet={onSetStyle} />}
 
+      <SectionHeader
+        label="Typography"
+        collapsed={!open.typography}
+        onToggle={() => setOpen({ ...open, typography: !open.typography })}
+      />
+      {open.typography && <Typography styles={styles} onSet={onSetStyle} />}
+
+      <SectionHeader
+        label="Backgrounds"
+        collapsed={!open.backgrounds}
+        onToggle={() => setOpen({ ...open, backgrounds: !open.backgrounds })}
+      />
+      {open.backgrounds && <Backgrounds styles={styles} onSet={onSetStyle} />}
+
+      <SectionHeader
+        label="Borders"
+        collapsed={!open.borders}
+        onToggle={() => setOpen({ ...open, borders: !open.borders })}
+      />
+      {open.borders && <Borders styles={styles} onSet={onSetStyle} />}
+
+      <SectionHeader
+        label="Effects"
+        collapsed={!open.effects}
+        onToggle={() => setOpen({ ...open, effects: !open.effects })}
+      />
+      {open.effects && <Effects styles={styles} onSet={onSetStyle} />}
+
       <div style={{
         padding: '16px 12px', borderTop: `1px solid ${W.panelBorder}`,
         color: W.textFaint, fontSize: '10.5px', lineHeight: 1.5,
       }}>
-        Typography · Backgrounds · Borders · Effects land in Phase 4.
+        Multi-layer backgrounds, gradients, multi-layer shadows,
+        filters, 3D transforms, and text shadow land in Phase 4b.
       </div>
     </div>
   );
