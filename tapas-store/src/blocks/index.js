@@ -30,6 +30,10 @@ import {
   ReviewWall, EventRSVP,
   BookList, BlogList, EventList,
 } from './BlockLibrary';
+import {
+  TapasHero, TapasServices, TapasNewArrivals, TapasInspiration,
+  TapasTestimonials, TapasNewsletter,
+} from './TapasFigmaBlocks';
 
 export const BLOCK_REGISTRY = {
   hero: {
@@ -624,6 +628,168 @@ export const BLOCK_REGISTRY = {
       { key: 'upcoming_only', label: 'Upcoming only',  type: 'toggle' },
       { key: 'cta_text',      label: 'Button text',    type: 'text' },
       { key: 'cta_href',      label: 'Button link',    type: 'text' },
+    ],
+  },
+
+  // ---- Tapas home page Figma blocks ----------------------------------
+  // These make every section of the Figma home page editable via the
+  // dashboard. Each one renders one slab of the page.
+
+  tapas_hero: {
+    label: 'Tapas Hero (lime wave)',
+    category: 'Content',
+    Renderer: TapasHero,
+    defaultProps: {
+      headline_line1: 'Discover Our',
+      headline_line2: 'New Collection',
+      description: 'Curated reads from our shelves — fresh fiction, deep non-fiction, and the year\'s most-talked-about titles, all under one roof.',
+      cta_text: 'Join now!',
+      cta_href: '/books',
+      image_url: 'HERO-LIBRARY.png',
+    },
+    schema: [
+      { key: 'headline_line1', label: 'Headline — line 1', type: 'text' },
+      { key: 'headline_line2', label: 'Headline — line 2', type: 'text' },
+      { key: 'description',    label: 'Description',       type: 'textarea' },
+      { key: 'cta_text',       label: 'Button text',       type: 'text' },
+      { key: 'cta_href',       label: 'Button link',       type: 'text' },
+      { key: 'image_url',      label: 'Photo',             type: 'image' },
+    ],
+  },
+
+  tapas_services: {
+    label: 'Tapas Services (3 cards)',
+    category: 'Content',
+    Renderer: TapasServices,
+    defaultProps: {
+      eyebrow: 'Our Services',
+      heading: 'We provide great services for our customers based on',
+      items: [
+        { icon: '📚', title: 'Buying Books',  body: 'Browse our curated catalogue and take new titles home — from indie debuts to global bestsellers.', cta_text: 'Learn more', cta_href: '/books' },
+        { icon: '🪪', title: 'Lending Books', body: 'Become a member and borrow up to four books at a time. Renewals are free, late fees are gentle.',   cta_text: 'Learn more', cta_href: '/profile' },
+        { icon: '🎤', title: 'Events',         body: 'Author readings, book clubs, and quiet study evenings — there is always something on the calendar.', cta_text: 'Learn more', cta_href: '/blog' },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
+      { key: 'heading', label: 'Heading', type: 'text' },
+      {
+        key: 'items', label: 'Service cards', type: 'array',
+        itemDefaults: { icon: '✨', title: '', body: '', cta_text: 'Learn more', cta_href: '/' },
+        itemFields: [
+          { key: 'icon',     label: 'Icon (emoji)', type: 'text' },
+          { key: 'title',    label: 'Title',        type: 'text' },
+          { key: 'body',     label: 'Description',  type: 'textarea' },
+          { key: 'cta_text', label: 'Link text',    type: 'text' },
+          { key: 'cta_href', label: 'Link URL',     type: 'text' },
+        ],
+      },
+    ],
+  },
+
+  tapas_new_arrivals: {
+    label: 'Tapas New Arrivals (4 products)',
+    category: 'Content',
+    Renderer: TapasNewArrivals,
+    defaultProps: {
+      eyebrow: 'New Arrivals',
+      items: [
+        { title: 'Syltherine', sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: 'Rp 3.500.000', badge: '-30%', image_url: 'arrival-1.jpg' },
+        { title: 'Leviosa',    sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: '',              badge: '',     image_url: 'arrival-2.jpg' },
+        { title: 'Lolito',     sub: 'Luxury big sofa',    price: 'Rp 7.000.000', strike: 'Rp 14.000.000', badge: '-50%', image_url: 'arrival-3.jpg' },
+        { title: 'Respira',    sub: 'Outdoor bar table',  price: 'Rp 500.000',   strike: '',              badge: 'New',  image_url: 'arrival-4.jpg' },
+      ],
+    },
+    schema: [
+      { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
+      {
+        key: 'items', label: 'Products', type: 'array',
+        itemDefaults: { title: '', sub: '', price: '', strike: '', badge: '', image_url: '' },
+        itemFields: [
+          { key: 'title',     label: 'Title',          type: 'text' },
+          { key: 'sub',       label: 'Subtitle',       type: 'text' },
+          { key: 'price',     label: 'Price',          type: 'text' },
+          { key: 'strike',    label: 'Strike price',   type: 'text', hint: 'Optional. Shown struck through.' },
+          { key: 'badge',     label: 'Badge',          type: 'text', hint: 'e.g. -30%, New. Leave blank for none.' },
+          { key: 'image_url', label: 'Image',          type: 'image' },
+        ],
+      },
+    ],
+  },
+
+  tapas_inspiration: {
+    label: 'Tapas Inspiration (split)',
+    category: 'Content',
+    Renderer: TapasInspiration,
+    defaultProps: {
+      heading_line1: '50+ Beautiful rooms',
+      heading_line2: 'inspiration',
+      description: 'Our designers have already arranged a lot of beautiful prototypes of reading nooks that inspire us.',
+      cta_text: 'Explore More',
+      cta_href: '/blog',
+      image_1_url: 'room-1.jpg',
+      image_2_url: 'room-2.jpg',
+      badge_eyebrow: '01 — Bed Room',
+      badge_title: 'Inner Peace',
+      background_color: '#FBF8EE',
+    },
+    schema: [
+      { key: 'heading_line1',    label: 'Heading — line 1',  type: 'text' },
+      { key: 'heading_line2',    label: 'Heading — line 2',  type: 'text' },
+      { key: 'description',      label: 'Description',       type: 'textarea' },
+      { key: 'cta_text',         label: 'Button text',       type: 'text' },
+      { key: 'cta_href',         label: 'Button link',       type: 'text' },
+      { key: 'image_1_url',      label: 'Large image',       type: 'image' },
+      { key: 'image_2_url',      label: 'Side image',        type: 'image' },
+      { key: 'badge_eyebrow',    label: 'Badge eyebrow',     type: 'text' },
+      { key: 'badge_title',      label: 'Badge title',       type: 'text' },
+      { key: 'background_color', label: 'Background color',  type: 'color' },
+    ],
+  },
+
+  tapas_testimonials: {
+    label: 'Tapas Testimonials',
+    category: 'Content',
+    Renderer: TapasTestimonials,
+    defaultProps: {
+      background_color: '#CFF389',
+      items: [
+        { quote: 'You made it so simple.', body: 'My new shelf is so much faster and easier to browse than my old library app.', author: 'Corey Valdez', role: 'Founder at Zenix' },
+        { quote: 'Simply the best.',        body: "Better than all the rest. I'd recommend this place to beginners.", author: 'Ian Klein', role: 'Digital Marketer' },
+      ],
+    },
+    schema: [
+      { key: 'background_color', label: 'Background color', type: 'color' },
+      {
+        key: 'items', label: 'Testimonials', type: 'array',
+        itemDefaults: { quote: '', body: '', author: '', role: '' },
+        itemFields: [
+          { key: 'quote',  label: 'Quote',  type: 'text' },
+          { key: 'body',   label: 'Body',   type: 'textarea' },
+          { key: 'author', label: 'Author', type: 'text' },
+          { key: 'role',   label: 'Role',   type: 'text' },
+        ],
+      },
+    ],
+  },
+
+  tapas_newsletter: {
+    label: 'Tapas Newsletter (dark strip)',
+    category: 'Content',
+    Renderer: TapasNewsletter,
+    defaultProps: {
+      headline: '✉ Subscribe to our Newsletter',
+      subtext: 'Monthly book picks, member events, and quiet announcements.',
+      placeholder: 'Your email address',
+      button_text: 'Subscribe',
+      background_color: '#1F1F1F',
+    },
+    schema: [
+      { key: 'headline',         label: 'Headline',          type: 'text' },
+      { key: 'subtext',          label: 'Subtext',           type: 'text' },
+      { key: 'placeholder',      label: 'Input placeholder', type: 'text' },
+      { key: 'button_text',      label: 'Button text',       type: 'text' },
+      { key: 'background_color', label: 'Background color',  type: 'color' },
     ],
   },
 };

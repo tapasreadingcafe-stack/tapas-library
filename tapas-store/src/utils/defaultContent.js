@@ -266,7 +266,17 @@ export const DEFAULT_CONTENT = {
   //     matching entry's `schema` and `defaultProps`
   // =====================================================================
   pages: {
-    home:    { meta: { title: 'Home',    description: '' }, blocks: [] },
+    home: {
+      meta: { title: 'Home', description: '' },
+      blocks: [
+        { id: 'tapas_home_hero',         type: 'tapas_hero',         props: {} },
+        { id: 'tapas_home_services',     type: 'tapas_services',     props: {} },
+        { id: 'tapas_home_new_arrivals', type: 'tapas_new_arrivals', props: {} },
+        { id: 'tapas_home_inspiration',  type: 'tapas_inspiration',  props: {} },
+        { id: 'tapas_home_testimonials', type: 'tapas_testimonials', props: {} },
+        { id: 'tapas_home_newsletter',   type: 'tapas_newsletter',   props: {} },
+      ],
+    },
     about:   { meta: { title: 'About',   description: '' }, blocks: [] },
     catalog: { meta: { title: 'Shop',    description: '' }, blocks: [] },
     offers:  { meta: { title: 'Offers',  description: '' }, blocks: [] },
