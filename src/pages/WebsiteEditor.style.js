@@ -272,6 +272,19 @@ function Layout({ styles, onSet }) {
         </Field>
       )}
       {(isFlex || isGrid) && (
+        <Field label="Align">
+          <AlignGrid
+            justify={styles['justify-content'] || 'flex-start'}
+            align={styles['align-items'] || 'stretch'}
+            direction={styles['flex-direction'] || 'row'}
+            onChange={(justify, align) => {
+              onSet('justify-content', justify === 'flex-start' ? '' : justify);
+              onSet('align-items',    align   === 'stretch'     ? '' : align);
+            }}
+          />
+        </Field>
+      )}
+      {(isFlex || isGrid) && (
         <Field label="Gap">
           <DimensionInput
             value={styles.gap || ''}
@@ -280,6 +293,168 @@ function Layout({ styles, onSet }) {
         </Field>
       )}
     </>
+  );
+}
+
+// 3×3 picker — clicking a cell writes justify-content (X) + align-items
+// (Y) at once. Column direction flips which axis is main vs. cross,
+// which is exactly what Webflow's picker does behind the scenes, but we
+// keep the semantic CSS properties the same — the visual orientation
+// just gets rotated when direction is column.
+const ALIGN_JUSTIFY = ['flex-start', 'center', 'flex-end'];
+const ALIGN_ALIGN   = ['flex-start', 'center', 'flex-end'];
+
+function AlignGrid({ justify, align, direction, onChange }) {
+  const isColumn = direction === 'column' || direction === 'column-reverse';
+  // Map justify/align to a (col, row) index in the grid. For row layout
+  // justify is main-axis (horizontal) → x; align is cross-axis → y.
+  // For column layout axes flip, so we swap.
+  const xAxis = isColumn ? align   : justify;
+  const yAxis = isColumn ? justify : align;
+  const xi = ALIGN_JUSTIFY.indexOf(xAxis === 'stretch' ? 'flex-start' : xAxis);
+  const yi = ALIGN_ALIGN.indexOf(yAxis === 'stretch' ? 'flex-start' : yAxis);
+
+  const set = (col, row) => {
+    const x = ALIGN_JUSTIFY[col];
+    const y = ALIGN_ALIGN[row];
+    if (isColumn) onChange(y, x); else onChange(x, y);
+  };
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(3, 20px)', gridTemplateRows: 'repeat(3, 20px)',
+      gap: '2px', padding: '2px',
+      background: W.input, border: `1px solid ${W.inputBorder}`,
+      borderRadius: '3px', width: 'fit-content',
+    }}>
+      {Array.from({ length: 9 }).map((_, i) => {
+        const col = i % 3, row = Math.floor(i / 3);
+        const isActive = col === xi && row === yi;
+        return (
+          <button key={i}
+            onClick={() => set(col, row)}
+            title={`${ALIGN_JUSTIFY[col]} / ${ALIGN_ALIGN[row]}`}
+            style={{
+              width: '20px', height: '20px', padding: 0,
+              background: isActive ? W.accent : 'transparent',
+              border: 'none', borderRadius: '2px',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = W.hoverBg; }}
+            onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+          >
+            {/* dot marker */}
+            <span style={{
+              width: '6px', height: '6px', borderRadius: '50%',
+              background: isActive ? '#fff' : W.textFaint,
+            }} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Size (spec § 3.5)
+// ---------------------------------------------------------------------
+function Size({ styles, onSet }) {
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <Field label="Width">
+        <DimensionInput value={styles.width || ''} onChange={(v) => onSet('width', v)} placeholder="auto" />
+      </Field>
+      <Field label="Height">
+        <DimensionInput value={styles.height || ''} onChange={(v) => onSet('height', v)} placeholder="auto" />
+      </Field>
+      <Field label="Min W">
+        <DimensionInput value={styles['min-width'] || ''} onChange={(v) => onSet('min-width', v)} placeholder="0" />
+      </Field>
+      <Field label="Min H">
+        <DimensionInput value={styles['min-height'] || ''} onChange={(v) => onSet('min-height', v)} placeholder="0" />
+      </Field>
+      <Field label="Max W">
+        <DimensionInput value={styles['max-width'] || ''} onChange={(v) => onSet('max-width', v)} placeholder="none" />
+      </Field>
+      <Field label="Max H">
+        <DimensionInput value={styles['max-height'] || ''} onChange={(v) => onSet('max-height', v)} placeholder="none" />
+      </Field>
+      <Field label="Overflow">
+        <SegButtons
+          value={styles.overflow || 'visible'}
+          onChange={(v) => onSet('overflow', v === 'visible' ? '' : v)}
+          options={[
+            { label: 'Visible', value: 'visible' },
+            { label: 'Hidden',  value: 'hidden' },
+            { label: 'Scroll',  value: 'scroll' },
+            { label: 'Auto',    value: 'auto' },
+          ]}
+        />
+      </Field>
+      <Field label="Fit">
+        <SegButtons
+          value={styles['object-fit'] || 'fill'}
+          onChange={(v) => onSet('object-fit', v === 'fill' ? '' : v)}
+          options={[
+            { label: 'Fill',    value: 'fill' },
+            { label: 'Contain', value: 'contain' },
+            { label: 'Cover',   value: 'cover' },
+            { label: 'None',    value: 'none' },
+            { label: 'Scale',   value: 'scale-down' },
+          ]}
+        />
+      </Field>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Position (spec § 3.6)
+// ---------------------------------------------------------------------
+function Position({ styles, onSet }) {
+  const position = styles.position || 'static';
+  const showOffsets = position !== 'static';
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <Field label="Position">
+        <SegButtons
+          value={position}
+          onChange={(v) => onSet('position', v === 'static' ? '' : v)}
+          options={[
+            { label: 'Static',   value: 'static' },
+            { label: 'Relative', value: 'relative' },
+            { label: 'Absolute', value: 'absolute' },
+            { label: 'Fixed',    value: 'fixed' },
+            { label: 'Sticky',   value: 'sticky' },
+          ]}
+        />
+      </Field>
+      {showOffsets && (
+        <div style={{ padding: '8px 12px' }}>
+          <div style={{
+            position: 'relative',
+            padding: '28px', borderRadius: '4px',
+            background: '#2b2b2b', border: `1px dashed #555`,
+          }}>
+            <BoxLabel text="OFFSETS" />
+            <SideCell position="top"    value={styles.top    || ''} onChange={(v) => onSet('top', v)} />
+            <SideCell position="right"  value={styles.right  || ''} onChange={(v) => onSet('right', v)} />
+            <SideCell position="bottom" value={styles.bottom || ''} onChange={(v) => onSet('bottom', v)} />
+            <SideCell position="left"   value={styles.left   || ''} onChange={(v) => onSet('left', v)} />
+            <div style={{
+              height: '26px', borderRadius: '2px',
+              background: W.accentDim, border: `1px solid ${W.accent}`,
+              color: W.accent, fontSize: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{position}</div>
+          </div>
+        </div>
+      )}
+      <Field label="Z-index">
+        <DimensionInput value={styles['z-index'] || ''} onChange={(v) => onSet('z-index', v)} placeholder="auto" />
+      </Field>
+    </div>
   );
 }
 
@@ -300,8 +475,7 @@ function Spacing({ styles, onSet }) {
         padding: '28px', borderRadius: '4px',
         background: '#2b2b2b', border: `1px dashed #555`,
       }}>
-        <span style={spacingLabel('MARGIN', '-8px', '10px')} />
-        {/* 4 margin editors */}
+        <BoxLabel text="MARGIN" />
         <SideCell position="top"    value={get('margin-top')}    onChange={(v) => setSide('margin', 'top', v)} />
         <SideCell position="right"  value={get('margin-right')}  onChange={(v) => setSide('margin', 'right', v)} />
         <SideCell position="bottom" value={get('margin-bottom')} onChange={(v) => setSide('margin', 'bottom', v)} />
@@ -313,7 +487,7 @@ function Spacing({ styles, onSet }) {
           padding: '28px', borderRadius: '3px',
           background: '#1e1e1e', border: `1px dashed #555`,
         }}>
-          <span style={spacingLabel('PADDING', '-8px', '10px')} />
+          <BoxLabel text="PADDING" />
           <SideCell position="top"    value={get('padding-top')}    onChange={(v) => setSide('padding', 'top', v)} />
           <SideCell position="right"  value={get('padding-right')}  onChange={(v) => setSide('padding', 'right', v)} />
           <SideCell position="bottom" value={get('padding-bottom')} onChange={(v) => setSide('padding', 'bottom', v)} />
@@ -331,10 +505,19 @@ function Spacing({ styles, onSet }) {
   );
 }
 
-function spacingLabel(text, top, left) {
-  return {
-    content: `"${text}"`, // not used — kept for parity if we ever inline
-  };
+// Small top-left caption that sits inside the dashed box chrome. Uses
+// negative top + tiny padding so the text visually sits on the border,
+// matching the DevTools / Webflow box-model rendering.
+function BoxLabel({ text }) {
+  return (
+    <span style={{
+      position: 'absolute', top: '4px', left: '8px',
+      fontSize: '9px', fontWeight: 700,
+      letterSpacing: '0.06em',
+      color: W.textFaint,
+      pointerEvents: 'none',
+    }}>{text}</span>
+  );
 }
 
 // Side cell: an absolutely-placed small numeric input on one of the 4
@@ -370,7 +553,7 @@ export default function StylePanel({
   onRenameClass,
   onSetStyle,
 }) {
-  const [open, setOpen] = useState({ layout: true, spacing: true });
+  const [open, setOpen] = useState({ layout: true, spacing: true, size: true, position: true });
 
   if (!node) {
     return (
@@ -417,12 +600,25 @@ export default function StylePanel({
       />
       {open.spacing && <Spacing styles={styles} onSet={onSetStyle} />}
 
+      <SectionHeader
+        label="Size"
+        collapsed={!open.size}
+        onToggle={() => setOpen({ ...open, size: !open.size })}
+      />
+      {open.size && <Size styles={styles} onSet={onSetStyle} />}
+
+      <SectionHeader
+        label="Position"
+        collapsed={!open.position}
+        onToggle={() => setOpen({ ...open, position: !open.position })}
+      />
+      {open.position && <Position styles={styles} onSet={onSetStyle} />}
+
       <div style={{
         padding: '16px 12px', borderTop: `1px solid ${W.panelBorder}`,
         color: W.textFaint, fontSize: '10.5px', lineHeight: 1.5,
       }}>
-        Size · Position · Typography · Backgrounds · Borders · Effects
-        land in the next Phase 3 session.
+        Typography · Backgrounds · Borders · Effects land in Phase 4.
       </div>
     </div>
   );
