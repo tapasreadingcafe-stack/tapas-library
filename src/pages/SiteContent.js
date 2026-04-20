@@ -816,6 +816,26 @@ const ELEMENT_GROUPS = [
     ],
   },
   {
+    // Phase 5: Interactions — scroll-in + hover animations. Values are
+    // stored inline in element_styles under keys that start with _anim,
+    // so the CSS emitter (which filters out _-prefixed keys) leaves
+    // them alone. The storefront's applyElementAnimations reads them
+    // and wires up IntersectionObserver + data-attributes.
+    key: 'interactions',
+    title: 'Interactions',
+    icon: '⚡',
+    fields: [
+      { cssProp: '_anim_scroll_in', label: 'On scroll in', type: 'css-select',
+        options: ['', 'fade', 'slide-up', 'slide-left', 'slide-right', 'zoom'] },
+      { cssProp: '_anim_hover',     label: 'On hover',     type: 'css-select',
+        options: ['', 'lift', 'scale', 'glow', 'tilt'] },
+      { cssProp: '_anim_duration',  label: 'Duration (ms)', type: 'css-text', placeholder: '600' },
+      { cssProp: '_anim_delay',     label: 'Delay (ms)',    type: 'css-text', placeholder: '0' },
+      { cssProp: '_anim_easing',    label: 'Easing',        type: 'css-select',
+        options: ['', 'ease-out', 'ease-in', 'ease-in-out', 'linear', 'cubic-bezier(0.4, 0, 0.2, 1)'] },
+    ],
+  },
+  {
     key: 'effects',
     title: 'Effects',
     icon: '◐',

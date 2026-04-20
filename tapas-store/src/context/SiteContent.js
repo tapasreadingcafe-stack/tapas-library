@@ -152,6 +152,103 @@ function applyElementStyles(elementStyles, classes, elementClasses) {
   document.head.appendChild(style);
 }
 
+// Phase 5: Element animations. Reads _anim_* keys from element_styles
+// + classes (class values seed the config; element values override) and
+// wires up scroll-in animations via a module-level IntersectionObserver
+// plus CSS-only hover effects. All CSS lives in one injected <style>
+// tag so there's zero runtime cost for pages with no animated elements.
+const ANIMATION_CSS = `
+@keyframes tapas-a-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes tapas-a-slide-up { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: none } }
+@keyframes tapas-a-slide-left { from { opacity: 0; transform: translateX(-24px) } to { opacity: 1; transform: none } }
+@keyframes tapas-a-slide-right { from { opacity: 0; transform: translateX(24px) } to { opacity: 1; transform: none } }
+@keyframes tapas-a-zoom { from { opacity: 0; transform: scale(0.92) } to { opacity: 1; transform: scale(1) } }
+
+[data-tapas-anim] { opacity: 0; will-change: opacity, transform; }
+[data-tapas-anim][data-tapas-anim-in] {
+  opacity: 1;
+  animation: tapas-a-fade var(--tapas-anim-duration,600ms) var(--tapas-anim-easing,ease-out) var(--tapas-anim-delay,0ms) both;
+}
+[data-tapas-anim="slide-up"][data-tapas-anim-in]    { animation-name: tapas-a-slide-up }
+[data-tapas-anim="slide-left"][data-tapas-anim-in]  { animation-name: tapas-a-slide-left }
+[data-tapas-anim="slide-right"][data-tapas-anim-in] { animation-name: tapas-a-slide-right }
+[data-tapas-anim="zoom"][data-tapas-anim-in]        { animation-name: tapas-a-zoom }
+
+[data-tapas-hover] { transition: transform 220ms ease-out, box-shadow 220ms ease-out, filter 220ms ease-out; }
+[data-tapas-hover="lift"]:hover  { transform: translateY(-4px); box-shadow: 0 14px 32px rgba(0,0,0,0.14); }
+[data-tapas-hover="scale"]:hover { transform: scale(1.04); }
+[data-tapas-hover="glow"]:hover  { box-shadow: 0 0 0 3px rgba(99,102,241,0.35); }
+[data-tapas-hover="tilt"]:hover  { transform: perspective(600px) rotateX(4deg) rotateY(-4deg); }
+`;
+
+let tapasAnimObserver = null;
+function applyElementAnimations(elementStyles, classes, elementClasses) {
+  // Inject stylesheet once (idempotent).
+  if (!document.getElementById('tapas-element-animations')) {
+    const s = document.createElement('style');
+    s.id = 'tapas-element-animations';
+    s.innerHTML = ANIMATION_CSS;
+    document.head.appendChild(s);
+  }
+  // Clear previously-applied attributes on every apply so removing an
+  // animation via the inspector actually takes effect.
+  document.querySelectorAll('[data-tapas-anim]').forEach(el => {
+    el.removeAttribute('data-tapas-anim');
+    el.removeAttribute('data-tapas-anim-in');
+    el.style.removeProperty('--tapas-anim-duration');
+    el.style.removeProperty('--tapas-anim-delay');
+    el.style.removeProperty('--tapas-anim-easing');
+  });
+  document.querySelectorAll('[data-tapas-hover]').forEach(el => {
+    el.removeAttribute('data-tapas-hover');
+  });
+
+  const resolvePath = (path) => {
+    const className = elementClasses?.[path];
+    const fromClass = className ? (classes?.[className] || {}) : {};
+    const own = elementStyles?.[path] || {};
+    const pick = (k) => own[k] !== undefined ? own[k] : fromClass[k];
+    return {
+      scrollIn: pick('_anim_scroll_in'),
+      hover:    pick('_anim_hover'),
+      duration: pick('_anim_duration'),
+      delay:    pick('_anim_delay'),
+      easing:   pick('_anim_easing'),
+    };
+  };
+
+  const allPaths = new Set([
+    ...Object.keys(elementStyles || {}),
+    ...Object.keys(elementClasses || {}),
+  ]);
+
+  // Lazily create a single IntersectionObserver that flips
+  // data-tapas-anim-in on intersecting elements.
+  if (!tapasAnimObserver && typeof IntersectionObserver !== 'undefined') {
+    tapasAnimObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) e.target.setAttribute('data-tapas-anim-in', '');
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  }
+
+  for (const path of allPaths) {
+    const cfg = resolvePath(path);
+    if (!cfg.scrollIn && !cfg.hover) continue;
+    const els = document.querySelectorAll(`[data-editable="${path}"]`);
+    els.forEach(el => {
+      if (cfg.scrollIn) {
+        el.setAttribute('data-tapas-anim', cfg.scrollIn);
+        if (cfg.duration) el.style.setProperty('--tapas-anim-duration', `${cfg.duration}ms`);
+        if (cfg.delay)    el.style.setProperty('--tapas-anim-delay',    `${cfg.delay}ms`);
+        if (cfg.easing)   el.style.setProperty('--tapas-anim-easing',   cfg.easing);
+        if (tapasAnimObserver) tapasAnimObserver.observe(el);
+      }
+      if (cfg.hover) el.setAttribute('data-tapas-hover', cfg.hover);
+    });
+  }
+}
+
 // Apply brand + typography + button tokens to :root as CSS custom props.
 // Phase 4: Merges the active mode's overrides on top of `brand` before
 // resolving CSS vars, so switching modes changes every themed element.
@@ -203,6 +300,8 @@ function applyTheme(content) {
 
   // Per-element overrides (rendered from [data-editable] attributes).
   applyElementStyles(content?.element_styles, content?.classes, content?.element_classes);
+  // Phase 5: wire up scroll-in + hover animations.
+  applyElementAnimations(content?.element_styles, content?.classes, content?.element_classes);
 }
 
 // Load any Google Fonts the user has picked that aren't already loaded.
