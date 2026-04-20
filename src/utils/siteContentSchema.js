@@ -19,6 +19,21 @@ export const DEFAULT_CONTENT = {
     heading_font: 'Space Grotesk',
     body_font: 'Inter',
   },
+  // Phase 4 — variable modes. Mirrors the structure in tapas-store's
+  // defaultContent.js so the editor's mode toggle has something to
+  // render out of the box.
+  active_mode: 'light',
+  modes: {
+    light: {},
+    dark: {
+      primary_color:       '#1F2937',
+      primary_color_dark:  '#111827',
+      primary_color_light: '#374151',
+      accent_color:        '#EF3D7B',
+      cream_color:         '#0F172A',
+      sand_color:          '#E5E7EB',
+    },
+  },
   contact: {
     phone: '', email: '', address: '',
     hours_weekdays: '', hours_saturday: '', hours_sunday: '',
