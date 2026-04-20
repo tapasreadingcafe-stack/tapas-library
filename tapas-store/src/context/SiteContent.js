@@ -93,25 +93,34 @@ function deepMerge(base, override) {
 // Apply per-element CSS override rules by injecting a single <style>
 // tag whose rules target [data-editable="..."] selectors. Each rule
 // uses !important so it wins over inline styles hardcoded in JSX.
+// Supports reserved sub-keys `_hover` and `_active` which emit
+// `:hover` and `:active` pseudo-class rules respectively.
 function applyElementStyles(elementStyles) {
   const existing = document.getElementById('tapas-element-styles');
   if (existing) existing.remove();
   if (!elementStyles || typeof elementStyles !== 'object') return;
 
+  const buildDecls = (props) => Object.entries(props)
+    .filter(([k, v]) => !k.startsWith('_') && v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => {
+      const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
+      return `${cssProp}: ${v} !important`;
+    })
+    .join('; ');
+
   const rules = [];
   for (const [path, props] of Object.entries(elementStyles)) {
     if (!props || typeof props !== 'object') continue;
-    const decls = Object.entries(props)
-      .filter(([, v]) => v !== undefined && v !== null && v !== '')
-      .map(([k, v]) => {
-        const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
-        return `${cssProp}: ${v} !important`;
-      })
-      .join('; ');
-    if (decls) {
-      // Escape any quotes in the path just in case.
-      const safePath = String(path).replace(/"/g, '\\"');
-      rules.push(`[data-editable="${safePath}"] { ${decls}; }`);
+    const safePath = String(path).replace(/"/g, '\\"');
+    const normalDecls = buildDecls(props);
+    if (normalDecls) rules.push(`[data-editable="${safePath}"] { ${normalDecls}; }`);
+    if (props._hover && typeof props._hover === 'object') {
+      const hoverDecls = buildDecls(props._hover);
+      if (hoverDecls) rules.push(`[data-editable="${safePath}"]:hover { ${hoverDecls}; }`);
+    }
+    if (props._active && typeof props._active === 'object') {
+      const activeDecls = buildDecls(props._active);
+      if (activeDecls) rules.push(`[data-editable="${safePath}"]:active { ${activeDecls}; }`);
     }
   }
 

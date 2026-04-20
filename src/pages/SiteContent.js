@@ -1618,6 +1618,20 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
 
 function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup }) {
   const shortPath = path.split('.').slice(-1)[0].replace(/_/g, ' ');
+  // Which interaction state the user is currently editing. Normal
+  // writes to styles[prop]; Hover writes to styles._hover[prop]; Active
+  // writes to styles._active[prop]. The tapas-store compiler translates
+  // these into :hover and :active pseudo rules.
+  const [stateTab, setStateTab] = useState('normal');
+  const stateStyles = stateTab === 'normal'
+    ? styles
+    : styles?.[`_${stateTab}`];
+  const stateHasValues = stateStyles && Object.keys(stateStyles).length > 0;
+  const TABS = [
+    { key: 'normal', label: 'Normal' },
+    { key: 'hover',  label: 'Hover'  },
+    { key: 'active', label: 'Active' },
+  ];
   return (
     <>
       {/* Header with back button */}
@@ -1649,8 +1663,58 @@ function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expand
         </button>
       </div>
 
+      {/* Interaction-state tabs (Normal / Hover / Active). Each tab
+          scopes the fields below so staff can wire real hover styles
+          without writing CSS. The store applies these as :hover and
+          :active pseudo rules. */}
+      <div style={{
+        display: 'flex', padding: '8px 10px', gap: '4px',
+        borderBottom: `1px solid ${D.border}`, background: D.panelAlt,
+      }}>
+        {TABS.map(t => {
+          const isActive = stateTab === t.key;
+          const hasOverrides = t.key === 'normal'
+            ? (styles && Object.keys(styles).filter(k => !k.startsWith('_')).length > 0)
+            : (styles?.[`_${t.key}`] && Object.keys(styles[`_${t.key}`]).length > 0);
+          return (
+            <button
+              key={t.key}
+              onClick={() => setStateTab(t.key)}
+              style={{
+                flex: 1, padding: '6px 8px',
+                background: isActive ? '#fff' : 'transparent',
+                color: isActive ? D.text : D.textDim,
+                border: `1px solid ${isActive ? D.border : 'transparent'}`,
+                borderRadius: '4px', cursor: 'pointer',
+                fontSize: '11px', fontWeight: isActive ? 600 : 500,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+              }}
+              title={t.key === 'normal' ? 'Default appearance' : `On ${t.key}`}
+            >
+              {t.label}
+              {hasOverrides && (
+                <span style={{
+                  width: '5px', height: '5px', borderRadius: '50%',
+                  background: D.accent, display: 'inline-block',
+                }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Groups */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '40px', background: D.panel }}>
+        {stateTab !== 'normal' && !stateHasValues && (
+          <div style={{
+            margin: '12px 14px 0', padding: '10px 12px',
+            background: D.panelAlt, border: `1px dashed ${D.border}`,
+            borderRadius: '4px', fontSize: '11px', color: D.textDim, lineHeight: 1.5,
+          }}>
+            No {stateTab} overrides yet. Set any field below and it only
+            applies when the element is {stateTab === 'hover' ? 'hovered' : 'clicked'}.
+          </div>
+        )}
         {ELEMENT_GROUPS.map(group => {
           const isOpen = expandedGroups.has(group.key);
           return (
@@ -1675,13 +1739,13 @@ function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expand
                 <div style={{ padding: '4px 0 12px' }}>
                   {group.fields.map(field => {
                     const Renderer = CSS_RENDERERS[field.type] || CssTextField;
-                    const value = styles?.[field.cssProp];
+                    const value = stateStyles?.[field.cssProp];
                     return (
                       <Renderer
                         key={field.cssProp}
                         field={field}
                         value={value}
-                        onChange={(v) => onChangeStyle(field.cssProp, v)}
+                        onChange={(v) => onChangeStyle(field.cssProp, v, stateTab)}
                       />
                     );
                   })}
@@ -3118,13 +3182,29 @@ export default function SiteContent() {
 
   // Update a single CSS property on the currently selected element.
   // Empty string clears the override.
-  const updateElementStyle = (path, cssProp, value) => {
+  // `state` is one of 'normal' | 'hover' | 'active' — hover/active
+  // writes land in a reserved `_hover` / `_active` sub-object that the
+  // storefront's applyElementStyles renders as :hover / :active rules.
+  const updateElementStyle = (path, cssProp, value, state = 'normal') => {
+    const clearing = value === '' || value === null || value === undefined;
     setDraftContent(prev => {
       const currentMap = prev.element_styles || {};
       const currentEl  = currentMap[path] || {};
-      const nextEl     = { ...currentEl };
-      if (value === '' || value === null || value === undefined) delete nextEl[cssProp];
-      else nextEl[cssProp] = value;
+      let nextEl;
+      if (state === 'normal') {
+        nextEl = { ...currentEl };
+        if (clearing) delete nextEl[cssProp];
+        else nextEl[cssProp] = value;
+      } else {
+        const key = `_${state}`;
+        const currentSub = currentEl[key] || {};
+        const nextSub = { ...currentSub };
+        if (clearing) delete nextSub[cssProp];
+        else nextSub[cssProp] = value;
+        nextEl = { ...currentEl };
+        if (Object.keys(nextSub).length === 0) delete nextEl[key];
+        else nextEl[key] = nextSub;
+      }
       const nextMap = { ...currentMap };
       if (Object.keys(nextEl).length === 0) delete nextMap[path];
       else nextMap[path] = nextEl;
@@ -5879,7 +5959,7 @@ export default function SiteContent() {
               styles={draftContent.element_styles?.[selectedElement]}
               expandedGroups={expandedGroups}
               toggleGroup={toggleGroup}
-              onChangeStyle={(cssProp, value) => updateElementStyle(selectedElement, cssProp, value)}
+              onChangeStyle={(cssProp, value, state) => updateElementStyle(selectedElement, cssProp, value, state)}
               onClear={() => clearElementStyles(selectedElement)}
               onBack={clearSelection}
             />
