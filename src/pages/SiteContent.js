@@ -811,7 +811,8 @@ const ELEMENT_GROUPS = [
 function CssTextField({ field, value, onChange }) {
   return (
     <Row label={field.label} iconType="text">
-      <input type="text" value={value || ''} onChange={e => onChange(e.target.value)}
+      <input id={`css-${field.cssProp}`}
+        type="text" value={value || ''} onChange={e => onChange(e.target.value)}
         placeholder={field.placeholder || ''}
         style={inputBaseStyle}
         onFocus={e => { e.target.style.border = `1px solid ${D.accent}`; e.target.style.background = D.inputFocus; }}
@@ -1616,6 +1617,73 @@ function BlockInspector({ block, meta, onChangeProp, onBack, onDelete, onDuplica
   );
 }
 
+// Visual CSS box-model diagram rendered above the Spacing group.
+// Shows the current margin (outer) and padding (inner) values on each
+// side as read from the passed `styles`. Clicking a side focuses the
+// matching text input below via a shared DOM id. Purely informational —
+// edits still happen via the text inputs. Matches Chrome DevTools look.
+function SpacingBoxDiagram({ styles }) {
+  const get = (k) => {
+    const v = styles?.[k];
+    return (v === undefined || v === null || v === '') ? '—' : String(v);
+  };
+  const side = (label, cssProp, outer) => (
+    <div
+      onClick={() => { try { document.getElementById(`css-${cssProp}`)?.focus(); } catch {} }}
+      style={{
+        fontSize: '10px', color: outer ? '#7C3AED' : '#059669',
+        fontFamily: 'ui-monospace, monospace',
+        cursor: 'pointer', whiteSpace: 'nowrap',
+      }}
+      title={`${label}: ${get(cssProp)}`}
+    >
+      {get(cssProp)}
+    </div>
+  );
+  const marginBg = '#F5F3FF';
+  const marginBorder = '#DDD6FE';
+  const paddingBg = '#ECFDF5';
+  const paddingBorder = '#A7F3D0';
+  return (
+    <div style={{ padding: '8px 14px 4px' }}>
+      {/* Margin box (outer) */}
+      <div style={{
+        position: 'relative', background: marginBg,
+        border: `1px dashed ${marginBorder}`, borderRadius: '4px',
+        padding: '18px 22px',
+      }}>
+        <div style={{ position: 'absolute', top: '3px', left: '6px', fontSize: '9px', color: '#7C3AED', fontWeight: 600, letterSpacing: '0.5px' }}>MARGIN</div>
+        <div style={{ position: 'absolute', top: '3px', left: '50%', transform: 'translateX(-50%)' }}>{side('margin-top', 'marginTop', true)}</div>
+        <div style={{ position: 'absolute', bottom: '3px', left: '50%', transform: 'translateX(-50%)' }}>{side('margin-bottom', 'marginBottom', true)}</div>
+
+        {/* Padding box (inner) */}
+        <div style={{
+          position: 'relative', background: paddingBg,
+          border: `1px dashed ${paddingBorder}`, borderRadius: '3px',
+          padding: '18px 22px',
+        }}>
+          <div style={{ position: 'absolute', top: '3px', left: '6px', fontSize: '9px', color: '#059669', fontWeight: 600, letterSpacing: '0.5px' }}>PADDING</div>
+          <div style={{ position: 'absolute', top: '3px', left: '50%', transform: 'translateX(-50%)' }}>{side('padding-top', 'paddingTop', false)}</div>
+          <div style={{ position: 'absolute', bottom: '3px', left: '50%', transform: 'translateX(-50%)' }}>{side('padding-bottom', 'paddingBottom', false)}</div>
+          <div style={{ position: 'absolute', left: '4px', top: '50%', transform: 'translateY(-50%)' }}>{side('padding-left', 'paddingLeft', false)}</div>
+          <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)' }}>{side('padding-right', 'paddingRight', false)}</div>
+
+          {/* Content slot */}
+          <div style={{
+            background: '#fff', border: '1px solid #E5E7EB',
+            borderRadius: '3px', padding: '12px 18px',
+            textAlign: 'center', fontSize: '10px', color: '#6B7280',
+            fontWeight: 600, letterSpacing: '0.5px',
+          }}>CONTENT</div>
+        </div>
+      </div>
+      <div style={{ fontSize: '9.5px', color: '#9CA3AF', marginTop: '6px', textAlign: 'center' }}>
+        Click a value to jump to its input
+      </div>
+    </div>
+  );
+}
+
 function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expandedGroups, toggleGroup }) {
   const shortPath = path.split('.').slice(-1)[0].replace(/_/g, ' ');
   // Which interaction state the user is currently editing. Normal
@@ -1737,6 +1805,9 @@ function ElementInspector({ path, styles, onChangeStyle, onClear, onBack, expand
               </button>
               {isOpen && (
                 <div style={{ padding: '4px 0 12px' }}>
+                  {group.key === 'spacing' && (
+                    <SpacingBoxDiagram styles={stateStyles} />
+                  )}
                   {group.fields.map(field => {
                     const Renderer = CSS_RENDERERS[field.type] || CssTextField;
                     const value = stateStyles?.[field.cssProp];

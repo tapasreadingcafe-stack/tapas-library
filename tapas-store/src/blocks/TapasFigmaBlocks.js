@@ -22,6 +22,61 @@ const asset = (name) => (name && !name.startsWith('http') && !name.startsWith('/
   ? `${process.env.PUBLIC_URL || ''}/${name}`
   : name);
 
+// Ultra-minimal Markdown renderer for inline text fields. Supports the
+// three things staff actually type: **bold**, *italic*, and [label](url)
+// links. Returns an array of React nodes that can be dropped inline
+// inside a <p>, <span>, or <div>. No HTML parsing — every other char is
+// preserved verbatim. Safe against XSS because we never dangerouslySet.
+function renderInlineMarkdown(text) {
+  if (typeof text !== 'string' || !text) return text;
+  // Escape nothing — we only match a small alphabet of tokens and emit
+  // plain React nodes, so HTML in the source text stays literal.
+  const out = [];
+  let i = 0;
+  let key = 0;
+  const pushText = (t) => { if (t) out.push(t); };
+  while (i < text.length) {
+    // Link: [label](url)
+    if (text[i] === '[') {
+      const close = text.indexOf('](', i);
+      const end = close >= 0 ? text.indexOf(')', close + 2) : -1;
+      if (close > i && end > close) {
+        const label = text.slice(i + 1, close);
+        const url = text.slice(close + 2, end);
+        out.push(<a key={`md-${key++}`} href={url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>{label}</a>);
+        i = end + 1;
+        continue;
+      }
+    }
+    // Bold: **text**
+    if (text[i] === '*' && text[i + 1] === '*') {
+      const end = text.indexOf('**', i + 2);
+      if (end > i + 2) {
+        out.push(<strong key={`md-${key++}`}>{text.slice(i + 2, end)}</strong>);
+        i = end + 2;
+        continue;
+      }
+    }
+    // Italic: *text* (but not inside ** which was handled above)
+    if (text[i] === '*') {
+      const end = text.indexOf('*', i + 1);
+      if (end > i + 1) {
+        out.push(<em key={`md-${key++}`}>{text.slice(i + 1, end)}</em>);
+        i = end + 1;
+        continue;
+      }
+    }
+    // Plain text run — greedily consume until the next marker.
+    let j = i;
+    while (j < text.length && text[j] !== '*' && text[j] !== '[') j++;
+    pushText(text.slice(i, j));
+    i = j;
+  }
+  return out;
+}
+
+const MD = renderInlineMarkdown;
+
 function Placeholder({ ratio = '4 / 3', label, bg = '#E5E7EB' }) {
   return (
     <div style={{
@@ -86,7 +141,7 @@ export function TapasHero({
             {headline_line1}<br />{headline_line2}
           </h1>
           <p style={{ marginTop: '18px', maxWidth: '440px', color: INK_DIM, fontSize: '15px', lineHeight: 1.65 }}>
-            {description}
+            {MD(description)}
           </p>
           <div style={{ marginTop: '28px' }}>
             <Link
@@ -179,7 +234,7 @@ function ServiceCard({ icon, title, body, cta_text, cta_href }) {
         {title}
       </h3>
       <p style={{ marginTop: '14px', color: INK_DIM, fontSize: '14px', lineHeight: 1.6, minHeight: '64px' }}>
-        {body}
+        {MD(body)}
       </p>
       {cta_text && cta_href && (
         <Link to={cta_href} style={{
@@ -291,7 +346,7 @@ export function TapasInspiration({
             {heading_line1}<br />{heading_line2}
           </h2>
           <p style={{ marginTop: '14px', color: INK_DIM, fontSize: '14px', lineHeight: 1.65, maxWidth: '320px' }}>
-            {description}
+            {MD(description)}
           </p>
           {cta_text && (
             <Link to={cta_href} style={{
@@ -356,7 +411,7 @@ export function TapasTestimonials({
               "{r.quote}"
             </div>
             <p style={{ marginTop: '10px', color: INK_DIM, fontSize: '14px', lineHeight: 1.6, maxWidth: '320px', marginInline: 'auto' }}>
-              {r.body}
+              {MD(r.body)}
             </p>
             <div style={{ marginTop: '18px', fontWeight: 700, color: INK, fontSize: '14px' }}>{r.author}</div>
             <div style={{ color: INK_FAINT, fontSize: '12px' }}>{r.role}</div>
@@ -387,7 +442,7 @@ export function TapasNewsletter({
         <div>
           <div style={{ fontSize: '18px', fontWeight: 700 }}>{headline}</div>
           <div style={{ fontSize: '12px', color: '#A0A0A0', marginTop: '4px' }}>
-            {subtext}
+            {MD(subtext)}
           </div>
         </div>
         <form
