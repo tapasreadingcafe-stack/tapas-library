@@ -3220,6 +3220,19 @@ export default function SiteContent() {
     return fresh.id;
   }, [mutateBlocks]);
 
+  // Insert a new block as a child of an existing tapas_group. Used when
+  // a library tile is dropped onto a group row in the Layers tree.
+  const addBlockAsChild = useCallback((pageKey, parentId, type, presetId) => {
+    const fresh = makeBlock(type, presetId);
+    mutateBlocks(pageKey, (blocks) => blocks.map(b => {
+      if (b.id !== parentId) return b;
+      const nextChildren = Array.isArray(b.props?.children) ? [...b.props.children, fresh] : [fresh];
+      return { ...b, props: { ...(b.props || {}), children: nextChildren } };
+    }));
+    setSelectedBlockId(fresh.id);
+    return fresh.id;
+  }, [mutateBlocks]);
+
   const deleteBlock = useCallback((pageKey, blockId) => {
     mutateBlocks(pageKey, (blocks) => blocks.filter(b => b.id !== blockId));
     setSelectedBlockId(prev => prev === blockId ? null : prev);
@@ -5495,13 +5508,22 @@ export default function SiteContent() {
           const data = active.data?.current;
           const blocks = getBlocks(editingPage);
 
-          // Library → tree drop. Insert at the over-row's index, or
-          // append if dropped on the empty zone. Preset tiles forward
-          // their presetId so the new block opens with the variant's
-          // styling defaults already applied.
+          // Library → tree drop. Three cases:
+          //   1. Over a tapas_group row → add as CHILD of that group
+          //   2. Over any other block row → insert at that index (sibling)
+          //   3. Over empty zone / canvas → append to the page
+          // Preset tiles forward their presetId so the new block opens
+          // with the variant's styling defaults applied.
           if (data?.kind === 'library') {
+            if (over.id !== 'layers-end' && over.id !== 'canvas-drop') {
+              const overBlock = blocks.find(b => b.id === over.id);
+              if (overBlock?.type === 'tapas_group') {
+                addBlockAsChild(editingPage, overBlock.id, data.type, data.presetId);
+                return;
+              }
+            }
             let insertAt = blocks.length;
-            if (over.id !== 'layers-end') {
+            if (over.id !== 'layers-end' && over.id !== 'canvas-drop') {
               const idx = blocks.findIndex(b => b.id === over.id);
               if (idx >= 0) insertAt = idx;
             }
@@ -5893,6 +5915,40 @@ export default function SiteContent() {
                       </div>
                     );
                   }
+                  // Render a tree of rows. Root blocks live inside the
+                  // SortableContext so they can be drag-reordered. Children
+                  // of tapas_group blocks render visually indented under
+                  // their parent but stay outside the sortable — reorder-
+                  // across-parents is deferred to avoid nested-DnD churn.
+                  const renderChildRows = (kids, depth) => {
+                    if (!Array.isArray(kids) || kids.length === 0) return null;
+                    return kids.map((child) => {
+                      const cMeta = BLOCK_REGISTRY_META[child.type];
+                      const cSelected = selectedBlockId === child.id;
+                      return (
+                        <div key={child.id} style={{ paddingLeft: `${depth * 16}px` }}>
+                          <div
+                            onClick={() => { setSelectedBlockId(child.id); setMultiSelectedIds(new Set()); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px',
+                              padding: '6px 8px', margin: '2px 0',
+                              borderRadius: '3px', cursor: 'pointer',
+                              background: cSelected ? S.accentLight : 'transparent',
+                              color: cSelected ? S.accent : S.textDim,
+                              fontSize: '11.5px', fontWeight: cSelected ? 600 : 500,
+                            }}
+                          >
+                            <span style={{ color: S.textFaint, fontSize: '10px' }}>└</span>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: S.textFaint }}>{cMeta?.icon || '▣'}</span>
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {cMeta?.label || child.type}
+                            </span>
+                          </div>
+                          {child.type === 'tapas_group' && renderChildRows(child.props?.children || [], depth + 1)}
+                        </div>
+                      );
+                    });
+                  };
                   return (
                     <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                       {blocks.map((b, idx) => {
@@ -5901,35 +5957,37 @@ export default function SiteContent() {
                         const isMulti = multiSelectedIds.has(b.id);
                         const isSelected = isPrimary || isMulti;
                         return (
-                          <SortableBlockRow
-                            key={b.id}
-                            block={b}
-                            meta={meta}
-                            isPrimary={isPrimary}
-                            isMulti={isMulti}
-                            isSelected={isSelected}
-                            isHidden={!!b.props?.hidden}
-                            isLocked={!!b.locked}
-                            S={S}
-                            onSelect={handleSelect(b, idx)}
-                            onToggleVisibility={() => toggleBlockHidden(editingPage, b.id)}
-                            onToggleLocked={() => toggleBlockLocked(editingPage, b.id)}
-                            onReset={() => askConfirm({
-                              title: `Reset ${meta?.label || b.type} to defaults?`,
-                              message: 'Block content will be replaced with the registry defaults. You can undo with ⌘Z.',
-                              confirmLabel: 'Reset block',
-                              tone: 'danger',
-                              onConfirm: () => resetBlockProps(editingPage, b.id),
-                            })}
-                            onDuplicate={() => duplicateBlock(editingPage, b.id)}
-                            onDelete={() => askConfirm({
-                              title: `Delete ${meta?.label || b.type}?`,
-                              message: 'This removes the block from the draft. You can undo with ⌘Z.',
-                              confirmLabel: 'Delete',
-                              tone: 'danger',
-                              onConfirm: () => deleteBlock(editingPage, b.id),
-                            })}
-                          />
+                          <div key={b.id}>
+                            <SortableBlockRow
+                              block={b}
+                              meta={meta}
+                              isPrimary={isPrimary}
+                              isMulti={isMulti}
+                              isSelected={isSelected}
+                              isHidden={!!b.props?.hidden}
+                              isLocked={!!b.locked}
+                              S={S}
+                              onSelect={handleSelect(b, idx)}
+                              onToggleVisibility={() => toggleBlockHidden(editingPage, b.id)}
+                              onToggleLocked={() => toggleBlockLocked(editingPage, b.id)}
+                              onReset={() => askConfirm({
+                                title: `Reset ${meta?.label || b.type} to defaults?`,
+                                message: 'Block content will be replaced with the registry defaults. You can undo with ⌘Z.',
+                                confirmLabel: 'Reset block',
+                                tone: 'danger',
+                                onConfirm: () => resetBlockProps(editingPage, b.id),
+                              })}
+                              onDuplicate={() => duplicateBlock(editingPage, b.id)}
+                              onDelete={() => askConfirm({
+                                title: `Delete ${meta?.label || b.type}?`,
+                                message: 'This removes the block from the draft. You can undo with ⌘Z.',
+                                confirmLabel: 'Delete',
+                                tone: 'danger',
+                                onConfirm: () => deleteBlock(editingPage, b.id),
+                              })}
+                            />
+                            {b.type === 'tapas_group' && renderChildRows(b.props?.children || [], 1)}
+                          </div>
                         );
                       })}
                     </SortableContext>
