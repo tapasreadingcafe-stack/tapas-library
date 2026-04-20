@@ -1910,6 +1910,42 @@ function LayersDropZone({ children, S }) {
   );
 }
 
+// ---- CanvasDropZone ----------------------------------------------------
+// Transparent overlay that covers the canvas iframe while a library block
+// is being dragged. Appears only during drag (so the iframe keeps its
+// normal click-to-edit behavior when idle). Dropping here appends the
+// block to the end of the current page.
+function CanvasDropZone({ active, S }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'canvas-drop' });
+  if (!active) return null;
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        position: 'absolute', inset: 0, zIndex: 50,
+        pointerEvents: 'auto',
+        background: isOver ? (S.accent + '12') : 'transparent',
+        border: isOver ? `3px dashed ${S.accent}` : '3px dashed transparent',
+        borderRadius: '8px',
+        transition: 'background 0.12s, border-color 0.12s',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <div style={{
+        padding: '14px 22px', borderRadius: '999px',
+        background: isOver ? S.accent : 'rgba(17,24,39,0.85)',
+        color: 'white', fontWeight: 600, fontSize: '13px',
+        letterSpacing: '0.3px',
+        boxShadow: '0 10px 30px rgba(17,24,39,0.25)',
+        transform: isOver ? 'scale(1.05)' : 'scale(1)',
+        transition: 'transform 0.12s, background 0.12s',
+      }}>
+        {isOver ? '⤵ Drop here to add block' : 'Drop anywhere on canvas to add to page'}
+      </div>
+    </div>
+  );
+}
+
 // ---- SortableBlockRow --------------------------------------------------
 // One row in the Layers tree. Uses @dnd-kit's useSortable to make the row
 // reorderable via drag-and-drop. The drag handle (⋮⋮) on the left is the
@@ -5760,6 +5796,7 @@ export default function SiteContent() {
             flex: 1, overflow: 'auto', background: '#E4E7EB',
             display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
             padding: viewport === 'desktop' ? '0' : '20px',
+            position: 'relative',
           }}>
             <iframe
               ref={iframeRef}
@@ -5775,6 +5812,7 @@ export default function SiteContent() {
                 boxShadow: viewport === 'desktop' ? 'none' : '0 10px 30px rgba(0,0,0,0.1)',
               }}
             />
+            <CanvasDropZone active={!!activeDragLib} S={S} />
           </div>
         </main>
 
