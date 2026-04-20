@@ -2389,6 +2389,51 @@ function PageSettingsPanel({
             </div>
           </div>
         </div>
+
+        {/* Canonical URL — declares this page's authoritative URL so
+            Google doesn't flag duplicates when the same page is
+            reachable from multiple paths. */}
+        <div style={{ padding: '0 16px 8px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '600', color: D.textDim, display: 'block', marginBottom: '4px' }}>
+            Canonical URL <span style={{ color: D.textFaint, fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={pageMeta.canonical_url || ''}
+            onChange={(e) => onChangeMeta('canonical_url', e.target.value)}
+            placeholder="https://www.tapasreadingcafe.com/"
+            style={{
+              width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+              background: '#fff', border: `1px solid ${D.border}`,
+              borderRadius: '4px', fontSize: '11px', color: D.text,
+              outline: 'none', fontFamily: 'ui-monospace, monospace',
+            }}
+          />
+          <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '3px' }}>
+            Leave blank to use this page's own URL.
+          </div>
+        </div>
+
+        {/* Hide from search engines — adds <meta name="robots" content="noindex">
+            so the page doesn't show up in Google results. Useful for
+            thank-you pages, drafts, internal-only pages. */}
+        <div style={{ padding: '0 16px 12px' }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            fontSize: '11.5px', color: D.text, cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox"
+              checked={!!pageMeta.robots_noindex}
+              onChange={(e) => onChangeMeta('robots_noindex', e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            Hide this page from search engines
+          </label>
+          <div style={{ fontSize: '10px', color: D.textFaint, marginTop: '3px', marginLeft: '24px' }}>
+            Adds <code>noindex</code> so Google, Bing, etc. won't list it.
+          </div>
+        </div>
       </SubSection>
 
       {/* Page actions — duplicate or delete any page.

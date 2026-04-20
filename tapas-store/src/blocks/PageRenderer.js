@@ -308,10 +308,27 @@ function upsertMeta(attr, attrValue, content) {
 // Applies per-page SEO meta (title + description + og_image) to the
 // document & the <head>. Each route's <PageRenderer> overrides the
 // previous route's tags on mount, so we don't need to undo on unmount.
+// Upserts a <link rel="canonical"> tag, or removes it if href is empty.
+function upsertCanonical(href) {
+  let link = document.querySelector('link[rel="canonical"]');
+  if (!href) {
+    if (link) link.remove();
+    return;
+  }
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', 'canonical');
+    document.head.appendChild(link);
+  }
+  link.setAttribute('href', href);
+}
+
 function usePageMeta(meta) {
   const title = meta?.title;
   const description = meta?.description;
   const ogImage = meta?.og_image;
+  const canonicalUrl = meta?.canonical_url;
+  const noindex = meta?.robots_noindex;
   React.useEffect(() => {
     if (title) document.title = title;
     if (typeof description === 'string') {
@@ -334,7 +351,10 @@ function usePageMeta(meta) {
     if (title) upsertMeta('name', 'twitter:title', title);
     if (typeof description === 'string') upsertMeta('name', 'twitter:description', description);
     if (ogImage) upsertMeta('name', 'twitter:image', ogImage);
-  }, [title, description, ogImage]);
+    // Canonical + robots
+    upsertCanonical(canonicalUrl || (typeof window !== 'undefined' ? window.location.href : ''));
+    upsertMeta('name', 'robots', noindex ? 'noindex, nofollow' : 'index, follow');
+  }, [title, description, ogImage, canonicalUrl, noindex]);
 }
 
 // Rough editor-mode detector: the staff dashboard loads the store with
