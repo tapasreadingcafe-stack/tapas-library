@@ -571,7 +571,23 @@ function SidebarNav({ sidebarOpen, openGroups, toggleGroup, isActive, isGroupAct
 
 function DashboardShell() {
   const isMobile = () => window.innerWidth <= 768;
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
+  // Persist sidebar open/closed across refreshes. Mobile always starts
+  // closed (screen is too narrow for the open state) but the saved
+  // desktop preference wins on every reload after that.
+  const SIDEBAR_KEY = 'tapas_sidebar_open';
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (isMobile()) return false;
+    try {
+      const saved = localStorage.getItem(SIDEBAR_KEY);
+      if (saved === 'true')  return true;
+      if (saved === 'false') return false;
+    } catch {}
+    return true; // default open on desktop
+  });
+  useEffect(() => {
+    if (isMobile()) return; // don't pollute the saved pref from mobile
+    try { localStorage.setItem(SIDEBAR_KEY, String(sidebarOpen)); } catch {}
+  }, [sidebarOpen]);
   const [tourActive, setTourActive] = useState(false);
   const location = useLocation();
   const { dark, toggleTheme } = useTheme();
