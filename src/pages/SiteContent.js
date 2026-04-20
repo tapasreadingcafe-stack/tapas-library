@@ -5645,7 +5645,7 @@ export default function SiteContent() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
           <Palette size={16} color={S.text} strokeWidth={2.25} />
-          <span style={{ fontSize: '13px', fontWeight: '700', color: S.text, flexShrink: 0 }}>Edit Website</span>
+          <span style={{ fontSize: '13px', fontWeight: '700', color: S.text, flexShrink: 0 }}>Website Editor</span>
           <span style={{ color: S.textFaint, fontSize: '12px', flexShrink: 0 }}>/</span>
 
           {/* Page switcher — same state as the sidebar Pages list. */}

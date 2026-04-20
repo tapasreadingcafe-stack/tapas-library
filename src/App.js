@@ -271,7 +271,7 @@ const NAV_CONFIG = [
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
       { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
-      { to: '/store/content',    icon: '🎨', label: 'Edit Website' },
+      { to: '/store/content',    icon: '🎨', label: 'Website Editor' },
     ],
   },
   {
