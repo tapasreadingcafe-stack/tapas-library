@@ -153,9 +153,15 @@ function applyElementStyles(elementStyles, classes, elementClasses) {
 }
 
 // Apply brand + typography + button tokens to :root as CSS custom props.
+// Phase 4: Merges the active mode's overrides on top of `brand` before
+// resolving CSS vars, so switching modes changes every themed element.
 function applyTheme(content) {
   const root = document.documentElement;
-  const b = content?.brand;
+  // Resolve the effective brand = brand + modes[active_mode] overrides.
+  const baseBrand = content?.brand || {};
+  const activeMode = content?.active_mode;
+  const modeOverrides = (activeMode && content?.modes?.[activeMode]) || {};
+  const b = { ...baseBrand, ...modeOverrides };
   if (b) {
     root.style.setProperty('--tapas-primary',        b.primary_color);
     root.style.setProperty('--tapas-primary-dark',   b.primary_color_dark);
@@ -166,6 +172,10 @@ function applyTheme(content) {
     root.style.setProperty('--tapas-sand',           b.sand_color);
     root.style.setProperty('--tapas-heading-font',   `"${b.heading_font}", serif`);
     root.style.setProperty('--tapas-body-font',      `"${b.body_font}", sans-serif`);
+    // Expose the active mode for any components that want to branch on it
+    // (e.g. dark-mode-only SVGs, adjusted shadows).
+    if (activeMode) root.setAttribute('data-mode', activeMode);
+    else root.removeAttribute('data-mode');
   }
 
   const t = content?.typography;

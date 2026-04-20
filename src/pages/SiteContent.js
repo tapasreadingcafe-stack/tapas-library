@@ -6392,6 +6392,37 @@ export default function SiteContent() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {/* Phase 4: Mode switcher — Webflow-style variable modes.
+                  Each mode can override brand colors/fonts. Storefront
+                  merges modes[active_mode] on top of brand. Staff can
+                  add modes via the Design System modal. */}
+              {(() => {
+                const modes = draftContent.modes || {};
+                const modeNames = Object.keys(modes);
+                if (modeNames.length === 0) return null;
+                const active = draftContent.active_mode || modeNames[0];
+                return (
+                  <div style={{ display: 'flex', gap: '2px', background: S.bg, padding: '2px', borderRadius: '6px' }}>
+                    {modeNames.map(m => {
+                      const isActive = m === active;
+                      return (
+                        <button key={m}
+                          onClick={() => setDraftContent(prev => ({ ...prev, active_mode: m }))}
+                          title={`Preview in ${m} mode`}
+                          style={{
+                            padding: '0 10px', height: '24px',
+                            background: isActive ? 'white' : 'transparent',
+                            color: isActive ? S.text : S.textDim,
+                            border: 'none', borderRadius: '4px', cursor: 'pointer',
+                            fontSize: '11px', fontWeight: isActive ? 600 : 500,
+                            textTransform: 'capitalize',
+                            boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                          }}>{m}</button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {/* Viewport switcher — Lucide device glyphs. */}
               <div style={{ display: 'flex', gap: '2px', background: S.bg, padding: '2px', borderRadius: '6px' }}>
                 {VIEWPORTS.map(v => {
