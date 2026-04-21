@@ -194,7 +194,7 @@ const STATE_TABS = [
   { key: 'focused', label: 'Focused' },
 ];
 
-function Selector({ node, className, classDef, onRenameClass, onCreateClass, state, onStateChange }) {
+function Selector({ node, className, classDef, onRenameClass, onCreateClass, state, onStateChange, isBaseBreakpoint = true }) {
   const [draft, setDraft] = useState(className || '');
   useEffect(() => { setDraft(className || ''); }, [className]);
 
@@ -238,8 +238,10 @@ function Selector({ node, className, classDef, onRenameClass, onCreateClass, sta
         >+ Give this element a class</button>
       )}
 
-      {/* State tabs — only meaningful when a class exists */}
-      {className && (
+      {/* State tabs — only on desktop base breakpoint. The v2 schema
+          doesn't carry per-state styles inside a media query, so Hover
+          / Pressed / Focused are hidden when editing a breakpoint. */}
+      {className && isBaseBreakpoint && (
         <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
           {STATE_TABS.map((t) => {
             const isActive = t.key === state;
@@ -1000,6 +1002,7 @@ export default function StylePanel({
   classDef,
   state,
   onStateChange,
+  device,
   onCreateClass,
   onRenameClass,
   onSetStyle,
@@ -1017,21 +1020,54 @@ export default function StylePanel({
     );
   }
 
-  // The bucket of declarations we read FROM and write TO is dictated by
-  // the active state tab. 'base' reads from styles.base; pseudo-states
-  // layer overrides on top. We still display only the selected tab's
-  // own declarations so users can edit per-state without the base
-  // leaking into the form.
-  const styles = classDef?.styles?.[state] || {};
+  // The bucket we read FROM / write TO depends on two axes:
+  //   - device (desktop / tablet / mobileL / mobileP)
+  //   - state  (base / hover / pressed / focused)
+  //
+  // At desktop + state → classDef.styles.<state> (full per-state bucket)
+  // At non-desktop     → classDef.breakpoints.<device> (flat StyleBlock)
+  //
+  // State tabs are meaningless on non-desktop in this schema, so the
+  // Selector force-hides them. Breakpoint banner tells the user which
+  // bucket edits land in.
+  const isBaseBreakpoint = !device || device === 'desktop';
+  const styles = isBaseBreakpoint
+    ? (classDef?.styles?.[state] || {})
+    : (classDef?.breakpoints?.[device] || {});
+
+  // Human-readable label + CSS max-width for the banner. Kept in sync
+  // with BREAKPOINT_MEDIA over in WebsiteEditor.css.js.
+  const BP_META = {
+    tablet:  { label: 'Tablet',        max: '991px' },
+    mobileL: { label: 'Mobile L',      max: '767px' },
+    mobileP: { label: 'Mobile P',      max: '479px' },
+  };
+  const bp = BP_META[device];
 
   return (
     <div style={{ overflowY: 'auto', flex: 1 }}>
+      {bp && (
+        <div style={{
+          padding: '8px 12px',
+          background: '#1d2a3a', color: '#9ccfff',
+          borderBottom: `1px solid ${W.panelBorder}`,
+          fontSize: '10.5px', lineHeight: 1.4,
+        }}>
+          <div style={{ fontWeight: 700, letterSpacing: '0.03em' }}>
+            Editing at {bp.label} (≤ {bp.max})
+          </div>
+          <div style={{ color: '#7ea9c7' }}>
+            Changes here override the Desktop base inside @media only.
+          </div>
+        </div>
+      )}
       <Selector
         node={node}
         className={className}
         classDef={classDef}
         state={state}
         onStateChange={onStateChange}
+        isBaseBreakpoint={isBaseBreakpoint}
         onCreateClass={onCreateClass}
         onRenameClass={onRenameClass}
       />

@@ -22,7 +22,7 @@ import {
   prevInFlat, nextInFlat, labelOf,
 } from './WebsiteEditor.tree';
 import {
-  ensureNodeClass, setClassStyle, renameClass,
+  ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
   setNodeTag, setNodeAttribute, renameNodeAttribute,
 } from './WebsiteEditor.mutations';
 import StylePanel from './WebsiteEditor.style';
@@ -315,8 +315,8 @@ const DEVICES = [
   { key: 'mobileP',  label: 'Mobile P', width: '375px',  glyph: '▯' },
 ];
 
-function Canvas({ tree, classes, selectedId, onSelect }) {
-  const [device, setDevice] = useState('desktop');
+function Canvas({ tree, classes, selectedId, onSelect, device, onDeviceChange }) {
+  const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
   const [hoverId, setHoverId] = useState(null);
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
@@ -549,6 +549,7 @@ function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
 function RightPanel({
   selectedNode, className, classDef,
   state, onStateChange,
+  device,
   onCreateClass, onRenameClass, onSetStyle,
   onSetTag, onSetAttribute, onRenameAttribute,
 }) {
@@ -604,6 +605,7 @@ function RightPanel({
             classDef={classDef}
             state={state}
             onStateChange={onStateChange}
+            device={device}
             onCreateClass={onCreateClass}
             onRenameClass={onRenameClass}
             onSetStyle={onSetStyle}
@@ -642,6 +644,11 @@ export default function WebsiteEditor() {
   const [selectedId, setSelectedId] = useState(null);
   const [railActive, setRailActive] = useState('navigator');
   const [styleState, setStyleState] = useState('base');
+  // Active breakpoint / device frame. Drives both the canvas width and
+  // where style writes land (desktop → styles.<state>, others →
+  // breakpoints.<bp>). Lives on the main editor so the Style panel can
+  // read from the right bucket.
+  const [device, setDevice] = useState('desktop');
 
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
@@ -730,14 +737,23 @@ export default function WebsiteEditor() {
   // onSet from Layout/Spacing: routes the CSS property/value through
   // the class-only pipeline. Auto-creates a class on the selected node
   // if this is the first style edit (spec § 7).
+  // Writes route based on the active device. Desktop → per-state
+  // styles (supports :hover, :focused, etc). Non-desktop → a flat
+  // StyleBlock under breakpoints.<bp>. This is deliberate: per-state
+  // breakpoint overrides aren't in the v2 schema yet, and adding them
+  // now costs a migration. Callers (Style panel) already force state
+  // back to 'base' when device is non-desktop so this branch is safe.
   const handleSetStyle = useCallback((prop, value) => {
     if (!selectedId) return;
     setContent((c) => {
       const { content: withClass, className } = ensureNodeClass(c, pageKey, selectedId);
       if (!className) return c;
-      return setClassStyle(withClass, className, styleState, prop, value);
+      if (device === 'desktop') {
+        return setClassStyle(withClass, className, styleState, prop, value);
+      }
+      return setClassBreakpointStyle(withClass, className, device, prop, value);
     });
-  }, [selectedId, pageKey, styleState]);
+  }, [selectedId, pageKey, styleState, device]);
 
   const handleSetTag = useCallback((tag) => {
     if (!selectedId) return;
@@ -808,13 +824,21 @@ export default function WebsiteEditor() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <LeftRail active={railActive} onChange={setRailActive} />
         <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />
-        <Canvas tree={tree} classes={classes} selectedId={selectedId} onSelect={setSelectedId} />
+        <Canvas
+          tree={tree}
+          classes={classes}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          device={device}
+          onDeviceChange={setDevice}
+        />
         <RightPanel
           selectedNode={selectedNode}
           className={primaryClass}
           classDef={classDef}
           state={styleState}
           onStateChange={setStyleState}
+          device={device}
           onCreateClass={handleCreateClass}
           onRenameClass={handleRenameClass}
           onSetStyle={handleSetStyle}

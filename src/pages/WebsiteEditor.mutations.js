@@ -182,6 +182,30 @@ export function renameNodeAttribute(content, pageKey, nodeId, oldKey, newKey) {
   });
 }
 
+// Breakpoint-scoped write. Writes into cls.breakpoints[bp][prop]. The
+// 'desktop' breakpoint is a no-op here because the CSS compiler treats
+// breakpoints.desktop as an ignored shim — callers should route
+// desktop writes through setClassStyle so they land in styles.<state>.
+export function setClassBreakpointStyle(content, className, breakpoint, prop, value) {
+  const cls = content?.classes?.[className];
+  if (!cls) return content;
+  const bucket = cls.breakpoints?.[breakpoint] || {};
+  let nextBucket;
+  if (value === '' || value === null || value === undefined) {
+    if (!(prop in bucket)) return content;
+    nextBucket = { ...bucket };
+    delete nextBucket[prop];
+  } else {
+    if (bucket[prop] === value) return content;
+    nextBucket = { ...bucket, [prop]: value };
+  }
+  const nextCls = {
+    ...cls,
+    breakpoints: { ...cls.breakpoints, [breakpoint]: nextBucket },
+  };
+  return { ...content, classes: { ...content.classes, [className]: nextCls } };
+}
+
 // Rename a class across the classes map AND every node's classes[] on
 // every page's tree. Used when the user edits the class badge.
 export function renameClass(content, oldName, newName) {
