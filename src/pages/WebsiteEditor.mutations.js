@@ -406,6 +406,34 @@ export function deletePage(content, pageKey) {
   return { ...content, pages: rest };
 }
 
+// Patch page.meta fields (title / description / og_image / canonical_url
+// / robots_noindex). Accepts a partial — only the provided keys get
+// written. Empty string drops the key to keep the stored blob tidy.
+export function updatePageMeta(content, pageKey, patch) {
+  const page = content?.pages?.[pageKey];
+  if (!page || !patch) return content;
+  const prev = page.meta || {};
+  const next = { ...prev };
+  let changed = false;
+  for (const [k, v] of Object.entries(patch)) {
+    const normalized = typeof v === 'string' ? v : v;
+    if (normalized === '' || normalized === null || normalized === undefined) {
+      if (k in next) { delete next[k]; changed = true; }
+    } else if (next[k] !== normalized) {
+      next[k] = normalized;
+      changed = true;
+    }
+  }
+  if (!changed) return content;
+  return {
+    ...content,
+    pages: {
+      ...content.pages,
+      [pageKey]: { ...page, meta: next },
+    },
+  };
+}
+
 export function renamePage(content, pageKey, { name, slug } = {}) {
   const page = content?.pages?.[pageKey];
   if (!page) return content;

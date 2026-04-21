@@ -27,7 +27,7 @@ import {
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
-  createPage,
+  createPage, updatePageMeta,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
@@ -35,6 +35,7 @@ import StylePanel from './WebsiteEditor.style';
 import SettingsPanel from './WebsiteEditor.settings';
 import AddPanel from './WebsiteEditor.add';
 import InteractionsPanel from './WebsiteEditor.interactions';
+import PagePanel from './WebsiteEditor.page';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -772,12 +773,14 @@ function RightPanel({
   device,
   onCreateClass, onRenameClass, onSetStyle,
   onSetTag, onSetAttribute, onRenameAttribute,
+  page, pageKey, siteUrl, onUpdatePageMeta,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
     { key: 'style',        label: 'Style' },
     { key: 'settings',     label: 'Settings' },
     { key: 'interactions', label: 'Interactions' },
+    { key: 'page',         label: 'Page' },
   ];
   return (
     <div style={{
@@ -843,6 +846,14 @@ function RightPanel({
           <InteractionsPanel
             node={selectedNode}
             onSetAttribute={onSetAttribute}
+          />
+        )}
+        {tab === 'page' && (
+          <PagePanel
+            page={page}
+            pageKey={pageKey}
+            siteUrl={siteUrl}
+            onUpdateMeta={onUpdatePageMeta}
           />
         )}
       </div>
@@ -1048,6 +1059,13 @@ export default function WebsiteEditor() {
     if (!selectedId) return;
     applyEdit((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
   }, [selectedId, pageKey, applyEdit]);
+
+  // Lane A item 3: Page-level meta (SEO) updates. Partial patch; the
+  // mutation drops empty-string values so the stored blob stays tidy.
+  const handleUpdatePageMeta = useCallback((patch) => {
+    if (!pageKey) return;
+    applyEdit((c) => updatePageMeta(c, pageKey, patch));
+  }, [pageKey, applyEdit]);
 
   // Insert a block from the Add panel. For this MVP we always append
   // to the page root; drag-to-precise-position lands in Phase 7b.
@@ -1328,6 +1346,10 @@ export default function WebsiteEditor() {
           onSetTag={handleSetTag}
           onSetAttribute={handleSetAttribute}
           onRenameAttribute={handleRenameAttribute}
+          page={content?.pages?.[pageKey]}
+          pageKey={pageKey}
+          siteUrl={content?.brand?.site_url || ''}
+          onUpdatePageMeta={handleUpdatePageMeta}
         />
       </div>
       {(saving || saveError) && (
