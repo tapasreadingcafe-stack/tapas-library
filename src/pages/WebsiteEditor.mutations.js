@@ -182,6 +182,30 @@ export function renameNodeAttribute(content, pageKey, nodeId, oldKey, newKey) {
   });
 }
 
+// Fresh node id for inserts. Short enough for DOM attribute use,
+// random enough that collisions are negligible across a single page.
+export function newNodeId() {
+  return 'n-' + Math.random().toString(36).slice(2, 10);
+}
+
+// Insert a node as a child of parentId at the given index (defaults to
+// end). Used by the Phase-7 Add panel. If parentId is null or not
+// found, inserts at the end of the page root.
+export function insertNode(content, pageKey, parentId, newNode, index) {
+  const page = content?.pages?.[pageKey];
+  if (!page) return content;
+  const targetParentId = parentId || page.tree?.id;
+  if (!targetParentId) return content;
+  return withNode(content, pageKey, targetParentId, (parent) => {
+    const kids = parent.children || [];
+    const safe = typeof index === 'number'
+      ? Math.max(0, Math.min(index, kids.length))
+      : kids.length;
+    const next = [...kids.slice(0, safe), newNode, ...kids.slice(safe)];
+    return { ...parent, children: next };
+  });
+}
+
 // Breakpoint-scoped write. Writes into cls.breakpoints[bp][prop]. The
 // 'desktop' breakpoint is a no-op here because the CSS compiler treats
 // breakpoints.desktop as an ignored shim — callers should route

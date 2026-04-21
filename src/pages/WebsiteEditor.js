@@ -24,9 +24,12 @@ import {
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
   setNodeTag, setNodeAttribute, renameNodeAttribute,
+  insertNode,
 } from './WebsiteEditor.mutations';
+import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import StylePanel from './WebsiteEditor.style';
 import SettingsPanel from './WebsiteEditor.settings';
+import AddPanel from './WebsiteEditor.add';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -770,6 +773,18 @@ export default function WebsiteEditor() {
     setContent((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
   }, [selectedId, pageKey]);
 
+  // Insert a block from the Add panel. For this MVP we always append
+  // to the page root; drag-to-precise-position lands in Phase 7b.
+  // Selecting the freshly inserted node is a small UX win — it puts
+  // the Inspector on the new element so users can style immediately.
+  const handleInsertBlock = useCallback((blockKey) => {
+    const entry = BLOCK_CATALOGUE.find((b) => b.key === blockKey);
+    if (!entry) return;
+    const newNode = entry.create();
+    setContent((c) => insertNode(c, pageKey, null, newNode));
+    setSelectedId(newNode.id);
+  }, [pageKey]);
+
   // Keyboard — spec § 2. Selection-only moves ship here; mutation
   // shortcuts (Cmd+D duplicate, Delete, Cmd+Shift+D reset) land with
   // the write pipeline in Phase 3.
@@ -823,7 +838,9 @@ export default function WebsiteEditor() {
       />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <LeftRail active={railActive} onChange={setRailActive} />
-        <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />
+        {railActive === 'add'
+          ? <AddPanel onInsert={handleInsertBlock} />
+          : <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />}
         <Canvas
           tree={tree}
           classes={classes}
