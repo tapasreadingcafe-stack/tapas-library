@@ -29,9 +29,11 @@ import {
   cloneWithFreshIds, siblingOf,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
+import { ANIM_CSS } from './WebsiteEditor.anim';
 import StylePanel from './WebsiteEditor.style';
 import SettingsPanel from './WebsiteEditor.settings';
 import AddPanel from './WebsiteEditor.add';
+import InteractionsPanel from './WebsiteEditor.interactions';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -340,6 +342,42 @@ function Canvas({
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
   const surfaceRef = useRef(null);
 
+  // Phase-8 runtime. For every element with data-tapas-anim:
+  //   - mirror its timing data-* attributes into CSS variables so
+  //     the ANIM_CSS var() lookups resolve;
+  //   - observe the element; when it intersects the viewport, flip
+  //     data-tapas-anim-in which triggers the keyframe animation.
+  //
+  // Re-runs on every tree change so newly added / reconfigured nodes
+  // are picked up. Hover effects are pure CSS and need no JS hookup.
+  useEffect(() => {
+    if (!surfaceRef.current) return;
+    const surface = surfaceRef.current;
+    const els = surface.querySelectorAll('[data-tapas-anim]');
+    els.forEach((el) => {
+      const setVar = (attr, cssVar) => {
+        const v = el.getAttribute(attr);
+        if (v) el.style.setProperty(cssVar, v);
+        else el.style.removeProperty(cssVar);
+      };
+      setVar('data-tapas-anim-duration', '--tapas-anim-duration');
+      setVar('data-tapas-anim-delay',    '--tapas-anim-delay');
+      setVar('data-tapas-anim-easing',   '--tapas-anim-easing');
+    });
+
+    if (typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          // Sticky — fires once and stays, matching Webflow's default.
+          e.target.setAttribute('data-tapas-anim-in', '');
+        }
+      }
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [tree]);
+
   // Walk from the event target up to the nearest node element, then
   // classify the cursor's vertical band into before / after / inside.
   // Returns null if the cursor isn't over any node (drop falls back
@@ -463,7 +501,7 @@ function Canvas({
           transition: 'width 0.15s ease',
           position: 'relative',
         }}>
-          <style>{cssText}</style>
+          <style>{ANIM_CSS}{cssText}</style>
           <CanvasSelectionShell
             tree={tree}
             selectedId={selectedId}
@@ -763,9 +801,10 @@ function RightPanel({
           />
         )}
         {tab === 'interactions' && (
-          <div style={{ padding: '14px 12px', color: W.textDim, fontSize: '11px', lineHeight: 1.6 }}>
-            Trigger + timeline editor lands in <b style={{ color: W.text }}>Phase 8</b>.
-          </div>
+          <InteractionsPanel
+            node={selectedNode}
+            onSetAttribute={onSetAttribute}
+          />
         )}
       </div>
     </div>
