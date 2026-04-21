@@ -833,45 +833,72 @@ function Borders({ styles, onSet }) {
 }
 
 // ---------------------------------------------------------------------
-// Effects (spec § 3.10, MVP) — opacity, box-shadow, transform, transition
-// Multi-layer shadow / filters / 3D transforms land in Phase 4b.
+// Effects (spec § 3.10) — Phase 4b expansion
+// Ships: multi-layer box-shadow, multi-layer text-shadow, filter,
+// backdrop-filter, transform (translate/rotate/scale/skew), transition,
+// mix-blend-mode, cursor. Gradients + multi-layer bg still deferred.
 // ---------------------------------------------------------------------
-//
-// Box-shadow is stored as a single composed string in the base CSS
-// property. We parse it back into its 5 parts so the form can edit
-// each independently, then recompose on write.
-function parseShadow(s) {
-  if (!s) return { x: '', y: '', blur: '', spread: '', color: '', inset: false };
-  const inset = /\binset\b/.test(s);
-  const body = s.replace(/\binset\b/, '').trim();
-  // Color is either #hex, rgb(…), rgba(…), hsl(…), hsla(…), or a named color.
+
+// Split a CSS property value at TOP-LEVEL commas only. Needed because
+// background-image / box-shadow / etc. use commas as layer separators
+// but may also contain commas inside rgba(…) or gradient stops.
+function splitTopLevelCommas(s) {
+  if (!s) return [];
+  const out = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    else if (c === ',' && depth === 0) {
+      out.push(s.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  const tail = s.slice(start).trim();
+  if (tail) out.push(tail);
+  return out;
+}
+
+// Parse ONE shadow layer — used for both box-shadow and text-shadow.
+// kind: 'box' or 'text'. text-shadow has no spread or inset.
+function parseShadowLayer(s, kind = 'box') {
+  const empty = { x: '', y: '', blur: '', spread: '', color: '', inset: false };
+  if (!s) return empty;
+  const inset = kind === 'box' ? /\binset\b/.test(s) : false;
+  const body = (kind === 'box' ? s.replace(/\binset\b/, '') : s).trim();
   const colorMatch = body.match(/(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))/);
   const color = colorMatch ? colorMatch[0] : '';
-  const rest = (colorMatch ? body.replace(colorMatch[0], '') : body).trim().split(/\s+/);
-  return {
-    x:      rest[0] || '',
-    y:      rest[1] || '',
-    blur:   rest[2] || '',
-    spread: rest[3] || '',
-    color,
-    inset,
-  };
+  const rest = (colorMatch ? body.replace(colorMatch[0], '') : body).trim().split(/\s+/).filter(Boolean);
+  if (kind === 'box') {
+    return { x: rest[0] || '', y: rest[1] || '', blur: rest[2] || '', spread: rest[3] || '', color, inset };
+  }
+  return { x: rest[0] || '', y: rest[1] || '', blur: rest[2] || '', spread: '', color, inset: false };
 }
-function composeShadow({ x, y, blur, spread, color, inset }) {
+
+function composeShadowLayer({ x, y, blur, spread, color, inset }, kind = 'box') {
   const parts = [];
-  if (inset) parts.push('inset');
+  if (kind === 'box' && inset) parts.push('inset');
+  const hasAny = x || y || blur || spread || color;
+  if (!hasAny) return '';
   parts.push(x || '0', y || '0');
   if (blur || spread) parts.push(blur || '0');
-  if (spread) parts.push(spread);
+  if (kind === 'box' && spread) parts.push(spread);
   if (color) parts.push(color);
-  if (!x && !y && !blur && !spread && !color) return '';
   return parts.join(' ');
 }
 
-// Transform is similarly composed. We only support translate X/Y and
-// rotate in this MVP; scale / skew / 3D belong in Phase 4b.
+function parseShadowLayers(s, kind = 'box') {
+  return splitTopLevelCommas(s).map((p) => parseShadowLayer(p, kind)).filter((l) => l.x || l.y || l.blur || l.spread || l.color);
+}
+function composeShadowLayers(layers, kind = 'box') {
+  return layers.map((l) => composeShadowLayer(l, kind)).filter(Boolean).join(', ');
+}
+
+// Transform: now supports translate (X,Y), rotate, scale (X,Y), skew (X,Y).
+// 3D variants (translate3d, rotate3d, perspective) stay deferred.
 function parseTransform(s) {
-  const out = { tx: '', ty: '', rot: '' };
+  const out = { tx: '', ty: '', rot: '', sx: '', sy: '', kx: '', ky: '' };
   if (!s) return out;
   const tr = /translate(?:X|3d)?\(([^)]+)\)/.exec(s);
   if (tr) {
@@ -881,66 +908,243 @@ function parseTransform(s) {
   }
   const ro = /rotate\(([^)]+)\)/.exec(s);
   if (ro) out.rot = ro[1].trim();
+  const sc = /scale\(([^)]+)\)/.exec(s);
+  if (sc) {
+    const parts = sc[1].split(',').map((p) => p.trim());
+    out.sx = parts[0] || '';
+    out.sy = parts[1] || parts[0] || '';
+  }
+  const sk = /skew\(([^)]+)\)/.exec(s);
+  if (sk) {
+    const parts = sk[1].split(',').map((p) => p.trim());
+    out.kx = parts[0] || '';
+    out.ky = parts[1] || '';
+  }
   return out;
 }
-function composeTransform({ tx, ty, rot }) {
+function composeTransform({ tx, ty, rot, sx, sy, kx, ky }) {
   const parts = [];
   if (tx || ty) parts.push(`translate(${tx || '0'}, ${ty || '0'})`);
   if (rot) parts.push(`rotate(${rot})`);
+  if (sx || sy) parts.push(`scale(${sx || '1'}${sy ? `, ${sy}` : ''})`);
+  if (kx || ky) parts.push(`skew(${kx || '0'}, ${ky || '0'})`);
   return parts.join(' ');
 }
 
+// Filter chain: blur(), brightness(), contrast(), saturate(), hue-rotate().
+const FILTER_KEYS = ['blur', 'brightness', 'contrast', 'saturate', 'hue-rotate'];
+function parseFilters(s) {
+  const out = { blur: '', brightness: '', contrast: '', saturate: '', 'hue-rotate': '' };
+  if (!s) return out;
+  for (const k of FILTER_KEYS) {
+    const re = new RegExp(`${k}\\(([^)]+)\\)`);
+    const m = re.exec(s);
+    if (m) out[k] = m[1].trim();
+  }
+  return out;
+}
+function composeFilters(obj) {
+  const parts = [];
+  for (const k of FILTER_KEYS) {
+    const v = obj[k];
+    if (v && v !== '0' && v !== '0px' && v !== '100%' && v !== '1' && v !== '0deg') {
+      parts.push(`${k}(${v})`);
+    }
+  }
+  return parts.join(' ');
+}
+
+// One shadow layer card. Used by both box-shadow and text-shadow
+// sections via the `kind` prop.
+function ShadowLayerCard({ layer, kind, onChange, onRemove }) {
+  const set = (patch) => onChange({ ...layer, ...patch });
+  return (
+    <div style={{
+      padding: '6px 8px', marginBottom: '6px',
+      background: '#1e1e1e', border: `1px solid ${W.inputBorder}`,
+      borderRadius: '3px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <span style={{ color: W.textFaint, fontSize: '10px', fontFamily: 'ui-monospace, monospace' }}>
+          {composeShadowLayer(layer, kind) || '(empty)'}
+        </span>
+        <button
+          onClick={onRemove}
+          title="Remove layer"
+          style={{
+            width: '18px', height: '18px', padding: 0,
+            background: 'transparent', color: W.textDim,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '11px',
+          }}
+        >×</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '4px' }}>
+        <DimensionInput value={layer.x} onChange={(v) => set({ x: v })} placeholder="X" />
+        <DimensionInput value={layer.y} onChange={(v) => set({ y: v })} placeholder="Y" />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: kind === 'box' ? '1fr 1fr' : '1fr', gap: '4px', marginBottom: '4px' }}>
+        <DimensionInput value={layer.blur} onChange={(v) => set({ blur: v })} placeholder="Blur" />
+        {kind === 'box' && (
+          <DimensionInput value={layer.spread} onChange={(v) => set({ spread: v })} placeholder="Spread" />
+        )}
+      </div>
+      <div style={{ marginBottom: kind === 'box' ? '4px' : 0 }}>
+        <ColorInput value={layer.color} onChange={(v) => set({ color: v })} />
+      </div>
+      {kind === 'box' && (
+        <SegButtons
+          value={layer.inset ? 'on' : 'off'}
+          onChange={(v) => set({ inset: v === 'on' })}
+          options={[
+            { label: 'Outer', value: 'off' },
+            { label: 'Inset', value: 'on' },
+          ]}
+        />
+      )}
+    </div>
+  );
+}
+
+// Multi-layer shadow editor. `cssProp` is 'box-shadow' or 'text-shadow'.
+function ShadowStack({ cssProp, kind, value, onSet }) {
+  const layers = parseShadowLayers(value || '', kind);
+  const commit = (next) => onSet(cssProp, composeShadowLayers(next, kind));
+  const addLayer = () => {
+    const defaultLayer = kind === 'box'
+      ? { x: '0', y: '2px', blur: '4px', spread: '', color: 'rgba(0,0,0,0.12)', inset: false }
+      : { x: '0', y: '1px', blur: '2px', spread: '', color: 'rgba(0,0,0,0.3)', inset: false };
+    commit([...layers, defaultLayer]);
+  };
+  return (
+    <div style={{ padding: '4px 12px' }}>
+      {layers.length === 0 && (
+        <div style={{ color: W.textFaint, fontSize: '11px', padding: '4px 0' }}>
+          No layers.
+        </div>
+      )}
+      {layers.map((layer, i) => (
+        <ShadowLayerCard
+          key={i}
+          layer={layer}
+          kind={kind}
+          onChange={(nl) => {
+            const next = [...layers];
+            next[i] = nl;
+            commit(next);
+          }}
+          onRemove={() => {
+            const next = layers.filter((_, j) => j !== i);
+            commit(next);
+          }}
+        />
+      ))}
+      <button
+        onClick={addLayer}
+        style={{
+          width: '100%', height: '24px',
+          background: W.accentDim, color: W.accent,
+          border: `1px dashed ${W.accent}`, borderRadius: '3px',
+          cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+        }}
+      >+ Add layer</button>
+    </div>
+  );
+}
+
+// Filter slider row. Unit-aware DimensionInput, same ArrowUp/Down nudging.
+function FilterChain({ property, value, onSet }) {
+  const parsed = parseFilters(value || '');
+  const commit = (patch) => {
+    const next = composeFilters({ ...parsed, ...patch });
+    onSet(property, next);
+  };
+  return (
+    <>
+      <Field label="Blur">
+        <DimensionInput value={parsed.blur} onChange={(v) => commit({ blur: v })} placeholder="0" />
+      </Field>
+      <Field label="Bright">
+        <DimensionInput value={parsed.brightness} onChange={(v) => commit({ brightness: v })} placeholder="100%" />
+      </Field>
+      <Field label="Contrast">
+        <DimensionInput value={parsed.contrast} onChange={(v) => commit({ contrast: v })} placeholder="100%" />
+      </Field>
+      <Field label="Saturate">
+        <DimensionInput value={parsed.saturate} onChange={(v) => commit({ saturate: v })} placeholder="100%" />
+      </Field>
+      <Field label="Hue">
+        <DimensionInput value={parsed['hue-rotate']} onChange={(v) => commit({ 'hue-rotate': v })} placeholder="0deg" />
+      </Field>
+    </>
+  );
+}
+
+// Sub-header inside Effects — visual break between shadow / transform / etc.
+function SubHead({ text }) {
+  return (
+    <div style={{
+      padding: '8px 12px 4px',
+      color: W.textFaint, fontSize: '10px', fontWeight: 700,
+      letterSpacing: '0.05em', textTransform: 'uppercase',
+      borderTop: `1px solid ${W.panelBorder}`,
+      marginTop: '4px',
+    }}>{text}</div>
+  );
+}
+
+const BLEND_MODES = [
+  'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
+  'color-dodge', 'color-burn', 'hard-light', 'soft-light',
+  'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
+];
+const CURSOR_VALUES = [
+  'auto', 'default', 'pointer', 'text', 'move', 'grab', 'grabbing',
+  'not-allowed', 'wait', 'help', 'crosshair', 'zoom-in', 'zoom-out',
+  'col-resize', 'row-resize', 'nesw-resize', 'nwse-resize',
+];
+
 function Effects({ styles, onSet }) {
-  const shadow = parseShadow(styles['box-shadow'] || '');
-  const setShadow = (patch) => {
-    const next = composeShadow({ ...shadow, ...patch });
-    onSet('box-shadow', next);
-  };
   const xform = parseTransform(styles.transform || '');
-  const setXform = (patch) => {
-    const next = composeTransform({ ...xform, ...patch });
-    onSet('transform', next);
-  };
+  const setXform = (patch) => onSet('transform', composeTransform({ ...xform, ...patch }));
+
   return (
     <div style={{ padding: '4px 0' }}>
       <Field label="Opacity">
         <DimensionInput value={styles.opacity || ''} onChange={(v) => onSet('opacity', v)} placeholder="1" />
       </Field>
 
-      {/* Shadow */}
-      <div style={{ padding: '6px 12px', color: W.textFaint, fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-        Shadow
-      </div>
-      <Field label="Offset">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-          <DimensionInput value={shadow.x} onChange={(v) => setShadow({ x: v })} placeholder="X" />
-          <DimensionInput value={shadow.y} onChange={(v) => setShadow({ y: v })} placeholder="Y" />
-        </div>
-      </Field>
-      <Field label="Blur">
-        <DimensionInput value={shadow.blur} onChange={(v) => setShadow({ blur: v })} placeholder="0" />
-      </Field>
-      <Field label="Spread">
-        <DimensionInput value={shadow.spread} onChange={(v) => setShadow({ spread: v })} placeholder="0" />
-      </Field>
-      <Field label="Color">
-        <ColorInput value={shadow.color} onChange={(v) => setShadow({ color: v })} />
-      </Field>
-      <Field label="Inset">
-        <SegButtons
-          value={shadow.inset ? 'on' : 'off'}
-          onChange={(v) => setShadow({ inset: v === 'on' })}
-          options={[
-            { label: 'Off', value: 'off' },
-            { label: 'On',  value: 'on' },
-          ]}
-        />
-      </Field>
+      <SubHead text="Box shadow" />
+      <ShadowStack
+        cssProp="box-shadow"
+        kind="box"
+        value={styles['box-shadow'] || ''}
+        onSet={onSet}
+      />
 
-      {/* Transform */}
-      <div style={{ padding: '6px 12px', color: W.textFaint, fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-        Transform
-      </div>
+      <SubHead text="Text shadow" />
+      <ShadowStack
+        cssProp="text-shadow"
+        kind="text"
+        value={styles['text-shadow'] || ''}
+        onSet={onSet}
+      />
+
+      <SubHead text="Filter" />
+      <FilterChain
+        property="filter"
+        value={styles.filter || ''}
+        onSet={onSet}
+      />
+
+      <SubHead text="Backdrop filter" />
+      <FilterChain
+        property="backdrop-filter"
+        value={styles['backdrop-filter'] || ''}
+        onSet={onSet}
+      />
+
+      <SubHead text="Transform" />
       <Field label="Translate">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
           <DimensionInput value={xform.tx} onChange={(v) => setXform({ tx: v })} placeholder="X" />
@@ -950,11 +1154,20 @@ function Effects({ styles, onSet }) {
       <Field label="Rotate">
         <DimensionInput value={xform.rot} onChange={(v) => setXform({ rot: v })} placeholder="0deg" />
       </Field>
+      <Field label="Scale">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput value={xform.sx} onChange={(v) => setXform({ sx: v })} placeholder="X" />
+          <DimensionInput value={xform.sy} onChange={(v) => setXform({ sy: v })} placeholder="Y" />
+        </div>
+      </Field>
+      <Field label="Skew">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput value={xform.kx} onChange={(v) => setXform({ kx: v })} placeholder="X" />
+          <DimensionInput value={xform.ky} onChange={(v) => setXform({ ky: v })} placeholder="Y" />
+        </div>
+      </Field>
 
-      {/* Transition */}
-      <div style={{ padding: '6px 12px', color: W.textFaint, fontSize: '10px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-        Transition
-      </div>
+      <SubHead text="Transition" />
       <Field label="Property">
         <TextInput
           value={styles['transition-property'] || ''}
@@ -987,6 +1200,42 @@ function Effects({ styles, onSet }) {
           <option value="ease-out">ease-out</option>
           <option value="ease-in-out">ease-in-out</option>
           <option value="cubic-bezier(0.4, 0, 0.2, 1)">standard</option>
+        </select>
+      </Field>
+
+      <SubHead text="Misc" />
+      <Field label="Blend">
+        <select
+          value={styles['mix-blend-mode'] || ''}
+          onChange={(e) => onSet('mix-blend-mode', e.target.value)}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          <option value="">normal</option>
+          {BLEND_MODES.filter((m) => m !== 'normal').map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Cursor">
+        <select
+          value={styles.cursor || ''}
+          onChange={(e) => onSet('cursor', e.target.value)}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          <option value="">inherit</option>
+          {CURSOR_VALUES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
         </select>
       </Field>
     </div>
