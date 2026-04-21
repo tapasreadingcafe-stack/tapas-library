@@ -24,7 +24,8 @@ import {
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
   setNodeTag, setNodeAttribute, renameNodeAttribute,
-  insertNode,
+  insertNode, duplicateNode, removeNode, insertNodeAfter,
+  cloneWithFreshIds, siblingOf,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import StylePanel from './WebsiteEditor.style';
@@ -656,6 +657,14 @@ export default function WebsiteEditor() {
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
 
+  // Undo/redo history. Snapshot-based, capped at 50 entries each way.
+  // Autosave still observes content changes identically — undoing just
+  // flips content to a prior snapshot and the next debounced save
+  // persists it. No server-side history; this is purely client-local.
+  const historyRef = useRef({ past: [], future: [] });
+  const HISTORY_CAP = 50;
+  const clipboardRef = useRef(null);   // last Cmd+C'd node subtree
+
   useEffect(() => {
     (async () => {
       setLoading(true); setError('');
@@ -724,18 +733,64 @@ export default function WebsiteEditor() {
   const primaryClass = selectedNode?.classes?.[0] || null;
   const classDef = primaryClass ? classes[primaryClass] : null;
 
+  // Core edit wrapper. Every user-initiated mutation flows through
+  // here so the history stack stays honest. updater: content → content.
+  // If the updater is a no-op (returns the same reference or an equal
+  // blob) we skip the history push to avoid dead entries.
+  const applyEdit = useCallback((updater) => {
+    setContent((prev) => {
+      if (!prev) return prev;
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (!next || next === prev) return prev;
+      const past = historyRef.current.past;
+      historyRef.current = {
+        past: [...past, prev].slice(-HISTORY_CAP),
+        future: [], // any new edit invalidates redo stack
+      };
+      return next;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (past.length === 0) return;
+    setContent((prev) => {
+      if (!prev) return prev;
+      const last = past[past.length - 1];
+      historyRef.current = {
+        past: past.slice(0, -1),
+        future: [prev, ...future].slice(0, HISTORY_CAP),
+      };
+      return last;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (future.length === 0) return;
+    setContent((prev) => {
+      if (!prev) return prev;
+      const first = future[0];
+      historyRef.current = {
+        past: [...past, prev].slice(-HISTORY_CAP),
+        future: future.slice(1),
+      };
+      return first;
+    });
+  }, []);
+
   const handleCreateClass = useCallback(() => {
     if (!selectedId) return;
-    setContent((c) => {
+    applyEdit((c) => {
       const { content: next } = ensureNodeClass(c, pageKey, selectedId);
       return next;
     });
-  }, [selectedId, pageKey]);
+  }, [selectedId, pageKey, applyEdit]);
 
   const handleRenameClass = useCallback((newName) => {
     if (!primaryClass || !newName) return;
-    setContent((c) => renameClass(c, primaryClass, newName));
-  }, [primaryClass]);
+    applyEdit((c) => renameClass(c, primaryClass, newName));
+  }, [primaryClass, applyEdit]);
 
   // onSet from Layout/Spacing: routes the CSS property/value through
   // the class-only pipeline. Auto-creates a class on the selected node
@@ -748,7 +803,7 @@ export default function WebsiteEditor() {
   // back to 'base' when device is non-desktop so this branch is safe.
   const handleSetStyle = useCallback((prop, value) => {
     if (!selectedId) return;
-    setContent((c) => {
+    applyEdit((c) => {
       const { content: withClass, className } = ensureNodeClass(c, pageKey, selectedId);
       if (!className) return c;
       if (device === 'desktop') {
@@ -756,22 +811,22 @@ export default function WebsiteEditor() {
       }
       return setClassBreakpointStyle(withClass, className, device, prop, value);
     });
-  }, [selectedId, pageKey, styleState, device]);
+  }, [selectedId, pageKey, styleState, device, applyEdit]);
 
   const handleSetTag = useCallback((tag) => {
     if (!selectedId) return;
-    setContent((c) => setNodeTag(c, pageKey, selectedId, tag));
-  }, [selectedId, pageKey]);
+    applyEdit((c) => setNodeTag(c, pageKey, selectedId, tag));
+  }, [selectedId, pageKey, applyEdit]);
 
   const handleSetAttribute = useCallback((key, value) => {
     if (!selectedId) return;
-    setContent((c) => setNodeAttribute(c, pageKey, selectedId, key, value));
-  }, [selectedId, pageKey]);
+    applyEdit((c) => setNodeAttribute(c, pageKey, selectedId, key, value));
+  }, [selectedId, pageKey, applyEdit]);
 
   const handleRenameAttribute = useCallback((oldKey, newKey) => {
     if (!selectedId) return;
-    setContent((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
-  }, [selectedId, pageKey]);
+    applyEdit((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
+  }, [selectedId, pageKey, applyEdit]);
 
   // Insert a block from the Add panel. For this MVP we always append
   // to the page root; drag-to-precise-position lands in Phase 7b.
@@ -781,39 +836,143 @@ export default function WebsiteEditor() {
     const entry = BLOCK_CATALOGUE.find((b) => b.key === blockKey);
     if (!entry) return;
     const newNode = entry.create();
-    setContent((c) => insertNode(c, pageKey, null, newNode));
+    applyEdit((c) => insertNode(c, pageKey, null, newNode));
     setSelectedId(newNode.id);
-  }, [pageKey]);
+  }, [pageKey, applyEdit]);
 
-  // Keyboard — spec § 2. Selection-only moves ship here; mutation
-  // shortcuts (Cmd+D duplicate, Delete, Cmd+Shift+D reset) land with
-  // the write pipeline in Phase 3.
+  // --- Phase 9 mutation handlers (duplicate / remove / paste) ---------
+  const handleDuplicate = useCallback(() => {
+    if (!selectedId || !tree || selectedId === tree.id) return;
+    let created = null;
+    applyEdit((c) => {
+      const { content: next, newId } = duplicateNode(c, pageKey, selectedId);
+      if (newId) created = newId;
+      return next;
+    });
+    if (created) setSelectedId(created);
+  }, [selectedId, tree, pageKey, applyEdit]);
+
+  const handleDelete = useCallback(() => {
+    if (!selectedId || !tree || selectedId === tree.id) return;
+    let fallbackParent = null;
+    applyEdit((c) => {
+      const { content: next, parentId } = removeNode(c, pageKey, selectedId);
+      fallbackParent = parentId;
+      return next;
+    });
+    // Move selection to the parent so the Inspector has something to show.
+    setSelectedId(fallbackParent);
+  }, [selectedId, tree, pageKey, applyEdit]);
+
+  const handleCopy = useCallback(() => {
+    if (!selectedId || !tree) return;
+    const node = findNode(tree, selectedId);
+    if (!node) return;
+    // Deep-clone on capture so later edits to the live tree don't
+    // mutate the clipboard. Fresh IDs are minted at paste time.
+    clipboardRef.current = JSON.parse(JSON.stringify(node));
+  }, [selectedId, tree]);
+
+  const handlePaste = useCallback(() => {
+    const src = clipboardRef.current;
+    if (!src) return;
+    const fresh = cloneWithFreshIds(src);
+    let created = null;
+    applyEdit((c) => {
+      if (selectedId && tree && selectedId !== tree.id) {
+        // Paste as next sibling of the current selection.
+        const { content: next, newId } = insertNodeAfter(c, pageKey, selectedId, fresh);
+        if (newId) created = newId;
+        return next;
+      }
+      // Nothing selected (or root) → append to page root.
+      created = fresh.id;
+      return insertNode(c, pageKey, null, fresh);
+    });
+    if (created) setSelectedId(created);
+  }, [selectedId, tree, pageKey, applyEdit]);
+
+  // Keyboard — spec § 2 + § 10.
+  // Selection-only moves (Esc, Enter, Arrow keys, Tab) work without the
+  // meta key. Mutation shortcuts require Cmd/Ctrl:
+  //   Cmd+Z / Cmd+Shift+Z (or Cmd+Y) — undo / redo
+  //   Cmd+D — duplicate selected
+  //   Cmd+C / Cmd+V         — copy / paste element
+  //   Delete / Backspace    — remove selected
+  //
+  // Typing inside INPUT / TEXTAREA / contentEditable never hijacks —
+  // the Style panel and Settings forms own those keys. Undo/redo still
+  // fires inside inputs so Cmd+Z undoes the last tree edit even if
+  // the user's focus is in an input; browsers will swallow Cmd+Z for
+  // the input's own text history first, which is the right behavior.
   useEffect(() => {
     if (!tree) return;
+    const isTyping = (t) =>
+      t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+
     const onKey = (e) => {
-      // Don't hijack keys while the user is typing in an input.
-      const t = e.target;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
-        return;
+      const mod = e.metaKey || e.ctrlKey;
+
+      // Undo / redo — fires regardless of focus so keyboard still
+      // rescues users when they're editing inside the Inspector.
+      if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        undo(); e.preventDefault(); return;
       }
+      if (mod && ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')) {
+        redo(); e.preventDefault(); return;
+      }
+
+      // Everything else defers to input focus.
+      if (isTyping(e.target)) return;
       if (!selectedId) return;
-      if (e.key === 'Escape') {
-        const p = parentOf(tree, selectedId);
-        if (p) { setSelectedId(p.id); e.preventDefault(); }
-      } else if (e.key === 'Enter') {
-        const c = firstChildOf(tree, selectedId);
-        if (c) { setSelectedId(c.id); e.preventDefault(); }
-      } else if (e.key === 'ArrowUp') {
-        const p = prevInFlat(flat, selectedId);
-        if (p) { setSelectedId(p.id); e.preventDefault(); }
-      } else if (e.key === 'ArrowDown') {
-        const n = nextInFlat(flat, selectedId);
-        if (n) { setSelectedId(n.id); e.preventDefault(); }
+
+      // Selection moves (no meta key)
+      if (!mod) {
+        if (e.key === 'Escape') {
+          const p = parentOf(tree, selectedId);
+          if (p) { setSelectedId(p.id); e.preventDefault(); }
+          return;
+        }
+        if (e.key === 'Enter') {
+          const c = firstChildOf(tree, selectedId);
+          if (c) { setSelectedId(c.id); e.preventDefault(); }
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          const p = prevInFlat(flat, selectedId);
+          if (p) { setSelectedId(p.id); e.preventDefault(); }
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          const n = nextInFlat(flat, selectedId);
+          if (n) { setSelectedId(n.id); e.preventDefault(); }
+          return;
+        }
+        if (e.key === 'Tab') {
+          const dir = e.shiftKey ? 'prev' : 'next';
+          const sib = siblingOf(content, pageKey, selectedId, dir);
+          if (sib) { setSelectedId(sib.id); e.preventDefault(); }
+          return;
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          handleDelete(); e.preventDefault(); return;
+        }
+      }
+
+      // Mutation shortcuts (meta + letter)
+      if (mod && (e.key === 'd' || e.key === 'D')) {
+        handleDuplicate(); e.preventDefault(); return;
+      }
+      if (mod && (e.key === 'c' || e.key === 'C')) {
+        handleCopy(); e.preventDefault(); return;
+      }
+      if (mod && (e.key === 'v' || e.key === 'V')) {
+        handlePaste(); e.preventDefault(); return;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tree, flat, selectedId]);
+  }, [tree, flat, selectedId, content, pageKey, undo, redo, handleDelete, handleDuplicate, handleCopy, handlePaste]);
 
   if (loading) {
     return <div style={fullScreenMessage(W, 'Loading v2 content…')} />;

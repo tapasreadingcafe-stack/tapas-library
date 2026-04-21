@@ -188,6 +188,112 @@ export function newNodeId() {
   return 'n-' + Math.random().toString(36).slice(2, 10);
 }
 
+// Deep-clone a subtree, minting fresh ids everywhere. Attributes,
+// classes, textContent, tag are preserved — classes[] intentionally
+// stays as-is so duplicated elements share styling with the original.
+export function cloneWithFreshIds(node) {
+  if (!node) return null;
+  const next = { ...node, id: newNodeId() };
+  if (node.children && node.children.length) {
+    next.children = node.children.map(cloneWithFreshIds);
+  } else {
+    next.children = [];
+  }
+  return next;
+}
+
+// Locate a node's parent + index within that parent's children. Used
+// by duplicate / remove / insert-after without exposing the walker
+// to callers. Returns null if nodeId isn't reachable from the root.
+function locateWithParent(root, nodeId) {
+  if (!root) return null;
+  let hit = null;
+  const rec = (node) => {
+    if (hit) return;
+    const kids = node.children || [];
+    for (let i = 0; i < kids.length; i++) {
+      if (kids[i].id === nodeId) { hit = { parent: node, index: i, node: kids[i] }; return; }
+      rec(kids[i]);
+    }
+  };
+  rec(root);
+  return hit;
+}
+
+// Duplicate a node — clone with fresh ids, insert after the original
+// in its parent's children. Returns { content, newId } so the caller
+// can select the clone.
+export function duplicateNode(content, pageKey, nodeId) {
+  const page = content?.pages?.[pageKey];
+  if (!page) return { content, newId: null };
+  const loc = locateWithParent(page.tree, nodeId);
+  if (!loc) return { content, newId: null };
+  const clone = cloneWithFreshIds(loc.node);
+  const next = withNode(content, pageKey, loc.parent.id, (parent) => {
+    const kids = parent.children || [];
+    return {
+      ...parent,
+      children: [
+        ...kids.slice(0, loc.index + 1),
+        clone,
+        ...kids.slice(loc.index + 1),
+      ],
+    };
+  });
+  return { content: next, newId: clone.id };
+}
+
+// Insert a prepared node after an anchor node (same parent). Returns
+// { content, newId }. If afterId isn't reachable, no-op.
+export function insertNodeAfter(content, pageKey, afterId, newNode) {
+  const page = content?.pages?.[pageKey];
+  if (!page || !newNode) return { content, newId: null };
+  const loc = locateWithParent(page.tree, afterId);
+  if (!loc) return { content, newId: null };
+  const next = withNode(content, pageKey, loc.parent.id, (parent) => {
+    const kids = parent.children || [];
+    return {
+      ...parent,
+      children: [
+        ...kids.slice(0, loc.index + 1),
+        newNode,
+        ...kids.slice(loc.index + 1),
+      ],
+    };
+  });
+  return { content: next, newId: newNode.id };
+}
+
+// Remove a node from its parent's children. Refuses to remove the
+// page root because there's no parent to host the result. Returns
+// the new content plus the removed node's parent id so callers can
+// pick a sensible next selection.
+export function removeNode(content, pageKey, nodeId) {
+  const page = content?.pages?.[pageKey];
+  if (!page) return { content, parentId: null };
+  if (page.tree?.id === nodeId) return { content, parentId: null };
+  const loc = locateWithParent(page.tree, nodeId);
+  if (!loc) return { content, parentId: null };
+  const next = withNode(content, pageKey, loc.parent.id, (parent) => ({
+    ...parent,
+    children: (parent.children || []).filter((c) => c.id !== nodeId),
+  }));
+  return { content: next, parentId: loc.parent.id };
+}
+
+// Sibling lookup for Tab / Shift+Tab — returns the node just before
+// or after the current selection inside the same parent. Null if
+// there is no sibling in that direction.
+export function siblingOf(content, pageKey, nodeId, direction) {
+  const page = content?.pages?.[pageKey];
+  if (!page) return null;
+  const loc = locateWithParent(page.tree, nodeId);
+  if (!loc) return null;
+  const kids = loc.parent.children || [];
+  const target = direction === 'next' ? loc.index + 1 : loc.index - 1;
+  return kids[target] || null;
+}
+
 // Insert a node as a child of parentId at the given index (defaults to
 // end). Used by the Phase-7 Add panel. If parentId is null or not
 // found, inserts at the end of the page root.
