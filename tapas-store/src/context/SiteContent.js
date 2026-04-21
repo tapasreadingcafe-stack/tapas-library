@@ -214,7 +214,71 @@ const ANIMATION_CSS = `
 [data-tapas-hover="scale"]:hover { transform: scale(1.04); }
 [data-tapas-hover="glow"]:hover  { box-shadow: 0 0 0 3px rgba(99,102,241,0.35); }
 [data-tapas-hover="tilt"]:hover  { transform: perspective(600px) rotateX(4deg) rotateY(-4deg); }
+
+/* Navbar composite (Lane C1). Kept in sync with the staff-app's
+   WebsiteEditor.anim.js — the two apps can't easily share code, so
+   edits go in both places. The runtime-toggle logic is below in
+   wireNavbarToggles(). */
+[data-tapas-navbar] {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 22px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  position: relative;
+}
+[data-tapas-navbar] .tapas-navbar-brand { font-weight: 700; font-size: 18px; }
+[data-tapas-navbar] .tapas-navbar-menu {
+  display: flex; list-style: none; margin: 0 0 0 auto; padding: 0; gap: 24px;
+}
+[data-tapas-navbar] .tapas-navbar-menu > li { margin: 0; padding: 0; }
+[data-tapas-navbar] .tapas-navbar-link {
+  text-decoration: none; color: inherit; font-size: 14px; line-height: 1.4;
+}
+[data-tapas-navbar] .tapas-navbar-toggle {
+  display: none; margin-left: auto; background: transparent; border: 0;
+  font-size: 20px; line-height: 1; cursor: pointer; padding: 4px 8px; color: inherit;
+}
+@media (max-width: 767px) {
+  [data-tapas-navbar] { flex-wrap: wrap; }
+  [data-tapas-navbar] .tapas-navbar-toggle { display: block; }
+  [data-tapas-navbar] .tapas-navbar-menu {
+    display: none; width: 100%; flex-direction: column; order: 10;
+    margin-left: 0; padding-top: 8px; gap: 10px;
+  }
+  [data-tapas-navbar][data-tapas-navbar-open] .tapas-navbar-menu { display: flex; }
+}
 `;
+
+// Navbar hamburger toggle — attached once to document, delegates
+// click-events to find data-tapas-navbar-toggle → walk up to
+// data-tapas-navbar → flip data-tapas-navbar-open. Idempotent so
+// hot-reload in dev doesn't double-wire.
+let tapasNavbarWired = false;
+function wireNavbarToggles() {
+  if (tapasNavbarWired || typeof document === 'undefined') return;
+  tapasNavbarWired = true;
+  document.addEventListener('click', (e) => {
+    let tgl = e.target;
+    while (tgl && tgl !== document.body) {
+      if (tgl.hasAttribute?.('data-tapas-navbar-toggle')) break;
+      tgl = tgl.parentElement;
+    }
+    if (!tgl || tgl === document.body) return;
+    let nav = tgl.parentElement;
+    while (nav && nav !== document.body) {
+      if (nav.hasAttribute?.('data-tapas-navbar')) break;
+      nav = nav.parentElement;
+    }
+    if (!nav || nav === document.body) return;
+    if (nav.hasAttribute('data-tapas-navbar-open')) {
+      nav.removeAttribute('data-tapas-navbar-open');
+    } else {
+      nav.setAttribute('data-tapas-navbar-open', '');
+    }
+  });
+}
 
 let tapasAnimObserver = null;
 function applyElementAnimations(elementStyles, classes, elementClasses) {
@@ -338,6 +402,8 @@ function applyTheme(content) {
   applyElementStyles(content?.element_styles, content?.classes, content?.element_classes);
   // Phase 5: wire up scroll-in + hover animations.
   applyElementAnimations(content?.element_styles, content?.classes, content?.element_classes);
+  // Lane C1: one-shot delegate for navbar hamburger toggles.
+  wireNavbarToggles();
 }
 
 // Load any Google Fonts the user has picked that aren't already loaded.

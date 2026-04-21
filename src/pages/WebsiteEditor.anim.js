@@ -111,6 +111,66 @@ export const ANIM_CSS = `
 [data-tapas-load-anim="slide-left"]  { --tapas-load-name: tapas-slide-left  }
 [data-tapas-load-anim="slide-right"] { --tapas-load-name: tapas-slide-right }
 [data-tapas-load-anim="zoom"]        { --tapas-load-name: tapas-zoom        }
+
+/* Navbar composite (Lane C1). Styling is intentionally minimal —
+   users layer their own classes on top via the Style panel. These
+   rules only solve what the class system can't express: the
+   responsive-toggle relationship between the hamburger button and
+   the menu list at narrow viewports. */
+[data-tapas-navbar] {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 22px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  position: relative;
+}
+[data-tapas-navbar] .tapas-navbar-brand {
+  font-weight: 700;
+  font-size: 18px;
+}
+[data-tapas-navbar] .tapas-navbar-menu {
+  display: flex;
+  list-style: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  gap: 24px;
+}
+[data-tapas-navbar] .tapas-navbar-menu > li { margin: 0; padding: 0; }
+[data-tapas-navbar] .tapas-navbar-link {
+  text-decoration: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+[data-tapas-navbar] .tapas-navbar-toggle {
+  display: none;
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  color: inherit;
+}
+@media (max-width: 767px) {
+  [data-tapas-navbar] { flex-wrap: wrap; }
+  [data-tapas-navbar] .tapas-navbar-toggle { display: block; }
+  [data-tapas-navbar] .tapas-navbar-menu {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    order: 10;
+    margin-left: 0;
+    padding-top: 8px;
+    gap: 10px;
+  }
+  [data-tapas-navbar][data-tapas-navbar-open] .tapas-navbar-menu {
+    display: flex;
+  }
+}
 `;
 
 // Used by InteractionsPanel's dropdowns and Canvas's observer.

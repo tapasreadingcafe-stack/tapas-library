@@ -426,6 +426,32 @@ function Canvas({
       setVar('data-tapas-click-easing',   '--tapas-click-easing');
     });
     const onSurfaceClick = (e) => {
+      // Navbar toggle: walk up looking for data-tapas-navbar-toggle,
+      // then walk up once more to the nav root and flip the open
+      // attribute. Runs before the click-anim branch so the hamburger
+      // can also carry a click animation without one canceling the
+      // other.
+      let tgl = e.target;
+      while (tgl && tgl !== surface) {
+        if (tgl.hasAttribute?.('data-tapas-navbar-toggle')) break;
+        tgl = tgl.parentElement;
+      }
+      if (tgl && tgl !== surface) {
+        let nav = tgl.parentElement;
+        while (nav && nav !== surface) {
+          if (nav.hasAttribute?.('data-tapas-navbar')) break;
+          nav = nav.parentElement;
+        }
+        if (nav && nav !== surface) {
+          if (nav.hasAttribute('data-tapas-navbar-open')) {
+            nav.removeAttribute('data-tapas-navbar-open');
+          } else {
+            nav.setAttribute('data-tapas-navbar-open', '');
+          }
+        }
+      }
+
+      // Click-anim branch.
       let el = e.target;
       while (el && el !== surface) {
         if (el.hasAttribute?.('data-tapas-click-anim')) break;

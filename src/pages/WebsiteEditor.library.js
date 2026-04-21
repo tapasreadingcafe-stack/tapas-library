@@ -275,6 +275,41 @@ const Tabs = () => {
   });
 };
 
+// Navbar — responsive header with brand, menu, and a hamburger that
+// reveals the menu on narrow viewports. data-tapas-navbar marks the
+// root so the shared runtime can find it; data-tapas-navbar-toggle
+// marks the hamburger button; the toggle's click flips
+// data-tapas-navbar-open on the root, which CSS uses to show the menu
+// below the breakpoint. Desktop stays inline/unchanged.
+const Navbar = () => n('nav', {
+  classes: ['tapas-navbar'],
+  attributes: { 'data-tapas-navbar': '' },
+  children: [
+    n('div', {
+      classes: ['tapas-navbar-brand'],
+      textContent: 'Brand',
+    }),
+    n('button', {
+      classes: ['tapas-navbar-toggle'],
+      attributes: {
+        type: 'button',
+        'data-tapas-navbar-toggle': '',
+        'aria-label': 'Toggle menu',
+      },
+      textContent: '☰',
+    }),
+    n('ul', {
+      classes: ['tapas-navbar-menu'],
+      children: [
+        n('li', { children: [n('a', { classes: ['tapas-navbar-link'], attributes: { href: '/' }, textContent: 'Home' })] }),
+        n('li', { children: [n('a', { classes: ['tapas-navbar-link'], attributes: { href: '/about' }, textContent: 'About' })] }),
+        n('li', { children: [n('a', { classes: ['tapas-navbar-link'], attributes: { href: '/shop' }, textContent: 'Shop' })] }),
+        n('li', { children: [n('a', { classes: ['tapas-navbar-link'], attributes: { href: '/contact' }, textContent: 'Contact' })] }),
+      ],
+    }),
+  ],
+});
+
 // Accordion — same <details> primitive without the shared `name`, so
 // any number of sections can be open at once. Dropdown / FAQ / spec
 // sheet all fit this pattern.
@@ -349,6 +384,7 @@ export const BLOCK_CATALOGUE = [
   { key: 'search',    group: 'Advanced', label: 'Search',       glyph: '⌕',   keywords: 'search input',                    create: Search    },
   { key: 'tabs',      group: 'Advanced', label: 'Tabs',         glyph: '▤',   keywords: 'tabs tabbed sections switch',     create: Tabs      },
   { key: 'accordion', group: 'Advanced', label: 'Accordion',    glyph: '≡',   keywords: 'accordion faq collapse expand dropdown', create: Accordion },
+  { key: 'navbar',    group: 'Advanced', label: 'Navbar',       glyph: '▭',   keywords: 'navbar nav menu header responsive hamburger', create: Navbar },
 ];
 
 // Used by AddPanel to render groups in a stable order.
