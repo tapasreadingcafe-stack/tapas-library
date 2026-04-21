@@ -62,6 +62,41 @@ export function useSiteContent() {
   return useContext(SiteContentCtx);
 }
 
+// ---------------------------------------------------------------------
+// Phase 10 cutover plumbing (flag-gated, v1 stays authoritative).
+//
+// Storefront can render a page two ways:
+//   v1 — composite blocks via <BlockView> (today's production path)
+//   v2 — primitive Node tree compiled from `store_content_v2`, with
+//        class CSS compiled on the fly.
+//
+// Which one wins is determined by the `content_system` row in
+// app_settings (string value 'v1' or 'v2'), overridable per-request
+// via a `?v2=1` or `?v2=0` URL parameter so QA can preview without
+// affecting anyone else.
+//
+// We load the flag + v2 blob in parallel with v1 so the flip is a
+// single DB value change — no code deploy needed.
+// ---------------------------------------------------------------------
+const V2_CTX_DEFAULT = { enabled: false, content: null, loaded: false };
+const V2ContentCtx = createContext(V2_CTX_DEFAULT);
+
+export function useV2Content() {
+  return useContext(V2ContentCtx);
+}
+
+// URL override: `?v2=1` forces the v2 path, `?v2=0` forces v1,
+// anything else falls through to the Supabase flag.
+function readV2UrlOverride() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('v2');
+    if (v === '1' || v === 'true') return true;
+    if (v === '0' || v === 'false') return false;
+  } catch {}
+  return null;
+}
+
 // Pages a user deleted are tracked in `_deleted_pages` on the content
 // blob so the deep-merge with DEFAULT_CONTENT doesn't resurrect them.
 // Strip them after every merge.
@@ -327,6 +362,11 @@ export function SiteContentProvider({ children }) {
   // so this is synchronous — no flash.
   const [content, setContent] = useState(() => loadFromCache() || DEFAULT_CONTENT);
 
+  // v2 cutover plumbing (see note above the V2ContentCtx definition).
+  // Stays false/null until Supabase responds — any consumer (PageRenderer)
+  // falls back to v1 while loaded === false.
+  const [v2, setV2] = useState(V2_CTX_DEFAULT);
+
   // Apply theme from whatever we have RIGHT NOW (cache or defaults).
   // This runs on first render, before any paint, so CSS variables
   // and fonts are in place before the browser draws anything.
@@ -421,9 +461,43 @@ export function SiteContentProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Parallel v2 load: the flag + the v2 content blob in one round-trip.
+  // URL override (?v2=1 / ?v2=0) takes precedence over the Supabase
+  // flag. Always loads the blob if the row exists so QA can preview
+  // even while the flag remains 'v1' for everyone else.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const urlOverride = readV2UrlOverride();
+      try {
+        const { data: rows } = await supabase
+          .from('app_settings')
+          .select('key, value')
+          .in('key', ['content_system', 'store_content_v2']);
+        if (!mounted) return;
+        const byKey = {};
+        for (const r of rows || []) byKey[r.key] = r.value;
+        const flagRaw = byKey.content_system;
+        const flag = (typeof flagRaw === 'string' ? flagRaw : flagRaw?.toString?.() || '').replace(/"/g, '');
+        const flagEnabled = flag === 'v2';
+        const enabled = urlOverride ?? flagEnabled;
+        const v2Content = byKey.store_content_v2 || null;
+        setV2({ enabled, content: v2Content, loaded: true });
+      } catch (err) {
+        // If we can't read the flag / blob, leave v2 disabled so the
+        // storefront serves the proven v1 path.
+        if (mounted) setV2({ enabled: false, content: null, loaded: true });
+        console.warn('[SiteContent] v2 load failed:', err?.message || err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <SiteContentCtx.Provider value={content}>
-      {children}
+      <V2ContentCtx.Provider value={v2}>
+        {children}
+      </V2ContentCtx.Provider>
     </SiteContentCtx.Provider>
   );
 }
