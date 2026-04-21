@@ -27,7 +27,8 @@ import {
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
-  createPage, updatePageMeta, deletePage,
+  createPage, updatePageMeta, deletePage, renamePage,
+  classUsageMap, deleteClass, deleteUnusedClasses,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
@@ -36,6 +37,8 @@ import SettingsPanel from './WebsiteEditor.settings';
 import AddPanel from './WebsiteEditor.add';
 import InteractionsPanel from './WebsiteEditor.interactions';
 import PagePanel from './WebsiteEditor.page';
+import PagesPanel from './WebsiteEditor.pages';
+import ClassBrowser from './WebsiteEditor.classes';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -68,7 +71,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, pages }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -159,6 +162,18 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.accent; e.currentTarget.style.color = W.accent; }}
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.topbarBorder; e.currentTarget.style.color = W.text; }}
         >+</button>
+        <button
+          onClick={onRenamePage}
+          title="Rename this page"
+          style={{
+            height: '26px', padding: '0 9px',
+            background: '#111', color: W.text,
+            border: `1px solid ${W.topbarBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '12px', lineHeight: 1,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.accent; e.currentTarget.style.color = W.accent; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.topbarBorder; e.currentTarget.style.color = W.text; }}
+        >✎</button>
         <button
           onClick={onDeletePage}
           disabled={page === 'home'}
@@ -1194,6 +1209,30 @@ export default function WebsiteEditor() {
     applyEdit((c) => updatePageMeta(c, pageKey, patch));
   }, [pageKey, applyEdit]);
 
+  // Lane G4 — class browser. Usage map re-derives on every content
+  // change; cheap (flat walk, same cost as compileClassesToCSS).
+  const usageMap = useMemo(() => classUsageMap(content), [content]);
+  const handleRenameClassByName = useCallback((oldName) => {
+    if (!oldName || typeof window === 'undefined') return;
+    const next = window.prompt(`Rename .${oldName} to:`, oldName);
+    if (!next || next === oldName) return;
+    if (!/^[a-zA-Z][\w-]*$/.test(next)) {
+      window.alert('Class name must start with a letter and contain only letters, digits, - and _.');
+      return;
+    }
+    applyEdit((c) => renameClass(c, oldName, next));
+  }, [applyEdit]);
+  const handleDeleteClass = useCallback((name) => {
+    if (!name) return;
+    applyEdit((c) => deleteClass(c, name));
+  }, [applyEdit]);
+  const handleCleanupClasses = useCallback(() => {
+    applyEdit((c) => {
+      const { content: nc } = deleteUnusedClasses(c);
+      return nc;
+    });
+  }, [applyEdit]);
+
   // Insert a block from the Add panel. For this MVP we always append
   // to the page root; drag-to-precise-position lands in Phase 7b.
   // Selecting the freshly inserted node is a small UX win — it puts
@@ -1232,21 +1271,45 @@ export default function WebsiteEditor() {
   // Create a brand-new v2 page from a user-supplied slug. Uses the
   // native prompt for MVP — a proper modal can land with Phase 10b
   // polish. Normalization and collision detection live in createPage().
+  // Rename a page's display name and slug. Defaults to the current
+  // page when no explicit key is passed (top-bar button flow). A
+  // live slug change invalidates inbound links — the prompt warns
+  // about that; a proper redirect-mapping flow can land later. The
+  // page's key stays the same so undo/redo history doesn't go stale.
+  const handleRenamePage = useCallback((key) => {
+    const targetKey = key || pageKey;
+    if (!targetKey || typeof window === 'undefined') return;
+    const page = content?.pages?.[targetKey];
+    if (!page) return;
+    const nextName = window.prompt('Display name:', page.name || '');
+    if (nextName === null) return; // cancel
+    const nextSlug = window.prompt(
+      'Slug (changing a live slug can break inbound links — add redirects separately):',
+      page.slug || '/'
+    );
+    if (nextSlug === null) return;
+    applyEdit((c) => renamePage(c, targetKey, { name: nextName, slug: nextSlug }));
+  }, [pageKey, content, applyEdit]);
+
   // Delete the current page. Refuses on 'home' (the mutation also
   // defends this invariant, but the UI disables the button anyway).
   // After delete, jump to home so the editor doesn't linger on a
   // now-missing pageKey.
-  const handleDeletePage = useCallback(() => {
-    if (!pageKey || pageKey === 'home') return;
+  const handleDeletePage = useCallback((key) => {
+    const targetKey = key || pageKey;
+    if (!targetKey || targetKey === 'home') return;
     if (typeof window === 'undefined') return;
     const ok = window.confirm(
       `Delete this page? Its tree and any styles unique to it will be removed from v2. Other v2 pages keep their class references intact; this is undoable with Cmd+Z.`
     );
     if (!ok) return;
-    applyEdit((c) => deletePage(c, pageKey));
-    setPageKey('home');
-    setSelectedId(null);
-    setEditingNodeId(null);
+    applyEdit((c) => deletePage(c, targetKey));
+    // Only move selection if we were editing the page we just deleted.
+    if (targetKey === pageKey) {
+      setPageKey('home');
+      setSelectedId(null);
+      setEditingNodeId(null);
+    }
   }, [pageKey, applyEdit]);
 
   const handleCreatePage = useCallback(() => {
@@ -1458,13 +1521,33 @@ export default function WebsiteEditor() {
         onPageChange={(k) => { setPageKey(k); setSelectedId(null); }}
         onCreatePage={handleCreatePage}
         onDeletePage={handleDeletePage}
+        onRenamePage={handleRenamePage}
         pages={pages}
       />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <LeftRail active={railActive} onChange={setRailActive} />
-        {railActive === 'add'
-          ? <AddPanel onInsert={handleInsertBlock} />
-          : <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />}
+        {railActive === 'add' ? (
+          <AddPanel onInsert={handleInsertBlock} />
+        ) : railActive === 'pages' ? (
+          <PagesPanel
+            pages={pages}
+            activeKey={pageKey}
+            onPick={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); }}
+            onCreate={handleCreatePage}
+            onRename={handleRenamePage}
+            onDelete={handleDeletePage}
+          />
+        ) : railActive === 'styleguide' ? (
+          <ClassBrowser
+            classes={classes}
+            usage={usageMap}
+            onRename={handleRenameClassByName}
+            onDelete={handleDeleteClass}
+            onCleanup={handleCleanupClasses}
+          />
+        ) : (
+          <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />
+        )}
         <Canvas
           tree={tree}
           classes={classes}

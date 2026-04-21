@@ -691,36 +691,205 @@ function Typography({ styles, onSet }) {
 }
 
 // ---------------------------------------------------------------------
-// Backgrounds (spec § 3.8, single-layer MVP)
-// Multi-layer gradient editor lands in Phase 4b — this form edits only
-// background-color + a single background-image URL + its sizing.
+// Backgrounds (spec § 3.8 + Lane D2 gradient editor + D3 multi-layer)
 // ---------------------------------------------------------------------
-function Backgrounds({ styles, onSet }) {
-  // Detect `url(...)` form so users see just the URL, not the wrapper.
-  const bgImageRaw = styles['background-image'] || '';
-  const m = /^url\((['"]?)(.*)\1\)$/.exec(bgImageRaw.trim());
-  const bgImageUrl = m ? m[2] : bgImageRaw;
-  const onBgImageChange = (v) => {
-    const trimmed = (v || '').trim();
-    if (!trimmed) onSet('background-image', '');
-    else if (/^(url\(|linear-gradient\(|radial-gradient\()/.test(trimmed)) {
-      onSet('background-image', trimmed);
-    } else onSet('background-image', `url("${trimmed}")`);
+// background-image is stored as a single comma-separated string. Each
+// top-level comma-separated chunk is one layer: either a url(…) image
+// or a linear-gradient(…). Radial / conic gradients pass through as
+// opaque strings (editor shows them but doesn't parse into fields).
+//
+// Color stays separate on background-color and stacks beneath every
+// image layer as the ultimate fallback — matching the CSS spec.
+
+function parseBackgroundLayers(s) {
+  return splitTopLevelCommas(s).map(parseBackgroundLayer).filter(Boolean);
+}
+function parseBackgroundLayer(raw) {
+  const s = raw.trim();
+  if (!s) return null;
+  const urlMatch = /^url\((['"]?)(.*)\1\)$/.exec(s);
+  if (urlMatch) return { type: 'image', url: urlMatch[2] };
+  if (/^linear-gradient\(/i.test(s)) {
+    const inner = s.replace(/^linear-gradient\(/i, '').replace(/\)$/, '');
+    // First part is (optionally) the angle if it ends with deg/turn/etc.
+    const parts = splitTopLevelCommas(inner);
+    let angle = '135deg';
+    let stops = parts;
+    if (parts.length && /^(-?\d*\.?\d+)(deg|turn|rad|grad)$/i.test(parts[0].trim())) {
+      angle = parts[0].trim();
+      stops = parts.slice(1);
+    } else if (parts.length && /^to\s/i.test(parts[0].trim())) {
+      angle = parts[0].trim();
+      stops = parts.slice(1);
+    }
+    const parsedStops = stops.map((p) => {
+      const m = /^(.+?)\s+(-?\d*\.?\d+(?:%|px))$/.exec(p.trim());
+      if (m) return { color: m[1].trim(), pos: m[2].trim() };
+      return { color: p.trim(), pos: '' };
+    });
+    return { type: 'gradient', angle, stops: parsedStops };
+  }
+  // Radial / conic / other — pass through unparsed. UI will show a
+  // read-only card with the raw string + a remove button.
+  return { type: 'raw', raw: s };
+}
+function composeBackgroundLayer(layer) {
+  if (!layer) return '';
+  if (layer.type === 'image') {
+    if (!layer.url) return '';
+    return `url("${layer.url}")`;
+  }
+  if (layer.type === 'gradient') {
+    const stops = (layer.stops || []).map((s) => {
+      if (!s.color) return '';
+      return s.pos ? `${s.color} ${s.pos}` : s.color;
+    }).filter(Boolean);
+    if (stops.length < 2) return '';
+    return `linear-gradient(${layer.angle || '135deg'}, ${stops.join(', ')})`;
+  }
+  if (layer.type === 'raw') return layer.raw || '';
+  return '';
+}
+function composeBackgroundLayers(layers) {
+  return layers.map(composeBackgroundLayer).filter(Boolean).join(', ');
+}
+
+function GradientLayerCard({ layer, onChange, onRemove }) {
+  const set = (patch) => onChange({ ...layer, ...patch });
+  const setStop = (i, patch) => {
+    const next = [...(layer.stops || [])];
+    next[i] = { ...next[i], ...patch };
+    onChange({ ...layer, stops: next });
   };
+  const addStop = () => {
+    const next = [...(layer.stops || [])];
+    next.push({ color: '#ffffff', pos: '50%' });
+    onChange({ ...layer, stops: next });
+  };
+  const removeStop = (i) => {
+    if ((layer.stops || []).length <= 2) return; // need ≥ 2
+    const next = (layer.stops || []).filter((_, j) => j !== i);
+    onChange({ ...layer, stops: next });
+  };
+  return (
+    <div style={{
+      padding: '6px 8px', marginBottom: '6px',
+      background: '#1e1e1e', border: `1px solid ${W.inputBorder}`,
+      borderRadius: '3px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <span style={{ color: W.accent, fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Gradient</span>
+        <button onClick={onRemove} title="Remove layer" style={removeBtnStyle}>×</button>
+      </div>
+      {/* Live gradient preview bar */}
+      <div style={{
+        height: '18px', borderRadius: '2px', marginBottom: '6px',
+        background: composeBackgroundLayer(layer) || 'transparent',
+        border: `1px solid ${W.inputBorder}`,
+      }} />
+      <Field label="Angle">
+        <DimensionInput value={layer.angle} onChange={(v) => set({ angle: v })} placeholder="135deg" />
+      </Field>
+      {(layer.stops || []).map((stop, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 22px', gap: '4px', padding: '2px 12px', alignItems: 'center' }}>
+          <ColorInput value={stop.color} onChange={(v) => setStop(i, { color: v })} />
+          <DimensionInput value={stop.pos} onChange={(v) => setStop(i, { pos: v })} placeholder="0%" />
+          <button
+            onClick={() => removeStop(i)}
+            disabled={(layer.stops || []).length <= 2}
+            title="Remove stop"
+            style={{ ...removeBtnStyle, opacity: (layer.stops || []).length <= 2 ? 0.3 : 1 }}
+          >×</button>
+        </div>
+      ))}
+      <button
+        onClick={addStop}
+        style={{
+          width: '100%', height: '22px', marginTop: '4px',
+          background: 'transparent', color: W.textDim,
+          border: `1px dashed ${W.inputBorder}`, borderRadius: '3px',
+          cursor: 'pointer', fontSize: '10.5px',
+        }}
+      >+ Stop</button>
+    </div>
+  );
+}
+
+function ImageLayerCard({ layer, onChange, onRemove }) {
+  return (
+    <div style={{
+      padding: '6px 8px', marginBottom: '6px',
+      background: '#1e1e1e', border: `1px solid ${W.inputBorder}`,
+      borderRadius: '3px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <span style={{ color: W.accent, fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Image</span>
+        <button onClick={onRemove} title="Remove layer" style={removeBtnStyle}>×</button>
+      </div>
+      <TextInput
+        value={layer.url || ''}
+        onChange={(v) => onChange({ ...layer, url: v })}
+        onCommit={() => {}}
+        placeholder="https://…/image.jpg"
+      />
+    </div>
+  );
+}
+
+function RawLayerCard({ layer, onRemove }) {
+  return (
+    <div style={{
+      padding: '6px 8px', marginBottom: '6px',
+      background: '#1e1e1e', border: `1px solid ${W.inputBorder}`,
+      borderRadius: '3px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <span style={{ color: W.textDim, fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Raw</span>
+        <button onClick={onRemove} title="Remove layer" style={removeBtnStyle}>×</button>
+      </div>
+      <code style={{
+        display: 'block', fontSize: '10px', color: W.textFaint,
+        fontFamily: 'ui-monospace, monospace',
+        wordBreak: 'break-all',
+      }}>{layer.raw}</code>
+    </div>
+  );
+}
+
+const removeBtnStyle = {
+  width: '18px', height: '18px', padding: 0,
+  background: 'transparent', color: '#a0a0a0',
+  border: `1px solid #3a3a3a`, borderRadius: '3px',
+  cursor: 'pointer', fontSize: '11px',
+};
+
+function Backgrounds({ styles, onSet }) {
+  const bgImageRaw = styles['background-image'] || '';
+  const layers = parseBackgroundLayers(bgImageRaw);
+
+  const commit = (nextLayers) => onSet('background-image', composeBackgroundLayers(nextLayers));
+  const updateLayer = (i, nl) => {
+    const next = [...layers];
+    next[i] = nl;
+    commit(next);
+  };
+  const removeLayer = (i) => commit(layers.filter((_, j) => j !== i));
+  const addGradient = () => commit([...layers, {
+    type: 'gradient',
+    angle: '135deg',
+    stops: [
+      { color: '#cff389', pos: '0%' },
+      { color: '#ef3d7b', pos: '100%' },
+    ],
+  }]);
+  const addImage = () => commit([...layers, { type: 'image', url: '' }]);
+
   return (
     <div style={{ padding: '4px 0' }}>
       <Field label="Color">
         <ColorInput
           value={styles['background-color'] || ''}
           onChange={(v) => onSet('background-color', v)}
-        />
-      </Field>
-      <Field label="Image">
-        <TextInput
-          value={bgImageUrl}
-          onChange={onBgImageChange}
-          onCommit={() => {}}
-          placeholder="https://…/image.jpg"
         />
       </Field>
       <Field label="Size">
@@ -757,6 +926,54 @@ function Backgrounds({ styles, onSet }) {
           ]}
         />
       </Field>
+
+      {/* Layer stack */}
+      <div style={{
+        padding: '10px 12px 4px',
+        color: W.textFaint, fontSize: '10px', fontWeight: 700,
+        letterSpacing: '0.05em', textTransform: 'uppercase',
+      }}>Layers ({layers.length})</div>
+      <div style={{ padding: '0 12px' }}>
+        {layers.map((layer, i) => {
+          if (layer.type === 'gradient') {
+            return <GradientLayerCard
+              key={i}
+              layer={layer}
+              onChange={(nl) => updateLayer(i, nl)}
+              onRemove={() => removeLayer(i)}
+            />;
+          }
+          if (layer.type === 'image') {
+            return <ImageLayerCard
+              key={i}
+              layer={layer}
+              onChange={(nl) => updateLayer(i, nl)}
+              onRemove={() => removeLayer(i)}
+            />;
+          }
+          return <RawLayerCard key={i} layer={layer} onRemove={() => removeLayer(i)} />;
+        })}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={addGradient}
+            style={{
+              flex: 1, height: '24px',
+              background: W.accentDim, color: W.accent,
+              border: `1px dashed ${W.accent}`, borderRadius: '3px',
+              cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+            }}
+          >+ Gradient</button>
+          <button
+            onClick={addImage}
+            style={{
+              flex: 1, height: '24px',
+              background: W.accentDim, color: W.accent,
+              border: `1px dashed ${W.accent}`, borderRadius: '3px',
+              cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+            }}
+          >+ Image</button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -467,6 +467,64 @@ export function setClassBreakpointStyle(content, className, breakpoint, prop, va
   return { ...content, classes: { ...content.classes, [className]: nextCls } };
 }
 
+// Count how many times each class is referenced across every tree.
+// Used by the Class browser to surface dead classes staff can clean up.
+export function classUsageMap(content) {
+  const counts = {};
+  const walk = (node) => {
+    if (!node) return;
+    for (const c of node.classes || []) {
+      counts[c] = (counts[c] || 0) + 1;
+    }
+    for (const ch of node.children || []) walk(ch);
+  };
+  for (const p of Object.values(content?.pages || {})) walk(p.tree);
+  return counts;
+}
+
+// Remove a class from content.classes AND strip every reference to it
+// across every node's classes[] on every page. Idempotent on missing
+// classes. No-op if the class is a combo prerequisite; the caller
+// should check combo-class dependencies before invoking.
+export function deleteClass(content, className) {
+  if (!content?.classes?.[className]) return content;
+  const { [className]: _gone, ...restClasses } = content.classes;
+  const rewriteClasses = (arr) => (arr || []).filter((n) => n !== className);
+  const rewriteTree = (node) => {
+    if (!node) return node;
+    const hasIt = node.classes?.includes(className);
+    const nc = hasIt ? { ...node, classes: rewriteClasses(node.classes) } : node;
+    const children = node.children || [];
+    let changed = nc !== node;
+    const nextChildren = children.map((c) => {
+      const r = rewriteTree(c);
+      if (r !== c) changed = true;
+      return r;
+    });
+    return changed ? { ...nc, children: nextChildren } : node;
+  };
+  const nextPages = {};
+  for (const [k, p] of Object.entries(content.pages || {})) {
+    nextPages[k] = { ...p, tree: rewriteTree(p.tree) };
+  }
+  return { ...content, classes: restClasses, pages: nextPages };
+}
+
+// Bulk-delete all classes whose usage count is zero. Returns new
+// content plus the list of removed names so the UI can toast.
+export function deleteUnusedClasses(content) {
+  const counts = classUsageMap(content);
+  const removed = [];
+  let next = content;
+  for (const name of Object.keys(content?.classes || {})) {
+    if (!counts[name]) {
+      next = deleteClass(next, name);
+      removed.push(name);
+    }
+  }
+  return { content: next, removed };
+}
+
 // Rename a class across the classes map AND every node's classes[] on
 // every page's tree. Used when the user edits the class badge.
 export function renameClass(content, oldName, newName) {
