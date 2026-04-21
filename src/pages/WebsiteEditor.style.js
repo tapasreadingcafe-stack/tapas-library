@@ -192,20 +192,49 @@ function DimensionInput({ value, onChange, placeholder }) {
   );
 }
 
-// Color picker — native swatch + hex text input. Accepts any CSS color
-// string on read, round-trips hex to the swatch and leaves other forms
-// (rgba, hsl, var(…), named) untouched in the text input.
+// Resolve any CSS color string (rgba(...), hsl(...), var(...), named,
+// keywords) to #rrggbb for the native swatch. Uses the canvas2d API's
+// built-in parser — anything invalid falls back to black.
+function cssToHex(cssColor) {
+  const s = String(cssColor || '').trim();
+  if (!s) return '#000000';
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s;
+  // var(…) and keyword-substituted values won't resolve at edit time;
+  // just show the neutral swatch rather than guessing.
+  if (s.startsWith('var(')) return '#000000';
+  try {
+    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    if (!canvas) return '#000000';
+    canvas.width = 1; canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = s;
+    const resolved = ctx.fillStyle;
+    if (resolved.startsWith('#') && resolved.length === 7) return resolved;
+    const m = /rgba?\(([0-9.]+),\s*([0-9.]+),\s*([0-9.]+)/.exec(resolved);
+    if (!m) return '#000000';
+    const toHex = (n) => Math.max(0, Math.min(255, Math.round(Number(n))))
+      .toString(16).padStart(2, '0');
+    return `#${toHex(m[1])}${toHex(m[2])}${toHex(m[3])}`;
+  } catch {
+    return '#000000';
+  }
+}
+
+// Color picker — native swatch + free-form text input. Accepts any CSS
+// color string on read (rgba / hsl / named / var(…)); the swatch now
+// reflects the *actual* colour instead of black-for-anything-non-hex.
+// A one-click × unsets the property entirely.
 function ColorInput({ value, onChange }) {
-  // The native swatch only understands #rrggbb. If the current value
-  // isn't that form, fall back to #000000 for the swatch but preserve
-  // the real value in the text input.
-  const hex = /^#[0-9a-fA-F]{6}$/.test((value || '').trim()) ? value.trim() : '#000000';
+  const hex = cssToHex(value);
+  const isSet = Boolean(value && String(value).trim());
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
       <input
         type="color"
         value={hex}
         onChange={(e) => onChange(e.target.value)}
+        title={isSet ? value : 'Pick a colour'}
         style={{
           width: '22px', height: '22px', padding: 0,
           background: W.input, border: `1px solid ${W.inputBorder}`,
@@ -225,6 +254,18 @@ function ColorInput({ value, onChange }) {
           outline: 'none',
         }}
       />
+      {isSet && (
+        <button
+          onClick={() => onChange('')}
+          title="Unset colour"
+          style={{
+            width: '22px', height: '22px', padding: 0,
+            background: 'transparent', color: W.textDim,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '13px',
+          }}
+        >×</button>
+      )}
     </div>
   );
 }

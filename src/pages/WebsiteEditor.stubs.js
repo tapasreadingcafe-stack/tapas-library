@@ -465,6 +465,7 @@ export function CommandPalette({ open, onClose, content, tree, onSelect, onPickP
 const SHORTCUTS = [
   { group: 'Selection', items: [
     ['Esc',         'Select parent'],
+    ['Alt+Click',   'Select parent under cursor'],
     ['Enter',       'Select first child'],
     ['↑ / ↓',       'Previous / next in tree'],
     ['Tab / ⇧Tab',  'Next / previous sibling'],

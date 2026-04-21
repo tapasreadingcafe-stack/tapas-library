@@ -10,7 +10,7 @@
 // own careful session.
 // =====================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ENTRANCE_PRESETS, HOVER_PRESETS,
 } from './WebsiteEditor.anim';
@@ -94,6 +94,63 @@ function DurationInput({ value, onChange, placeholder }) {
       }}
     />
   );
+}
+
+// Buffered input — the timeline step editor writes JSON back to the
+// attribute on every change, which (through applyEdit) coalesces
+// rapid edits into one history entry but still burns a Supabase
+// round-trip per keystroke. Committing on blur / Enter instead lets
+// the user type "600" without three intermediate saves, AND gives
+// us a single point to apply clamping / parsing.
+function CommitInput({ value, onCommit, placeholder, parse }) {
+  const [draft, setDraft] = useState(String(value ?? ''));
+  const lastCommittedRef = useRef(String(value ?? ''));
+  // If the external value changes (reorder, reset), sync in.
+  useEffect(() => {
+    const next = String(value ?? '');
+    if (next !== lastCommittedRef.current) {
+      setDraft(next);
+      lastCommittedRef.current = next;
+    }
+  }, [value]);
+  const commit = () => {
+    const parsed = typeof parse === 'function' ? parse(draft) : draft;
+    const normalised = String(parsed ?? '');
+    if (normalised === lastCommittedRef.current) return;
+    lastCommittedRef.current = normalised;
+    setDraft(normalised);
+    onCommit(parsed);
+  };
+  return (
+    <input
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.currentTarget.blur(); }
+        if (e.key === 'Escape') {
+          setDraft(lastCommittedRef.current);
+          e.currentTarget.blur();
+        }
+      }}
+      style={{
+        width: '100%', height: '22px',
+        padding: '0 6px',
+        background: W.input, color: W.text,
+        border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+        fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+      }}
+    />
+  );
+}
+
+// Clamp string input to 0..1 inclusive. Non-numeric input falls back
+// to "0" so the stored JSON always deserialises cleanly.
+function parseProgress(raw) {
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return '0';
+  return String(Math.max(0, Math.min(1, n)));
 }
 
 export default function InteractionsPanel({ node, onSetAttribute, onPlayTimeline }) {
@@ -482,9 +539,9 @@ function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRe
       </Row>
       {step.target && step.target !== 'self' && (
         <Row label={step.target === 'class' ? 'Class' : 'Selector'}>
-          <DurationInput
+          <CommitInput
             value={step.targetValue}
-            onChange={(v) => onChange({ targetValue: v })}
+            onCommit={(v) => onChange({ targetValue: v })}
             placeholder={step.target === 'class' ? '.card' : '.hero > h1'}
           />
         </Row>
@@ -515,16 +572,16 @@ function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRe
 
       <div style={{ display: 'flex', gap: '6px' }}>
         <Row label="From">
-          <DurationInput
+          <CommitInput
             value={step.from}
-            onChange={(v) => onChange({ from: v })}
+            onCommit={(v) => onChange({ from: v })}
             placeholder="0"
           />
         </Row>
         <Row label="To">
-          <DurationInput
+          <CommitInput
             value={step.to}
-            onChange={(v) => onChange({ to: v })}
+            onCommit={(v) => onChange({ to: v })}
             placeholder="0"
           />
         </Row>
@@ -532,9 +589,9 @@ function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRe
 
       {prop.unit && (
         <Row label="Unit">
-          <DurationInput
+          <CommitInput
             value={step.unit}
-            onChange={(v) => onChange({ unit: v })}
+            onCommit={(v) => onChange({ unit: v })}
             placeholder={prop.unit}
           />
         </Row>
@@ -544,16 +601,16 @@ function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRe
         <>
           <div style={{ display: 'flex', gap: '6px' }}>
             <Row label="Duration">
-              <DurationInput
+              <CommitInput
                 value={step.duration}
-                onChange={(v) => onChange({ duration: clampMs(v) })}
+                onCommit={(v) => onChange({ duration: clampMs(v) })}
                 placeholder="600"
               />
             </Row>
             <Row label="Delay">
-              <DurationInput
+              <CommitInput
                 value={step.delay}
-                onChange={(v) => onChange({ delay: clampMs(v) })}
+                onCommit={(v) => onChange({ delay: clampMs(v) })}
                 placeholder="0"
               />
             </Row>
@@ -570,16 +627,18 @@ function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRe
       {isScrollDrive && (
         <div style={{ display: 'flex', gap: '6px' }}>
           <Row label="Start">
-            <DurationInput
+            <CommitInput
               value={step.fromProgress}
-              onChange={(v) => onChange({ fromProgress: v })}
+              parse={parseProgress}
+              onCommit={(v) => onChange({ fromProgress: v })}
               placeholder="0"
             />
           </Row>
           <Row label="End">
-            <DurationInput
+            <CommitInput
               value={step.toProgress}
-              onChange={(v) => onChange({ toProgress: v })}
+              parse={parseProgress}
+              onCommit={(v) => onChange({ toProgress: v })}
               placeholder="1"
             />
           </Row>

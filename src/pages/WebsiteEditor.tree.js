@@ -74,6 +74,14 @@ export function nextInFlat(flat, id) {
 
 export function labelOf(n) {
   if (!n) return '';
+  // Component instances carry a componentRef — prefix the label so
+  // staff can tell at a glance that clicks inside won't select
+  // descendants (they have to open the component via the Components
+  // panel to edit its internals).
+  if (n.componentRef) {
+    const base = n.classes?.[0] ? `.${n.classes[0]}` : (n.tag || 'instance');
+    return `◆ ${base}`;
+  }
   if (n.classes?.[0]) return `.${n.classes[0]}`;
   return n.tag || '?';
 }

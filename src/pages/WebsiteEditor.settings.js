@@ -578,6 +578,8 @@ function BindingSection({ node, ancestor, onSetAttribute, onSetTextContent, isLi
     onSetTextContent(node.id, `{{${fieldKey}}}`);
   };
   const bindAttr = (attrKey, fieldKey) => onSetAttribute(attrKey, `{{${fieldKey}}}`);
+  const unbindText = () => onSetTextContent?.(node.id, '');
+  const unbindAttr = (attrKey) => onSetAttribute(attrKey, '');
 
   return (
     <Section title="Bind to CMS">
@@ -594,22 +596,26 @@ function BindingSection({ node, ancestor, onSetAttribute, onSetTextContent, isLi
         </div>
       )}
       {isTextLeaf && onSetTextContent && (
-        <BindRow label="Text" bound={textBound} fields={fields} onPick={bindText} />
+        <BindRow label="Text" bound={textBound} fields={fields}
+          onPick={bindText} onUnbind={unbindText} />
       )}
       {isImage && (
         <>
-          <BindRow label="Image src" bound={srcBound} fields={fields} onPick={(k) => bindAttr('src', k)} />
-          <BindRow label="Alt text"  bound={altBound} fields={fields} onPick={(k) => bindAttr('alt', k)} />
+          <BindRow label="Image src" bound={srcBound} fields={fields}
+            onPick={(k) => bindAttr('src', k)} onUnbind={() => unbindAttr('src')} />
+          <BindRow label="Alt text" bound={altBound} fields={fields}
+            onPick={(k) => bindAttr('alt', k)} onUnbind={() => unbindAttr('alt')} />
         </>
       )}
       {isLink && (
-        <BindRow label="Link href" bound={hrefBound} fields={fields} onPick={(k) => bindAttr('href', k)} />
+        <BindRow label="Link href" bound={hrefBound} fields={fields}
+          onPick={(k) => bindAttr('href', k)} onUnbind={() => unbindAttr('href')} />
       )}
     </Section>
   );
 }
 
-function BindRow({ label, bound, fields, onPick }) {
+function BindRow({ label, bound, fields, onPick, onUnbind }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 0' }}>
       <span style={{ width: '72px', flexShrink: 0, color: W.textDim, fontSize: '11px' }}>
@@ -627,6 +633,18 @@ function BindRow({ label, bound, fields, onPick }) {
           </option>
         ))}
       </select>
+      {bound && (
+        <button
+          onClick={onUnbind}
+          title="Unbind (clear this field)"
+          style={{
+            width: '22px', height: '22px', padding: 0,
+            background: 'transparent', color: '#ff9a9a',
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+          }}
+        >×</button>
+      )}
     </div>
   );
 }

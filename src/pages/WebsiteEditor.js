@@ -404,6 +404,12 @@ function Canvas({
   const [zoom, setZoom] = useState(100);
   const [hoverId, setHoverId] = useState(null);
   const [dropHover, setDropHover] = useState(null); // { targetId, position }
+  // Preview interactions — when on, the editor canvas installs the
+  // runtime for scroll-drive + mouse triggers so staff can sanity-
+  // check parallax / tilt effects. Off by default because drive
+  // triggers on the hovered element make it impossible to style
+  // (the element tilts away every time you try to click it).
+  const [previewInteractions, setPreviewInteractions] = useState(false);
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
   const surfaceRef = useRef(null);
@@ -576,17 +582,21 @@ function Canvas({
     // --- Phase H drive triggers ----------------------------------
     // scroll-drive and mouse triggers are continuous — they install
     // rAF loops and listener cleanup functions instead of playing
-    // once. We still run them in the editor canvas so staff can
-    // preview parallax / tilt-follow without leaving /content-v2.
+    // once. Gated behind the Preview-interactions toolbar button:
+    // running them by default means a mouse-tilt card tilts away
+    // whenever staff hover it to click, which makes editing
+    // impossible. Opt-in previewing is the saner default.
     const driveCleanups = [];
-    surface.querySelectorAll('[data-tapas-timeline-scroll-drive]').forEach((el) => {
-      const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll-drive'));
-      if (steps.length) driveCleanups.push(driveTimeline('scroll-drive', steps, el));
-    });
-    surface.querySelectorAll('[data-tapas-timeline-mouse]').forEach((el) => {
-      const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-mouse'));
-      if (steps.length) driveCleanups.push(driveTimeline('mouse', steps, el));
-    });
+    if (previewInteractions) {
+      surface.querySelectorAll('[data-tapas-timeline-scroll-drive]').forEach((el) => {
+        const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll-drive'));
+        if (steps.length) driveCleanups.push(driveTimeline('scroll-drive', steps, el));
+      });
+      surface.querySelectorAll('[data-tapas-timeline-mouse]').forEach((el) => {
+        const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-mouse'));
+        if (steps.length) driveCleanups.push(driveTimeline('mouse', steps, el));
+      });
+    }
 
     return () => {
       if (io) io.disconnect();
@@ -598,7 +608,7 @@ function Canvas({
       timelineControllers.forEach((ctrl) => ctrl.cancel());
       driveCleanups.forEach((fn) => fn());
     };
-  }, [tree]);
+  }, [tree, previewInteractions]);
 
   // Walk from the event target up to the nearest node element, then
   // classify the cursor's vertical band into before / after / inside.
@@ -732,7 +742,19 @@ function Canvas({
           >+</button>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={toolbarBtn(W)} title="Preview">◉</button>
+        <button
+          onClick={() => setPreviewInteractions((p) => !p)}
+          title={previewInteractions ? 'Interactions running — click to pause' : 'Preview interactions (runs scroll-drive + mouse triggers)'}
+          style={{
+            ...toolbarBtn(W),
+            background: previewInteractions ? W.accentDim : 'transparent',
+            color:      previewInteractions ? W.accent    : W.textDim,
+            border: `1px solid ${previewInteractions ? W.accent : 'transparent'}`,
+            width: 'auto', padding: '0 8px',
+          }}
+        >
+          {previewInteractions ? '◼ Preview on' : '▶ Preview'}
+        </button>
         <button style={toolbarBtn(W)} title="Grid overlay">▦</button>
       </div>
       {/* Canvas surface */}
@@ -865,20 +887,28 @@ function SelectionOverlay({ targetId, rootRef, tree, kind }) {
   const color = '#146ef5';
   const isSelected = kind === 'selected';
 
+  // Body-root selection is a special case — drawing a 1px outline
+  // around the entire page makes it visually noisy and near-invisible
+  // at the top + left corners. Show only the label chip so the user
+  // still gets confirmation that the root is selected.
+  const isBodyRoot = !!(tree && targetId && tree.id === targetId);
+
   return (
     <>
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: rect.top, left: rect.left,
-          width: rect.width, height: rect.height,
-          outline: `1px ${isSelected ? 'solid' : 'dashed'} ${color}`,
-          outlineOffset: '-1px',
-          pointerEvents: 'none',
-          zIndex: 10,
-        }}
-      />
+      {!isBodyRoot && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: rect.top, left: rect.left,
+            width: rect.width, height: rect.height,
+            outline: `1px ${isSelected ? 'solid' : 'dashed'} ${color}`,
+            outlineOffset: '-1px',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        />
+      )}
       {isSelected && (
         <div
           aria-hidden
@@ -995,7 +1025,17 @@ function CanvasSelectionShell({
     // Clicks inside the editable element are already stopped by
     // EditableText; this only fires for clicks elsewhere on the canvas.
     const id = nearestNodeId(e.target, e.currentTarget);
-    if (id) { onSelect(id); e.preventDefault(); e.stopPropagation(); }
+    if (!id) return;
+    // Alt+Click escalates to the parent of the clicked node — matches
+    // Webflow's "click into parent" escape hatch. Falls back to the
+    // clicked id if no parent exists (e.g. clicking the body root).
+    if (e.altKey) {
+      const parent = parentOf(tree, id);
+      onSelect(parent?.id || id);
+    } else {
+      onSelect(id);
+    }
+    e.preventDefault(); e.stopPropagation();
   };
   const onDoubleClick = (e) => {
     // Double-click enters inline edit mode. Only text-leaf-ish nodes
@@ -1171,6 +1211,16 @@ export default function WebsiteEditor() {
   // breakpoints.<bp>). Lives on the main editor so the Style panel can
   // read from the right bucket.
   const [device, setDevice] = useState('desktop');
+  // State tabs (None / Hover / Pressed / Focused) are only meaningful
+  // at the Desktop breakpoint because non-desktop writes land in a
+  // flat breakpoints.<bp> bucket that has no per-state slots. When
+  // the user switches to a non-desktop device, collapse state back
+  // to 'base' so subsequent writes can't silently target the wrong
+  // bucket and the Style panel UI matches what's being stored.
+  useEffect(() => {
+    if (device !== 'desktop' && styleState !== 'base') setStyleState('base');
+  }, [device, styleState]);
+
   // Inline text edit. When set, the Node renderer makes that node's
   // element contentEditable and hides the selection/hover overlays so
   // the caret isn't obscured. Commit on blur / Enter, cancel on Esc.
@@ -1872,6 +1922,16 @@ export default function WebsiteEditor() {
 
       // Everything else defers to input focus.
       if (isTyping(e.target)) return;
+
+      // `?` opens the Help rail panel from anywhere (matches the
+      // Webflow shortcut). Fires before the `!selectedId` guard
+      // below so it works on a fresh canvas with nothing selected.
+      if (!mod && !e.altKey && e.key === '?') {
+        setRailActive('help');
+        e.preventDefault();
+        return;
+      }
+
       if (!selectedId) return;
 
       // Selection moves (no meta key)
