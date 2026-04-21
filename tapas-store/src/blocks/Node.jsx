@@ -12,9 +12,10 @@
 // v2 store_content without any other piece of production being ready.
 // =====================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Slider from './Slider';
 import Lightbox from './Lightbox';
+import { mountTimelineRuntime } from '../runtime/timeline';
 
 // Tags that are self-closing in HTML. React handles most of this for us
 // but keeping the list explicit avoids passing `children` to them.
@@ -144,6 +145,21 @@ const ALLOWED_TAGS = new Set([
 // classes) still works.
 const COMPOSITE_TAG_REWRITE = { slide: 'div' };
 
+// Page-root wrapper mounted when the tree's body renders. Owns the
+// one-time Phase G timeline runtime mount + cleanup for its subtree.
+// Every other node is still rendered via the pure Node() function,
+// so the added runtime cost only applies to the outermost element.
+function PageRoot({ className, attrs, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return undefined;
+    return mountTimelineRuntime(ref.current);
+  }, []);
+  return (
+    <div ref={ref} className={className} {...attrs}>{children}</div>
+  );
+}
+
 // Phase F composites — the storefront hands these off to interactive
 // runtime wrappers. The wrappers render the slot children back through
 // Node so the rest of the tree (styles, classes, nested composites)
@@ -230,13 +246,28 @@ export function Node({ node, components }) {
   }
 
   // Mixed or branch node.
-  return (
-    <Tag className={className} {...attrs}>
+  const renderedChildren = (
+    <>
       {hasText ? node.textContent : null}
       {children.map((child, idx) => (
         <Node key={child.id || idx} node={child} components={components} />
       ))}
-    </Tag>
+    </>
+  );
+
+  // Top-level <body> render — use PageRoot so Phase G timelines and
+  // any future one-time runtime work mount correctly. Everything
+  // else stays in the pure-function path.
+  if (rawTag === 'body') {
+    return (
+      <PageRoot className={className} attrs={attrs}>
+        {renderedChildren}
+      </PageRoot>
+    );
+  }
+
+  return (
+    <Tag className={className} {...attrs}>{renderedChildren}</Tag>
   );
 }
 

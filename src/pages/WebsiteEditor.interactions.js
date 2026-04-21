@@ -10,11 +10,15 @@
 // own careful session.
 // =====================================================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ENTRANCE_PRESETS, HOVER_PRESETS,
 } from './WebsiteEditor.anim';
 import { EasingField } from './WebsiteEditor.bezier';
+import {
+  TIMELINE_PROPERTIES, TIMELINE_TARGETS, TIMELINE_TRIGGERS,
+  makeStep, parseTimelineAttr, stringifyTimeline, timelineAttrName,
+} from './WebsiteEditor.timeline';
 
 const W = {
   panelBorder: '#2a2a2a',
@@ -91,7 +95,7 @@ function DurationInput({ value, onChange, placeholder }) {
   );
 }
 
-export default function InteractionsPanel({ node, onSetAttribute }) {
+export default function InteractionsPanel({ node, onSetAttribute, onPlayTimeline }) {
   if (!node) {
     return (
       <div style={{ padding: '24px 12px', color: W.textFaint, fontSize: '11px', textAlign: 'center' }}>
@@ -275,14 +279,294 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
         )}
       </Section>
 
+      <TimelineEditor
+        node={node}
+        onSetAttribute={onSetAttribute}
+        onPlayTimeline={onPlayTimeline}
+      />
+
       <div style={{
         padding: '16px 12px', borderTop: `1px solid ${W.panelBorder}`,
         color: W.textFaint, fontSize: '10.5px', lineHeight: 1.5,
       }}>
-        Timed, mouse-move, and while-scrolling triggers — plus
-        multi-step timelines with custom cubic-bezier — land in
-        Phase 8b.
+        Timed, mouse-move, and while-scrolling triggers land in a
+        follow-up phase.
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TimelineEditor — Phase G multi-step timeline UI.
+//
+// A single Section that lets staff pick a trigger (scroll / load /
+// click / hover) and edit its step list. The list is stored JSON-
+// encoded on data-tapas-timeline-<trigger>; every mutation writes
+// through onSetAttribute so undo / redo already works.
+// ---------------------------------------------------------------------
+function TimelineEditor({ node, onSetAttribute, onPlayTimeline }) {
+  const [trigger, setTrigger] = useState('scroll');
+  const attrs = node?.attributes || {};
+  const rawAttr = attrs[timelineAttrName(trigger)];
+  const steps = parseTimelineAttr(rawAttr);
+
+  const writeSteps = (next) => {
+    onSetAttribute(timelineAttrName(trigger), stringifyTimeline(next));
+  };
+
+  const updateStep = (index, patch) => {
+    const next = steps.slice();
+    next[index] = { ...next[index], ...patch };
+    writeSteps(next);
+  };
+
+  const removeStep = (index) => {
+    const next = steps.slice();
+    next.splice(index, 1);
+    writeSteps(next);
+  };
+
+  const moveStep = (index, dir) => {
+    const target = index + dir;
+    if (target < 0 || target >= steps.length) return;
+    const next = steps.slice();
+    [next[index], next[target]] = [next[target], next[index]];
+    writeSteps(next);
+  };
+
+  const addStep = () => {
+    const next = steps.slice();
+    next.push(makeStep());
+    writeSteps(next);
+  };
+
+  return (
+    <Section title="Timeline">
+      <Row label="Trigger">
+        <select
+          value={trigger}
+          onChange={(e) => setTrigger(e.target.value)}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          {TIMELINE_TRIGGERS.map((t) => (
+            <option key={t} value={t}>{triggerLabel(t)}</option>
+          ))}
+        </select>
+      </Row>
+
+      {steps.length === 0 ? (
+        <div style={{
+          padding: '10px 0', color: W.textFaint, fontSize: '11px',
+          lineHeight: 1.5,
+        }}>
+          No steps yet. Add one below to build a multi-step animation.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '6px 0' }}>
+          {steps.map((step, i) => (
+            <StepCard
+              key={step.id || i}
+              index={i}
+              step={step}
+              canMoveUp={i > 0}
+              canMoveDown={i < steps.length - 1}
+              onChange={(patch) => updateStep(i, patch)}
+              onRemove={() => removeStep(i)}
+              onMoveUp={() => moveStep(i, -1)}
+              onMoveDown={() => moveStep(i, 1)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+        <button
+          onClick={addStep}
+          style={{
+            flex: 1, padding: '6px', fontSize: '11px', fontWeight: 600,
+            background: W.accentDim, color: W.accent,
+            border: `1px solid ${W.accent}`, borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >+ Add step</button>
+        <button
+          onClick={() => onPlayTimeline?.(trigger)}
+          disabled={steps.length === 0}
+          title={steps.length === 0 ? 'Add a step first' : 'Preview on canvas'}
+          style={{
+            flex: 1, padding: '6px', fontSize: '11px', fontWeight: 600,
+            background: steps.length ? '#146ef5' : '#222',
+            color: steps.length ? '#fff' : W.textFaint,
+            border: `1px solid ${steps.length ? '#146ef5' : W.inputBorder}`,
+            borderRadius: '3px',
+            cursor: steps.length ? 'pointer' : 'not-allowed',
+          }}
+        >▶ Play preview</button>
+      </div>
+    </Section>
+  );
+}
+
+function triggerLabel(key) {
+  switch (key) {
+    case 'scroll': return 'Scroll into view';
+    case 'load':   return 'Page load';
+    case 'click':  return 'Click';
+    case 'hover':  return 'Hover';
+    default:       return key;
+  }
+}
+
+function StepCard({ index, step, canMoveUp, canMoveDown, onChange, onRemove, onMoveUp, onMoveDown }) {
+  const prop = TIMELINE_PROPERTIES.find((p) => p.key === step.property) || TIMELINE_PROPERTIES[0];
+  return (
+    <div style={{
+      border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+      padding: '8px', background: '#1f1f1f',
+      display: 'flex', flexDirection: 'column', gap: '6px',
+    }}>
+      {/* Header row — index + reorder + delete */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        paddingBottom: '4px', borderBottom: `1px solid ${W.panelBorder}`,
+      }}>
+        <span style={{ color: W.textDim, fontSize: '10.5px', fontWeight: 700 }}>
+          STEP {index + 1}
+        </span>
+        <span style={{ flex: 1 }} />
+        <MiniBtn onClick={onMoveUp}   disabled={!canMoveUp}   title="Move up">↑</MiniBtn>
+        <MiniBtn onClick={onMoveDown} disabled={!canMoveDown} title="Move down">↓</MiniBtn>
+        <MiniBtn onClick={onRemove} title="Remove step">×</MiniBtn>
+      </div>
+
+      <Row label="Target">
+        <select
+          value={step.target || 'self'}
+          onChange={(e) => onChange({ target: e.target.value, targetValue: e.target.value === 'self' ? '' : step.targetValue })}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          {TIMELINE_TARGETS.map((t) => (
+            <option key={t.key} value={t.key}>{t.label}</option>
+          ))}
+        </select>
+      </Row>
+      {step.target && step.target !== 'self' && (
+        <Row label={step.target === 'class' ? 'Class' : 'Selector'}>
+          <DurationInput
+            value={step.targetValue}
+            onChange={(v) => onChange({ targetValue: v })}
+            placeholder={step.target === 'class' ? '.card' : '.hero > h1'}
+          />
+        </Row>
+      )}
+
+      <Row label="Property">
+        <select
+          value={step.property}
+          onChange={(e) => {
+            const nextProp = TIMELINE_PROPERTIES.find((p) => p.key === e.target.value);
+            onChange({
+              property: e.target.value,
+              unit: nextProp?.unit || '',
+            });
+          }}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          {TIMELINE_PROPERTIES.map((p) => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+        </select>
+      </Row>
+
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <Row label="From">
+          <DurationInput
+            value={step.from}
+            onChange={(v) => onChange({ from: v })}
+            placeholder="0"
+          />
+        </Row>
+        <Row label="To">
+          <DurationInput
+            value={step.to}
+            onChange={(v) => onChange({ to: v })}
+            placeholder="0"
+          />
+        </Row>
+      </div>
+
+      {prop.unit && (
+        <Row label="Unit">
+          <DurationInput
+            value={step.unit}
+            onChange={(v) => onChange({ unit: v })}
+            placeholder={prop.unit}
+          />
+        </Row>
+      )}
+
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <Row label="Duration">
+          <DurationInput
+            value={step.duration}
+            onChange={(v) => onChange({ duration: clampMs(v) })}
+            placeholder="600"
+          />
+        </Row>
+        <Row label="Delay">
+          <DurationInput
+            value={step.delay}
+            onChange={(v) => onChange({ delay: clampMs(v) })}
+            placeholder="0"
+          />
+        </Row>
+      </div>
+
+      <Row label="Easing">
+        <EasingField
+          value={step.easing}
+          onChange={(v) => onChange({ easing: v })}
+        />
+      </Row>
+    </div>
+  );
+}
+
+function clampMs(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, n);
+}
+
+function MiniBtn({ children, onClick, disabled, title }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: '22px', height: '22px', padding: 0,
+        background: disabled ? 'transparent' : '#2a2a2a',
+        color: disabled ? W.textFaint : W.text,
+        border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fontSize: '12px', fontWeight: 700, lineHeight: 1,
+      }}
+    >{children}</button>
   );
 }

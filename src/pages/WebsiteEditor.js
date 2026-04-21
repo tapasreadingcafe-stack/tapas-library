@@ -37,6 +37,9 @@ import {
 import {
   FloatingTextToolbar, toggleMark, clearFormatting, applyLink,
 } from './WebsiteEditor.richtext';
+import {
+  compileTimeline, parseTimelineAttr, timelineAttrName,
+} from './WebsiteEditor.timeline';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
 import StylePanel from './WebsiteEditor.style';
@@ -522,11 +525,56 @@ function Canvas({
       loadEls.forEach((el) => el.setAttribute('data-tapas-load-in', ''));
     });
 
+    // --- Phase G timelines ---------------------------------------
+    // Scroll-into-view timelines: compile once, reset to initial so
+    // elements don't flash their final state, then play when the
+    // observer first intersects the viewport.
+    const timelineControllers = [];
+    const scrollTimelineEls = surface.querySelectorAll('[data-tapas-timeline-scroll]');
+    let timelineIo = null;
+    if (scrollTimelineEls.length && typeof IntersectionObserver !== 'undefined') {
+      scrollTimelineEls.forEach((el) => {
+        const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll'));
+        if (!steps.length) return;
+        const ctrl = compileTimeline(steps, el, { resetToInitial: true });
+        el.__tapasTimelineCtrl = ctrl;
+        timelineControllers.push(ctrl);
+      });
+      timelineIo = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.__tapasTimelineCtrl?.play();
+          timelineIo.unobserve(e.target);
+        }
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      scrollTimelineEls.forEach((el) => {
+        if (el.__tapasTimelineCtrl) timelineIo.observe(el);
+      });
+    }
+
+    // Page-load timelines fire once on the next frame, after the
+    // reset-to-initial paint so the transition is visible.
+    const loadTimelineEls = surface.querySelectorAll('[data-tapas-timeline-load]');
+    const loadTimelineCtrls = [];
+    loadTimelineEls.forEach((el) => {
+      const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-load'));
+      if (!steps.length) return;
+      const ctrl = compileTimeline(steps, el, { resetToInitial: true });
+      loadTimelineCtrls.push(ctrl);
+      timelineControllers.push(ctrl);
+    });
+    const loadTimelineFrame = requestAnimationFrame(() => {
+      loadTimelineCtrls.forEach((ctrl) => ctrl.play());
+    });
+
     return () => {
       if (io) io.disconnect();
+      if (timelineIo) timelineIo.disconnect();
       surface.removeEventListener('click', onSurfaceClick);
       surface.removeEventListener('animationend', onAnimEnd);
       cancelAnimationFrame(loadFrame);
+      cancelAnimationFrame(loadTimelineFrame);
+      timelineControllers.forEach((ctrl) => ctrl.cancel());
     };
   }, [tree]);
 
@@ -939,6 +987,7 @@ function RightPanel({
   onSetTag, onSetAttribute, onRenameAttribute,
   page, pageKey, siteUrl, onUpdatePageMeta,
   previewSliderId, onTogglePreviewSlider,
+  onPlayTimeline,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -1014,6 +1063,7 @@ function RightPanel({
           <InteractionsPanel
             node={selectedNode}
             onSetAttribute={onSetAttribute}
+            onPlayTimeline={onPlayTimeline}
           />
         )}
         {tab === 'page' && (
@@ -1065,6 +1115,30 @@ export default function WebsiteEditor() {
   // Context menu state — { x, y, nodeId }. Opened on right-click via
   // the CanvasSelectionShell; closed on outside click or Esc.
   const [contextMenu, setContextMenu] = useState(null);
+  // Phase G — active timeline controller. Kept in a ref so the Play
+  // preview button can cancel the previous run before starting a new
+  // one, and so scroll / load observers can own their own controllers
+  // without stepping on each other.
+  const timelinePreviewRef = useRef(null);
+
+  const handlePlayTimeline = useCallback((triggerKey) => {
+    if (!selectedId || typeof document === 'undefined') return;
+    const el = document.querySelector(`[data-tapas-node-id="${selectedId}"]`);
+    if (!el) return;
+    const raw = el.getAttribute(timelineAttrName(triggerKey));
+    const steps = parseTimelineAttr(raw);
+    if (steps.length === 0) return;
+    if (timelinePreviewRef.current) {
+      timelinePreviewRef.current.cancel();
+    }
+    const controller = compileTimeline(steps, el, { resetToInitial: true });
+    timelinePreviewRef.current = controller;
+    // Defer one frame so the reset paints before the animation starts,
+    // otherwise the browser may fold the two into a single commit and
+    // the user sees no transition on the first step.
+    requestAnimationFrame(() => controller.play());
+  }, [selectedId]);
+
   // Phase F — "Preview slider" toggle in the Settings tab. When set
   // to a slider node's id, the editor canvas swaps that node from
   // stacked-edit mode into a lightweight runtime carousel so staff
@@ -1907,6 +1981,7 @@ export default function WebsiteEditor() {
           onTogglePreviewSlider={(id) => {
             setPreviewSliderId((prev) => (prev === id ? null : id));
           }}
+          onPlayTimeline={handlePlayTimeline}
         />
       </div>
       <CommandPalette
