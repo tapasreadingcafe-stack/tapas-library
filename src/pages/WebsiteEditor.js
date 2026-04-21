@@ -392,7 +392,7 @@ function Canvas({
   tree, classes, selectedId, onSelect, device, onDeviceChange,
   onDropBlock, onDropAsset,
   editingNodeId, onStartEdit, onCommitEdit, onCommitRuns, onCancelEdit,
-  editableRef, components, onContextMenu,
+  editableRef, components, onContextMenu, previewSliderId,
 }) {
   const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
@@ -674,6 +674,7 @@ function Canvas({
             editableRef={editableRef}
             components={components}
             onContextMenu={onContextMenu}
+            previewSliderId={previewSliderId}
           />
         </div>
         {/* Overlays live in surface space so they scroll with the
@@ -869,7 +870,7 @@ function DropIndicator({ drop, surfaceRef }) {
 function CanvasSelectionShell({
   tree, selectedId, onSelect, onHover,
   editingNodeId, onStartEdit, onCommitText, onCommitRuns, onCancelEdit,
-  editableRef, components, onContextMenu,
+  editableRef, components, onContextMenu, previewSliderId,
 }) {
   const nearestNodeId = (target, stopAt) => {
     let el = target;
@@ -920,6 +921,7 @@ function CanvasSelectionShell({
         onCancelEdit={onCancelEdit}
         editableRef={editableRef}
         components={components}
+        previewSliderId={previewSliderId}
       />
     </div>
   );
@@ -936,6 +938,7 @@ function RightPanel({
   onCreateClass, onRenameClass, onSetStyle,
   onSetTag, onSetAttribute, onRenameAttribute,
   page, pageKey, siteUrl, onUpdatePageMeta,
+  previewSliderId, onTogglePreviewSlider,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -1003,6 +1006,8 @@ function RightPanel({
             onSetTag={onSetTag}
             onSetAttribute={onSetAttribute}
             onRenameAttribute={onRenameAttribute}
+            previewSliderId={previewSliderId}
+            onTogglePreviewSlider={onTogglePreviewSlider}
           />
         )}
         {tab === 'interactions' && (
@@ -1060,6 +1065,12 @@ export default function WebsiteEditor() {
   // Context menu state — { x, y, nodeId }. Opened on right-click via
   // the CanvasSelectionShell; closed on outside click or Esc.
   const [contextMenu, setContextMenu] = useState(null);
+  // Phase F — "Preview slider" toggle in the Settings tab. When set
+  // to a slider node's id, the editor canvas swaps that node from
+  // stacked-edit mode into a lightweight runtime carousel so staff
+  // can sanity-check autoplay / arrows / swipe without leaving the
+  // editor.
+  const [previewSliderId, setPreviewSliderId] = useState(null);
 
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
@@ -1873,6 +1884,7 @@ export default function WebsiteEditor() {
           editableRef={editableRef}
           components={content?.components}
           onContextMenu={(id, x, y) => setContextMenu({ nodeId: id, x, y })}
+          previewSliderId={previewSliderId}
         />
         <RightPanel
           selectedNode={selectedNode}
@@ -1891,6 +1903,10 @@ export default function WebsiteEditor() {
           pageKey={pageKey}
           siteUrl={content?.brand?.site_url || ''}
           onUpdatePageMeta={handleUpdatePageMeta}
+          previewSliderId={previewSliderId}
+          onTogglePreviewSlider={(id) => {
+            setPreviewSliderId((prev) => (prev === id ? null : id));
+          }}
         />
       </div>
       <CommandPalette

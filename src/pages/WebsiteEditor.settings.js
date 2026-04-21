@@ -28,6 +28,14 @@ const W = {
   labelLetter: '0.05em',
 };
 
+// Shared dropdown style used by the Link + Image + Slider sections.
+const selectStyle = {
+  width: '100%', height: '22px',
+  background: W.input, color: W.text,
+  border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+  fontSize: '11px',
+};
+
 // Curated tag list — grouped so the picker isn't a wall of options.
 // Kept in sync with mutations.SAFE_TAGS (subset).
 const TAG_GROUPS = [
@@ -202,7 +210,11 @@ function AttributesList({ attributes, onSet, onRename }) {
 // ---------------------------------------------------------------------
 // SettingsPanel — entry point
 // ---------------------------------------------------------------------
-export default function SettingsPanel({ node, pageId, onSetTag, onSetAttribute, onRenameAttribute }) {
+export default function SettingsPanel({
+  node, pageId,
+  onSetTag, onSetAttribute, onRenameAttribute,
+  previewSliderId, onTogglePreviewSlider,
+}) {
   const [pickerOpen, setPickerOpen] = useState(false);
   if (!node) {
     return (
@@ -213,8 +225,10 @@ export default function SettingsPanel({ node, pageId, onSetTag, onSetAttribute, 
   }
 
   const attrs = node.attributes || {};
-  const isLink  = node.tag === 'a';
-  const isImage = node.tag === 'img';
+  const isLink   = node.tag === 'a';
+  const isImage  = node.tag === 'img';
+  const isSlider = node.tag === 'slider';
+  const isPreviewing = previewSliderId && previewSliderId === node.id;
 
   // Derived curated tag groups, plus the element's current tag pinned
   // to the top group if it's outside our curated list (rare — tolerated).
@@ -398,6 +412,82 @@ export default function SettingsPanel({ node, pageId, onSetTag, onSetAttribute, 
         Visibility conditions and embed raw-HTML editor land alongside
         CMS collections in a later phase.
       </div>
+
+      {isSlider && (
+        <Section title="Slider">
+          <Row label="Autoplay">
+            <select
+              value={String(attrs.autoplay ?? 'true')}
+              onChange={(e) => onSetAttribute('autoplay', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="true">On</option>
+              <option value="false">Off</option>
+            </select>
+          </Row>
+          <Row label="Interval">
+            <Text
+              value={attrs.interval}
+              onChange={(v) => onSetAttribute('interval', v)}
+              placeholder="4500"
+            />
+          </Row>
+          <Row label="Loop">
+            <select
+              value={String(attrs.loop ?? 'true')}
+              onChange={(e) => onSetAttribute('loop', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="true">Wrap around</option>
+              <option value="false">Stop at ends</option>
+            </select>
+          </Row>
+          <Row label="Transition">
+            <select
+              value={attrs.transition || 'slide'}
+              onChange={(e) => onSetAttribute('transition', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="slide">Slide</option>
+              <option value="fade">Fade</option>
+            </select>
+          </Row>
+          <Row label="Arrows">
+            <select
+              value={String(attrs.show_arrows ?? 'true')}
+              onChange={(e) => onSetAttribute('show_arrows', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="true">Show</option>
+              <option value="false">Hide</option>
+            </select>
+          </Row>
+          <Row label="Dots">
+            <select
+              value={String(attrs.show_dots ?? 'true')}
+              onChange={(e) => onSetAttribute('show_dots', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="true">Show</option>
+              <option value="false">Hide</option>
+            </select>
+          </Row>
+          <div style={{ padding: '6px 0 2px 72px' }}>
+            <button
+              onClick={() => onTogglePreviewSlider?.(node.id)}
+              style={{
+                padding: '4px 10px', fontSize: '10.5px', fontWeight: 600,
+                background: isPreviewing ? W.accent : W.accentDim,
+                color:      isPreviewing ? '#fff'   : W.accent,
+                border: `1px solid ${W.accent}`, borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              {isPreviewing ? '◼ Stop preview' : '▶ Preview slider'}
+            </button>
+          </div>
+        </Section>
+      )}
 
       <AssetPicker
         open={pickerOpen}

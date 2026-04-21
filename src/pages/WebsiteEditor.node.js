@@ -16,6 +16,7 @@
 
 import React, { useRef, useLayoutEffect, useState, useEffect } from 'react';
 import { renderRuns, isRunArray, runsFromElement } from './WebsiteEditor.richtext';
+import EditorSliderPreview from './WebsiteEditor.slider.preview';
 
 const VOID_TAGS = new Set([
   'img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'area', 'base',
@@ -85,9 +86,21 @@ const ALLOWED_TAGS = new Set([
   'button', 'form', 'input', 'textarea', 'select', 'option', 'label',
   'blockquote', 'code', 'pre', 'em', 'strong', 'small',
   'details', 'summary',
+  'u', 's', 'code', 'sup', 'sub', // rich-text mark tags (Phase D)
   'br', 'hr',
   'body', // compiler uses body as the page root; we rewrite to div
 ]);
+
+// Phase F composite tags. Rewritten to layout elements in the editor
+// so every native DOM feature (selection outline, drag-drop target,
+// drag-drop indicator) keeps working against plain div-like nodes.
+// Storefront has its own runtime renderer that activates carousel /
+// lightbox behaviour for the same tags.
+const COMPOSITE_TAG_REWRITE = {
+  slider: 'section',
+  slide:  'div',
+  lightbox: 'span',
+};
 
 const ATTR_ALIASES = { class: 'className', for: 'htmlFor' };
 
@@ -228,6 +241,7 @@ export function Node({
   onCommitText, onCommitRuns, onCancelEdit,
   editableRef,
   components,
+  previewSliderId,
 }) {
   if (!node || typeof node !== 'object') return null;
 
@@ -269,11 +283,82 @@ export function Node({
   }
 
   const rawTag = node.tag || 'div';
-  const Tag = rawTag === 'body' ? 'div' : (ALLOWED_TAGS.has(rawTag) ? rawTag : 'div');
+  // Composite tags (slider / slide / lightbox) get rewritten to real
+  // HTML elements for the editor canvas but keep their identity in a
+  // data-tapas-composite attr so staff see what they're editing.
+  const composite = COMPOSITE_TAG_REWRITE[rawTag];
+  const Tag = composite
+    ? composite
+    : (rawTag === 'body' ? 'div' : (ALLOWED_TAGS.has(rawTag) ? rawTag : 'div'));
   const className = (node.classes || []).join(' ') || undefined;
   const attrs = attrsToProps(node.attributes);
   attrs['data-tapas-node-id'] = node.id;
+  if (composite) attrs['data-tapas-composite'] = rawTag;
   if (node.id === selectedId) attrs['data-tapas-selected'] = '';
+
+  // Slider — preview mode runs the editor-side carousel so staff can
+  // sanity-check the autoplay / swipe behaviour without leaving the
+  // canvas. Default view stays stacked so every slide is editable.
+  if (rawTag === 'slider' && previewSliderId === node.id) {
+    const childNodes = (node.children || []).map((child) => (
+      <Node
+        key={child.id}
+        node={child}
+        selectedId={selectedId}
+        editingNodeId={editingNodeId}
+        onCommitText={onCommitText}
+        onCommitRuns={onCommitRuns}
+        onCancelEdit={onCancelEdit}
+        editableRef={editableRef}
+        components={components}
+        previewSliderId={previewSliderId}
+      />
+    ));
+    return (
+      <EditorSliderPreview
+        node={node}
+        slides={childNodes}
+        className={className}
+        dataAttrs={attrs}
+      />
+    );
+  }
+
+  // Lightbox editor affordance: render normally but overlay a ⛶ badge
+  // so staff can tell the image is click-through on the storefront.
+  if (rawTag === 'lightbox') {
+    const lbChildren = node.children || [];
+    return (
+      <Tag className={className} {...attrs} style={{ ...(attrs.style || {}), position: 'relative', display: 'inline-block' }}>
+        {lbChildren.map((child) => (
+          <Node
+            key={child.id}
+            node={child}
+            selectedId={selectedId}
+            editingNodeId={editingNodeId}
+            onCommitText={onCommitText}
+            onCommitRuns={onCommitRuns}
+            onCancelEdit={onCancelEdit}
+            editableRef={editableRef}
+            components={components}
+            previewSliderId={previewSliderId}
+          />
+        ))}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute', top: '6px', right: '6px',
+            padding: '2px 5px',
+            background: 'rgba(20, 110, 245, 0.9)', color: '#fff',
+            fontSize: '10px', fontWeight: 700, borderRadius: '3px',
+            fontFamily: 'ui-monospace, monospace',
+            pointerEvents: 'none', letterSpacing: '0.04em',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
+          }}
+        >⛶ LIGHTBOX</span>
+      </Tag>
+    );
+  }
 
   if (VOID_TAGS.has(Tag)) {
     if (Tag === 'img') {
@@ -332,6 +417,7 @@ export function Node({
           onCancelEdit={onCancelEdit}
           editableRef={editableRef}
           components={components}
+          previewSliderId={previewSliderId}
         />
       ))}
     </Tag>

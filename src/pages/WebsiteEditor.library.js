@@ -310,6 +310,80 @@ const Navbar = () => n('nav', {
   ],
 });
 
+// Slider — Phase F composite. The <slider> custom tag flags the node
+// to both renderers: editor stacks slides vertically for in-place
+// editing; storefront upgrades to a swipeable carousel with arrows,
+// dots, and autoplay. Attributes drive the runtime (autoplay, interval,
+// loop, show_arrows, show_dots, transition).
+const Slider = () => n('slider', {
+  classes: ['tapas-slider'],
+  attributes: {
+    'data-tapas-slider': '',
+    autoplay: 'true',
+    interval: '4500',
+    loop: 'true',
+    show_arrows: 'true',
+    show_dots: 'true',
+    transition: 'slide',
+  },
+  children: [
+    n('slide', {
+      classes: ['tapas-slide'],
+      children: [
+        n('h2', { classes: ['tapas-slide-title'], textContent: 'Slide one' }),
+        n('p',  { classes: ['tapas-slide-body'],  textContent: 'Edit this slide or drag to reorder.' }),
+      ],
+    }),
+    n('slide', {
+      classes: ['tapas-slide'],
+      children: [
+        n('h2', { classes: ['tapas-slide-title'], textContent: 'Slide two' }),
+        n('p',  { classes: ['tapas-slide-body'],  textContent: 'Click a slide to edit its contents.' }),
+      ],
+    }),
+    n('slide', {
+      classes: ['tapas-slide'],
+      children: [
+        n('h2', { classes: ['tapas-slide-title'], textContent: 'Slide three' }),
+        n('p',  { classes: ['tapas-slide-body'],  textContent: 'Add more slides via the Navigator.' }),
+      ],
+    }),
+  ],
+});
+
+// Empty slide, used when staff clicks "+ Slide" inside an existing
+// slider. Separate factory so the Add panel can offer it as its own
+// tile for when drag-into-slider is awkward.
+const Slide = () => n('slide', {
+  classes: ['tapas-slide'],
+  children: [
+    n('h2', { classes: ['tapas-slide-title'], textContent: 'New slide' }),
+    n('p',  { classes: ['tapas-slide-body'],  textContent: 'Replace me.' }),
+  ],
+});
+
+// Lightbox — wraps an image. Click on the storefront pops a full-size
+// modal. In the editor it renders as a plain image with a ⛶ indicator
+// (handled by the Node renderer). The `group` attribute ties related
+// lightboxes together so prev/next paging walks the gallery.
+const Lightbox = () => n('lightbox', {
+  classes: ['tapas-lightbox'],
+  attributes: {
+    'data-tapas-lightbox': '',
+    group: 'gallery-1',
+  },
+  children: [
+    n('img', {
+      classes: ['tapas-lightbox-img'],
+      attributes: {
+        src: 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=1200',
+        alt: 'Lightbox photo',
+        loading: 'lazy',
+      },
+    }),
+  ],
+});
+
 // Accordion — same <details> primitive without the shared `name`, so
 // any number of sections can be open at once. Dropdown / FAQ / spec
 // sheet all fit this pattern.
@@ -385,6 +459,9 @@ export const BLOCK_CATALOGUE = [
   { key: 'tabs',      group: 'Advanced', label: 'Tabs',         glyph: '▤',   keywords: 'tabs tabbed sections switch',     create: Tabs      },
   { key: 'accordion', group: 'Advanced', label: 'Accordion',    glyph: '≡',   keywords: 'accordion faq collapse expand dropdown', create: Accordion },
   { key: 'navbar',    group: 'Advanced', label: 'Navbar',       glyph: '▭',   keywords: 'navbar nav menu header responsive hamburger', create: Navbar },
+  { key: 'slider',    group: 'Advanced', label: 'Slider',       glyph: '↔',   keywords: 'slider carousel hero swipe autoplay', create: Slider },
+  { key: 'slide',     group: 'Advanced', label: 'Slide',        glyph: '▭',   keywords: 'slide slider item frame',                 create: Slide  },
+  { key: 'lightbox',  group: 'Advanced', label: 'Lightbox',     glyph: '⛶',   keywords: 'lightbox modal zoom gallery image popup', create: Lightbox },
 ];
 
 // Used by AddPanel to render groups in a stable order.

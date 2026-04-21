@@ -196,6 +196,10 @@ const SAFE_TAGS = new Set([
   'img', 'video', 'iframe', 'picture',
   'button', 'form', 'input', 'textarea', 'select', 'option', 'label',
   'blockquote', 'code', 'pre', 'em', 'strong', 'small',
+  // Phase F composites — custom tags so renderers can activate
+  // runtime carousel / lightbox behaviour. Editor treats them as
+  // layout containers; storefront wraps them in interactive runtime.
+  'slider', 'slide', 'lightbox',
 ]);
 
 export function setNodeTag(content, pageKey, nodeId, tag) {

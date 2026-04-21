@@ -13,6 +13,8 @@
 // =====================================================================
 
 import React, { useState, useEffect } from 'react';
+import Slider from './Slider';
+import Lightbox from './Lightbox';
 
 // Tags that are self-closing in HTML. React handles most of this for us
 // but keeping the list explicit avoids passing `children` to them.
@@ -130,11 +132,35 @@ const ALLOWED_TAGS = new Set([
   'button', 'form', 'input', 'textarea', 'select', 'option', 'label',
   'blockquote', 'code', 'pre', 'em', 'strong', 'small',
   'details', 'summary',
+  'u', 's', 'code', 'sup', 'sub',   // rich-text mark tags (Phase D)
   'br', 'hr',
   // body is used by the compiler as the tree root; React won't render a
   // nested <body> so we rewrite it to <div class="tapas-page-root">.
   'body',
 ]);
+
+// Phase F slides — rendered inside Slider via renderChild. Treated
+// as plain divs by the static renderer so slide styling (via
+// classes) still works.
+const COMPOSITE_TAG_REWRITE = { slide: 'div' };
+
+// Phase F composites — the storefront hands these off to interactive
+// runtime wrappers. The wrappers render the slot children back through
+// Node so the rest of the tree (styles, classes, nested composites)
+// keeps working. Done before the componentRef branch so a component
+// whose root is a slider still activates the carousel.
+function renderComposite(node, components) {
+  const renderChild = (child, opts) => (
+    <Node node={child} components={opts?.components ?? components} />
+  );
+  if (node.tag === 'slider') {
+    return <Slider node={node} renderChild={renderChild} components={components} />;
+  }
+  if (node.tag === 'lightbox') {
+    return <Lightbox node={node} renderChild={renderChild} components={components} />;
+  }
+  return null;
+}
 
 export function Node({ node, components }) {
   if (!node || typeof node !== 'object') return null;
@@ -157,9 +183,18 @@ export function Node({ node, components }) {
     return <Node node={def.root} components={components} />;
   }
 
+  // Phase F: slider / lightbox route through their own runtimes; the
+  // rest of this function never sees them.
+  if (node.tag === 'slider' || node.tag === 'lightbox') {
+    return renderComposite(node, components);
+  }
+
   const rawTag = node.tag || 'div';
   // A nested <body> inside React would be ignored; rewrite it.
-  const Tag = rawTag === 'body' ? 'div' : (ALLOWED_TAGS.has(rawTag) ? rawTag : 'div');
+  const composite = COMPOSITE_TAG_REWRITE[rawTag];
+  const Tag = composite
+    ? composite
+    : (rawTag === 'body' ? 'div' : (ALLOWED_TAGS.has(rawTag) ? rawTag : 'div'));
   const className = (node.classes || []).join(' ') || undefined;
 
   // Attributes — React uses camelCase for some, kebab for data-*/aria-*.
@@ -168,8 +203,10 @@ export function Node({ node, components }) {
   // known attrs so the set is small.
   const attrs = attrsToReactProps(node.attributes || {});
 
-  // Tag-rewrite warning marker when we silently downgraded the tag.
-  if (rawTag !== Tag) attrs['data-tapas-unknown-tag'] = rawTag;
+  // Tag-rewrite warning marker when we silently downgraded the tag —
+  // skipped for intentional composite rewrites (slide → div).
+  if (rawTag !== Tag && !composite) attrs['data-tapas-unknown-tag'] = rawTag;
+  if (composite) attrs['data-tapas-composite'] = rawTag;
 
   // Void tags can't carry children.
   if (VOID_TAGS.has(Tag)) {
