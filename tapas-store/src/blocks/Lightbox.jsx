@@ -16,11 +16,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-// Module-level registry — every mounted Lightbox registers itself
-// under its `group` so open() knows the siblings to page through.
-// WeakMap would leak per-refresh, but the registry is fine since
-// unmount removes the entry.
-const groups = new Map(); // group -> Set<{ id, src, alt }>
+// Registry — every mounted Lightbox registers itself under its
+// `group` so open() knows the siblings to page through. Attached to
+// window so CRA's hot-module-replace doesn't allocate a new Map on
+// every save while stale entries from the previous module instance
+// still live in the DOM. In production this is a plain singleton.
+const GROUPS_KEY = '__tapasLightboxGroups';
+const groups = (() => {
+  if (typeof window === 'undefined') return new Map();
+  if (!window[GROUPS_KEY]) window[GROUPS_KEY] = new Map();
+  return window[GROUPS_KEY];
+})();
 
 function register(group, entry) {
   if (!group) return () => {};

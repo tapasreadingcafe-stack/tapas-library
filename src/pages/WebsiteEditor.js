@@ -1790,14 +1790,34 @@ export default function WebsiteEditor() {
   // handle them when the need comes up).
   const handleDropAsset = useCallback((payload, targetId, position) => {
     if (!payload?.url) return;
-    const assetEntry = BLOCK_CATALOGUE.find((b) => b.key === 'image');
-    if (!assetEntry) return;
-    const newNode = assetEntry.create();
-    newNode.attributes = {
-      ...(newNode.attributes || {}),
-      src: payload.url,
-      alt: payload.alt || '',
-    };
+    // Asset kind drives which block type to create. Previously every
+    // asset became an <img>, so dragging an mp4 produced <img src="v.mp4">
+    // which renders as a broken-image placeholder on the storefront.
+    const kind = payload.kind || 'image';
+    let newNode;
+    if (kind === 'video') {
+      newNode = {
+        id: 'n_' + Math.random().toString(36).slice(2, 9),
+        tag: 'video',
+        classes: ['video'],
+        attributes: {
+          src: payload.url,
+          controls: '',
+          playsInline: '',
+          preload: 'metadata',
+        },
+        children: [],
+      };
+    } else {
+      const assetEntry = BLOCK_CATALOGUE.find((b) => b.key === 'image');
+      if (!assetEntry) return;
+      newNode = assetEntry.create();
+      newNode.attributes = {
+        ...(newNode.attributes || {}),
+        src: payload.url,
+        alt: payload.alt || '',
+      };
+    }
     applyEdit((c) => {
       if (!targetId || position === 'append') {
         return insertNode(c, activePageKey, null, newNode);
@@ -1818,7 +1838,7 @@ export default function WebsiteEditor() {
   // Click handler for the AssetsPanel's "insert here" button — inserts
   // at root, no drop target required.
   const handleInsertAsset = useCallback((asset) => {
-    handleDropAsset({ url: asset.url, alt: asset.name }, null, 'append');
+    handleDropAsset({ url: asset.url, alt: asset.name, kind: asset.kind }, null, 'append');
   }, [handleDropAsset]);
 
   // --- Phase 9 mutation handlers (duplicate / remove / paste) ---------

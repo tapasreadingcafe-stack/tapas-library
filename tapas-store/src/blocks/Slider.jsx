@@ -46,8 +46,21 @@ export default function Slider({ node, renderChild, components }) {
 
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [tabHidden, setTabHidden] = useState(
+    typeof document !== 'undefined' && document.visibilityState === 'hidden'
+  );
   const rootRef = useRef(null);
   const pointerRef = useRef(null); // { startX, startY, dx, dy, active }
+
+  // Don't burn CPU on carousels in background tabs. Also helpful for
+  // users on battery power: a tab with a visible slider wakes the GPU
+  // every `interval` ms even when hidden.
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const onVis = () => setTabHidden(document.visibilityState === 'hidden');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   const go = useCallback((dir) => {
     setActive((i) => {
@@ -68,10 +81,10 @@ export default function Slider({ node, renderChild, components }) {
   // re-trigger from hover-off is imperceptible, so setInterval is
   // fine and avoids reinventing a scheduler.
   useEffect(() => {
-    if (!autoplay || paused || count < 2) return undefined;
+    if (!autoplay || paused || tabHidden || count < 2) return undefined;
     const id = setInterval(() => go(1), interval);
     return () => clearInterval(id);
-  }, [autoplay, paused, interval, go, count]);
+  }, [autoplay, paused, tabHidden, interval, go, count]);
 
   // Pointer swipe. We capture on pointerdown so the slider owns the
   // gesture even if the pointer leaves the element mid-drag. Threshold
@@ -134,11 +147,17 @@ export default function Slider({ node, renderChild, components }) {
   }
 
   return (
+    // No tabIndex on the section — the internal arrows + dots are
+    // already keyboard-focusable buttons, so adding a tab stop here
+    // would make screen readers announce "slider / slide 1 button /
+    // slide 2 button / …" for every carousel on the page. Keyboard
+    // ←/→ still works: onKeyDown fires whenever the active focus
+    // lives inside the slider (event bubbles).
     <section
       ref={rootRef}
       className={className}
       data-tapas-slider=""
-      tabIndex={0}
+      aria-roledescription="carousel"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}

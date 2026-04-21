@@ -15,7 +15,7 @@
 // layer and the authoring surface.
 // =====================================================================
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   listCollections, createCollection, deleteCollection, updateCollection,
   listItems, createItem, updateItem, deleteItem,
@@ -262,6 +262,20 @@ function SchemaView({ collection, onBack, onSave }) {
   };
   const add = () => setFields([...fields, makeField({})]);
 
+  // Detect collisions: two labels that normalise to the same snake_
+  // case key silently overwrote each other in `data` before. Surface
+  // the collision inline so staff see + fix it instead of losing
+  // data on publish.
+  const keyCounts = fields.reduce((acc, f) => {
+    const k = (f.key || '').trim();
+    if (!k) return acc;
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const collidingKeys = new Set(Object.keys(keyCounts).filter((k) => keyCounts[k] > 1));
+  const blankKey = fields.some((f) => !(f.key || '').trim());
+  const canSave = collidingKeys.size === 0 && !blankKey;
+
   return (
     <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div style={{ color: P.text, fontSize: '12.5px', fontWeight: 700 }}>
@@ -270,34 +284,49 @@ function SchemaView({ collection, onBack, onSave }) {
       {fields.length === 0 && (
         <Empty>No fields yet. Add one below.</Empty>
       )}
-      {fields.map((f, i) => (
-        <div key={i} style={{
-          padding: '8px', background: '#1f1f1f',
-          border: `1px solid ${P.inputBorder}`, borderRadius: '3px',
-          display: 'flex', flexDirection: 'column', gap: '4px',
-        }}>
-          <Input
-            value={f.label}
-            onChange={(v) => update(i, { label: v, key: (f.key || v).replace(/[^a-z0-9_]/gi, '_').toLowerCase() })}
-            placeholder="Field label"
-          />
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <Select
-              value={f.type}
-              onChange={(v) => update(i, { type: v })}
-              options={FIELD_TYPES}
+      {fields.map((f, i) => {
+        const collides = collidingKeys.has((f.key || '').trim());
+        return (
+          <div key={i} style={{
+            padding: '8px', background: '#1f1f1f',
+            border: `1px solid ${collides ? '#9a3a3a' : P.inputBorder}`, borderRadius: '3px',
+            display: 'flex', flexDirection: 'column', gap: '4px',
+          }}>
+            <Input
+              value={f.label}
+              onChange={(v) => update(i, { label: v, key: (f.key || v).replace(/[^a-z0-9_]/gi, '_').toLowerCase() })}
+              placeholder="Field label"
             />
-            <button onClick={() => remove(i)} style={iconBtn()} title="Remove">×</button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <Select
+                value={f.type}
+                onChange={(v) => update(i, { type: v })}
+                options={FIELD_TYPES}
+              />
+              <button onClick={() => remove(i)} style={iconBtn()} title="Remove">×</button>
+            </div>
+            <div style={{ color: collides ? '#ff9a9a' : P.textFaint, fontSize: '10.5px' }}>
+              key: <code>{f.key || '(empty)'}</code>
+              {collides && ' · ⚠ duplicate key — rename to avoid losing data'}
+            </div>
           </div>
-          <div style={{ color: P.textFaint, fontSize: '10.5px' }}>
-            key: <code>{f.key}</code>
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       <div style={{ display: 'flex', gap: '6px' }}>
         <button onClick={add} style={primaryButton()}>+ Field</button>
-        <button onClick={() => onSave({ fields })} style={saveButton()}>Save schema</button>
+        <button
+          onClick={() => canSave && onSave({ fields })}
+          disabled={!canSave}
+          style={{
+            ...saveButton(),
+            opacity: canSave ? 1 : 0.4,
+            cursor: canSave ? 'pointer' : 'not-allowed',
+          }}
+          title={!canSave
+            ? (blankKey ? 'Fix blank field keys first' : 'Fix duplicate keys first')
+            : 'Save schema'}
+        >Save schema</button>
       </div>
       <div style={{ padding: '2px 0' }}>
         <button onClick={onBack} style={linkButton()}>← Back to collections</button>
@@ -374,7 +403,15 @@ function ItemsView({ collection, onBack, onError }) {
           <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
             <Btn onClick={() => setEditing(it.id)}>Edit</Btn>
             <Btn
+              disabled={it.status !== 'published' && !(it.slug || '').trim()}
               onClick={async () => {
+                // Publishing without a slug would produce a broken
+                // /collection/<slug> link on the storefront, so guard
+                // at the UI layer. Unpublish is always OK.
+                if (it.status !== 'published' && !(it.slug || '').trim()) {
+                  onError('Cannot publish: slug is empty. Open the item and set one.');
+                  return;
+                }
                 try {
                   await updateItem(it.id, {
                     status: it.status === 'published' ? 'draft' : 'published',
@@ -460,11 +497,10 @@ function FieldInput({ field, value, onChange }) {
     case 'number':
       return (
         <Row label={label}>
-          <Input
-            value={value ?? ''}
-            onChange={onChange}
+          <NumberField
+            value={value}
+            onCommit={onChange}
             placeholder="0"
-            inputMode="decimal"
           />
         </Row>
       );
@@ -523,6 +559,58 @@ function Input({ value, onChange, placeholder, inputMode }) {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       inputMode={inputMode}
+      style={{
+        width: '100%', height: '22px',
+        padding: '0 6px',
+        background: P.input, color: P.text,
+        border: `1px solid ${P.inputBorder}`, borderRadius: '3px',
+        fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+      }}
+    />
+  );
+}
+
+// Numeric input that lets the user type partial decimals like "1." or
+// "-" without immediately coercing the raw string to NaN. The buffered
+// draft only commits as a Number on blur / Enter. Blank clears to null
+// so the stored blob doesn't carry empty-string numbers.
+function NumberField({ value, onCommit, placeholder }) {
+  const [draft, setDraft] = useState(value == null ? '' : String(value));
+  const lastRef = useRef(value == null ? '' : String(value));
+  useEffect(() => {
+    const v = value == null ? '' : String(value);
+    if (v !== lastRef.current) {
+      setDraft(v);
+      lastRef.current = v;
+    }
+  }, [value]);
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed === '') {
+      if (lastRef.current === '') return;
+      lastRef.current = '';
+      onCommit(null);
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) { setDraft(lastRef.current); return; }
+    const canonical = String(n);
+    if (canonical === lastRef.current) return;
+    lastRef.current = canonical;
+    setDraft(canonical);
+    onCommit(n);
+  };
+  return (
+    <input
+      value={draft}
+      placeholder={placeholder}
+      inputMode="decimal"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter')  { e.currentTarget.blur(); }
+        if (e.key === 'Escape') { setDraft(lastRef.current); e.currentTarget.blur(); }
+      }}
       style={{
         width: '100%', height: '22px',
         padding: '0 6px',

@@ -33,15 +33,34 @@ function randomId() {
 }
 
 // Public URL cache — avoids re-deriving the same URL on every render
-// of the AssetsPanel grid.
+// of the AssetsPanel grid. Bounded so a long-lived session browsing
+// a huge bucket doesn't grow the map forever, and exposes an
+// invalidate() so callers can force a refresh after a bucket-policy
+// change or auth handover.
+const PUBLIC_URL_CACHE_MAX = 1000;
 const _publicUrlCache = new Map();
 export function publicUrlFor(path) {
   if (!path) return '';
-  if (_publicUrlCache.has(path)) return _publicUrlCache.get(path);
+  if (_publicUrlCache.has(path)) {
+    // Refresh LRU position by re-inserting.
+    const hit = _publicUrlCache.get(path);
+    _publicUrlCache.delete(path);
+    _publicUrlCache.set(path, hit);
+    return hit;
+  }
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   const url = data?.publicUrl || '';
+  if (_publicUrlCache.size >= PUBLIC_URL_CACHE_MAX) {
+    // Evict the oldest key (Map insertion order).
+    const oldest = _publicUrlCache.keys().next().value;
+    if (oldest) _publicUrlCache.delete(oldest);
+  }
   _publicUrlCache.set(path, url);
   return url;
+}
+
+export function invalidateAssetCache() {
+  _publicUrlCache.clear();
 }
 
 // Classify a storage object by its mime / extension so the panel can
@@ -105,11 +124,23 @@ function extOf(file) {
 // Progress is reported via the optional onProgress(fraction) callback;
 // Supabase JS v2 doesn't yet expose upload progress, so we approximate
 // with a two-step indicator (pre-upload → post-upload).
+// Sanitise the caller's pageId so component-scope keys (e.g.
+// `__c:uuid`) don't leak into Supabase Storage paths as folder names
+// with colons — jank to browse and invalid in some CDN setups. Anything
+// without a clean [a-z0-9-_] shape collapses to 'site'.
+function sanitisePageId(pageId) {
+  const s = String(pageId || '').trim();
+  if (!s) return 'site';
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(s)) return 'site';
+  return s.toLowerCase();
+}
+
 export async function uploadAsset(file, { pageId = 'site', onProgress } = {}) {
   if (!file) throw new Error('No file provided');
   const id = randomId();
   const ext = extOf(file);
-  const path = `${pageId}/${id}.${ext}`;
+  const scopedId = sanitisePageId(pageId);
+  const path = `${scopedId}/${id}.${ext}`;
 
   onProgress?.(0.05);
   const thumbBlob = await makeThumbnail(file);
@@ -129,7 +160,7 @@ export async function uploadAsset(file, { pageId = 'site', onProgress } = {}) {
 
   let thumbPath = null;
   if (thumbBlob) {
-    thumbPath = `${pageId}/thumbs/${id}.png`;
+    thumbPath = `${scopedId}/thumbs/${id}.png`;
     const { error: thErr } = await supabase
       .storage.from(BUCKET)
       .upload(thumbPath, thumbBlob, {
@@ -163,19 +194,41 @@ export async function uploadAsset(file, { pageId = 'site', onProgress } = {}) {
 // returns one directory at a time, so we first list the prefixes, then
 // each prefix's files. Thumbnails are paired back to their full file
 // via shared UUID.
+// Supabase's list() caps each response at 1000 entries. For sites
+// that accumulate more assets, page through until the response comes
+// back short. Hard ceiling at 10k to keep the grid responsive; the
+// panel would need virtualisation to go higher.
+const LIST_PAGE_SIZE = 1000;
+const LIST_MAX       = 10000;
+
+async function listAllInPrefix(root) {
+  const out = [];
+  let offset = 0;
+  while (out.length < LIST_MAX) {
+    const { data, error } = await supabase.storage.from(BUCKET).list(root, {
+      limit: LIST_PAGE_SIZE,
+      offset,
+      sortBy: { column: 'created_at', order: 'desc' },
+    });
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.warn(`list(${root}) failed: ${error.message}`);
+      return out;
+    }
+    const page = data || [];
+    out.push(...page);
+    if (page.length < LIST_PAGE_SIZE) break;
+    offset += LIST_PAGE_SIZE;
+  }
+  return out;
+}
+
 export async function listAssets({ pageId } = {}) {
   const roots = pageId ? [pageId] : await listRootPrefixes();
   const files = [];
   for (const root of roots) {
-    const { data, error } = await supabase.storage.from(BUCKET).list(root, {
-      limit: 1000,
-      sortBy: { column: 'created_at', order: 'desc' },
-    });
-    if (error) {
-      console.warn(`list(${root}) failed: ${error.message}`);
-      continue;
-    }
-    for (const entry of data || []) {
+    const entries = await listAllInPrefix(root);
+    for (const entry of entries) {
       // Skip the `thumbs/` sub-folder marker — listed separately below.
       if (!entry.name || entry.name === 'thumbs') continue;
       const path = `${root}/${entry.name}`;
@@ -201,14 +254,24 @@ export async function listAssets({ pageId } = {}) {
 }
 
 async function listRootPrefixes() {
-  const { data, error } = await supabase.storage.from(BUCKET).list('', {
-    limit: 1000,
-    sortBy: { column: 'name', order: 'asc' },
-  });
-  if (error) return ['site'];
-  return (data || [])
-    .filter((e) => e && e.id == null && e.name && !e.name.startsWith('.'))
-    .map((e) => e.name);
+  // Prefix list is normally small (one per page key). Paged defensively.
+  const out = [];
+  let offset = 0;
+  while (out.length < LIST_MAX) {
+    const { data, error } = await supabase.storage.from(BUCKET).list('', {
+      limit: LIST_PAGE_SIZE,
+      offset,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+    if (error) return out.length ? out : ['site'];
+    const page = (data || [])
+      .filter((e) => e && e.id == null && e.name && !e.name.startsWith('.'))
+      .map((e) => e.name);
+    out.push(...page);
+    if ((data || []).length < LIST_PAGE_SIZE) break;
+    offset += LIST_PAGE_SIZE;
+  }
+  return out.length ? out : ['site'];
 }
 
 // -------- Delete ----------------------------------------------------
