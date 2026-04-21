@@ -1000,13 +1000,14 @@ const STANDARD_PAGES = [
   { key: 'events',  slug: '/events',   name: 'Events' },
 ];
 
-function hasClassInTree(node, name) {
-  if (!node) return false;
-  if (Array.isArray(node.classes) && node.classes.includes(name)) return true;
-  for (const c of node.children || []) {
-    if (hasClassInTree(c, name)) return true;
-  }
-  return false;
+// Previously walked the full subtree, which meant a nested
+// `tapas-navbar` class buried inside a slider satisfied the check
+// and the heal skipped seeding the real chrome. Now strict: looks
+// at a single child node (first for navbar, last for footer).
+function childHasClass(child, name) {
+  return !!child
+    && Array.isArray(child.classes)
+    && child.classes.includes(name);
 }
 
 function seedPage({ key, slug, name, brandName }) {
@@ -1037,20 +1038,26 @@ export function ensureSiteDefaults(content) {
   let nextClasses = content.classes || {};
   let mutated = false;
 
-  // Step 1: seed missing standard pages.
-  for (const def of STANDARD_PAGES) {
-    if (!nextPages[def.key]) {
-      if (!mutated) { nextPages = { ...nextPages }; mutated = true; }
+  // Step 1: seed the standard page set ONLY when the content has no
+  // pages at all. Once the site has been initialised, missing
+  // individual pages stay missing — staff might have deleted them on
+  // purpose and we'd be "possessing" the editor by re-seeding them
+  // on every reload.
+  if (Object.keys(nextPages).length === 0) {
+    nextPages = {};
+    for (const def of STANDARD_PAGES) {
       nextPages[def.key] = seedPage({ ...def, brandName });
     }
+    mutated = true;
   }
 
   // Step 2: each page gets a navbar + footer if missing.
   for (const [key, page] of Object.entries(nextPages)) {
     if (!page?.tree || !Array.isArray(page.tree.children)) continue;
 
-    const needsNav    = !hasClassInTree(page.tree, 'tapas-navbar');
-    const needsFooter = !hasClassInTree(page.tree, 'tapas-footer');
+    const kids = page.tree.children;
+    const needsNav    = !childHasClass(kids[0], 'tapas-navbar');
+    const needsFooter = !childHasClass(kids[kids.length - 1], 'tapas-footer');
     if (!needsNav && !needsFooter) continue;
 
     if (!mutated) {

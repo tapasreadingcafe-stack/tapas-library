@@ -35,6 +35,50 @@ const W = {
 // ---------------------------------------------------------------------
 // Small shared UI atoms
 // ---------------------------------------------------------------------
+// Class-scope reset strip — shows "N props · Reset" whenever the
+// active state/breakpoint bucket has any declarations. Clicking
+// confirms and then clears every property the Style panel can see
+// for that bucket. Scoped: it never touches other states or other
+// breakpoints, and never touches other classes.
+function ResetStrip({ styles, label, onReset }) {
+  const count = Object.keys(styles || {}).length;
+  if (count === 0) return null;
+  const confirm = () => {
+    const ok = typeof window === 'undefined'
+      ? true
+      : window.confirm(`Clear ${count} style${count === 1 ? '' : 's'} from ${label}?`);
+    if (ok) onReset();
+  };
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '6px 12px',
+      background: '#1a1a1a',
+      borderTop: `1px solid ${W.panelBorder}`,
+      borderBottom: `1px solid ${W.panelBorder}`,
+      color: W.textDim, fontSize: '10.5px',
+    }}>
+      <span>
+        <span style={{ color: W.text, fontWeight: 600 }}>{count}</span>
+        {' '}{count === 1 ? 'property' : 'properties'} set in {label}
+      </span>
+      <button
+        onClick={confirm}
+        title={`Reset all ${count} ${count === 1 ? 'property' : 'properties'}`}
+        style={{
+          padding: '2px 8px',
+          background: 'transparent',
+          color: '#ff9a9a',
+          border: '1px solid #5a2a2a',
+          borderRadius: '3px',
+          cursor: 'pointer',
+          fontSize: '10.5px', fontWeight: 600,
+        }}
+      >Reset</button>
+    </div>
+  );
+}
+
 function SectionHeader({ label, collapsed, onToggle }) {
   return (
     <button
@@ -1557,6 +1601,23 @@ export default function StylePanel({
         isBaseBreakpoint={isBaseBreakpoint}
         onCreateClass={onCreateClass}
         onRenameClass={onRenameClass}
+      />
+
+      <ResetStrip
+        styles={styles}
+        label={isBaseBreakpoint
+          ? `${state === 'base' ? 'Base' : state} styles`
+          : `${bp?.label || device} styles`}
+        onReset={() => {
+          // Clear every property the current bucket holds. onSetStyle
+          // routes through setClassStyle with value='' which deletes
+          // the key from the StyleBlock, so this collapses the whole
+          // bucket back to "inherit parent defaults" without touching
+          // other states or breakpoints.
+          for (const prop of Object.keys(styles || {})) {
+            onSetStyle(prop, '');
+          }
+        }}
       />
 
       <SectionHeader

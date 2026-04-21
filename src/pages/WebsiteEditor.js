@@ -407,6 +407,9 @@ function Canvas({
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
   const surfaceRef = useRef(null);
+  // Overlays (selection outline, drop indicator) are mounted inside
+  // this ref so they share the zoomed canvas's coord space.
+  const canvasInnerRef = useRef(null);
 
   // Phase-8 runtime. For every element with data-tapas-anim:
   //   - mirror its timing data-* attributes into CSS variables so
@@ -601,6 +604,13 @@ function Canvas({
   // classify the cursor's vertical band into before / after / inside.
   // Returns null if the cursor isn't over any node (drop falls back
   // to append-to-root in the caller).
+  //
+  // Void tags (img, input, br, hr, video, iframe, …) can't carry
+  // children, so hovering one anchors the drop to its *parent*
+  // with a before/after position relative to the void element's
+  // bounds — that way the indicator never claims "inside" for a
+  // target that couldn't accept it, and the user sees a meaningful
+  // preview (a thin bar at the side of the image / input).
   const classifyDropTarget = (e) => {
     let el = e.target;
     while (el && el !== e.currentTarget) {
@@ -608,16 +618,34 @@ function Canvas({
       el = el.parentElement;
     }
     if (!el || el === e.currentTarget) return null;
+    const tag = el.tagName.toLowerCase();
+    if (VOID_DROP_TAGS.has(tag)) {
+      // Anchor to the parent node so "inside" can never happen; the
+      // side of the void element the cursor is on decides before vs
+      // after.
+      let parent = el.parentElement;
+      while (parent && parent !== e.currentTarget) {
+        if (parent.dataset?.tapasNodeId) break;
+        parent = parent.parentElement;
+      }
+      if (!parent || parent === e.currentTarget) return null;
+      const rect = el.getBoundingClientRect();
+      if (!rect.height) return null;
+      const relY = (e.clientY - rect.top) / rect.height;
+      // Use the void element's own rect as the visual anchor target
+      // so the indicator draws beside the image / input.
+      return {
+        targetId: el.dataset.tapasNodeId,
+        position: relY < 0.5 ? 'before' : 'after',
+      };
+    }
     const rect = el.getBoundingClientRect();
     if (!rect.height) return null;
     const relY = (e.clientY - rect.top) / rect.height;
-    const tag = el.tagName.toLowerCase();
-    const isVoid = VOID_DROP_TAGS.has(tag);
     let position;
-    if (isVoid) position = relY < 0.5 ? 'before' : 'after';
-    else if (relY < 0.25)      position = 'before';
-    else if (relY > 0.75)      position = 'after';
-    else                       position = 'inside';
+    if (relY < 0.25)      position = 'before';
+    else if (relY > 0.75) position = 'after';
+    else                  position = 'inside';
     return { targetId: el.dataset.tapasNodeId, position };
   };
 
@@ -719,14 +747,17 @@ function Canvas({
           padding: '24px',
         }}
       >
-        <div style={{
-          width: vp.width, maxWidth: '100%',
-          transform: `scale(${zoom / 100})`, transformOrigin: 'top center',
-          background: '#fff', minHeight: '80vh',
-          boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)',
-          transition: 'width 0.15s ease',
-          position: 'relative',
-        }}>
+        <div
+          ref={canvasInnerRef}
+          style={{
+            width: vp.width, maxWidth: '100%',
+            transform: `scale(${zoom / 100})`, transformOrigin: 'top center',
+            background: '#fff', minHeight: '80vh',
+            boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)',
+            transition: 'width 0.15s ease',
+            position: 'relative',
+          }}
+        >
           <style>{ANIM_CSS}{cssText}</style>
           <CanvasSelectionShell
             tree={tree}
@@ -743,28 +774,30 @@ function Canvas({
             onContextMenu={onContextMenu}
             previewSliderId={previewSliderId}
           />
+          {/* Overlays live *inside* the zoomed canvas so they share
+              the same coord space as the rendered tree. Using
+              element.offsetTop / offsetLeft (unscaled CSS pixels
+              relative to the canvas inner div) means the outlines
+              stay pixel-perfect at every zoom level. While an
+              inline edit is active, both overlays hide so they
+              don't obscure the caret. */}
+          <SelectionOverlay
+            targetId={editingNodeId ? null : selectedId}
+            rootRef={canvasInnerRef}
+            tree={tree}
+            kind="selected"
+          />
+          <SelectionOverlay
+            targetId={!editingNodeId && hoverId && hoverId !== selectedId ? hoverId : null}
+            rootRef={canvasInnerRef}
+            tree={tree}
+            kind="hover"
+          />
+          <DropIndicator
+            drop={dropHover}
+            rootRef={canvasInnerRef}
+          />
         </div>
-        {/* Overlays live in surface space so they scroll with the
-            canvas. Rect measurements already account for the zoom
-            transform because getBoundingClientRect returns visual
-            pixels. While an inline edit is active, both overlays
-            hide so they don't obscure the caret. */}
-        <SelectionOverlay
-          targetId={editingNodeId ? null : selectedId}
-          surfaceRef={surfaceRef}
-          tree={tree}
-          kind="selected"
-        />
-        <SelectionOverlay
-          targetId={!editingNodeId && hoverId && hoverId !== selectedId ? hoverId : null}
-          surfaceRef={surfaceRef}
-          tree={tree}
-          kind="hover"
-        />
-        <DropIndicator
-          drop={dropHover}
-          surfaceRef={surfaceRef}
-        />
       </div>
     </div>
   );
@@ -777,41 +810,51 @@ function Canvas({
 // surface-local coords. Re-measures on scroll, resize, and whenever the
 // target changes.
 // =====================================================================
-function SelectionOverlay({ targetId, surfaceRef, tree, kind }) {
+function SelectionOverlay({ targetId, rootRef, tree, kind }) {
   const [rect, setRect] = useState(null);
   const [nodeLabel, setNodeLabel] = useState('');
 
   const measure = useCallback(() => {
-    if (!targetId || !surfaceRef.current) { setRect(null); return; }
-    const el = surfaceRef.current.querySelector(
+    if (!targetId || !rootRef?.current) { setRect(null); return; }
+    const root = rootRef.current;
+    const el = root.querySelector(
       `[data-tapas-node-id="${targetId}"]`
     );
     if (!el) { setRect(null); return; }
-    const er = el.getBoundingClientRect();
-    const sr = surfaceRef.current.getBoundingClientRect();
-    setRect({
-      top: er.top - sr.top + surfaceRef.current.scrollTop,
-      left: er.left - sr.left + surfaceRef.current.scrollLeft,
-      width: er.width,
-      height: er.height,
-    });
+    // offsetLeft / offsetTop are unscaled CSS pixels relative to the
+    // nearest positioned ancestor. The canvas inner div is position:
+    // relative, so these stay accurate at every zoom level. Walk up
+    // manually in case an offsetParent boundary (e.g. a transformed
+    // composite) sits between the element and the root.
+    let top = 0, left = 0;
+    let cur = el;
+    while (cur && cur !== root) {
+      top  += cur.offsetTop;
+      left += cur.offsetLeft;
+      cur = cur.offsetParent;
+    }
+    setRect({ top, left, width: el.offsetWidth, height: el.offsetHeight });
     const n = findNode(tree, targetId);
     setNodeLabel(n ? labelOf(n) : '');
-  }, [targetId, surfaceRef, tree]);
+  }, [targetId, rootRef, tree]);
 
   useLayoutEffect(() => { measure(); }, [measure]);
 
   useEffect(() => {
     if (!targetId) return;
-    const surface = surfaceRef.current;
-    if (!surface) return;
+    const root = rootRef?.current;
+    if (!root) return;
     const onScroll = () => measure();
-    surface.addEventListener('scroll', onScroll);
+    // Scroll happens on the outer surface, not the inner canvas —
+    // but offset-based math is unaffected by scroll. Listen anyway
+    // so re-measures happen if layout shifts (e.g. lazy images
+    // finish loading while the user is scrolled).
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', measure);
     // Re-measure after layout settles — fonts, images, etc.
     const t = setTimeout(measure, 50);
     return () => {
-      surface.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', measure);
       clearTimeout(t);
     };
@@ -876,24 +919,25 @@ function toolbarBtn(W) {
 //   inside         → blue dashed outline over the whole target rect
 // Measures identically to SelectionOverlay so coordinates account for
 // canvas zoom and scroll.
-function DropIndicator({ drop, surfaceRef }) {
+function DropIndicator({ drop, rootRef }) {
   const [rect, setRect] = useState(null);
 
   useLayoutEffect(() => {
-    if (!drop?.targetId || !surfaceRef.current) { setRect(null); return; }
-    const el = surfaceRef.current.querySelector(
+    if (!drop?.targetId || !rootRef?.current) { setRect(null); return; }
+    const root = rootRef.current;
+    const el = root.querySelector(
       `[data-tapas-node-id="${drop.targetId}"]`
     );
     if (!el) { setRect(null); return; }
-    const er = el.getBoundingClientRect();
-    const sr = surfaceRef.current.getBoundingClientRect();
-    setRect({
-      top: er.top - sr.top + surfaceRef.current.scrollTop,
-      left: er.left - sr.left + surfaceRef.current.scrollLeft,
-      width: er.width,
-      height: er.height,
-    });
-  }, [drop, surfaceRef]);
+    let top = 0, left = 0;
+    let cur = el;
+    while (cur && cur !== root) {
+      top  += cur.offsetTop;
+      left += cur.offsetLeft;
+      cur = cur.offsetParent;
+    }
+    setRect({ top, left, width: el.offsetWidth, height: el.offsetHeight });
+  }, [drop, rootRef]);
 
   if (!drop || !rect) return null;
   const color = '#146ef5';
@@ -1212,18 +1256,28 @@ export default function WebsiteEditor() {
   // --- Autosave: debounced upsert back to app_settings.store_content_v2 --
   // Mirrors the legacy editor's pattern: 900 ms after the last edit, push
   // the whole blob. Skips if we haven't drifted from what we loaded.
+  //
+  // Epoch guard: if `content` is replaced between scheduling the save
+  // and the 900 ms timer firing, we abandon the stale snapshot instead
+  // of persisting the wrong value. This stops a fast page-swap from
+  // racing with an in-flight save and overwriting the wrong row.
+  const contentEpochRef = useRef(0);
+  useEffect(() => { contentEpochRef.current += 1; }, [content]);
   useEffect(() => {
     if (loading || !content) return;
     if (content === loadedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const snapshotEpoch = contentEpochRef.current;
+    const snapshot = content;
     saveTimerRef.current = setTimeout(async () => {
+      if (snapshotEpoch !== contentEpochRef.current) return; // stale
       setSaving(true); setSaveError('');
       try {
         const { error: err } = await supabase.from('app_settings').upsert({
-          key: V2_KEY, value: content, updated_at: new Date().toISOString(),
+          key: V2_KEY, value: snapshot, updated_at: new Date().toISOString(),
         }, { onConflict: 'key' });
         if (err) throw err;
-        loadedRef.current = content;
+        loadedRef.current = snapshot;
       } catch (err) {
         setSaveError(err.message || 'Failed to save.');
       } finally {
@@ -1292,15 +1346,17 @@ export default function WebsiteEditor() {
     });
   }, []);
 
-  // Self-heal every time `content` changes. Idempotent —
-  // ensureSiteDefaults returns the same reference when nothing needs
-  // patching, so after the first heal this becomes a no-op. Routing
-  // through applyEdit guarantees the heal lands on the history stack
-  // *and* triggers autosave, so the user never has to run a migration
-  // script manually and the navbar/footer survive a hard refresh.
+  // Self-heal runs exactly once per load, not on every content
+  // change. If staff delete a navbar manually, we must NOT re-insert
+  // it the moment the content ref changes — the heal would fight
+  // the user on every undo / redo / edit. Gated via a ref that gets
+  // cleared only when a fresh Supabase row lands (see load effect).
+  const healRunRef = useRef(false);
   useEffect(() => {
+    if (healRunRef.current) return;
     if (!content || loading) return;
     const healed = ensureSiteDefaults(content);
+    healRunRef.current = true;
     if (healed === content) return;
     // eslint-disable-next-line no-console
     console.log('[WebsiteEditor] Self-heal: seeding navbar/footer and any missing standard pages');
@@ -2097,7 +2153,14 @@ function ContextMenu({ open, onClose, onSaveAsComponent, onDetach, isInstance })
     };
   }, [open, onClose]);
   if (!open) return null;
-  const { x, y } = open;
+  // Clamp the anchor to the viewport so a right-click near the
+  // bottom / right edge doesn't push the menu off-screen.
+  const MENU_W = 200;
+  const MENU_H = 80;
+  const vw = (typeof window !== 'undefined' ? window.innerWidth  : 1200) - 8;
+  const vh = (typeof window !== 'undefined' ? window.innerHeight : 800)  - 8;
+  const x = Math.max(4, Math.min(open.x, vw - MENU_W));
+  const y = Math.max(4, Math.min(open.y, vh - MENU_H));
   return (
     <div
       onMouseDown={(e) => e.stopPropagation()}

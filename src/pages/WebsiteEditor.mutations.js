@@ -219,15 +219,28 @@ export function setNodeTag(content, pageKey, nodeId, tag) {
 // leaving `""` around — the renderer treats absence and empty-string
 // identically but the stored blob stays tidier. Called by the inline
 // text editor on blur.
+//
+// If the node previously held rich-text runs (children[0].text), we
+// also strip `children`. The renderer prefers runs over textContent,
+// so leaving stale runs in place would silently shadow the new value
+// the user just typed.
 export function setNodeTextContent(content, pageKey, nodeId, text) {
   return withNode(content, pageKey, nodeId, (node) => {
     const next = text || '';
-    if ((node.textContent || '') === next) return node;
+    const hadRuns = Array.isArray(node.children)
+      && node.children.length > 0
+      && typeof node.children[0]?.text === 'string'
+      && !node.children[0].tag;
+    if ((node.textContent || '') === next && !hadRuns) return node;
     if (!next) {
-      const { textContent: _gone, ...rest } = node;
+      const { textContent: _gone, children: _c, ...rest } = node;
+      // Only re-attach children if they weren't a run shadow.
+      if (node.children && !hadRuns) rest.children = node.children;
       return rest;
     }
-    return { ...node, textContent: next };
+    const { textContent: _gone, children: _c, ...rest } = node;
+    if (node.children && !hadRuns) rest.children = node.children;
+    return { ...rest, textContent: next };
   });
 }
 
@@ -239,10 +252,19 @@ export function setNodeTextContent(content, pageKey, nodeId, text) {
 export function setNodeRuns(content, pageKey, nodeId, runs) {
   const cleaned = normalizeRuns(runs);
   return withNode(content, pageKey, nodeId, (node) => {
-    const before = Array.isArray(node.children) && node.children.length && typeof node.children[0]?.text === 'string'
-      ? node.children
+    // Detect whether the node's existing children are runs (rich-text
+    // leaf) vs actual child Nodes (branch). If the node has child
+    // Nodes, we refuse to replace them with runs — writing runs to a
+    // branch node would be a semantic error and blow away the subtree.
+    const childList = Array.isArray(node.children) ? node.children : [];
+    const hasNodeChildren = childList.length > 0 && !!childList[0]?.tag;
+    if (hasNodeChildren) return node;
+
+    const existingRuns = childList.length > 0 && typeof childList[0]?.text === 'string' && !childList[0].tag
+      ? childList
       : null;
-    if (before && sameRuns(before, cleaned)) return node;
+    if (existingRuns && sameRuns(existingRuns, cleaned)) return node;
+
     const { textContent: _gone, ...rest } = node;
     if (cleaned.length === 0) {
       const { children: _c, ...stripped } = rest;
