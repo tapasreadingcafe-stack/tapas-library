@@ -228,6 +228,21 @@ function cssToHex(cssColor) {
 function ColorInput({ value, onChange }) {
   const hex = cssToHex(value);
   const isSet = Boolean(value && String(value).trim());
+  // Feature-detect the EyeDropper API — currently Chromium-only
+  // (Chrome, Edge, Opera). Non-supported browsers just hide the
+  // button, leaving the swatch + text input as the pickers.
+  const hasEyedropper = typeof window !== 'undefined'
+    && typeof window.EyeDropper === 'function';
+  const pickFromScreen = async () => {
+    try {
+      // eslint-disable-next-line no-undef
+      const ed = new window.EyeDropper();
+      const { sRGBHex } = await ed.open();
+      if (sRGBHex) onChange(sRGBHex);
+    } catch {
+      // User cancelled or API unavailable — nothing to do.
+    }
+  };
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
       <input
@@ -254,6 +269,18 @@ function ColorInput({ value, onChange }) {
           outline: 'none',
         }}
       />
+      {hasEyedropper && (
+        <button
+          onClick={pickFromScreen}
+          title="Pick colour from anywhere on screen"
+          style={{
+            width: '22px', height: '22px', padding: 0,
+            background: 'transparent', color: W.textDim,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '12px',
+          }}
+        >⎋</button>
+      )}
       {isSet && (
         <button
           onClick={() => onChange('')}
@@ -302,12 +329,42 @@ function Selector({ node, className, classDef, onRenameClass, onCreateClass, sta
         </span>
       </div>
       {className ? (
-        <TextInput
-          value={draft}
-          onChange={setDraft}
-          onCommit={commitRename}
-          placeholder="class-name"
-        />
+        <>
+          <TextInput
+            value={draft}
+            onChange={setDraft}
+            onCommit={commitRename}
+            placeholder="class-name"
+          />
+          {/* Combo-class readout. The v2 schema stores classes[] per
+              node, so a node can carry multiple. The Style panel
+              edits only the first (primary); this chip row makes the
+              rest visible so staff don't wonder why their ".is-
+              highlighted" overrides aren't showing up in the Style
+              panel rules list. Read-only for now — editing combos
+              needs a first-class UI. */}
+          {(node?.classes || []).length > 1 && (
+            <div style={{
+              marginTop: '6px', display: 'flex', flexWrap: 'wrap',
+              gap: '4px', alignItems: 'center',
+            }}>
+              <span style={{ color: W.textFaint, fontSize: '10px', marginRight: '2px' }}>
+                +
+              </span>
+              {(node.classes || []).slice(1).map((c) => (
+                <span key={c} style={{
+                  padding: '1px 6px',
+                  background: W.input, color: W.textDim,
+                  border: `1px solid ${W.inputBorder}`, borderRadius: '2px',
+                  fontSize: '10px', fontFamily: 'ui-monospace, monospace',
+                }}>.{c}</span>
+              ))}
+              <span style={{ color: W.textFaint, fontSize: '9.5px', marginLeft: '4px' }}>
+                (edit primary only)
+              </span>
+            </div>
+          )}
+        </>
       ) : (
         <button
           onClick={onCreateClass}
@@ -1568,6 +1625,13 @@ function Effects({ styles, onSet }) {
 // ---------------------------------------------------------------------
 // StylePanel — top-level composition
 // ---------------------------------------------------------------------
+const STYLE_DEVICES = [
+  { key: 'desktop', label: 'Desktop', glyph: '▭' },
+  { key: 'tablet',  label: 'Tablet',  glyph: '▯' },
+  { key: 'mobileL', label: 'Mobile L', glyph: '▯' },
+  { key: 'mobileP', label: 'Mobile P', glyph: '▯' },
+];
+
 export default function StylePanel({
   node,
   className,
@@ -1575,6 +1639,7 @@ export default function StylePanel({
   state,
   onStateChange,
   device,
+  onDeviceChange,
   onCreateClass,
   onRenameClass,
   onSetStyle,
@@ -1619,6 +1684,37 @@ export default function StylePanel({
 
   return (
     <div style={{ overflowY: 'auto', flex: 1 }}>
+      {/* Inline device switcher so staff don't have to hunt up the
+          canvas toolbar when they want to flip to tablet / mobile
+          mid-edit. Mirrors the top-bar device picker; both write to
+          the same `device` state. */}
+      {onDeviceChange && (
+        <div style={{
+          display: 'flex', gap: '2px',
+          padding: '6px 12px',
+          borderBottom: `1px solid ${W.panelBorder}`,
+          background: '#1a1a1a',
+        }}>
+          {STYLE_DEVICES.map((d) => {
+            const active = d.key === (device || 'desktop');
+            return (
+              <button
+                key={d.key}
+                onClick={() => onDeviceChange(d.key)}
+                title={d.label}
+                style={{
+                  flex: 1, height: '22px',
+                  background: active ? W.accentDim : 'transparent',
+                  color: active ? W.accent : W.textDim,
+                  border: `1px solid ${active ? W.accent : W.inputBorder}`,
+                  borderRadius: '3px', cursor: 'pointer',
+                  fontSize: '10.5px',
+                }}
+              >{d.label}</button>
+            );
+          })}
+        </div>
+      )}
       {bp && (
         <div style={{
           padding: '8px 12px',

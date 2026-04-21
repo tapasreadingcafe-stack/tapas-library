@@ -18,8 +18,8 @@ import { supabase } from '../utils/supabase';
 import { Node as TreeNode } from './WebsiteEditor.node';
 import { compileClassesToCSS } from './WebsiteEditor.css';
 import {
-  flattenTree, pathToNode, findNode, parentOf, firstChildOf,
-  prevInFlat, nextInFlat, labelOf,
+  flattenTree, pathToNode, findNode, findNodeIn, buildNodeIndex,
+  parentOf, firstChildOf, prevInFlat, nextInFlat, labelOf,
 } from './WebsiteEditor.tree';
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
@@ -91,7 +91,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -156,6 +156,22 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
       </div>
       {/* Right cluster */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 12px' }}>
+        {unsavedCount > 0 && (
+          <span
+            title="Edits pending autosave — saved within 900ms of your last change"
+            style={{
+              padding: '2px 8px',
+              background: 'rgba(20, 110, 245, 0.12)',
+              color: W.accent,
+              border: `1px solid ${W.accent}`,
+              borderRadius: '999px',
+              fontSize: '10.5px', fontWeight: 600,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {unsavedCount} unsaved {unsavedCount === 1 ? 'edit' : 'edits'}
+          </span>
+        )}
         <select
           value={page}
           onChange={(e) => onPageChange(e.target.value)}
@@ -393,6 +409,16 @@ const VOID_DROP_TAGS = new Set([
   'img', 'input', 'br', 'hr', 'video', 'audio', 'source',
   'area', 'embed', 'iframe',
 ]);
+
+// Escape a value so it can be embedded inside
+// `[data-tapas-node-id="…"]` selectors without breaking out of the
+// attribute context. Current node ids come from newId() (alphanumeric
+// + underscore), so this is mostly insurance against ids pasted from
+// other systems or future schema changes. Inside a quoted attribute
+// value selector only "\" and '"' need escaping.
+function escapeAttrValue(v) {
+  return String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
 
 function Canvas({
   tree, classes, selectedId, onSelect, device, onDeviceChange,
@@ -840,7 +866,7 @@ function SelectionOverlay({ targetId, rootRef, tree, kind }) {
     if (!targetId || !rootRef?.current) { setRect(null); return; }
     const root = rootRef.current;
     const el = root.querySelector(
-      `[data-tapas-node-id="${targetId}"]`
+      `[data-tapas-node-id="${escapeAttrValue(targetId)}"]`
     );
     if (!el) { setRect(null); return; }
     // offsetLeft / offsetTop are unscaled CSS pixels relative to the
@@ -956,7 +982,7 @@ function DropIndicator({ drop, rootRef }) {
     if (!drop?.targetId || !rootRef?.current) { setRect(null); return; }
     const root = rootRef.current;
     const el = root.querySelector(
-      `[data-tapas-node-id="${drop.targetId}"]`
+      `[data-tapas-node-id="${escapeAttrValue(drop.targetId)}"]`
     );
     if (!el) { setRect(null); return; }
     let top = 0, left = 0;
@@ -1085,7 +1111,7 @@ function CanvasSelectionShell({
 function RightPanel({
   selectedNode, className, classDef,
   state, onStateChange,
-  device,
+  device, onDeviceChange,
   onCreateClass, onRenameClass, onSetStyle,
   sharedClassNotice,
   onSetTag, onSetAttribute, onRenameAttribute,
@@ -1148,6 +1174,7 @@ function RightPanel({
             state={state}
             onStateChange={onStateChange}
             device={device}
+            onDeviceChange={onDeviceChange}
             onCreateClass={onCreateClass}
             onRenameClass={onRenameClass}
             onSetStyle={onSetStyle}
@@ -1247,7 +1274,7 @@ export default function WebsiteEditor() {
 
   const handlePlayTimeline = useCallback((triggerKey) => {
     if (!selectedId || typeof document === 'undefined') return;
-    const el = document.querySelector(`[data-tapas-node-id="${selectedId}"]`);
+    const el = document.querySelector(`[data-tapas-node-id="${escapeAttrValue(selectedId)}"]`);
     if (!el) return;
     const raw = el.getAttribute(timelineAttrName(triggerKey));
     const steps = parseTimelineAttr(raw);
@@ -1272,6 +1299,25 @@ export default function WebsiteEditor() {
 
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
+  // Tracks the row's updated_at timestamp from the last successful
+  // load / save. Used as an optimistic lock: before upserting, we
+  // re-check the remote value and abort if someone else persisted a
+  // newer row (i.e. another tab beat us).
+  const lastUpdatedAtRef = useRef(null);
+  const [conflict, setConflict] = useState(false);
+  // Pending-edits count for the topbar chip. Incremented by
+  // applyEdit, zeroed by autosave success.
+  const [unsavedCount, setUnsavedCount] = useState(0);
+  // Transient toast shown at the bottom-right. Used for "can't do
+  // that on the page body" and similar soft blocks — previously the
+  // app just silently ignored the shortcut.
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef(null);
+  const flashToast = useCallback((msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(''), 2400);
+  }, []);
 
   // Undo/redo history. Snapshot-based, capped at 50 entries each way.
   // Autosave still observes content changes identically — undoing just
@@ -1292,11 +1338,12 @@ export default function WebsiteEditor() {
       setLoading(true); setError('');
       try {
         const { data, error: err } = await supabase
-          .from('app_settings').select('value').eq('key', V2_KEY).maybeSingle();
+          .from('app_settings').select('value, updated_at').eq('key', V2_KEY).maybeSingle();
         if (err) throw err;
         if (!data?.value) {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
+        lastUpdatedAtRef.current = data.updated_at || null;
         // Future-schema warning: if the stored row advertises a
         // schema_version we don't understand yet, another staff tab
         // (or a deployed future build) wrote it. Loading it here and
@@ -1338,6 +1385,10 @@ export default function WebsiteEditor() {
   useEffect(() => {
     if (loading || !content) return;
     if (content === loadedRef.current) return;
+    // Once a conflict with another tab is detected we stop saving
+    // entirely — further writes would overwrite the other tab's
+    // changes. User has to reload; the banner explains.
+    if (conflict) return;
     // Schema-version lockout (see load effect). Once we see a newer
     // version than this build supports, refuse to save so we don't
     // clobber fields the newer tab knows about. The banner nudges
@@ -1351,6 +1402,21 @@ export default function WebsiteEditor() {
       if (snapshotEpoch !== contentEpochRef.current) return; // stale
       setSaving(true); setSaveError('');
       try {
+        // Optimistic lock: fetch the row's current updated_at and
+        // compare against what we saw at load / last successful save.
+        // If a second tab (or someone else's session) beat us, we
+        // refuse to clobber their work — surface a banner + lock
+        // further saves until the user reloads.
+        const { data: remote, error: headErr } = await supabase
+          .from('app_settings').select('updated_at').eq('key', V2_KEY).maybeSingle();
+        if (headErr) throw headErr;
+        if (remote?.updated_at
+            && lastUpdatedAtRef.current
+            && remote.updated_at !== lastUpdatedAtRef.current) {
+          setConflict(true);
+          setSaveError('Another tab saved newer changes. Reload before editing to avoid overwriting their work.');
+          return;
+        }
         // Stamp the schema version on every save. A future breaking
         // change (e.g. children[] shape) can read this on load and
         // run a just-in-time migration instead of corrupting data.
@@ -1358,11 +1424,14 @@ export default function WebsiteEditor() {
         const stamped = snapshot && snapshot.schema_version !== SCHEMA_VERSION
           ? { ...snapshot, schema_version: SCHEMA_VERSION }
           : snapshot;
+        const nextUpdatedAt = new Date().toISOString();
         const { error: err } = await supabase.from('app_settings').upsert({
-          key: V2_KEY, value: stamped, updated_at: new Date().toISOString(),
+          key: V2_KEY, value: stamped, updated_at: nextUpdatedAt,
         }, { onConflict: 'key' });
         if (err) throw err;
         loadedRef.current = snapshot;
+        lastUpdatedAtRef.current = nextUpdatedAt;
+        setUnsavedCount(0);
       } catch (err) {
         setSaveError(err.message || 'Failed to save.');
       } finally {
@@ -1370,7 +1439,7 @@ export default function WebsiteEditor() {
       }
     }, 900);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [content, loading]);
+  }, [content, loading, conflict]);
 
   const pages = useMemo(() => {
     if (!content?.pages) return [];
@@ -1388,13 +1457,17 @@ export default function WebsiteEditor() {
   const tree = getEffectivePage(content, activePageKey)?.tree || null;
   const classes = content?.classes || {};
 
+  // Re-usable id → node index. Built once per tree reference so
+  // every downstream lookup (selectedNode, findNode-based callbacks)
+  // resolves in O(1) instead of walking the whole tree.
+  const nodeIndex = useMemo(() => buildNodeIndex(tree), [tree]);
   const breadcrumb = useMemo(
     () => pathToNode(tree, selectedId),
     [tree, selectedId]
   );
   const selectedNode = useMemo(
-    () => findNode(tree, selectedId),
-    [tree, selectedId]
+    () => findNodeIn(nodeIndex, selectedId),
+    [nodeIndex, selectedId]
   );
   const flat = useMemo(() => flattenTree(tree), [tree]);
 
@@ -1448,6 +1521,7 @@ export default function WebsiteEditor() {
         future: [], // any new edit invalidates redo stack
       };
       lastPushAtRef.current = now;
+      setUnsavedCount((n) => n + 1);
       return next;
     });
   }, []);
@@ -1760,8 +1834,18 @@ export default function WebsiteEditor() {
       page.slug || '/'
     );
     if (nextSlug === null) return;
-    applyEdit((c) => renamePage(c, targetKey, { name: nextName, slug: nextSlug }));
-  }, [pageKey, content, applyEdit]);
+    let reason = null;
+    applyEdit((c) => {
+      const { content: next, reason: r } = renamePage(c, targetKey, { name: nextName, slug: nextSlug });
+      reason = r;
+      return next || c;
+    });
+    if (reason === 'slug-collision') {
+      flashToast(`Slug "${nextSlug}" is already in use by another page.`);
+    } else if (reason === 'missing') {
+      flashToast("That page no longer exists.");
+    }
+  }, [pageKey, content, applyEdit, flashToast]);
 
   // Delete the current page. Refuses on 'home' (the mutation also
   // defends this invariant, but the UI disables the button anyway).
@@ -1899,7 +1983,11 @@ export default function WebsiteEditor() {
 
   // --- Phase 9 mutation handlers (duplicate / remove / paste) ---------
   const handleDuplicate = useCallback(() => {
-    if (!selectedId || !tree || selectedId === tree.id) return;
+    if (!selectedId || !tree) return;
+    if (selectedId === tree.id) {
+      flashToast("Can't duplicate the page body.");
+      return;
+    }
     let created = null;
     applyEdit((c) => {
       const { content: next, newId } = duplicateNode(c, activePageKey, selectedId);
@@ -1907,10 +1995,14 @@ export default function WebsiteEditor() {
       return next;
     });
     if (created) setSelectedId(created);
-  }, [selectedId, tree, activePageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit, flashToast]);
 
   const handleDelete = useCallback(() => {
-    if (!selectedId || !tree || selectedId === tree.id) return;
+    if (!selectedId || !tree) return;
+    if (selectedId === tree.id) {
+      flashToast("Can't delete the page body.");
+      return;
+    }
     let fallbackParent = null;
     applyEdit((c) => {
       const { content: next, parentId } = removeNode(c, activePageKey, selectedId);
@@ -1919,7 +2011,7 @@ export default function WebsiteEditor() {
     });
     // Move selection to the parent so the Inspector has something to show.
     setSelectedId(fallbackParent);
-  }, [selectedId, tree, activePageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit, flashToast]);
 
   const handleCopy = useCallback(() => {
     if (!selectedId || !tree) return;
@@ -2087,6 +2179,7 @@ export default function WebsiteEditor() {
         onDeletePage={handleDeletePage}
         onRenamePage={handleRenamePage}
         pages={pages}
+        unsavedCount={unsavedCount}
       />
       {editingComponentId && (
         <div style={{
@@ -2212,6 +2305,7 @@ export default function WebsiteEditor() {
           state={styleState}
           onStateChange={setStyleState}
           device={device}
+          onDeviceChange={setDevice}
           onCreateClass={handleCreateClass}
           onRenameClass={handleRenameClass}
           onSetStyle={handleSetStyle}
@@ -2267,6 +2361,19 @@ export default function WebsiteEditor() {
           zIndex: 20,
         }}>
           {saveError ? `⚠ ${saveError}` : 'Saving…'}
+        </div>
+      )}
+      {toast && !saveError && !saving && (
+        <div style={{
+          position: 'absolute', bottom: 8, right: 12,
+          padding: '6px 10px', borderRadius: '4px',
+          background: '#2a2a2a', color: W.text,
+          fontSize: '11px',
+          border: `1px solid ${W.panelBorder}`,
+          zIndex: 20,
+          pointerEvents: 'none',
+        }}>
+          {toast}
         </div>
       )}
     </div>

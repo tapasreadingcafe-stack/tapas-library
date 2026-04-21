@@ -15,7 +15,7 @@
 // layer and the authoring surface.
 // =====================================================================
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   listCollections, createCollection, deleteCollection, updateCollection,
   listItems, createItem, updateItem, deleteItem,
@@ -342,6 +342,7 @@ function ItemsView({ collection, onBack, onError }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(null); // item id
+  const [query, setQuery] = useState('');
 
   const refresh = useCallback(async () => {
     if (!collection) return;
@@ -352,6 +353,21 @@ function ItemsView({ collection, onBack, onError }) {
   }, [collection, onError]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Filter across slug, title, and all stringy field values so a
+  // fuzzy search works the same as Webflow's collection-list filter.
+  const visibleItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((it) => {
+      if ((it.slug || '').toLowerCase().includes(q)) return true;
+      const data = it.data || {};
+      for (const v of Object.values(data)) {
+        if (typeof v === 'string' && v.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [items, query]);
 
   if (!collection) return <Empty>Collection not found.</Empty>;
 
@@ -378,11 +394,30 @@ function ItemsView({ collection, onBack, onError }) {
       <div style={{ padding: '0 12px 8px', color: P.text, fontSize: '12.5px', fontWeight: 700 }}>
         {collection.name}
       </div>
+      {items.length > 0 && (
+        <div style={{ padding: '0 12px 8px' }}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Search ${items.length} item${items.length === 1 ? '' : 's'}…`}
+            style={{
+              width: '100%', height: '24px',
+              padding: '0 8px',
+              background: P.input, color: P.text,
+              border: `1px solid ${P.inputBorder}`, borderRadius: '3px',
+              fontSize: '11.5px',
+            }}
+          />
+        </div>
+      )}
       {loading && <Empty>Loading…</Empty>}
       {!loading && items.length === 0 && (
         <Empty>No items yet. Create one below.</Empty>
       )}
-      {items.map((it) => (
+      {!loading && items.length > 0 && visibleItems.length === 0 && (
+        <Empty>No items match "{query}".</Empty>
+      )}
+      {visibleItems.map((it) => (
         <div key={it.id} style={{
           padding: '8px 12px', borderTop: `1px solid ${P.border}`,
         }}>

@@ -579,13 +579,32 @@ export function updatePageMeta(content, pageKey, patch) {
   };
 }
 
+// Rename a page. Returns { content, reason? } so callers can surface
+// why a rename was rejected — e.g. 'slug-collision' when another page
+// already owns that route, which would silently break navigation if
+// allowed through.
 export function renamePage(content, pageKey, { name, slug } = {}) {
   const page = content?.pages?.[pageKey];
-  if (!page) return content;
+  if (!page) return { content, reason: 'missing' };
   const next = { ...page };
   if (typeof name === 'string' && name.trim()) next.name = name.trim();
-  if (typeof slug === 'string' && slug.trim()) next.slug = normalizeSlug(slug);
-  return { ...content, pages: { ...content.pages, [pageKey]: next } };
+  if (typeof slug === 'string' && slug.trim()) {
+    const normalisedSlug = normalizeSlug(slug);
+    // Collision check: any OTHER page already using this slug blocks
+    // the rename. Case-insensitive normalisation handled by
+    // normalizeSlug so "/About" vs "/about" can't sneak past.
+    for (const [otherKey, otherPage] of Object.entries(content.pages || {})) {
+      if (otherKey === pageKey) continue;
+      if ((otherPage.slug || '') === normalisedSlug) {
+        return { content, reason: 'slug-collision' };
+      }
+    }
+    next.slug = normalisedSlug;
+  }
+  return {
+    content: { ...content, pages: { ...content.pages, [pageKey]: next } },
+    reason: null,
+  };
 }
 
 // Breakpoint-scoped write. Writes into cls.breakpoints[bp][prop]. The
