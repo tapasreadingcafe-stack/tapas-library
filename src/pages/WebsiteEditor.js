@@ -1197,10 +1197,16 @@ export default function WebsiteEditor() {
         }
         // Self-heal: prepend tapas-navbar + append tapas-footer to
         // every page's tree, and seed any missing standard pages.
-        // If the healed content differs from the stored row, leaving
-        // loadedRef pointing at the raw row lets the autosave hook
-        // see drift and persist the heal on first tick.
+        // We intentionally set `loadedRef` to the RAW row (not the
+        // healed version) so the autosave hook sees drift on its
+        // first observation and persists the heal — so even if the
+        // staff reloads before the save fires, the next load picks
+        // up the already-healed row.
         const healed = ensureSiteDefaults(data.value);
+        if (healed !== data.value) {
+          // eslint-disable-next-line no-console
+          console.log('[WebsiteEditor] Self-heal applied: seeded missing pages and/or navbar/footer. Autosaving…');
+        }
         setContent(healed);
         loadedRef.current = data.value;
       } catch (err) {
