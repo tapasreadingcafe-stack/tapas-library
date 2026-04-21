@@ -151,6 +151,22 @@ export function setNodeTag(content, pageKey, nodeId, tag) {
   });
 }
 
+// Set textContent on a node. Empty string clears the key rather than
+// leaving `""` around — the renderer treats absence and empty-string
+// identically but the stored blob stays tidier. Called by the inline
+// text editor on blur.
+export function setNodeTextContent(content, pageKey, nodeId, text) {
+  return withNode(content, pageKey, nodeId, (node) => {
+    const next = text || '';
+    if ((node.textContent || '') === next) return node;
+    if (!next) {
+      const { textContent: _gone, ...rest } = node;
+      return rest;
+    }
+    return { ...node, textContent: next };
+  });
+}
+
 // Set / clear a single attribute on a node. Empty-string and null
 // values delete the key so the stored blob stays tidy.
 export function setNodeAttribute(content, pageKey, nodeId, key, value) {

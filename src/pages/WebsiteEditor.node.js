@@ -6,11 +6,15 @@
 // the storefront app. Both will converge after Phase 10 cutover.
 //
 // Phase 1 scope: emit the DOM, add data-tapas-node-id on every node
-// so the Canvas click handler can route selections. Selection outline
-// and label tab land in Phase 2.
+// so the Canvas click handler can route selections.
+//
+// Lane D (inline text editor): when editingNodeId matches and the
+// node is a text leaf, render the element with contentEditable on so
+// the user can type directly on the canvas. On blur / Enter the
+// caller commits the new innerText through onCommitText.
 // =====================================================================
 
-import React from 'react';
+import React, { useRef, useLayoutEffect } from 'react';
 
 const VOID_TAGS = new Set([
   'img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'area', 'base',
@@ -39,7 +43,64 @@ function attrsToProps(attrs) {
   return out;
 }
 
-export function Node({ node, selectedId }) {
+// Inline editor wrapper — only used for text-leaf nodes that are being
+// edited. React stays hands-off: we seed textContent via a ref once on
+// mount, then let the browser own the DOM until blur so the caret
+// never gets clobbered by a re-render.
+function EditableText({ Tag, className, attrs, initialText, onCommit, onCancel }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.textContent = initialText || '';
+    el.focus();
+    // Select all so the very first keystroke replaces the placeholder
+    // content — matches Webflow's double-click-to-edit behavior.
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    } catch {}
+  }, []);
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (onCancel) onCancel();
+    }
+    // Stop keydowns from bubbling to the document-level shortcut
+    // handler — Cmd+D / Delete would otherwise hijack typing.
+    e.stopPropagation();
+  };
+  const onBlur = (e) => {
+    onCommit(e.currentTarget.innerText);
+  };
+  // Don't let clicks on the editable element re-fire canvas selection.
+  const stop = (e) => e.stopPropagation();
+  return (
+    <Tag
+      ref={ref}
+      className={className}
+      {...attrs}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck
+      data-tapas-editing=""
+      onKeyDown={onKeyDown}
+      onBlur={onBlur}
+      onMouseDown={stop}
+      onClick={stop}
+      onDoubleClick={stop}
+      style={{ ...(attrs.style || {}), cursor: 'text', outline: 'none' }}
+    />
+  );
+}
+
+export function Node({ node, selectedId, editingNodeId, onCommitText, onCancelEdit }) {
   if (!node || typeof node !== 'object') return null;
 
   const rawTag = node.tag || 'div';
@@ -55,8 +116,25 @@ export function Node({ node, selectedId }) {
 
   const children = node.children || [];
   const hasText = typeof node.textContent === 'string' && node.textContent.length > 0;
+  const isTextLeaf = children.length === 0;
 
-  if (hasText && children.length === 0) {
+  // Inline-edit branch — only text-leaf nodes. Nested nodes with
+  // children keep their regular render so the user edits descendants
+  // individually instead of losing structure.
+  if (editingNodeId && node.id === editingNodeId && isTextLeaf) {
+    return (
+      <EditableText
+        Tag={Tag}
+        className={className}
+        attrs={attrs}
+        initialText={hasText ? node.textContent : ''}
+        onCommit={(text) => onCommitText?.(node.id, text)}
+        onCancel={onCancelEdit}
+      />
+    );
+  }
+
+  if (hasText && isTextLeaf) {
     return <Tag className={className} {...attrs}>{node.textContent}</Tag>;
   }
 
@@ -64,7 +142,14 @@ export function Node({ node, selectedId }) {
     <Tag className={className} {...attrs}>
       {hasText ? node.textContent : null}
       {children.map((child) => (
-        <Node key={child.id} node={child} selectedId={selectedId} />
+        <Node
+          key={child.id}
+          node={child}
+          selectedId={selectedId}
+          editingNodeId={editingNodeId}
+          onCommitText={onCommitText}
+          onCancelEdit={onCancelEdit}
+        />
       ))}
     </Tag>
   );

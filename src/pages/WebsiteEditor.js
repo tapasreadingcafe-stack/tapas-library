@@ -23,7 +23,7 @@ import {
 } from './WebsiteEditor.tree';
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
-  setNodeTag, setNodeAttribute, renameNodeAttribute,
+  setNodeTag, setNodeAttribute, renameNodeAttribute, setNodeTextContent,
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
@@ -346,6 +346,7 @@ const VOID_DROP_TAGS = new Set([
 function Canvas({
   tree, classes, selectedId, onSelect, device, onDeviceChange,
   onDropBlock,
+  editingNodeId, onStartEdit, onCommitEdit, onCancelEdit,
 }) {
   const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
@@ -520,20 +521,25 @@ function Canvas({
             selectedId={selectedId}
             onSelect={onSelect}
             onHover={setHoverId}
+            editingNodeId={editingNodeId}
+            onStartEdit={onStartEdit}
+            onCommitText={onCommitEdit}
+            onCancelEdit={onCancelEdit}
           />
         </div>
         {/* Overlays live in surface space so they scroll with the
             canvas. Rect measurements already account for the zoom
             transform because getBoundingClientRect returns visual
-            pixels. */}
+            pixels. While an inline edit is active, both overlays
+            hide so they don't obscure the caret. */}
         <SelectionOverlay
-          targetId={selectedId}
+          targetId={editingNodeId ? null : selectedId}
           surfaceRef={surfaceRef}
           tree={tree}
           kind="selected"
         />
         <SelectionOverlay
-          targetId={hoverId && hoverId !== selectedId ? hoverId : null}
+          targetId={!editingNodeId && hoverId && hoverId !== selectedId ? hoverId : null}
           surfaceRef={surfaceRef}
           tree={tree}
           kind="hover"
@@ -711,7 +717,10 @@ function DropIndicator({ drop, surfaceRef }) {
   );
 }
 
-function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
+function CanvasSelectionShell({
+  tree, selectedId, onSelect, onHover,
+  editingNodeId, onStartEdit, onCommitText, onCancelEdit,
+}) {
   const nearestNodeId = (target, stopAt) => {
     let el = target;
     while (el && el !== stopAt) {
@@ -721,8 +730,19 @@ function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
     return null;
   };
   const onClick = (e) => {
+    // Clicks inside the editable element are already stopped by
+    // EditableText; this only fires for clicks elsewhere on the canvas.
     const id = nearestNodeId(e.target, e.currentTarget);
     if (id) { onSelect(id); e.preventDefault(); e.stopPropagation(); }
+  };
+  const onDoubleClick = (e) => {
+    // Double-click enters inline edit mode. Only text-leaf-ish nodes
+    // (those without children) get editable; the Node renderer gates
+    // non-leaves, but we still fire onStartEdit for the id closest to
+    // the cursor and let Node decide.
+    if (!onStartEdit) return;
+    const id = nearestNodeId(e.target, e.currentTarget);
+    if (id) { onStartEdit(id); e.preventDefault(); e.stopPropagation(); }
   };
   const onMouseOver = (e) => {
     const id = nearestNodeId(e.target, e.currentTarget);
@@ -730,8 +750,14 @@ function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
   };
   const onMouseLeave = () => { if (onHover) onHover(null); };
   return (
-    <div onClick={onClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave}>
-      <TreeNode node={tree} selectedId={selectedId} />
+    <div onClick={onClick} onDoubleClick={onDoubleClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave}>
+      <TreeNode
+        node={tree}
+        selectedId={selectedId}
+        editingNodeId={editingNodeId}
+        onCommitText={onCommitText}
+        onCancelEdit={onCancelEdit}
+      />
     </div>
   );
 }
@@ -844,6 +870,10 @@ export default function WebsiteEditor() {
   // breakpoints.<bp>). Lives on the main editor so the Style panel can
   // read from the right bucket.
   const [device, setDevice] = useState('desktop');
+  // Inline text edit. When set, the Node renderer makes that node's
+  // element contentEditable and hides the selection/hover overlays so
+  // the caret isn't obscured. Commit on blur / Enter, cancel on Esc.
+  const [editingNodeId, setEditingNodeId] = useState(null);
 
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
@@ -1034,6 +1064,26 @@ export default function WebsiteEditor() {
   // Drag-drop insert. `position` ∈ { 'before', 'after', 'inside', 'append' }.
   // 'append' is the "dropped on empty canvas" fallback and just pushes
   // onto the page root's children.
+  // Inline text editor. handleStartEdit just flips a state flag; the
+  // Node renderer does the actual DOM work. handleCommitEdit writes
+  // back through applyEdit so it lands on the history stack — so
+  // Cmd+Z undoes an inline edit just like any other mutation.
+  const handleStartEdit = useCallback((nodeId) => {
+    if (!nodeId) return;
+    setEditingNodeId(nodeId);
+    setSelectedId(nodeId);
+  }, []);
+
+  const handleCommitEdit = useCallback((nodeId, text) => {
+    if (!nodeId) { setEditingNodeId(null); return; }
+    applyEdit((c) => setNodeTextContent(c, pageKey, nodeId, text));
+    setEditingNodeId(null);
+  }, [pageKey, applyEdit]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingNodeId(null);
+  }, []);
+
   // Create a brand-new v2 page from a user-supplied slug. Uses the
   // native prompt for MVP — a proper modal can land with Phase 10b
   // polish. Normalization and collision detection live in createPage().
@@ -1260,6 +1310,10 @@ export default function WebsiteEditor() {
           device={device}
           onDeviceChange={setDevice}
           onDropBlock={handleDropBlock}
+          editingNodeId={editingNodeId}
+          onStartEdit={handleStartEdit}
+          onCommitEdit={handleCommitEdit}
+          onCancelEdit={handleCancelEdit}
         />
         <RightPanel
           selectedNode={selectedNode}
