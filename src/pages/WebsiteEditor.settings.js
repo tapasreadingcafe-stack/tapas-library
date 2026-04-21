@@ -12,8 +12,10 @@
 // picker (page/email/tel/file), embed raw HTML editor.
 // =====================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AssetPicker } from './WebsiteEditor.assets';
+import { findCollectionAncestor, stringHasBinding } from '../utils/cmsBindings';
+import { supabase } from '../utils/supabase';
 
 const W = {
   panelBorder: '#2a2a2a',
@@ -214,6 +216,7 @@ export default function SettingsPanel({
   node, pageId,
   onSetTag, onSetAttribute, onRenameAttribute,
   previewSliderId, onTogglePreviewSlider,
+  tree, onSetTextContent,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   if (!node) {
@@ -229,6 +232,12 @@ export default function SettingsPanel({
   const isImage  = node.tag === 'img';
   const isSlider = node.tag === 'slider';
   const isPreviewing = previewSliderId && previewSliderId === node.id;
+
+  // Phase I3 — surface the "Bind to CMS field" picker only when the
+  // selection is inside a collection_list. Looking up the ancestor on
+  // every render is fine; the walk is O(depth-to-node) and trees are
+  // well under a few hundred nodes.
+  const collectionAncestor = tree ? findCollectionAncestor(tree, node.id) : null;
 
   // Derived curated tag groups, plus the element's current tag pinned
   // to the top group if it's outside our curated list (rare — tolerated).
@@ -489,6 +498,17 @@ export default function SettingsPanel({
         </Section>
       )}
 
+      {collectionAncestor && (
+        <BindingSection
+          node={node}
+          ancestor={collectionAncestor}
+          onSetAttribute={onSetAttribute}
+          onSetTextContent={onSetTextContent}
+          isLink={isLink}
+          isImage={isImage}
+        />
+      )}
+
       <AssetPicker
         open={pickerOpen}
         pageId={pageId}
@@ -504,6 +524,109 @@ export default function SettingsPanel({
           }
         }}
       />
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------
+// BindingSection — Phase I3 "Bind to CMS field" picker
+// ---------------------------------------------------------------------
+// Shown only when the selected node is a descendant of a
+// collection_list. Loads the ancestor collection's schema and offers
+// one-click bind buttons that replace the leaf's textContent / src /
+// alt / href with a `{{field}}` token.
+function BindingSection({ node, ancestor, onSetAttribute, onSetTextContent, isLink, isImage }) {
+  const slug = ancestor?.attributes?.collection_slug || '';
+  const [fields, setFields] = useState([]);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (!slug) { setFields([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('store_collections')
+          .select('fields')
+          .eq('slug', slug)
+          .maybeSingle();
+        if (error) throw error;
+        if (!cancelled) setFields(Array.isArray(data?.fields) ? data.fields : []);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || String(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [slug]);
+
+  const attrs = node.attributes || {};
+  const children = node.children || [];
+  const hasChildren = children.length > 0;
+  const firstRun = (hasChildren && typeof children[0]?.text === 'string' && !children[0].tag) ? children[0] : null;
+  const currentText = firstRun ? firstRun.text
+                     : typeof node.textContent === 'string' ? node.textContent
+                     : '';
+  const isTextLeaf = !hasChildren || firstRun != null;
+  const textBound = stringHasBinding(currentText);
+  const srcBound  = stringHasBinding(attrs.src);
+  const altBound  = stringHasBinding(attrs.alt);
+  const hrefBound = stringHasBinding(attrs.href);
+
+  const bindText = (fieldKey) => {
+    if (!onSetTextContent) return;
+    onSetTextContent(node.id, `{{${fieldKey}}}`);
+  };
+  const bindAttr = (attrKey, fieldKey) => onSetAttribute(attrKey, `{{${fieldKey}}}`);
+
+  return (
+    <Section title="Bind to CMS">
+      <div style={{ color: W.textFaint, fontSize: '10.5px', marginBottom: '4px' }}>
+        Inside collection <code style={{ color: W.accent }}>{slug || '(none)'}</code>.
+        Tokens render as the item's field value on the storefront.
+      </div>
+      {err && (
+        <div style={{ color: '#ff9a9a', fontSize: '10.5px', padding: '4px 0' }}>⚠ {err}</div>
+      )}
+      {fields.length === 0 && !err && (
+        <div style={{ color: W.textFaint, fontSize: '10.5px', padding: '4px 0' }}>
+          No fields defined yet — add some in the CMS panel.
+        </div>
+      )}
+      {isTextLeaf && onSetTextContent && (
+        <BindRow label="Text" bound={textBound} fields={fields} onPick={bindText} />
+      )}
+      {isImage && (
+        <>
+          <BindRow label="Image src" bound={srcBound} fields={fields} onPick={(k) => bindAttr('src', k)} />
+          <BindRow label="Alt text"  bound={altBound} fields={fields} onPick={(k) => bindAttr('alt', k)} />
+        </>
+      )}
+      {isLink && (
+        <BindRow label="Link href" bound={hrefBound} fields={fields} onPick={(k) => bindAttr('href', k)} />
+      )}
+    </Section>
+  );
+}
+
+function BindRow({ label, bound, fields, onPick }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 0' }}>
+      <span style={{ width: '72px', flexShrink: 0, color: W.textDim, fontSize: '11px' }}>
+        {label}
+      </span>
+      <select
+        value=""
+        onChange={(e) => { if (e.target.value) onPick(e.target.value); }}
+        style={{ ...selectStyle, flex: 1 }}
+      >
+        <option value="">{bound ? '✓ bound — replace…' : 'Select field…'}</option>
+        {fields.map((f) => (
+          <option key={f.key} value={f.key}>
+            {f.label || f.key} ({f.type})
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

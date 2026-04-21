@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Slider from './Slider';
 import Lightbox from './Lightbox';
+import CollectionList from './CollectionList';
 import { mountTimelineRuntime } from '../runtime/timeline';
 
 // Tags that are self-closing in HTML. React handles most of this for us
@@ -175,6 +176,9 @@ function renderComposite(node, components) {
   if (node.tag === 'lightbox') {
     return <Lightbox node={node} renderChild={renderChild} components={components} />;
   }
+  if (node.tag === 'collection_list') {
+    return <CollectionList node={node} renderChild={renderChild} components={components} />;
+  }
   return null;
 }
 
@@ -199,9 +203,9 @@ export function Node({ node, components }) {
     return <Node node={def.root} components={components} />;
   }
 
-  // Phase F: slider / lightbox route through their own runtimes; the
-  // rest of this function never sees them.
-  if (node.tag === 'slider' || node.tag === 'lightbox') {
+  // Phase F + I2: slider / lightbox / collection_list route through
+  // their own runtimes; the rest of this function never sees them.
+  if (node.tag === 'slider' || node.tag === 'lightbox' || node.tag === 'collection_list') {
     return renderComposite(node, components);
   }
 

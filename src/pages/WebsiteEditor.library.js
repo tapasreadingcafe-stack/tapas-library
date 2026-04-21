@@ -362,6 +362,42 @@ const Slide = () => n('slide', {
   ],
 });
 
+// Collection list — Phase I2. The storefront renders this by
+// fetching items from the named collection and stamping the first
+// child as the row template, substituting {{field}} bindings in text
+// and attribute values. The editor shows the template as-is so staff
+// can see and edit it in place. Default template is a simple card
+// with a cover image, title, and body — enough to get started.
+const CollectionList = () => n('collection_list', {
+  classes: ['tapas-collection-list'],
+  attributes: {
+    'data-tapas-collection-list': '',
+    collection_slug: 'books',
+    limit: '8',
+    order_by: 'created_at:desc',
+  },
+  children: [
+    n('article', {
+      classes: ['tapas-collection-item'],
+      attributes: { 'data-tapas-collection-template': '' },
+      children: [
+        n('img', {
+          classes: ['tapas-collection-img'],
+          attributes: { src: '{{cover}}', alt: '{{title}}', loading: 'lazy' },
+        }),
+        n('h3', {
+          classes: ['tapas-collection-title'],
+          textContent: '{{title}}',
+        }),
+        n('p', {
+          classes: ['tapas-collection-body'],
+          textContent: '{{body}}',
+        }),
+      ],
+    }),
+  ],
+});
+
 // Lightbox — wraps an image. Click on the storefront pops a full-size
 // modal. In the editor it renders as a plain image with a ⛶ indicator
 // (handled by the Node renderer). The `group` attribute ties related
@@ -462,6 +498,7 @@ export const BLOCK_CATALOGUE = [
   { key: 'slider',    group: 'Advanced', label: 'Slider',       glyph: '↔',   keywords: 'slider carousel hero swipe autoplay', create: Slider },
   { key: 'slide',     group: 'Advanced', label: 'Slide',        glyph: '▭',   keywords: 'slide slider item frame',                 create: Slide  },
   { key: 'lightbox',  group: 'Advanced', label: 'Lightbox',     glyph: '⛶',   keywords: 'lightbox modal zoom gallery image popup', create: Lightbox },
+  { key: 'collection_list', group: 'Advanced', label: 'Collection list', glyph: '▦', keywords: 'cms collection list dynamic template binding', create: CollectionList },
 ];
 
 // Used by AddPanel to render groups in a stable order.

@@ -1007,6 +1007,7 @@ function RightPanel({
   page, pageKey, siteUrl, onUpdatePageMeta,
   previewSliderId, onTogglePreviewSlider,
   onPlayTimeline,
+  tree, onSetTextContent,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -1076,6 +1077,8 @@ function RightPanel({
             onRenameAttribute={onRenameAttribute}
             previewSliderId={previewSliderId}
             onTogglePreviewSlider={onTogglePreviewSlider}
+            tree={tree}
+            onSetTextContent={onSetTextContent}
           />
         )}
         {tab === 'interactions' && (
@@ -1520,6 +1523,18 @@ export default function WebsiteEditor() {
     if (!nodeId) { setEditingNodeId(null); return; }
     applyEdit((c) => setNodeRuns(c, activePageKey, nodeId, runs));
     setEditingNodeId(null);
+  }, [activePageKey, applyEdit]);
+
+  // Phase I3 — used by the Settings-tab "Bind to CMS field" picker
+  // to overwrite a leaf's text with a single {{field}} run. Writes
+  // via setNodeRuns because every Phase-D-migrated leaf stores runs,
+  // not plain textContent; using setNodeTextContent would leave a
+  // stale run shadowing the new value.
+  const handleSetLeafText = useCallback((nodeId, text) => {
+    if (!nodeId) return;
+    applyEdit((c) => setNodeRuns(c, activePageKey, nodeId, [
+      { text: String(text ?? ''), marks: [] },
+    ]));
   }, [activePageKey, applyEdit]);
 
   const handleCancelEdit = useCallback(() => {
@@ -2007,6 +2022,8 @@ export default function WebsiteEditor() {
             setPreviewSliderId((prev) => (prev === id ? null : id));
           }}
           onPlayTimeline={handlePlayTimeline}
+          tree={tree}
+          onSetTextContent={handleSetLeafText}
         />
       </div>
       <CommandPalette

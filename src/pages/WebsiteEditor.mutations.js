@@ -200,6 +200,10 @@ const SAFE_TAGS = new Set([
   // runtime carousel / lightbox behaviour. Editor treats them as
   // layout containers; storefront wraps them in interactive runtime.
   'slider', 'slide', 'lightbox',
+  // Phase I2 — CMS composite. Storefront fetches items from the
+  // named collection and stamps the first child as a row template
+  // with {{field}} bindings substituted per item.
+  'collection_list',
 ]);
 
 export function setNodeTag(content, pageKey, nodeId, tag) {

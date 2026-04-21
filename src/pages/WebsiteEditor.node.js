@@ -100,6 +100,7 @@ const COMPOSITE_TAG_REWRITE = {
   slider: 'section',
   slide:  'div',
   lightbox: 'span',
+  collection_list: 'section',
 };
 
 const ATTR_ALIASES = { class: 'className', for: 'htmlFor' };
@@ -321,6 +322,45 @@ export function Node({
         className={className}
         dataAttrs={attrs}
       />
+    );
+  }
+
+  // Collection list editor affordance: show the template as-is with
+  // a corner badge so staff know they're editing one row that repeats
+  // at runtime. Binding tokens like {{title}} render verbatim so the
+  // author can see where each field will land.
+  if (rawTag === 'collection_list') {
+    const clChildren = node.children || [];
+    const slug = node.attributes?.collection_slug || '(no slug)';
+    return (
+      <Tag className={className} {...attrs} style={{ ...(attrs.style || {}), position: 'relative' }}>
+        {clChildren.map((child) => (
+          <Node
+            key={child.id}
+            node={child}
+            selectedId={selectedId}
+            editingNodeId={editingNodeId}
+            onCommitText={onCommitText}
+            onCommitRuns={onCommitRuns}
+            onCancelEdit={onCancelEdit}
+            editableRef={editableRef}
+            components={components}
+            previewSliderId={previewSliderId}
+          />
+        ))}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute', top: '8px', right: '8px',
+            padding: '2px 6px',
+            background: 'rgba(20, 110, 245, 0.9)', color: '#fff',
+            fontSize: '10px', fontWeight: 700, borderRadius: '3px',
+            fontFamily: 'ui-monospace, monospace',
+            pointerEvents: 'none', letterSpacing: '0.04em',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
+          }}
+        >▦ CMS · {slug}</span>
+      </Tag>
     );
   }
 
