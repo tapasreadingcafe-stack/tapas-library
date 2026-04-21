@@ -32,6 +32,19 @@ export function findPageByPath(pages, path) {
   return null;
 }
 
+// v2 pages use `page.slug` (leading slash, lowercase) instead of
+// `page.meta.path`. Used by CustomPage when the v2 content system
+// is enabled so new pages authored in /store/content-v2 become
+// real live URLs without any hardcoded <Route> wiring.
+export function findV2PageByPath(v2Pages, path) {
+  if (!v2Pages || typeof v2Pages !== 'object') return null;
+  const target = normalize(path);
+  for (const [key, page] of Object.entries(v2Pages)) {
+    if (normalize(page?.slug) === target) return key;
+  }
+  return null;
+}
+
 // Shared 404 used by hardcoded route files when their URL no longer
 // maps to any page (the user deleted it, or renamed its slug elsewhere).
 export function NotFound({ path }) {

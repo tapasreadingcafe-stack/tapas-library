@@ -27,6 +27,7 @@ import {
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
+  createPage,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
@@ -66,7 +67,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, pages }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, pages }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -145,6 +146,18 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, pages }) {
             <option key={p.key} value={p.key}>{p.name}</option>
           ))}
         </select>
+        <button
+          onClick={onCreatePage}
+          title="Create a new page"
+          style={{
+            height: '26px', padding: '0 9px',
+            background: '#111', color: W.text,
+            border: `1px solid ${W.topbarBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '13px', lineHeight: 1,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.accent; e.currentTarget.style.color = W.accent; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.topbarBorder; e.currentTarget.style.color = W.text; }}
+        >+</button>
         <div style={{
           width: '28px', height: '28px', borderRadius: '50%',
           background: W.accent, color: '#fff',
@@ -1021,6 +1034,41 @@ export default function WebsiteEditor() {
   // Drag-drop insert. `position` ∈ { 'before', 'after', 'inside', 'append' }.
   // 'append' is the "dropped on empty canvas" fallback and just pushes
   // onto the page root's children.
+  // Create a brand-new v2 page from a user-supplied slug. Uses the
+  // native prompt for MVP — a proper modal can land with Phase 10b
+  // polish. Normalization and collision detection live in createPage().
+  const handleCreatePage = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const slugInput = window.prompt(
+      'New page slug (e.g. /promo-2026 or /about/team):',
+      '/new-page'
+    );
+    if (!slugInput) return;
+    const nameInput = window.prompt(
+      'Display name for the new page:',
+      ''
+    );
+    let newKey = null;
+    let reason = null;
+    applyEdit((c) => {
+      const { content: next, key, reason: r } = createPage(c, {
+        slug: slugInput,
+        name: nameInput || undefined,
+      });
+      if (key) newKey = key;
+      if (r) reason = r;
+      return next || c;
+    });
+    if (reason === 'exists') {
+      window.alert(`A page already exists at that slug.`);
+      return;
+    }
+    if (newKey) {
+      setPageKey(newKey);
+      setSelectedId(null);
+    }
+  }, [applyEdit]);
+
   const handleDropBlock = useCallback((blockKey, targetId, position) => {
     const entry = BLOCK_CATALOGUE.find((b) => b.key === blockKey);
     if (!entry) return;
@@ -1196,6 +1244,7 @@ export default function WebsiteEditor() {
         onBreadcrumbClick={(id) => setSelectedId(id)}
         page={pageKey}
         onPageChange={(k) => { setPageKey(k); setSelectedId(null); }}
+        onCreatePage={handleCreatePage}
         pages={pages}
       />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>

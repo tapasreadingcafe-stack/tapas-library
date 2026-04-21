@@ -334,6 +334,71 @@ export function insertNode(content, pageKey, parentId, newNode, index) {
   });
 }
 
+// --- Page-level mutations (Phase 10 cutover enablement) -------------
+// Create / rename / delete pages so users can build marketing pages
+// that don't exist in the v1 blob. Each page ships with a blank body
+// root so selection, breadcrumb, and the Add panel all work on day one.
+//
+// Slugs are normalized to a leading `/`; names default to the slug's
+// basename, title-cased. Keys are derived from the slug so they're
+// stable across renames that change the display name only.
+
+function slugToKey(slug) {
+  const s = String(slug || '').trim();
+  const cleaned = s.replace(/^\/+/, '').replace(/\/+$/, '').replace(/[^a-zA-Z0-9_-]/g, '-') || 'page';
+  return cleaned.toLowerCase();
+}
+
+function normalizeSlug(slug) {
+  const s = String(slug || '').trim();
+  if (!s) return '/';
+  if (s === '/') return '/';
+  return ('/' + s.replace(/^\/+/, '').replace(/\/+$/, '')).toLowerCase();
+}
+
+export function createPage(content, { slug, name } = {}) {
+  const normalizedSlug = normalizeSlug(slug);
+  const key = slugToKey(normalizedSlug);
+  if (content?.pages?.[key]) return { content, key: null, reason: 'exists' };
+  const bodyId = 'body_' + Math.random().toString(36).slice(2, 10);
+  const pretty = name?.trim() || (normalizedSlug === '/'
+    ? 'Home'
+    : normalizedSlug.slice(1).replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+  const nextPage = {
+    id: 'p_' + key,
+    name: pretty,
+    slug: normalizedSlug,
+    tree: { id: bodyId, tag: 'body', classes: [], attributes: {}, children: [] },
+    meta: {
+      title: pretty,
+      description: '',
+      og_image: '',
+      canonical_url: '',
+      robots_noindex: false,
+    },
+  };
+  return {
+    content: { ...content, pages: { ...(content?.pages || {}), [key]: nextPage } },
+    key,
+  };
+}
+
+export function deletePage(content, pageKey) {
+  if (!content?.pages?.[pageKey]) return content;
+  if (pageKey === 'home') return content; // protect the home page
+  const { [pageKey]: _gone, ...rest } = content.pages;
+  return { ...content, pages: rest };
+}
+
+export function renamePage(content, pageKey, { name, slug } = {}) {
+  const page = content?.pages?.[pageKey];
+  if (!page) return content;
+  const next = { ...page };
+  if (typeof name === 'string' && name.trim()) next.name = name.trim();
+  if (typeof slug === 'string' && slug.trim()) next.slug = normalizeSlug(slug);
+  return { ...content, pages: { ...content.pages, [pageKey]: next } };
+}
+
 // Breakpoint-scoped write. Writes into cls.breakpoints[bp][prop]. The
 // 'desktop' breakpoint is a no-op here because the CSS compiler treats
 // breakpoints.desktop as an ignored shim — callers should route
