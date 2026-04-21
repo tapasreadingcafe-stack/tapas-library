@@ -47,7 +47,7 @@ function SmartImage({ className, attrs }) {
   if (failed || !resolvedSrc) {
     const label = typeof rawSrc === 'string' && rawSrc
       ? rawSrc.split('/').pop()
-      : 'image';
+      : '(no src set)';
     return (
       <span
         className={className}
@@ -55,15 +55,16 @@ function SmartImage({ className, attrs }) {
         style={{
           ...(attrs.style || {}),
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'repeating-linear-gradient(45deg, #F3F4F6 0 10px, #E5E7EB 10px 20px)',
-          color: '#6B7280',
+          background: 'repeating-linear-gradient(45deg, #FEF3C7 0 14px, #FBBF24 14px 28px)',
+          color: '#78350F',
           fontFamily: 'ui-monospace, monospace',
-          fontSize: '11px', textAlign: 'center', padding: '8px',
-          minHeight: '80px', wordBreak: 'break-all',
+          fontSize: '12px', fontWeight: 700, textAlign: 'center', padding: '10px',
+          minHeight: '120px', wordBreak: 'break-all',
+          border: '2px dashed #D97706',
         }}
         title={`Missing image: ${rawSrc || '(empty)'}`}
       >
-        ⛌ {label}
+        ⚠ No image · {label}
       </span>
     );
   }

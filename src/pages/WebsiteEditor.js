@@ -1195,19 +1195,11 @@ export default function WebsiteEditor() {
         if (!data?.value) {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
-        // Self-heal: prepend tapas-navbar + append tapas-footer to
-        // every page's tree, and seed any missing standard pages.
-        // We intentionally set `loadedRef` to the RAW row (not the
-        // healed version) so the autosave hook sees drift on its
-        // first observation and persists the heal — so even if the
-        // staff reloads before the save fires, the next load picks
-        // up the already-healed row.
-        const healed = ensureSiteDefaults(data.value);
-        if (healed !== data.value) {
-          // eslint-disable-next-line no-console
-          console.log('[WebsiteEditor] Self-heal applied: seeded missing pages and/or navbar/footer. Autosaving…');
-        }
-        setContent(healed);
+        // Self-heal on load is applied below via a content-keyed
+        // useEffect (robust against Vercel cache + race conditions).
+        // Setting loadedRef to the raw row lets autosave detect drift
+        // on the first tick after the heal runs.
+        setContent(data.value);
         loadedRef.current = data.value;
       } catch (err) {
         setError(err.message || String(err));
@@ -1299,6 +1291,21 @@ export default function WebsiteEditor() {
       return next;
     });
   }, []);
+
+  // Self-heal every time `content` changes. Idempotent —
+  // ensureSiteDefaults returns the same reference when nothing needs
+  // patching, so after the first heal this becomes a no-op. Routing
+  // through applyEdit guarantees the heal lands on the history stack
+  // *and* triggers autosave, so the user never has to run a migration
+  // script manually and the navbar/footer survive a hard refresh.
+  useEffect(() => {
+    if (!content || loading) return;
+    const healed = ensureSiteDefaults(content);
+    if (healed === content) return;
+    // eslint-disable-next-line no-console
+    console.log('[WebsiteEditor] Self-heal: seeding navbar/footer and any missing standard pages');
+    applyEdit(() => healed);
+  }, [content, loading, applyEdit]);
 
   const undo = useCallback(() => {
     const { past, future } = historyRef.current;
