@@ -40,6 +40,7 @@ import {
 import {
   compileTimeline, parseTimelineAttr, timelineAttrName,
 } from './WebsiteEditor.timeline';
+import { ensureSiteDefaults } from '../editor/compileBlocksToTree';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
 import StylePanel from './WebsiteEditor.style';
@@ -1173,7 +1174,13 @@ export default function WebsiteEditor() {
         if (!data?.value) {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
-        setContent(data.value);
+        // Self-heal: prepend tapas-navbar + append tapas-footer to
+        // every page's tree, and seed any missing standard pages.
+        // If the healed content differs from the stored row, leaving
+        // loadedRef pointing at the raw row lets the autosave hook
+        // see drift and persist the heal on first tick.
+        const healed = ensureSiteDefaults(data.value);
+        setContent(healed);
         loadedRef.current = data.value;
       } catch (err) {
         setError(err.message || String(err));

@@ -973,6 +973,118 @@ const COMPILERS = {
 // Export defaults so the nav/footer migration script can reuse them.
 export { compileTapasNavbar, compileTapasFooter };
 
+// =====================================================================
+// ensureSiteDefaults
+//
+// Runs on every editor load (see WebsiteEditor.js) so staff don't have
+// to remember the migration script. Two guarantees:
+//
+//   1. Every standard page exists (home, catalog, about, offers,
+//      contact, blog, events). Missing ones are minted with an empty
+//      body that the self-heal then populates with navbar + footer.
+//   2. Every page's tree starts with a tapas-navbar and ends with a
+//      tapas-footer. Classes merge additively (existing wins) so
+//      user customisations aren't clobbered.
+//
+// Idempotent — re-running against already-healed content returns the
+// same reference identity so autosave can diff and skip the write.
+// =====================================================================
+
+const STANDARD_PAGES = [
+  { key: 'home',    slug: '/',         name: 'Home' },
+  { key: 'catalog', slug: '/catalog',  name: 'Catalog' },
+  { key: 'about',   slug: '/about',    name: 'About' },
+  { key: 'offers',  slug: '/offers',   name: 'Offers' },
+  { key: 'contact', slug: '/contact',  name: 'Contact' },
+  { key: 'blog',    slug: '/blog',     name: 'Blog' },
+  { key: 'events',  slug: '/events',   name: 'Events' },
+];
+
+function hasClassInTree(node, name) {
+  if (!node) return false;
+  if (Array.isArray(node.classes) && node.classes.includes(name)) return true;
+  for (const c of node.children || []) {
+    if (hasClassInTree(c, name)) return true;
+  }
+  return false;
+}
+
+function seedPage({ key, slug, name, brandName }) {
+  return {
+    id: `p_${key}`,
+    name,
+    slug,
+    tree: makeNode({
+      id: `body_${key}`,
+      tag: 'body',
+      children: [],
+    }),
+    meta: {
+      title: name, description: '', og_image: '',
+      canonical_url: '', robots_noindex: false,
+    },
+  };
+}
+
+export function ensureSiteDefaults(content) {
+  if (!content || typeof content !== 'object') return content;
+
+  const brandName = content.brand?.name || 'TAPAS';
+  const navProps    = { brand_name: brandName };
+  const footerProps = { brand_name: brandName };
+
+  let nextPages = content.pages || {};
+  let nextClasses = content.classes || {};
+  let mutated = false;
+
+  // Step 1: seed missing standard pages.
+  for (const def of STANDARD_PAGES) {
+    if (!nextPages[def.key]) {
+      if (!mutated) { nextPages = { ...nextPages }; mutated = true; }
+      nextPages[def.key] = seedPage({ ...def, brandName });
+    }
+  }
+
+  // Step 2: each page gets a navbar + footer if missing.
+  for (const [key, page] of Object.entries(nextPages)) {
+    if (!page?.tree || !Array.isArray(page.tree.children)) continue;
+
+    const needsNav    = !hasClassInTree(page.tree, 'tapas-navbar');
+    const needsFooter = !hasClassInTree(page.tree, 'tapas-footer');
+    if (!needsNav && !needsFooter) continue;
+
+    if (!mutated) {
+      nextPages = { ...nextPages };
+      nextClasses = { ...nextClasses };
+      mutated = true;
+    }
+    const newChildren = page.tree.children.slice();
+
+    if (needsNav) {
+      const { root, classes } = compileTapasNavbar(navProps);
+      newChildren.unshift(root);
+      for (const [k, def] of Object.entries(classes)) {
+        if (!nextClasses[k]) nextClasses[k] = def;
+      }
+    }
+    if (needsFooter) {
+      const { root, classes } = compileTapasFooter(footerProps);
+      newChildren.push(root);
+      for (const [k, def] of Object.entries(classes)) {
+        if (!nextClasses[k]) nextClasses[k] = def;
+      }
+    }
+
+    nextPages[key] = {
+      ...page,
+      tree: { ...page.tree, children: newChildren },
+    };
+  }
+
+  if (!mutated) return content;
+  return { ...content, pages: nextPages, classes: nextClasses };
+}
+
 // Compile a single block to a { root, classes } bundle.
 export function compileBlock(block) {
   if (!block || !block.type) return compilePlaceholder(block || { type: 'unknown' });
