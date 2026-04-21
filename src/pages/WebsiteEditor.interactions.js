@@ -12,8 +12,9 @@
 
 import React from 'react';
 import {
-  ENTRANCE_PRESETS, HOVER_PRESETS, EASING_PRESETS,
+  ENTRANCE_PRESETS, HOVER_PRESETS,
 } from './WebsiteEditor.anim';
+import { EasingField } from './WebsiteEditor.bezier';
 
 const W = {
   panelBorder: '#2a2a2a',
@@ -142,11 +143,9 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
               />
             </Row>
             <Row label="Easing">
-              <Select
+              <EasingField
                 value={attrs['data-tapas-anim-easing']}
                 onChange={(v) => onSetAttribute('data-tapas-anim-easing', v)}
-                options={EASING_PRESETS}
-                placeholder="ease-out"
               />
             </Row>
             <div style={{
@@ -207,11 +206,9 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
               />
             </Row>
             <Row label="Easing">
-              <Select
+              <EasingField
                 value={attrs['data-tapas-click-easing']}
                 onChange={(v) => onSetAttribute('data-tapas-click-easing', v)}
-                options={EASING_PRESETS}
-                placeholder="ease-out"
               />
             </Row>
             <div style={{
@@ -260,11 +257,9 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
               />
             </Row>
             <Row label="Easing">
-              <Select
+              <EasingField
                 value={attrs['data-tapas-load-easing']}
                 onChange={(v) => onSetAttribute('data-tapas-load-easing', v)}
-                options={EASING_PRESETS}
-                placeholder="ease-out"
               />
             </Row>
             <div style={{

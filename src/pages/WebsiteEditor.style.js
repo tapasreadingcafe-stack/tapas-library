@@ -15,6 +15,7 @@
 // =====================================================================
 
 import React, { useState, useRef, useEffect } from 'react';
+import { EasingField } from './WebsiteEditor.bezier';
 
 const W = {
   panelBg:     '#252525',
@@ -1434,23 +1435,10 @@ function Effects({ styles, onSet }) {
         />
       </Field>
       <Field label="Easing">
-        <select
+        <EasingField
           value={styles['transition-timing-function'] || ''}
-          onChange={(e) => onSet('transition-timing-function', e.target.value)}
-          style={{
-            width: '100%', height: '22px',
-            background: W.input, color: W.text,
-            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
-            fontSize: '11px',
-          }}
-        >
-          <option value="">ease</option>
-          <option value="linear">linear</option>
-          <option value="ease-in">ease-in</option>
-          <option value="ease-out">ease-out</option>
-          <option value="ease-in-out">ease-in-out</option>
-          <option value="cubic-bezier(0.4, 0, 0.2, 1)">standard</option>
-        </select>
+          onChange={(v) => onSet('transition-timing-function', v)}
+        />
       </Field>
 
       <SubHead text="Misc" />
