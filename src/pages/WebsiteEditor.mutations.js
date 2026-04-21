@@ -243,6 +243,28 @@ export function duplicateNode(content, pageKey, nodeId) {
   return { content: next, newId: clone.id };
 }
 
+// Insert a prepared node BEFORE an anchor node (same parent). Mirror
+// of insertNodeAfter. Used by drag-drop when the cursor is above the
+// midpoint of the hover target.
+export function insertNodeBefore(content, pageKey, beforeId, newNode) {
+  const page = content?.pages?.[pageKey];
+  if (!page || !newNode) return { content, newId: null };
+  const loc = locateWithParent(page.tree, beforeId);
+  if (!loc) return { content, newId: null };
+  const next = withNode(content, pageKey, loc.parent.id, (parent) => {
+    const kids = parent.children || [];
+    return {
+      ...parent,
+      children: [
+        ...kids.slice(0, loc.index),
+        newNode,
+        ...kids.slice(loc.index),
+      ],
+    };
+  });
+  return { content: next, newId: newNode.id };
+}
+
 // Insert a prepared node after an anchor node (same parent). Returns
 // { content, newId }. If afterId isn't reachable, no-op.
 export function insertNodeAfter(content, pageKey, afterId, newNode) {

@@ -24,7 +24,8 @@ import {
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
   setNodeTag, setNodeAttribute, renameNodeAttribute,
-  insertNode, duplicateNode, removeNode, insertNodeAfter,
+  insertNode, duplicateNode, removeNode,
+  insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
@@ -319,13 +320,81 @@ const DEVICES = [
   { key: 'mobileP',  label: 'Mobile P', width: '375px',  glyph: '▯' },
 ];
 
-function Canvas({ tree, classes, selectedId, onSelect, device, onDeviceChange }) {
+// Tags the Node renderer treats as void — a drop INSIDE them is
+// nonsensical, so the drag handler rewrites "inside" to before/after
+// when the cursor is over one of these.
+const VOID_DROP_TAGS = new Set([
+  'img', 'input', 'br', 'hr', 'video', 'audio', 'source',
+  'area', 'embed', 'iframe',
+]);
+
+function Canvas({
+  tree, classes, selectedId, onSelect, device, onDeviceChange,
+  onDropBlock,
+}) {
   const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
   const [hoverId, setHoverId] = useState(null);
+  const [dropHover, setDropHover] = useState(null); // { targetId, position }
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
   const surfaceRef = useRef(null);
+
+  // Walk from the event target up to the nearest node element, then
+  // classify the cursor's vertical band into before / after / inside.
+  // Returns null if the cursor isn't over any node (drop falls back
+  // to append-to-root in the caller).
+  const classifyDropTarget = (e) => {
+    let el = e.target;
+    while (el && el !== e.currentTarget) {
+      if (el.dataset?.tapasNodeId) break;
+      el = el.parentElement;
+    }
+    if (!el || el === e.currentTarget) return null;
+    const rect = el.getBoundingClientRect();
+    if (!rect.height) return null;
+    const relY = (e.clientY - rect.top) / rect.height;
+    const tag = el.tagName.toLowerCase();
+    const isVoid = VOID_DROP_TAGS.has(tag);
+    let position;
+    if (isVoid) position = relY < 0.5 ? 'before' : 'after';
+    else if (relY < 0.25)      position = 'before';
+    else if (relY > 0.75)      position = 'after';
+    else                       position = 'inside';
+    return { targetId: el.dataset.tapasNodeId, position };
+  };
+
+  const handleDragOver = (e) => {
+    // Only accept drops carrying our custom type — other drag payloads
+    // (text selection, file drop) pass through.
+    const types = e.dataTransfer?.types;
+    if (!types || !(types.contains ? types.contains('application/x-tapas-block') : Array.from(types).includes('application/x-tapas-block'))) {
+      // Firefox's DataTransferItemList has contains(); Chrome has an array.
+      if (!Array.from(types || []).includes('application/x-tapas-block')) return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const next = classifyDropTarget(e);
+    setDropHover(next);
+  };
+
+  const handleDragLeave = (e) => {
+    // Keep the indicator while moving between descendant elements.
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDropHover(null);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const blockKey =
+      e.dataTransfer.getData('application/x-tapas-block') ||
+      e.dataTransfer.getData('text/plain');
+    const target = dropHover;
+    setDropHover(null);
+    if (!blockKey) return;
+    if (!target) { onDropBlock?.(blockKey, null, 'append'); return; }
+    onDropBlock?.(blockKey, target.targetId, target.position);
+  };
 
   return (
     <div style={{
@@ -377,6 +446,9 @@ function Canvas({ tree, classes, selectedId, onSelect, device, onDeviceChange })
       {/* Canvas surface */}
       <div
         ref={surfaceRef}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         style={{
           flex: 1, overflow: 'auto', position: 'relative',
           display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
@@ -414,6 +486,10 @@ function Canvas({ tree, classes, selectedId, onSelect, device, onDeviceChange })
           surfaceRef={surfaceRef}
           tree={tree}
           kind="hover"
+        />
+        <DropIndicator
+          drop={dropHover}
+          surfaceRef={surfaceRef}
         />
       </div>
     </div>
@@ -521,6 +597,69 @@ function toolbarBtn(W) {
 // nearest element with data-tapas-node-id; reports click → onSelect,
 // mouseover → onHover, and null-out on mouseleave so the dashed overlay
 // disappears when the cursor leaves the canvas.
+// Drag-drop indicator. Two shapes:
+//   before / after → thin blue bar across the top / bottom of target
+//   inside         → blue dashed outline over the whole target rect
+// Measures identically to SelectionOverlay so coordinates account for
+// canvas zoom and scroll.
+function DropIndicator({ drop, surfaceRef }) {
+  const [rect, setRect] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!drop?.targetId || !surfaceRef.current) { setRect(null); return; }
+    const el = surfaceRef.current.querySelector(
+      `[data-tapas-node-id="${drop.targetId}"]`
+    );
+    if (!el) { setRect(null); return; }
+    const er = el.getBoundingClientRect();
+    const sr = surfaceRef.current.getBoundingClientRect();
+    setRect({
+      top: er.top - sr.top + surfaceRef.current.scrollTop,
+      left: er.left - sr.left + surfaceRef.current.scrollLeft,
+      width: er.width,
+      height: er.height,
+    });
+  }, [drop, surfaceRef]);
+
+  if (!drop || !rect) return null;
+  const color = '#146ef5';
+  const { position } = drop;
+
+  if (position === 'inside') {
+    return (
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: rect.top, left: rect.left,
+          width: rect.width, height: rect.height,
+          outline: `2px dashed ${color}`,
+          outlineOffset: '-2px',
+          background: 'rgba(20,110,245,0.08)',
+          pointerEvents: 'none',
+          zIndex: 12,
+        }}
+      />
+    );
+  }
+
+  const barTop = position === 'before' ? rect.top - 1 : rect.top + rect.height - 1;
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        top: barTop, left: rect.left,
+        width: rect.width, height: '2px',
+        background: color,
+        boxShadow: `0 0 0 2px ${color}33`,
+        pointerEvents: 'none',
+        zIndex: 12,
+      }}
+    />
+  );
+}
+
 function CanvasSelectionShell({ tree, selectedId, onSelect, onHover }) {
   const nearestNodeId = (target, stopAt) => {
     let el = target;
@@ -840,6 +979,31 @@ export default function WebsiteEditor() {
     setSelectedId(newNode.id);
   }, [pageKey, applyEdit]);
 
+  // Drag-drop insert. `position` ∈ { 'before', 'after', 'inside', 'append' }.
+  // 'append' is the "dropped on empty canvas" fallback and just pushes
+  // onto the page root's children.
+  const handleDropBlock = useCallback((blockKey, targetId, position) => {
+    const entry = BLOCK_CATALOGUE.find((b) => b.key === blockKey);
+    if (!entry) return;
+    const newNode = entry.create();
+    applyEdit((c) => {
+      if (!targetId || position === 'append') {
+        return insertNode(c, pageKey, null, newNode);
+      }
+      if (position === 'inside') {
+        return insertNode(c, pageKey, targetId, newNode);
+      }
+      if (position === 'before') {
+        const { content: next } = insertNodeBefore(c, pageKey, targetId, newNode);
+        return next;
+      }
+      // after
+      const { content: next } = insertNodeAfter(c, pageKey, targetId, newNode);
+      return next;
+    });
+    setSelectedId(newNode.id);
+  }, [pageKey, applyEdit]);
+
   // --- Phase 9 mutation handlers (duplicate / remove / paste) ---------
   const handleDuplicate = useCallback(() => {
     if (!selectedId || !tree || selectedId === tree.id) return;
@@ -1007,6 +1171,7 @@ export default function WebsiteEditor() {
           onSelect={setSelectedId}
           device={device}
           onDeviceChange={setDevice}
+          onDropBlock={handleDropBlock}
         />
         <RightPanel
           selectedNode={selectedNode}

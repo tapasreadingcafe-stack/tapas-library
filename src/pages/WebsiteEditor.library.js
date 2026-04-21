@@ -128,6 +128,99 @@ const Divider = () => n('div', {
 const LineBreak = () => n('br', {});
 
 // ---------------------------------------------------------------------
+// Forms group (Phase 7b)
+// ---------------------------------------------------------------------
+// We render form primitives as real HTML elements so the browser's
+// built-in validation and labeling work out of the box. Submission
+// plumbing (Supabase / webhook) is out of scope for this session —
+// forms will render in the preview but a Submit won't POST anywhere
+// until the storefront wires that up.
+const FormBlock = () => n('form', {
+  classes: ['form'],
+  attributes: { method: 'POST' },
+  children: [
+    n('label', { classes: ['label'], textContent: 'Name' }),
+    n('input', { classes: ['input'], attributes: { type: 'text', name: 'name', placeholder: 'Your name' } }),
+    n('button', { classes: ['submit-btn'], attributes: { type: 'submit' }, textContent: 'Submit' }),
+  ],
+});
+const Label = () => n('label', { classes: ['label'], textContent: 'Field label' });
+const InputField = () => n('input', {
+  classes: ['input'],
+  attributes: { type: 'text', name: 'field', placeholder: 'Your answer' },
+});
+const Textarea = () => n('textarea', {
+  classes: ['textarea'],
+  attributes: { name: 'message', placeholder: 'Your message', rows: '4' },
+});
+const Checkbox = () => n('label', {
+  classes: ['checkbox'],
+  children: [
+    n('input', { attributes: { type: 'checkbox', name: 'agree' } }),
+    n('span', { textContent: ' I agree' }),
+  ],
+});
+const Radio = () => n('label', {
+  classes: ['radio'],
+  children: [
+    n('input', { attributes: { type: 'radio', name: 'choice', value: 'a' } }),
+    n('span', { textContent: ' Option A' }),
+  ],
+});
+const SelectBlock = () => n('select', {
+  classes: ['select'],
+  attributes: { name: 'choice' },
+  children: [
+    n('option', { attributes: { value: '' }, textContent: 'Choose…' }),
+    n('option', { attributes: { value: 'a' }, textContent: 'Option A' }),
+    n('option', { attributes: { value: 'b' }, textContent: 'Option B' }),
+  ],
+});
+const FileUpload = () => n('input', {
+  classes: ['file-upload'],
+  attributes: { type: 'file', name: 'file' },
+});
+const SubmitButton = () => n('button', {
+  classes: ['submit-btn'],
+  attributes: { type: 'submit' },
+  textContent: 'Submit',
+});
+// reCAPTCHA is a client-side widget — we render a placeholder <div>
+// with the standard attributes. The storefront wire-up in Phase 11+
+// will turn this into the actual challenge.
+const Recaptcha = () => n('div', {
+  classes: ['g-recaptcha'],
+  attributes: { 'data-sitekey': '__YOUR_SITE_KEY__' },
+  textContent: 'reCAPTCHA (placeholder)',
+});
+
+// ---------------------------------------------------------------------
+// Advanced (light — Phase 7b ships only embed + search + navbar shell)
+// ---------------------------------------------------------------------
+// HTML embed: stored as a <div> with an `embed` class. Proper raw-HTML
+// execution would need a sanitizer plus a trusted-html attribute on
+// the Node renderer — both deliberately out of scope here.
+const HtmlEmbed = () => n('div', {
+  classes: ['embed'],
+  textContent: '<!-- Paste HTML in the Settings tab -->',
+});
+const Search = () => n('form', {
+  classes: ['search'],
+  attributes: { role: 'search' },
+  children: [
+    n('input', {
+      classes: ['search-input'],
+      attributes: { type: 'search', name: 'q', placeholder: 'Search…' },
+    }),
+    n('button', {
+      classes: ['search-btn'],
+      attributes: { type: 'submit' },
+      textContent: 'Go',
+    }),
+  ],
+});
+
+// ---------------------------------------------------------------------
 // Catalogue — registered as a flat list so AddPanel.search can filter
 // linearly without traversing nested groups.
 // ---------------------------------------------------------------------
@@ -152,7 +245,23 @@ export const BLOCK_CATALOGUE = [
   { key: 'image',     group: 'Basic',  label: 'Image',      glyph: '▤', keywords: 'image photo img',          create: Image     },
   { key: 'divider',   group: 'Basic',  label: 'Divider',    glyph: '—', keywords: 'divider hr rule',          create: Divider   },
   { key: 'br',        group: 'Basic',  label: 'Line break', glyph: '↵', keywords: 'break br newline',         create: LineBreak },
+
+  // Forms
+  { key: 'form',      group: 'Forms',  label: 'Form block',     glyph: '▥', keywords: 'form contact submit',     create: FormBlock    },
+  { key: 'label',     group: 'Forms',  label: 'Label',          glyph: 'L', keywords: 'label form field',        create: Label        },
+  { key: 'input',     group: 'Forms',  label: 'Input',          glyph: '▭', keywords: 'input text field',        create: InputField   },
+  { key: 'textarea',  group: 'Forms',  label: 'Textarea',       glyph: '▢', keywords: 'textarea message',        create: Textarea     },
+  { key: 'checkbox',  group: 'Forms',  label: 'Checkbox',       glyph: '☐', keywords: 'checkbox toggle',         create: Checkbox     },
+  { key: 'radio',     group: 'Forms',  label: 'Radio',          glyph: '○', keywords: 'radio option',            create: Radio        },
+  { key: 'select',    group: 'Forms',  label: 'Select',         glyph: '▾', keywords: 'select dropdown',         create: SelectBlock  },
+  { key: 'file',      group: 'Forms',  label: 'File upload',    glyph: '↑', keywords: 'file upload',             create: FileUpload   },
+  { key: 'submit',    group: 'Forms',  label: 'Submit button',  glyph: '⏎', keywords: 'submit button form',      create: SubmitButton },
+  { key: 'recaptcha', group: 'Forms',  label: 'reCAPTCHA',      glyph: '✓', keywords: 'recaptcha captcha spam',  create: Recaptcha    },
+
+  // Advanced (light)
+  { key: 'embed',     group: 'Advanced', label: 'HTML embed',   glyph: '</>', keywords: 'embed html code raw',   create: HtmlEmbed    },
+  { key: 'search',    group: 'Advanced', label: 'Search',       glyph: '⌕',   keywords: 'search input',          create: Search       },
 ];
 
 // Used by AddPanel to render groups in a stable order.
-export const BLOCK_GROUPS = ['Layout', 'Basic'];
+export const BLOCK_GROUPS = ['Layout', 'Basic', 'Forms', 'Advanced'];
