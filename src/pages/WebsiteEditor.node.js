@@ -14,12 +14,68 @@
 // caller commits the new innerText through onCommitText.
 // =====================================================================
 
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useRef, useLayoutEffect, useState, useEffect } from 'react';
+import { renderRuns, isRunArray, runsFromElement } from './WebsiteEditor.richtext';
 
 const VOID_TAGS = new Set([
   'img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'area', 'base',
   'col', 'embed', 'param', 'track', 'wbr',
 ]);
+
+// Resolve raw asset filenames (e.g. "HERO-LIBRARY.png") to a URL both
+// the staff editor and the storefront can load. Anything already
+// absolute or scheme-qualified passes through untouched. Bare
+// filenames get a leading slash so they resolve from the web root
+// regardless of the current route (/store/content-v2 etc.).
+function resolveAssetUrl(src) {
+  if (!src || typeof src !== 'string') return src;
+  if (/^(https?:|data:|blob:|file:)/i.test(src)) return src;
+  if (src.startsWith('/')) return src;
+  return `/${src}`;
+}
+
+// <img> with a visible fallback so a 404 is diagnosable instead of
+// looking like "nothing rendered". On error, swap to an inline SVG
+// showing the intended filename — matches v1's ImageOrPlaceholder
+// behavior but stays in-tree so the editor still highlights the node.
+function SmartImage({ className, attrs }) {
+  const rawSrc = attrs.src;
+  const resolvedSrc = resolveAssetUrl(rawSrc);
+  const [failed, setFailed] = useState(false);
+  // Reset on src change so replacing an image clears a stale failure.
+  useEffect(() => { setFailed(false); }, [resolvedSrc]);
+  if (failed || !resolvedSrc) {
+    const label = typeof rawSrc === 'string' && rawSrc
+      ? rawSrc.split('/').pop()
+      : 'image';
+    return (
+      <span
+        className={className}
+        {...attrs}
+        style={{
+          ...(attrs.style || {}),
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'repeating-linear-gradient(45deg, #F3F4F6 0 10px, #E5E7EB 10px 20px)',
+          color: '#6B7280',
+          fontFamily: 'ui-monospace, monospace',
+          fontSize: '11px', textAlign: 'center', padding: '8px',
+          minHeight: '80px', wordBreak: 'break-all',
+        }}
+        title={`Missing image: ${rawSrc || '(empty)'}`}
+      >
+        ⛌ {label}
+      </span>
+    );
+  }
+  return (
+    <img
+      className={className}
+      {...attrs}
+      src={resolvedSrc}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 const ALLOWED_TAGS = new Set([
   'div', 'section', 'header', 'nav', 'aside', 'main', 'article', 'footer',
@@ -45,15 +101,39 @@ function attrsToProps(attrs) {
 }
 
 // Inline editor wrapper — only used for text-leaf nodes that are being
-// edited. React stays hands-off: we seed textContent via a ref once on
+// edited. React stays hands-off: we seed the initial DOM once on
 // mount, then let the browser own the DOM until blur so the caret
 // never gets clobbered by a re-render.
-function EditableText({ Tag, className, attrs, initialText, onCommit, onCancel }) {
+//
+// Phase D: commits TextRuns (parsed from the DOM) via onCommitRuns.
+// Falls back to onCommitText for backward compatibility.
+function EditableText({
+  Tag, className, attrs,
+  initialRuns, initialText,
+  onCommit, onCancel,
+  editableRef,
+}) {
   const ref = useRef(null);
+  // Expose the contentEditable DOM element to the parent so the
+  // FloatingTextToolbar can anchor to it without prop drilling.
+  useEffect(() => {
+    if (editableRef) editableRef.current = ref.current;
+    return () => { if (editableRef) editableRef.current = null; };
+  }, [editableRef]);
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.textContent = initialText || '';
+    // Seed DOM from TextRun[] if we have one; otherwise the plain
+    // string still renders for un-migrated content.
+    if (Array.isArray(initialRuns) && initialRuns.length) {
+      el.innerHTML = '';
+      for (const run of initialRuns) {
+        el.appendChild(elementFromRun(run));
+      }
+    } else {
+      el.textContent = initialText || '';
+    }
     el.focus();
     // Select all so the very first keystroke replaces the placeholder
     // content — matches Webflow's double-click-to-edit behavior.
@@ -74,11 +154,14 @@ function EditableText({ Tag, className, attrs, initialText, onCommit, onCancel }
       if (onCancel) onCancel();
     }
     // Stop keydowns from bubbling to the document-level shortcut
-    // handler — Cmd+D / Delete would otherwise hijack typing.
+    // handler so Cmd+D / Delete / palette don't hijack typing. The
+    // editor re-binds Cmd+B / Cmd+I / Cmd+U / Cmd+K at its own layer
+    // so those still work while editing.
     e.stopPropagation();
   };
   const onBlur = (e) => {
-    onCommit(e.currentTarget.innerText);
+    const runs = runsFromElement(e.currentTarget);
+    onCommit(runs, e.currentTarget.innerText);
   };
   // Don't let clicks on the editable element re-fire canvas selection.
   const stop = (e) => e.stopPropagation();
@@ -101,8 +184,89 @@ function EditableText({ Tag, className, attrs, initialText, onCommit, onCancel }
   );
 }
 
-export function Node({ node, selectedId, editingNodeId, onCommitText, onCancelEdit }) {
+// Build a DOM node from a TextRun, wrapping in mark tags + link in the
+// same order renderRuns uses so seed and re-parse are round-trip safe.
+const RUN_MARK_TAG = {
+  bold: 'strong', italic: 'em', underline: 'u', strike: 's',
+  code: 'code', sup: 'sup', sub: 'sub',
+};
+function elementFromRun(run) {
+  // Innermost: raw text with soft-break handling.
+  const frag = document.createDocumentFragment();
+  const pieces = (run.text || '').split('\n');
+  pieces.forEach((piece, idx) => {
+    if (idx > 0) frag.appendChild(document.createElement('br'));
+    if (piece) frag.appendChild(document.createTextNode(piece));
+  });
+  // Wrap inside out (matches renderRuns order).
+  let current = frag;
+  const marks = Array.from(new Set(run.marks || []));
+  const order = ['bold', 'italic', 'underline', 'strike', 'code', 'sup', 'sub'];
+  for (const m of order) {
+    if (!marks.includes(m)) continue;
+    const tag = RUN_MARK_TAG[m];
+    const el = document.createElement(tag);
+    el.appendChild(current);
+    current = el;
+  }
+  if (run.href) {
+    const a = document.createElement('a');
+    a.href = run.href;
+    a.rel = 'noreferrer';
+    a.appendChild(current);
+    current = a;
+  }
+  // Ensure we return a single Node so the caller can appendChild.
+  if (current.nodeType === 11 /* DocumentFragment */) return current;
+  const wrapper = document.createDocumentFragment();
+  wrapper.appendChild(current);
+  return wrapper;
+}
+
+export function Node({
+  node, selectedId, editingNodeId,
+  onCommitText, onCommitRuns, onCancelEdit,
+  editableRef,
+  components,
+}) {
   if (!node || typeof node !== 'object') return null;
+
+  // Component instance — render the referenced component's tree in
+  // the instance's slot, but keep the instance's own id and classes
+  // on the outer wrapper so selection, styling, and drag-drop still
+  // target the instance (not the shared def). A missing ref falls
+  // through to a visible warning so staff can spot orphans in QA.
+  if (node.componentRef) {
+    const def = components?.[node.componentRef];
+    const className = (node.classes || []).join(' ') || undefined;
+    const outer = attrsToProps(node.attributes);
+    outer['data-tapas-node-id'] = node.id;
+    outer['data-tapas-component'] = node.componentRef;
+    if (node.id === selectedId) outer['data-tapas-selected'] = '';
+    if (!def?.root) {
+      return (
+        <div className={className} {...outer} style={{
+          padding: '12px 16px', background: '#FEF3C7',
+          border: '1px dashed #F59E0B', color: '#92400E',
+          fontSize: '13px', margin: '8px 0',
+          fontFamily: 'ui-monospace, monospace',
+        }}>
+          Unknown component: {String(node.componentRef)}
+        </div>
+      );
+    }
+    return (
+      <div className={className} {...outer}>
+        <Node
+          node={def.root}
+          components={components}
+          // Descendants inside a rendered instance are read-only —
+          // never pass selection/edit props through. Staff edit the
+          // definition explicitly via the Components panel.
+        />
+      </div>
+    );
+  }
 
   const rawTag = node.tag || 'div';
   const Tag = rawTag === 'body' ? 'div' : (ALLOWED_TAGS.has(rawTag) ? rawTag : 'div');
@@ -112,12 +276,18 @@ export function Node({ node, selectedId, editingNodeId, onCommitText, onCancelEd
   if (node.id === selectedId) attrs['data-tapas-selected'] = '';
 
   if (VOID_TAGS.has(Tag)) {
+    if (Tag === 'img') {
+      return <SmartImage className={className} attrs={attrs} />;
+    }
     return <Tag className={className} {...attrs} />;
   }
 
   const children = node.children || [];
   const hasText = typeof node.textContent === 'string' && node.textContent.length > 0;
-  const isTextLeaf = children.length === 0;
+  const runChildren = isRunArray(children) ? children : null;
+  // A "text leaf" is any node that holds either plain textContent or
+  // TextRuns only — no child Nodes. Rich-text editing only applies here.
+  const isTextLeaf = runChildren !== null || children.length === 0;
 
   // Inline-edit branch — only text-leaf nodes. Nested nodes with
   // children keep their regular render so the user edits descendants
@@ -128,14 +298,23 @@ export function Node({ node, selectedId, editingNodeId, onCommitText, onCancelEd
         Tag={Tag}
         className={className}
         attrs={attrs}
+        initialRuns={runChildren}
         initialText={hasText ? node.textContent : ''}
-        onCommit={(text) => onCommitText?.(node.id, text)}
+        editableRef={editableRef}
+        onCommit={(runs, plainText) => {
+          if (onCommitRuns) onCommitRuns(node.id, runs);
+          else if (onCommitText) onCommitText(node.id, plainText);
+        }}
         onCancel={onCancelEdit}
       />
     );
   }
 
-  if (hasText && isTextLeaf) {
+  if (runChildren) {
+    return <Tag className={className} {...attrs}>{renderRuns(runChildren)}</Tag>;
+  }
+
+  if (hasText && children.length === 0) {
     return <Tag className={className} {...attrs}>{node.textContent}</Tag>;
   }
 
@@ -149,7 +328,10 @@ export function Node({ node, selectedId, editingNodeId, onCommitText, onCancelEd
           selectedId={selectedId}
           editingNodeId={editingNodeId}
           onCommitText={onCommitText}
+          onCommitRuns={onCommitRuns}
           onCancelEdit={onCancelEdit}
+          editableRef={editableRef}
+          components={components}
         />
       ))}
     </Tag>

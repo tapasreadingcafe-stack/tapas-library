@@ -13,6 +13,7 @@
 // =====================================================================
 
 import React, { useState } from 'react';
+import { AssetPicker } from './WebsiteEditor.assets';
 
 const W = {
   panelBorder: '#2a2a2a',
@@ -201,7 +202,8 @@ function AttributesList({ attributes, onSet, onRename }) {
 // ---------------------------------------------------------------------
 // SettingsPanel — entry point
 // ---------------------------------------------------------------------
-export default function SettingsPanel({ node, onSetTag, onSetAttribute, onRenameAttribute }) {
+export default function SettingsPanel({ node, pageId, onSetTag, onSetAttribute, onRenameAttribute }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   if (!node) {
     return (
       <div style={{ padding: '24px 12px', color: W.textFaint, fontSize: '11px', textAlign: 'center' }}>
@@ -341,6 +343,19 @@ export default function SettingsPanel({ node, onSetTag, onSetAttribute, onRename
               placeholder="https://…/photo.jpg"
             />
           </Row>
+          <div style={{ padding: '2px 0 6px 72px' }}>
+            <button
+              onClick={() => setPickerOpen(true)}
+              style={{
+                padding: '4px 10px', fontSize: '10.5px', fontWeight: 600,
+                background: W.accentDim, color: W.accent,
+                border: `1px solid ${W.accent}`, borderRadius: '3px',
+                cursor: 'pointer',
+              }}
+            >
+              ▤ Replace from library
+            </button>
+          </div>
           <Row label="Alt">
             <Text
               value={attrs.alt}
@@ -383,6 +398,22 @@ export default function SettingsPanel({ node, onSetTag, onSetAttribute, onRename
         Visibility conditions and embed raw-HTML editor land alongside
         CMS collections in a later phase.
       </div>
+
+      <AssetPicker
+        open={pickerOpen}
+        pageId={pageId}
+        onClose={() => setPickerOpen(false)}
+        onPick={(asset) => {
+          if (!asset) return;
+          onSetAttribute('src', asset.url);
+          // Seed alt from the filename only when it's currently empty,
+          // so the staff's custom caption isn't clobbered.
+          if (!attrs.alt) {
+            const base = (asset.name || '').replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ');
+            if (base) onSetAttribute('alt', base);
+          }
+        }}
+      />
     </div>
   );
 }

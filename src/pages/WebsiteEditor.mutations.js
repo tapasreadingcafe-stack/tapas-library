@@ -30,7 +30,63 @@ function mapNode(node, targetId, fn) {
 }
 
 // --- Page helpers -----------------------------------------------------
+// A "page key" of `__c:<componentId>` routes the existing tree /
+// mutation infrastructure at a component definition instead of a
+// page, so every helper that takes pageKey works unchanged while the
+// staff is editing a component in-canvas. Callers who specifically
+// need a page (createPage, updatePageMeta, etc.) keep rejecting
+// component keys because their own lookup misses.
+export const COMPONENT_PAGE_PREFIX = '__c:';
+
+export function isComponentScope(pageKey) {
+  return typeof pageKey === 'string' && pageKey.startsWith(COMPONENT_PAGE_PREFIX);
+}
+
+export function componentIdFromScope(pageKey) {
+  return isComponentScope(pageKey) ? pageKey.slice(COMPONENT_PAGE_PREFIX.length) : null;
+}
+
+export function componentScopeKey(componentId) {
+  return COMPONENT_PAGE_PREFIX + componentId;
+}
+
+// Returns a "page-shaped" view over a component definition so tree
+// walkers / pathToNode / flattenTree keep working when the edit target
+// is a component. The shape mirrors a real page: { id, tree, ... }.
+export function getEffectivePage(content, pageKey) {
+  if (isComponentScope(pageKey)) {
+    const id = componentIdFromScope(pageKey);
+    const def = content?.components?.[id];
+    if (!def) return null;
+    return {
+      id: def.id,
+      name: def.name || 'Component',
+      slug: '',
+      tree: def.root,
+      meta: {},
+      __component: true,
+    };
+  }
+  return content?.pages?.[pageKey] || null;
+}
+
 export function withPage(content, pageKey, updater) {
+  if (isComponentScope(pageKey)) {
+    const id = componentIdFromScope(pageKey);
+    const def = content?.components?.[id];
+    if (!def) return content;
+    const shim = { id: def.id, tree: def.root, meta: {}, name: def.name, slug: '' };
+    const next = updater(shim);
+    if (next === shim || !next) return content;
+    if (next.tree === def.root) return content;
+    return {
+      ...content,
+      components: {
+        ...content.components,
+        [id]: { ...def, root: next.tree, updated_at: new Date().toISOString() },
+      },
+    };
+  }
   const page = content?.pages?.[pageKey];
   if (!page) return content;
   const nextPage = updater(page);
@@ -87,7 +143,7 @@ export function attachClassToNode(content, pageKey, nodeId, className) {
 // Auto-create a class for a node if it has none, return { content, className }.
 // This is the bridge the Style panel calls on first edit per spec § 7.
 export function ensureNodeClass(content, pageKey, nodeId) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page) return { content, className: null };
   // Find the node, pick its first class or mint a new one.
   let hit = null;
@@ -167,6 +223,65 @@ export function setNodeTextContent(content, pageKey, nodeId, text) {
   });
 }
 
+// Phase D — write rich-text runs to a leaf node. Clears textContent
+// so a migrated node never carries stale string data; the renderer
+// sees children[] and walks the runs. Empty / all-blank runs fall
+// through to the same empty-leaf shape as setNodeTextContent(''):
+// the stored blob stays tidy.
+export function setNodeRuns(content, pageKey, nodeId, runs) {
+  const cleaned = normalizeRuns(runs);
+  return withNode(content, pageKey, nodeId, (node) => {
+    const before = Array.isArray(node.children) && node.children.length && typeof node.children[0]?.text === 'string'
+      ? node.children
+      : null;
+    if (before && sameRuns(before, cleaned)) return node;
+    const { textContent: _gone, ...rest } = node;
+    if (cleaned.length === 0) {
+      const { children: _c, ...stripped } = rest;
+      return stripped;
+    }
+    return { ...rest, children: cleaned };
+  });
+}
+
+// Merge runs that share identical marks (post-execCommand the browser
+// often emits chained <strong><strong>… pairs) and drop zero-length
+// runs. Ensures the stored shape is canonical so equality checks
+// short-circuit correctly.
+function normalizeRuns(runs) {
+  const out = [];
+  for (const r of runs || []) {
+    if (!r || typeof r.text !== 'string' || r.text.length === 0) continue;
+    const marks = Array.from(new Set(r.marks || [])).sort();
+    const href = r.href || undefined;
+    const prev = out[out.length - 1];
+    if (prev && sameMarks(prev.marks, marks) && (prev.href || undefined) === href) {
+      prev.text += r.text;
+      continue;
+    }
+    const next = { text: r.text, marks };
+    if (href) next.href = href;
+    out.push(next);
+  }
+  return out;
+}
+
+function sameMarks(a = [], b = []) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function sameRuns(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i]?.text !== b[i]?.text) return false;
+    if ((a[i]?.href || undefined) !== (b[i]?.href || undefined)) return false;
+    if (!sameMarks(a[i]?.marks || [], b[i]?.marks || [])) return false;
+  }
+  return true;
+}
+
 // Set / clear a single attribute on a node. Empty-string and null
 // values delete the key so the stored blob stays tidy.
 export function setNodeAttribute(content, pageKey, nodeId, key, value) {
@@ -240,7 +355,7 @@ function locateWithParent(root, nodeId) {
 // in its parent's children. Returns { content, newId } so the caller
 // can select the clone.
 export function duplicateNode(content, pageKey, nodeId) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page) return { content, newId: null };
   const loc = locateWithParent(page.tree, nodeId);
   if (!loc) return { content, newId: null };
@@ -263,7 +378,7 @@ export function duplicateNode(content, pageKey, nodeId) {
 // of insertNodeAfter. Used by drag-drop when the cursor is above the
 // midpoint of the hover target.
 export function insertNodeBefore(content, pageKey, beforeId, newNode) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page || !newNode) return { content, newId: null };
   const loc = locateWithParent(page.tree, beforeId);
   if (!loc) return { content, newId: null };
@@ -284,7 +399,7 @@ export function insertNodeBefore(content, pageKey, beforeId, newNode) {
 // Insert a prepared node after an anchor node (same parent). Returns
 // { content, newId }. If afterId isn't reachable, no-op.
 export function insertNodeAfter(content, pageKey, afterId, newNode) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page || !newNode) return { content, newId: null };
   const loc = locateWithParent(page.tree, afterId);
   if (!loc) return { content, newId: null };
@@ -307,7 +422,7 @@ export function insertNodeAfter(content, pageKey, afterId, newNode) {
 // the new content plus the removed node's parent id so callers can
 // pick a sensible next selection.
 export function removeNode(content, pageKey, nodeId) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page) return { content, parentId: null };
   if (page.tree?.id === nodeId) return { content, parentId: null };
   const loc = locateWithParent(page.tree, nodeId);
@@ -323,7 +438,7 @@ export function removeNode(content, pageKey, nodeId) {
 // or after the current selection inside the same parent. Null if
 // there is no sibling in that direction.
 export function siblingOf(content, pageKey, nodeId, direction) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page) return null;
   const loc = locateWithParent(page.tree, nodeId);
   if (!loc) return null;
@@ -336,7 +451,7 @@ export function siblingOf(content, pageKey, nodeId, direction) {
 // end). Used by the Phase-7 Add panel. If parentId is null or not
 // found, inserts at the end of the page root.
 export function insertNode(content, pageKey, parentId, newNode, index) {
-  const page = content?.pages?.[pageKey];
+  const page = getEffectivePage(content, pageKey);
   if (!page) return content;
   const targetParentId = parentId || page.tree?.id;
   if (!targetParentId) return content;
@@ -554,4 +669,183 @@ export function renameClass(content, oldName, newName) {
     nextPages[k] = { ...p, tree: rewriteTree(p.tree) };
   }
   return { ...content, classes: nextClasses, pages: nextPages };
+}
+
+// =====================================================================
+// Phase E — Components (a.k.a. Symbols).
+//
+// A component is a named, reusable subtree stored site-wide at
+// content.components[<id>] = { id, name, root: Node, created_at, updated_at }.
+// Pages reference them via nodes that carry `componentRef: <id>` in
+// place of children. Changing the definition updates every instance
+// at once.
+// =====================================================================
+
+function newComponentId() {
+  return 'c_' + Math.random().toString(36).slice(2, 9) + '_' + Date.now().toString(36);
+}
+
+function defaultComponentName(root) {
+  const firstClass = root?.classes?.[0];
+  if (firstClass) return firstClass.replace(/^tapas-/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return root?.tag ? `${root.tag} component` : 'Component';
+}
+
+// Save the selected subtree as a new component. Two moves in one:
+//   1. clone the subtree (fresh ids) into content.components as the def
+//   2. replace the selected node with an instance node that references
+//      the new component id
+// Returns { content, componentId, instanceId }.
+//
+// Idempotent-ish: if the selection is already an instance, we no-op
+// rather than nesting a component inside itself.
+export function saveAsComponent(content, pageKey, nodeId, { name } = {}) {
+  const page = getEffectivePage(content, pageKey);
+  if (!page) return { content, componentId: null, instanceId: null };
+  const loc = locateWithParent(page.tree, nodeId);
+  if (!loc) return { content, componentId: null, instanceId: null };
+  if (loc.node.componentRef) {
+    return { content, componentId: loc.node.componentRef, instanceId: loc.node.id };
+  }
+
+  const defRoot = cloneWithFreshIds(loc.node);
+  // Strip componentRef from descendants just in case — a component def
+  // should own its whole subtree.
+  stripComponentRefs(defRoot);
+
+  const componentId = newComponentId();
+  const now = new Date().toISOString();
+  const def = {
+    id: componentId,
+    name: (name && name.trim()) || defaultComponentName(defRoot),
+    root: defRoot,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const instance = {
+    id: newNodeId(),
+    tag: loc.node.tag || 'div',
+    classes: [],
+    attributes: {},
+    children: [],
+    componentRef: componentId,
+  };
+
+  // Rewire: replace selected node with instance + register def.
+  const withDef = {
+    ...content,
+    components: { ...(content.components || {}), [componentId]: def },
+  };
+  const withInstance = withNode(withDef, pageKey, loc.parent.id, (parent) => {
+    const kids = parent.children || [];
+    return {
+      ...parent,
+      children: kids.map((c) => (c.id === nodeId ? instance : c)),
+    };
+  });
+  return { content: withInstance, componentId, instanceId: instance.id };
+}
+
+function stripComponentRefs(node) {
+  if (!node) return;
+  if (node.componentRef) delete node.componentRef;
+  for (const c of node.children || []) stripComponentRefs(c);
+}
+
+// Detach a component instance — replaces the componentRef node with
+// a deep clone of the component's current def.root (fresh ids). The
+// def itself is left intact; other instances keep resolving against it.
+export function detachComponent(content, pageKey, nodeId) {
+  const page = getEffectivePage(content, pageKey);
+  if (!page) return { content, newId: null };
+  const loc = locateWithParent(page.tree, nodeId);
+  if (!loc || !loc.node.componentRef) return { content, newId: null };
+  const def = content?.components?.[loc.node.componentRef];
+  if (!def?.root) return { content, newId: null };
+  const clone = cloneWithFreshIds(def.root);
+  const next = withNode(content, pageKey, loc.parent.id, (parent) => {
+    const kids = parent.children || [];
+    return {
+      ...parent,
+      children: kids.map((c) => (c.id === nodeId ? clone : c)),
+    };
+  });
+  return { content: next, newId: clone.id };
+}
+
+// Insert a new instance of a component under parentId (or at page root).
+// Mirrors insertNode so the Add-panel-style flow works identically.
+export function insertComponentInstance(content, pageKey, parentId, componentId) {
+  if (!content?.components?.[componentId]) return { content, newId: null };
+  const def = content.components[componentId];
+  const instance = {
+    id: newNodeId(),
+    tag: def.root?.tag || 'div',
+    classes: [],
+    attributes: {},
+    children: [],
+    componentRef: componentId,
+  };
+  return { content: insertNode(content, pageKey, parentId, instance), newId: instance.id };
+}
+
+// Rename a component. Idempotent when the name is unchanged.
+export function renameComponent(content, componentId, name) {
+  const def = content?.components?.[componentId];
+  if (!def) return content;
+  const next = (name || '').trim() || def.name;
+  if (next === def.name) return content;
+  return {
+    ...content,
+    components: {
+      ...content.components,
+      [componentId]: { ...def, name: next, updated_at: new Date().toISOString() },
+    },
+  };
+}
+
+// Delete a component — refuses if any page still references it. The
+// caller can detach instances first (bulk-detach is a later pass).
+// Returns { content, deleted: bool, reason?: 'in-use' }.
+export function deleteComponent(content, componentId) {
+  if (!content?.components?.[componentId]) return { content, deleted: false };
+  const usage = componentUsage(content)[componentId] || 0;
+  if (usage > 0) return { content, deleted: false, reason: 'in-use' };
+  const { [componentId]: _gone, ...rest } = content.components;
+  return { content: { ...content, components: rest }, deleted: true };
+}
+
+// Replace the component's root via the supplied updater. Editing a
+// subtree of def.root is the common case, so the updater receives the
+// old root and returns the new one. Updates the timestamp so staff can
+// sort / audit component history later.
+export function updateComponentRoot(content, componentId, updater) {
+  const def = content?.components?.[componentId];
+  if (!def) return content;
+  const nextRoot = typeof updater === 'function' ? updater(def.root) : updater;
+  if (!nextRoot || nextRoot === def.root) return content;
+  return {
+    ...content,
+    components: {
+      ...content.components,
+      [componentId]: { ...def, root: nextRoot, updated_at: new Date().toISOString() },
+    },
+  };
+}
+
+// Count how many tree nodes (across every page) point at each
+// component id. Used by the Components panel's usage column and by
+// deleteComponent to gate destructive ops.
+export function componentUsage(content) {
+  const counts = {};
+  const walk = (n) => {
+    if (!n) return;
+    if (n.componentRef) counts[n.componentRef] = (counts[n.componentRef] || 0) + 1;
+    for (const c of n.children || []) walk(c);
+  };
+  for (const page of Object.values(content?.pages || {})) {
+    walk(page?.tree);
+  }
+  return counts;
 }

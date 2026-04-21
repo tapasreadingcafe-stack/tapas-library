@@ -12,7 +12,7 @@
 // v2 store_content without any other piece of production being ready.
 // =====================================================================
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Tags that are self-closing in HTML. React handles most of this for us
 // but keeping the list explicit avoids passing `children` to them.
@@ -20,6 +20,104 @@ const VOID_TAGS = new Set([
   'img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'area', 'base',
   'col', 'embed', 'param', 'track', 'wbr',
 ]);
+
+// Resolve bare asset filenames to root-relative URLs so a single v2
+// tree works across the staff app (/store/content-v2) and the
+// storefront without per-app rewriting. Scheme-qualified or already-
+// absolute paths pass through untouched.
+function resolveAssetUrl(src) {
+  if (!src || typeof src !== 'string') return src;
+  if (/^(https?:|data:|blob:|file:)/i.test(src)) return src;
+  if (src.startsWith('/')) return src;
+  return `/${src}`;
+}
+
+// <img> wrapper with a visible broken-image fallback so future
+// migrations stop silently hiding missing assets. Keeps the element
+// in-tree so editor selection / outlines continue to work.
+function SmartImage({ className, attrs }) {
+  const rawSrc = attrs.src;
+  const resolvedSrc = resolveAssetUrl(rawSrc);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [resolvedSrc]);
+  if (failed || !resolvedSrc) {
+    const label = typeof rawSrc === 'string' && rawSrc
+      ? rawSrc.split('/').pop()
+      : 'image';
+    return (
+      <span
+        className={className}
+        {...attrs}
+        style={{
+          ...(attrs.style || {}),
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'repeating-linear-gradient(45deg, #F3F4F6 0 10px, #E5E7EB 10px 20px)',
+          color: '#6B7280',
+          fontFamily: 'ui-monospace, monospace',
+          fontSize: '11px', textAlign: 'center', padding: '8px',
+          minHeight: '80px', wordBreak: 'break-all',
+        }}
+        title={`Missing image: ${rawSrc || '(empty)'}`}
+      >
+        ⛌ {label}
+      </span>
+    );
+  }
+  return (
+    <img
+      className={className}
+      {...attrs}
+      src={resolvedSrc}
+      loading={attrs.loading || 'lazy'}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+// ---- Rich text (Phase D) -------------------------------------------
+// Runs arrive as { text, marks[], href? }. A leaf whose children are
+// all runs renders them wrapped in the applied mark tags. Everything
+// else keeps the pre-Phase-D code path.
+const RUN_MARK_TAG = {
+  bold: 'strong', italic: 'em', underline: 'u', strike: 's',
+  code: 'code', sup: 'sup', sub: 'sub',
+};
+const RUN_MARK_ORDER = ['bold', 'italic', 'underline', 'strike', 'code', 'sup', 'sub'];
+
+function isRunArray(children) {
+  return Array.isArray(children)
+    && children.length > 0
+    && children.every((c) => c && typeof c.text === 'string' && !c.tag);
+}
+
+function renderRuns(runs) {
+  return runs.map((run, i) => renderRun(run, i));
+}
+
+function renderRun(run, key) {
+  if (!run || typeof run.text !== 'string') return null;
+  const pieces = run.text.split('\n');
+  let content = pieces.reduce((acc, piece, idx) => {
+    if (idx > 0) acc.push(React.createElement('br', { key: `br-${idx}` }));
+    if (piece) acc.push(piece);
+    return acc;
+  }, []);
+  const marks = new Set(run.marks || []);
+  for (const mark of RUN_MARK_ORDER) {
+    if (!marks.has(mark)) continue;
+    const tag = RUN_MARK_TAG[mark];
+    if (!tag) continue;
+    content = React.createElement(tag, { key: `m-${mark}` }, content);
+  }
+  if (run.href) {
+    content = React.createElement(
+      'a',
+      { key: `a-${run.href}`, href: run.href, rel: 'noreferrer' },
+      content
+    );
+  }
+  return React.createElement(React.Fragment, { key }, content);
+}
 
 // Tags we'll accept as-is. Anything else falls back to `<div>` with a
 // data-warning attribute so staff see it in devtools.
@@ -74,13 +172,21 @@ export function Node({ node, components }) {
 
   // Void tags can't carry children.
   if (VOID_TAGS.has(Tag)) {
+    if (Tag === 'img') {
+      return <SmartImage className={className} attrs={attrs} />;
+    }
     return <Tag className={className} {...attrs} />;
   }
 
   const children = node.children || [];
   const hasText = typeof node.textContent === 'string' && node.textContent.length > 0;
 
-  // Leaf text node (no children).
+  // Rich-text leaf — children are TextRuns.
+  if (isRunArray(children)) {
+    return <Tag className={className} {...attrs}>{renderRuns(children)}</Tag>;
+  }
+
+  // Legacy plain-text leaf.
   if (hasText && children.length === 0) {
     return <Tag className={className} {...attrs}>{node.textContent}</Tag>;
   }
@@ -89,8 +195,8 @@ export function Node({ node, components }) {
   return (
     <Tag className={className} {...attrs}>
       {hasText ? node.textContent : null}
-      {children.map((child) => (
-        <Node key={child.id} node={child} components={components} />
+      {children.map((child, idx) => (
+        <Node key={child.id || idx} node={child} components={components} />
       ))}
     </Tag>
   );

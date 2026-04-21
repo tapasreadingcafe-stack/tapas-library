@@ -24,12 +24,19 @@ import {
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
   setNodeTag, setNodeAttribute, renameNodeAttribute, setNodeTextContent,
+  setNodeRuns,
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
   createPage, updatePageMeta, deletePage, renamePage,
   classUsageMap, deleteClass, deleteUnusedClasses,
+  saveAsComponent, detachComponent, insertComponentInstance,
+  renameComponent, deleteComponent, componentUsage,
+  getEffectivePage, componentScopeKey,
 } from './WebsiteEditor.mutations';
+import {
+  FloatingTextToolbar, toggleMark, clearFormatting, applyLink,
+} from './WebsiteEditor.richtext';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
 import StylePanel from './WebsiteEditor.style';
@@ -39,6 +46,13 @@ import InteractionsPanel from './WebsiteEditor.interactions';
 import PagePanel from './WebsiteEditor.page';
 import PagesPanel from './WebsiteEditor.pages';
 import ClassBrowser from './WebsiteEditor.classes';
+import {
+  InteractionsListPanel,
+  VariablesPanel, CMSPanel, EcommercePanel,
+  SiteSettingsPanel, SearchPanel, HelpPanel, CommandPalette,
+} from './WebsiteEditor.stubs';
+import AssetsPanel from './WebsiteEditor.assets';
+import ComponentsPanel from './WebsiteEditor.components';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -216,6 +230,7 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
 // =====================================================================
 // Left rail  —  spec § 1: 48 px icon strip, #146ef5 active accent
 // =====================================================================
+// Webflow-parity 13-icon rail. Order matches the spec.
 const RAIL_ICONS = [
   { key: 'add',          label: 'Add',          glyph: '+' },
   { key: 'pages',        label: 'Pages',        glyph: '▤' },
@@ -227,8 +242,6 @@ const RAIL_ICONS = [
   { key: 'variables',    label: 'Variables',    glyph: 'V' },
   { key: 'cms',          label: 'CMS',          glyph: '▦' },
   { key: 'ecommerce',    label: 'Ecommerce',    glyph: '$' },
-  { key: 'accounts',     label: 'Accounts',     glyph: '◉' },
-  { key: 'apps',         label: 'Apps',         glyph: '▥' },
 ];
 const RAIL_FOOTER = [
   { key: 'settings', label: 'Settings', glyph: '⚙' },
@@ -377,8 +390,9 @@ const VOID_DROP_TAGS = new Set([
 
 function Canvas({
   tree, classes, selectedId, onSelect, device, onDeviceChange,
-  onDropBlock,
-  editingNodeId, onStartEdit, onCommitEdit, onCancelEdit,
+  onDropBlock, onDropAsset,
+  editingNodeId, onStartEdit, onCommitEdit, onCommitRuns, onCancelEdit,
+  editableRef, components, onContextMenu,
 }) {
   const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
@@ -541,13 +555,12 @@ function Canvas({
   };
 
   const handleDragOver = (e) => {
-    // Only accept drops carrying our custom type — other drag payloads
-    // (text selection, file drop) pass through.
-    const types = e.dataTransfer?.types;
-    if (!types || !(types.contains ? types.contains('application/x-tapas-block') : Array.from(types).includes('application/x-tapas-block'))) {
-      // Firefox's DataTransferItemList has contains(); Chrome has an array.
-      if (!Array.from(types || []).includes('application/x-tapas-block')) return;
-    }
+    // Accept drops carrying either a block-catalogue key (AddPanel) or
+    // an asset-library payload (AssetsPanel). Other drags pass through.
+    const types = Array.from(e.dataTransfer?.types || []);
+    const accepts = types.includes('application/x-tapas-block')
+                 || types.includes('application/x-tapas-asset');
+    if (!accepts) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     const next = classifyDropTarget(e);
@@ -562,11 +575,19 @@ function Canvas({
 
   const handleDrop = (e) => {
     e.preventDefault();
+    const assetData = e.dataTransfer.getData('application/x-tapas-asset');
     const blockKey =
       e.dataTransfer.getData('application/x-tapas-block') ||
-      e.dataTransfer.getData('text/plain');
+      (!assetData ? e.dataTransfer.getData('text/plain') : '');
     const target = dropHover;
     setDropHover(null);
+    if (assetData) {
+      try {
+        const payload = JSON.parse(assetData);
+        onDropAsset?.(payload, target?.targetId ?? null, target?.position ?? 'append');
+      } catch { /* malformed — ignore */ }
+      return;
+    }
     if (!blockKey) return;
     if (!target) { onDropBlock?.(blockKey, null, 'append'); return; }
     onDropBlock?.(blockKey, target.targetId, target.position);
@@ -648,7 +669,11 @@ function Canvas({
             editingNodeId={editingNodeId}
             onStartEdit={onStartEdit}
             onCommitText={onCommitEdit}
+            onCommitRuns={onCommitRuns}
             onCancelEdit={onCancelEdit}
+            editableRef={editableRef}
+            components={components}
+            onContextMenu={onContextMenu}
           />
         </div>
         {/* Overlays live in surface space so they scroll with the
@@ -843,7 +868,8 @@ function DropIndicator({ drop, surfaceRef }) {
 
 function CanvasSelectionShell({
   tree, selectedId, onSelect, onHover,
-  editingNodeId, onStartEdit, onCommitText, onCancelEdit,
+  editingNodeId, onStartEdit, onCommitText, onCommitRuns, onCancelEdit,
+  editableRef, components, onContextMenu,
 }) {
   const nearestNodeId = (target, stopAt) => {
     let el = target;
@@ -873,14 +899,27 @@ function CanvasSelectionShell({
     if (onHover) onHover(id);
   };
   const onMouseLeave = () => { if (onHover) onHover(null); };
+  const onRightClick = (e) => {
+    if (!onContextMenu) return;
+    const id = nearestNodeId(e.target, e.currentTarget);
+    if (id) {
+      e.preventDefault();
+      e.stopPropagation();
+      onSelect(id);
+      onContextMenu(id, e.clientX, e.clientY);
+    }
+  };
   return (
-    <div onClick={onClick} onDoubleClick={onDoubleClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave}>
+    <div onClick={onClick} onDoubleClick={onDoubleClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave} onContextMenu={onRightClick}>
       <TreeNode
         node={tree}
         selectedId={selectedId}
         editingNodeId={editingNodeId}
         onCommitText={onCommitText}
+        onCommitRuns={onCommitRuns}
         onCancelEdit={onCancelEdit}
+        editableRef={editableRef}
+        components={components}
       />
     </div>
   );
@@ -960,6 +999,7 @@ function RightPanel({
         {tab === 'settings' && (
           <SettingsPanel
             node={selectedNode}
+            pageId={pageKey}
             onSetTag={onSetTag}
             onSetAttribute={onSetAttribute}
             onRenameAttribute={onRenameAttribute}
@@ -996,6 +1036,12 @@ export default function WebsiteEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [pageKey, setPageKey] = useState('home');
+  // When set, the canvas renders the component's definition tree and
+  // every tree edit routes through withPage's component-scope branch
+  // (which rewrites the component def in place). Set via the
+  // Components panel's Edit button; cleared via the Done chip in the
+  // top bar.
+  const [editingComponentId, setEditingComponentId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [railActive, setRailActive] = useState('navigator');
   const [styleState, setStyleState] = useState('base');
@@ -1008,6 +1054,12 @@ export default function WebsiteEditor() {
   // element contentEditable and hides the selection/hover overlays so
   // the caret isn't obscured. Commit on blur / Enter, cancel on Esc.
   const [editingNodeId, setEditingNodeId] = useState(null);
+  // Command palette overlay (Cmd+K). Mounted at the editor root so it
+  // overlays everything including the right panel.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Context menu state — { x, y, nodeId }. Opened on right-click via
+  // the CanvasSelectionShell; closed on outside click or Esc.
+  const [contextMenu, setContextMenu] = useState(null);
 
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
@@ -1075,7 +1127,15 @@ export default function WebsiteEditor() {
     return Object.entries(content.pages).map(([key, p]) => ({ key, name: p.name || key }));
   }, [content]);
 
-  const tree = content?.pages?.[pageKey]?.tree || null;
+  // Active scope key — what mutations actually target. Equals pageKey
+  // normally; switches to a component-shim key while editing a
+  // component so withPage / withNode rewrite content.components[id]
+  // instead of content.pages[pageKey].
+  const activePageKey = editingComponentId
+    ? componentScopeKey(editingComponentId)
+    : pageKey;
+
+  const tree = getEffectivePage(content, activePageKey)?.tree || null;
   const classes = content?.classes || {};
 
   const breadcrumb = useMemo(
@@ -1156,10 +1216,10 @@ export default function WebsiteEditor() {
   const handleCreateClass = useCallback(() => {
     if (!selectedId) return;
     applyEdit((c) => {
-      const { content: next } = ensureNodeClass(c, pageKey, selectedId);
+      const { content: next } = ensureNodeClass(c, activePageKey, selectedId);
       return next;
     });
-  }, [selectedId, pageKey, applyEdit]);
+  }, [selectedId, activePageKey, applyEdit]);
 
   const handleRenameClass = useCallback((newName) => {
     if (!primaryClass || !newName) return;
@@ -1178,29 +1238,29 @@ export default function WebsiteEditor() {
   const handleSetStyle = useCallback((prop, value) => {
     if (!selectedId) return;
     applyEdit((c) => {
-      const { content: withClass, className } = ensureNodeClass(c, pageKey, selectedId);
+      const { content: withClass, className } = ensureNodeClass(c, activePageKey, selectedId);
       if (!className) return c;
       if (device === 'desktop') {
         return setClassStyle(withClass, className, styleState, prop, value);
       }
       return setClassBreakpointStyle(withClass, className, device, prop, value);
     });
-  }, [selectedId, pageKey, styleState, device, applyEdit]);
+  }, [selectedId, activePageKey, styleState, device, applyEdit]);
 
   const handleSetTag = useCallback((tag) => {
     if (!selectedId) return;
-    applyEdit((c) => setNodeTag(c, pageKey, selectedId, tag));
-  }, [selectedId, pageKey, applyEdit]);
+    applyEdit((c) => setNodeTag(c, activePageKey, selectedId, tag));
+  }, [selectedId, activePageKey, applyEdit]);
 
   const handleSetAttribute = useCallback((key, value) => {
     if (!selectedId) return;
-    applyEdit((c) => setNodeAttribute(c, pageKey, selectedId, key, value));
-  }, [selectedId, pageKey, applyEdit]);
+    applyEdit((c) => setNodeAttribute(c, activePageKey, selectedId, key, value));
+  }, [selectedId, activePageKey, applyEdit]);
 
   const handleRenameAttribute = useCallback((oldKey, newKey) => {
     if (!selectedId) return;
-    applyEdit((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
-  }, [selectedId, pageKey, applyEdit]);
+    applyEdit((c) => renameNodeAttribute(c, activePageKey, selectedId, oldKey, newKey));
+  }, [selectedId, activePageKey, applyEdit]);
 
   // Lane A item 3: Page-level meta (SEO) updates. Partial patch; the
   // mutation drops empty-string values so the stored blob stays tidy.
@@ -1208,6 +1268,85 @@ export default function WebsiteEditor() {
     if (!pageKey) return;
     applyEdit((c) => updatePageMeta(c, pageKey, patch));
   }, [pageKey, applyEdit]);
+
+  // Site-level patch. Used by the Settings rail panel to write
+  // brand.* and global_css.* fields through the same history-aware
+  // applyEdit so Cmd+Z unwinds them.
+  const handleSitePatch = useCallback((path, value) => {
+    if (!Array.isArray(path) || path.length === 0) return;
+    applyEdit((c) => {
+      const next = { ...c };
+      let cursor = next;
+      for (let i = 0; i < path.length - 1; i += 1) {
+        const k = path[i];
+        cursor[k] = { ...(cursor[k] || {}) };
+        cursor = cursor[k];
+      }
+      cursor[path[path.length - 1]] = value;
+      return next;
+    });
+  }, [applyEdit]);
+
+  // Phase E — component usage map. Re-derives on every content change
+  // (single tree walk; no keyed memo needed).
+  const componentUsageMap = useMemo(() => componentUsage(content), [content]);
+
+  const handleSaveAsComponent = useCallback(() => {
+    if (!selectedId || typeof window === 'undefined') return;
+    const name = window.prompt('Component name:', '');
+    if (name === null) return;
+    let newInstanceId = null;
+    applyEdit((c) => {
+      const { content: next, instanceId } = saveAsComponent(c, activePageKey, selectedId, { name });
+      if (!instanceId) return c;
+      newInstanceId = instanceId;
+      return next;
+    });
+    if (newInstanceId) setSelectedId(newInstanceId);
+  }, [selectedId, activePageKey, applyEdit]);
+
+  const handleDetachComponent = useCallback(() => {
+    if (!selectedId) return;
+    let newChildId = null;
+    applyEdit((c) => {
+      const { content: next, newId } = detachComponent(c, activePageKey, selectedId);
+      if (!newId) return c;
+      newChildId = newId;
+      return next;
+    });
+    if (newChildId) setSelectedId(newChildId);
+  }, [selectedId, activePageKey, applyEdit]);
+
+  const handleInsertComponent = useCallback((componentId) => {
+    let newInstanceId = null;
+    applyEdit((c) => {
+      const { content: next, newId } = insertComponentInstance(c, activePageKey, null, componentId);
+      if (!newId) return c;
+      newInstanceId = newId;
+      return next;
+    });
+    if (newInstanceId) setSelectedId(newInstanceId);
+  }, [activePageKey, applyEdit]);
+
+  const handleRenameComponent = useCallback((componentId, name) => {
+    applyEdit((c) => renameComponent(c, componentId, name));
+  }, [applyEdit]);
+
+  const handleDeleteComponent = useCallback((componentId) => {
+    applyEdit((c) => {
+      const { content: next, deleted } = deleteComponent(c, componentId);
+      return deleted ? next : c;
+    });
+  }, [applyEdit]);
+
+  // Enter / exit component-scope edit mode. When entering, selection +
+  // editing-node state resets so the user lands in a clean canvas. The
+  // actual tree swap happens transparently via activePageKey.
+  const handleEditComponent = useCallback((componentId) => {
+    setEditingComponentId(componentId || null);
+    setSelectedId(null);
+    setEditingNodeId(null);
+  }, []);
 
   // Lane G4 — class browser. Usage map re-derives on every content
   // change; cheap (flat walk, same cost as compileClassesToCSS).
@@ -1241,9 +1380,9 @@ export default function WebsiteEditor() {
     const entry = BLOCK_CATALOGUE.find((b) => b.key === blockKey);
     if (!entry) return;
     const newNode = entry.create();
-    applyEdit((c) => insertNode(c, pageKey, null, newNode));
+    applyEdit((c) => insertNode(c, activePageKey, null, newNode));
     setSelectedId(newNode.id);
-  }, [pageKey, applyEdit]);
+  }, [activePageKey, applyEdit]);
 
   // Drag-drop insert. `position` ∈ { 'before', 'after', 'inside', 'append' }.
   // 'append' is the "dropped on empty canvas" fallback and just pushes
@@ -1260,13 +1399,46 @@ export default function WebsiteEditor() {
 
   const handleCommitEdit = useCallback((nodeId, text) => {
     if (!nodeId) { setEditingNodeId(null); return; }
-    applyEdit((c) => setNodeTextContent(c, pageKey, nodeId, text));
+    applyEdit((c) => setNodeTextContent(c, activePageKey, nodeId, text));
     setEditingNodeId(null);
-  }, [pageKey, applyEdit]);
+  }, [activePageKey, applyEdit]);
+
+  // Phase D — inline rich-text edit commits TextRun[] instead of a
+  // plain string. Normalisation + strip-textContent happens inside
+  // setNodeRuns so the caller stays simple.
+  const handleCommitRuns = useCallback((nodeId, runs) => {
+    if (!nodeId) { setEditingNodeId(null); return; }
+    applyEdit((c) => setNodeRuns(c, activePageKey, nodeId, runs));
+    setEditingNodeId(null);
+  }, [activePageKey, applyEdit]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingNodeId(null);
   }, []);
+
+  // Ref to the currently-editing contentEditable element. Populated
+  // by the Node renderer on mount, nulled on unmount. The floating
+  // text toolbar anchors off it so selections outside the editable
+  // never surface a rogue toolbar.
+  const editableRef = useRef(null);
+
+  // Fires when the user clicks a toolbar button (or presses a
+  // Cmd+B/I/U/K shortcut). The contentEditable owns the DOM, so we
+  // just call execCommand and let blur parse the result later.
+  const runRichTextCommand = useCallback((cmd) => {
+    if (!editingNodeId) return;
+    if (cmd === 'clear') { clearFormatting(); return; }
+    if (cmd === 'link') {
+      // Inline prompt — the toolbar has its own inline input; this
+      // path is used by the ⌘K shortcut inside edit mode.
+      if (typeof window === 'undefined') return;
+      const href = window.prompt('Link URL (empty to remove):', '');
+      if (href === null) return;
+      applyLink(href.trim());
+      return;
+    }
+    toggleMark(cmd);
+  }, [editingNodeId]);
 
   // Create a brand-new v2 page from a user-supplied slug. Uses the
   // native prompt for MVP — a proper modal can land with Phase 10b
@@ -1350,45 +1522,84 @@ export default function WebsiteEditor() {
     const newNode = entry.create();
     applyEdit((c) => {
       if (!targetId || position === 'append') {
-        return insertNode(c, pageKey, null, newNode);
+        return insertNode(c, activePageKey, null, newNode);
       }
       if (position === 'inside') {
-        return insertNode(c, pageKey, targetId, newNode);
+        return insertNode(c, activePageKey, targetId, newNode);
       }
       if (position === 'before') {
-        const { content: next } = insertNodeBefore(c, pageKey, targetId, newNode);
+        const { content: next } = insertNodeBefore(c, activePageKey, targetId, newNode);
         return next;
       }
       // after
-      const { content: next } = insertNodeAfter(c, pageKey, targetId, newNode);
+      const { content: next } = insertNodeAfter(c, activePageKey, targetId, newNode);
       return next;
     });
     setSelectedId(newNode.id);
-  }, [pageKey, applyEdit]);
+  }, [activePageKey, applyEdit]);
+
+  // Drop-from-asset-library onto canvas. Builds an <img> block
+  // pre-populated with the asset's public URL and inserts it with the
+  // same position semantics as handleDropBlock. Videos and SVGs go
+  // through the same img path for now (browsers render SVG in <img>;
+  // videos would need <video> but staff rarely drop raw mp4s — we can
+  // handle them when the need comes up).
+  const handleDropAsset = useCallback((payload, targetId, position) => {
+    if (!payload?.url) return;
+    const assetEntry = BLOCK_CATALOGUE.find((b) => b.key === 'image');
+    if (!assetEntry) return;
+    const newNode = assetEntry.create();
+    newNode.attributes = {
+      ...(newNode.attributes || {}),
+      src: payload.url,
+      alt: payload.alt || '',
+    };
+    applyEdit((c) => {
+      if (!targetId || position === 'append') {
+        return insertNode(c, activePageKey, null, newNode);
+      }
+      if (position === 'inside') {
+        return insertNode(c, activePageKey, targetId, newNode);
+      }
+      if (position === 'before') {
+        const { content: next } = insertNodeBefore(c, activePageKey, targetId, newNode);
+        return next;
+      }
+      const { content: next } = insertNodeAfter(c, activePageKey, targetId, newNode);
+      return next;
+    });
+    setSelectedId(newNode.id);
+  }, [activePageKey, applyEdit]);
+
+  // Click handler for the AssetsPanel's "insert here" button — inserts
+  // at root, no drop target required.
+  const handleInsertAsset = useCallback((asset) => {
+    handleDropAsset({ url: asset.url, alt: asset.name }, null, 'append');
+  }, [handleDropAsset]);
 
   // --- Phase 9 mutation handlers (duplicate / remove / paste) ---------
   const handleDuplicate = useCallback(() => {
     if (!selectedId || !tree || selectedId === tree.id) return;
     let created = null;
     applyEdit((c) => {
-      const { content: next, newId } = duplicateNode(c, pageKey, selectedId);
+      const { content: next, newId } = duplicateNode(c, activePageKey, selectedId);
       if (newId) created = newId;
       return next;
     });
     if (created) setSelectedId(created);
-  }, [selectedId, tree, pageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit]);
 
   const handleDelete = useCallback(() => {
     if (!selectedId || !tree || selectedId === tree.id) return;
     let fallbackParent = null;
     applyEdit((c) => {
-      const { content: next, parentId } = removeNode(c, pageKey, selectedId);
+      const { content: next, parentId } = removeNode(c, activePageKey, selectedId);
       fallbackParent = parentId;
       return next;
     });
     // Move selection to the parent so the Inspector has something to show.
     setSelectedId(fallbackParent);
-  }, [selectedId, tree, pageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit]);
 
   const handleCopy = useCallback(() => {
     if (!selectedId || !tree) return;
@@ -1407,16 +1618,16 @@ export default function WebsiteEditor() {
     applyEdit((c) => {
       if (selectedId && tree && selectedId !== tree.id) {
         // Paste as next sibling of the current selection.
-        const { content: next, newId } = insertNodeAfter(c, pageKey, selectedId, fresh);
+        const { content: next, newId } = insertNodeAfter(c, activePageKey, selectedId, fresh);
         if (newId) created = newId;
         return next;
       }
       // Nothing selected (or root) → append to page root.
       created = fresh.id;
-      return insertNode(c, pageKey, null, fresh);
+      return insertNode(c, activePageKey, null, fresh);
     });
     if (created) setSelectedId(created);
-  }, [selectedId, tree, pageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit]);
 
   // Keyboard — spec § 2 + § 10.
   // Selection-only moves (Esc, Enter, Arrow keys, Tab) work without the
@@ -1438,6 +1649,23 @@ export default function WebsiteEditor() {
 
     const onKey = (e) => {
       const mod = e.metaKey || e.ctrlKey;
+
+      // Rich-text shortcuts — only fire while a contentEditable is
+      // active so the same keys stay available for the global palette
+      // / undo when editing isn't happening.
+      if (editingNodeId && mod) {
+        if (e.key === 'b' || e.key === 'B') { runRichTextCommand('bold');      e.preventDefault(); return; }
+        if (e.key === 'i' || e.key === 'I') { runRichTextCommand('italic');    e.preventDefault(); return; }
+        if (e.key === 'u' || e.key === 'U') { runRichTextCommand('underline'); e.preventDefault(); return; }
+        if (e.key === 'k' || e.key === 'K') { runRichTextCommand('link');      e.preventDefault(); return; }
+      }
+
+      // Cmd+K — command palette. Skipped while editing (see above).
+      if (mod && (e.key === 'k' || e.key === 'K')) {
+        setPaletteOpen((o) => !o);
+        e.preventDefault();
+        return;
+      }
 
       // Undo / redo — fires regardless of focus so keyboard still
       // rescues users when they're editing inside the Inspector.
@@ -1476,13 +1704,19 @@ export default function WebsiteEditor() {
         }
         if (e.key === 'Tab') {
           const dir = e.shiftKey ? 'prev' : 'next';
-          const sib = siblingOf(content, pageKey, selectedId, dir);
+          const sib = siblingOf(content, activePageKey, selectedId, dir);
           if (sib) { setSelectedId(sib.id); e.preventDefault(); }
           return;
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
           handleDelete(); e.preventDefault(); return;
         }
+      }
+
+      // Cmd+Option+C — save selection as component. Matches the
+      // Webflow shortcut so staff muscle memory carries over.
+      if (mod && e.altKey && (e.key === 'c' || e.key === 'C' || e.code === 'KeyC')) {
+        handleSaveAsComponent(); e.preventDefault(); return;
       }
 
       // Mutation shortcuts (meta + letter)
@@ -1498,7 +1732,7 @@ export default function WebsiteEditor() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tree, flat, selectedId, content, pageKey, undo, redo, handleDelete, handleDuplicate, handleCopy, handlePaste]);
+  }, [tree, flat, selectedId, content, activePageKey, undo, redo, handleDelete, handleDuplicate, handleCopy, handlePaste, editingNodeId, runRichTextCommand, handleSaveAsComponent]);
 
   if (loading) {
     return <div style={fullScreenMessage(W, 'Loading v2 content…')} />;
@@ -1518,36 +1752,110 @@ export default function WebsiteEditor() {
         breadcrumb={breadcrumb}
         onBreadcrumbClick={(id) => setSelectedId(id)}
         page={pageKey}
-        onPageChange={(k) => { setPageKey(k); setSelectedId(null); }}
+        onPageChange={(k) => { setPageKey(k); setSelectedId(null); setEditingComponentId(null); }}
         onCreatePage={handleCreatePage}
         onDeletePage={handleDeletePage}
         onRenamePage={handleRenamePage}
         pages={pages}
       />
+      {editingComponentId && (
+        <div style={{
+          flexShrink: 0, height: '28px',
+          padding: '0 14px',
+          background: '#146ef522',
+          borderBottom: `1px solid #146ef5`,
+          color: W.accent, fontSize: '11.5px', fontWeight: 600,
+          letterSpacing: '0.02em',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>
+            ◆ Editing component:{' '}
+            <span style={{ color: W.text }}>
+              {content?.components?.[editingComponentId]?.name || editingComponentId}
+            </span>
+            <span style={{ color: W.textFaint, marginLeft: '10px', fontWeight: 500 }}>
+              Changes apply to every instance.
+            </span>
+          </span>
+          <button
+            onClick={() => handleEditComponent(null)}
+            style={{
+              background: W.accent, color: '#fff',
+              border: 'none', borderRadius: '3px',
+              padding: '2px 10px', fontSize: '11px', fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            title="Return to page"
+          >Done</button>
+        </div>
+      )}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <LeftRail active={railActive} onChange={setRailActive} />
-        {railActive === 'add' ? (
-          <AddPanel onInsert={handleInsertBlock} />
-        ) : railActive === 'pages' ? (
-          <PagesPanel
-            pages={pages}
-            activeKey={pageKey}
-            onPick={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); }}
-            onCreate={handleCreatePage}
-            onRename={handleRenamePage}
-            onDelete={handleDeletePage}
-          />
-        ) : railActive === 'styleguide' ? (
-          <ClassBrowser
-            classes={classes}
-            usage={usageMap}
-            onRename={handleRenameClassByName}
-            onDelete={handleDeleteClass}
-            onCleanup={handleCleanupClasses}
-          />
-        ) : (
-          <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />
-        )}
+        {(() => {
+          switch (railActive) {
+            case 'add':
+              return <AddPanel onInsert={handleInsertBlock} />;
+            case 'pages':
+              return (
+                <PagesPanel
+                  pages={pages}
+                  activeKey={pageKey}
+                  onPick={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
+                  onCreate={handleCreatePage}
+                  onRename={handleRenamePage}
+                  onDelete={handleDeletePage}
+                />
+              );
+            case 'styleguide':
+              return (
+                <ClassBrowser
+                  classes={classes}
+                  usage={usageMap}
+                  onRename={handleRenameClassByName}
+                  onDelete={handleDeleteClass}
+                  onCleanup={handleCleanupClasses}
+                />
+              );
+            case 'components':
+              return (
+                <ComponentsPanel
+                  content={content}
+                  usage={componentUsageMap}
+                  editingComponentId={editingComponentId}
+                  onInsert={handleInsertComponent}
+                  onEdit={handleEditComponent}
+                  onRename={handleRenameComponent}
+                  onDelete={handleDeleteComponent}
+                />
+              );
+            case 'assets':
+              return <AssetsPanel pageId={pageKey} onInsertAsset={handleInsertAsset} />;
+            case 'interactions':
+              return <InteractionsListPanel />;
+            case 'variables':
+              return <VariablesPanel content={content} />;
+            case 'cms':
+              return <CMSPanel />;
+            case 'ecommerce':
+              return <EcommercePanel />;
+            case 'settings':
+              return <SiteSettingsPanel content={content} onPatch={handleSitePatch} />;
+            case 'search':
+              return (
+                <SearchPanel
+                  content={content}
+                  tree={tree}
+                  onSelect={setSelectedId}
+                  onPickPage={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
+                />
+              );
+            case 'help':
+              return <HelpPanel />;
+            case 'navigator':
+            default:
+              return <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />;
+          }
+        })()}
         <Canvas
           tree={tree}
           classes={classes}
@@ -1556,10 +1864,15 @@ export default function WebsiteEditor() {
           device={device}
           onDeviceChange={setDevice}
           onDropBlock={handleDropBlock}
+          onDropAsset={handleDropAsset}
           editingNodeId={editingNodeId}
           onStartEdit={handleStartEdit}
           onCommitEdit={handleCommitEdit}
+          onCommitRuns={handleCommitRuns}
           onCancelEdit={handleCancelEdit}
+          editableRef={editableRef}
+          components={content?.components}
+          onContextMenu={(id, x, y) => setContextMenu({ nodeId: id, x, y })}
         />
         <RightPanel
           selectedNode={selectedNode}
@@ -1580,6 +1893,30 @@ export default function WebsiteEditor() {
           onUpdatePageMeta={handleUpdatePageMeta}
         />
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        content={content}
+        tree={tree}
+        onSelect={setSelectedId}
+        onPickPage={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
+      />
+      <FloatingTextToolbar
+        active={!!editingNodeId}
+        anchorRef={editableRef}
+        onCommand={runRichTextCommand}
+      />
+      <ContextMenu
+        open={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onSaveAsComponent={() => { setContextMenu(null); handleSaveAsComponent(); }}
+        onDetach={() => { setContextMenu(null); handleDetachComponent(); }}
+        isInstance={(() => {
+          if (!contextMenu?.nodeId || !tree) return false;
+          const hit = findNode(tree, contextMenu.nodeId);
+          return !!hit?.componentRef;
+        })()}
+      />
       {(saving || saveError) && (
         <div style={{
           position: 'absolute', bottom: 8, right: 12,
@@ -1594,6 +1931,66 @@ export default function WebsiteEditor() {
         </div>
       )}
     </div>
+  );
+}
+
+// Small right-click menu anchored to the click position. Options are
+// gated on whether the selection is already a component instance —
+// staff can Detach an instance or Save a regular node as a new
+// component. Closes on Esc or any click outside.
+function ContextMenu({ open, onClose, onSaveAsComponent, onDetach, isInstance }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = () => onClose?.();
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+  if (!open) return null;
+  const { x, y } = open;
+  return (
+    <div
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        position: 'fixed', top: y, left: x, zIndex: 3200,
+        minWidth: '180px',
+        background: '#1e1e1e', color: '#e5e5e5',
+        border: '1px solid #333', borderRadius: '4px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+        padding: '4px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, Inter, sans-serif',
+      }}
+    >
+      {isInstance ? (
+        <MenuItem onClick={onDetach}>Detach component</MenuItem>
+      ) : (
+        <MenuItem onClick={onSaveAsComponent} hint="⌘⌥C">Save as component</MenuItem>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ children, hint, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', gap: '16px',
+        padding: '6px 10px', background: 'transparent',
+        color: '#e5e5e5', border: 'none', cursor: 'pointer',
+        textAlign: 'left', fontSize: '12px',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#2a2a2a'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span>{children}</span>
+      {hint && <span style={{ color: '#6a6a6a', fontSize: '11px', fontFamily: 'ui-monospace, monospace' }}>{hint}</span>}
+    </button>
   );
 }
 
