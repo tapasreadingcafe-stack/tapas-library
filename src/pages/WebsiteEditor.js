@@ -39,6 +39,7 @@ import {
 } from './WebsiteEditor.richtext';
 import {
   compileTimeline, parseTimelineAttr, timelineAttrName,
+  driveTimeline,
 } from './WebsiteEditor.timeline';
 import { ensureSiteDefaults } from '../editor/compileBlocksToTree';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
@@ -52,11 +53,12 @@ import PagesPanel from './WebsiteEditor.pages';
 import ClassBrowser from './WebsiteEditor.classes';
 import {
   InteractionsListPanel,
-  VariablesPanel, CMSPanel, EcommercePanel,
+  VariablesPanel, EcommercePanel,
   SiteSettingsPanel, SearchPanel, HelpPanel, CommandPalette,
 } from './WebsiteEditor.stubs';
 import AssetsPanel from './WebsiteEditor.assets';
 import ComponentsPanel from './WebsiteEditor.components';
+import CMSPanel from './WebsiteEditor.cms';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -568,6 +570,21 @@ function Canvas({
       loadTimelineCtrls.forEach((ctrl) => ctrl.play());
     });
 
+    // --- Phase H drive triggers ----------------------------------
+    // scroll-drive and mouse triggers are continuous — they install
+    // rAF loops and listener cleanup functions instead of playing
+    // once. We still run them in the editor canvas so staff can
+    // preview parallax / tilt-follow without leaving /content-v2.
+    const driveCleanups = [];
+    surface.querySelectorAll('[data-tapas-timeline-scroll-drive]').forEach((el) => {
+      const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll-drive'));
+      if (steps.length) driveCleanups.push(driveTimeline('scroll-drive', steps, el));
+    });
+    surface.querySelectorAll('[data-tapas-timeline-mouse]').forEach((el) => {
+      const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-mouse'));
+      if (steps.length) driveCleanups.push(driveTimeline('mouse', steps, el));
+    });
+
     return () => {
       if (io) io.disconnect();
       if (timelineIo) timelineIo.disconnect();
@@ -576,6 +593,7 @@ function Canvas({
       cancelAnimationFrame(loadFrame);
       cancelAnimationFrame(loadTimelineFrame);
       timelineControllers.forEach((ctrl) => ctrl.cancel());
+      driveCleanups.forEach((fn) => fn());
     };
   }, [tree]);
 

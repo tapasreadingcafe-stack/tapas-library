@@ -18,6 +18,7 @@ import { EasingField } from './WebsiteEditor.bezier';
 import {
   TIMELINE_PROPERTIES, TIMELINE_TARGETS, TIMELINE_TRIGGERS,
   makeStep, parseTimelineAttr, stringifyTimeline, timelineAttrName,
+  isDriveTrigger,
 } from './WebsiteEditor.timeline';
 
 const W = {
@@ -336,9 +337,10 @@ function TimelineEditor({ node, onSetAttribute, onPlayTimeline }) {
 
   const addStep = () => {
     const next = steps.slice();
-    next.push(makeStep());
+    next.push(makeStep({ trigger }));
     writeSteps(next);
   };
+  const drive = isDriveTrigger(trigger);
 
   return (
     <Section title="Timeline">
@@ -373,6 +375,7 @@ function TimelineEditor({ node, onSetAttribute, onPlayTimeline }) {
               key={step.id || i}
               index={i}
               step={step}
+              trigger={trigger}
               canMoveUp={i > 0}
               canMoveDown={i < steps.length - 1}
               onChange={(patch) => updateStep(i, patch)}
@@ -396,18 +399,33 @@ function TimelineEditor({ node, onSetAttribute, onPlayTimeline }) {
         >+ Add step</button>
         <button
           onClick={() => onPlayTimeline?.(trigger)}
-          disabled={steps.length === 0}
-          title={steps.length === 0 ? 'Add a step first' : 'Preview on canvas'}
+          disabled={steps.length === 0 || drive}
+          title={
+            drive ? 'Drive triggers run live — scroll or move the mouse over the element'
+            : steps.length === 0 ? 'Add a step first' : 'Preview on canvas'
+          }
           style={{
             flex: 1, padding: '6px', fontSize: '11px', fontWeight: 600,
-            background: steps.length ? '#146ef5' : '#222',
-            color: steps.length ? '#fff' : W.textFaint,
-            border: `1px solid ${steps.length ? '#146ef5' : W.inputBorder}`,
+            background: (steps.length && !drive) ? '#146ef5' : '#222',
+            color: (steps.length && !drive) ? '#fff' : W.textFaint,
+            border: `1px solid ${(steps.length && !drive) ? '#146ef5' : W.inputBorder}`,
             borderRadius: '3px',
-            cursor: steps.length ? 'pointer' : 'not-allowed',
+            cursor: (steps.length && !drive) ? 'pointer' : 'not-allowed',
           }}
         >▶ Play preview</button>
       </div>
+      {drive && (
+        <div style={{
+          marginTop: '6px', padding: '6px 8px',
+          background: W.accentDim, color: W.accent,
+          border: `1px solid ${W.accent}`, borderRadius: '3px',
+          fontSize: '10.5px', lineHeight: 1.4,
+        }}>
+          {trigger === 'scroll-drive'
+            ? 'Properties interpolate between From and To as the element scrolls through the viewport. Use the progress window (0–1) to pick the active range.'
+            : 'Properties track the cursor position over the element. From = pointer at left/top edge, To = right/bottom edge.'}
+        </div>
+      )}
     </Section>
   );
 }
@@ -422,8 +440,10 @@ function triggerLabel(key) {
   }
 }
 
-function StepCard({ index, step, canMoveUp, canMoveDown, onChange, onRemove, onMoveUp, onMoveDown }) {
+function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRemove, onMoveUp, onMoveDown }) {
   const prop = TIMELINE_PROPERTIES.find((p) => p.key === step.property) || TIMELINE_PROPERTIES[0];
+  const isScrollDrive = trigger === 'scroll-drive';
+  const isMouse       = trigger === 'mouse';
   return (
     <div style={{
       border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
@@ -520,29 +540,69 @@ function StepCard({ index, step, canMoveUp, canMoveDown, onChange, onRemove, onM
         </Row>
       )}
 
-      <div style={{ display: 'flex', gap: '6px' }}>
-        <Row label="Duration">
-          <DurationInput
-            value={step.duration}
-            onChange={(v) => onChange({ duration: clampMs(v) })}
-            placeholder="600"
-          />
-        </Row>
-        <Row label="Delay">
-          <DurationInput
-            value={step.delay}
-            onChange={(v) => onChange({ delay: clampMs(v) })}
-            placeholder="0"
-          />
-        </Row>
-      </div>
+      {!isScrollDrive && !isMouse && (
+        <>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <Row label="Duration">
+              <DurationInput
+                value={step.duration}
+                onChange={(v) => onChange({ duration: clampMs(v) })}
+                placeholder="600"
+              />
+            </Row>
+            <Row label="Delay">
+              <DurationInput
+                value={step.delay}
+                onChange={(v) => onChange({ delay: clampMs(v) })}
+                placeholder="0"
+              />
+            </Row>
+          </div>
+          <Row label="Easing">
+            <EasingField
+              value={step.easing}
+              onChange={(v) => onChange({ easing: v })}
+            />
+          </Row>
+        </>
+      )}
 
-      <Row label="Easing">
-        <EasingField
-          value={step.easing}
-          onChange={(v) => onChange({ easing: v })}
-        />
-      </Row>
+      {isScrollDrive && (
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <Row label="Start">
+            <DurationInput
+              value={step.fromProgress}
+              onChange={(v) => onChange({ fromProgress: v })}
+              placeholder="0"
+            />
+          </Row>
+          <Row label="End">
+            <DurationInput
+              value={step.toProgress}
+              onChange={(v) => onChange({ toProgress: v })}
+              placeholder="1"
+            />
+          </Row>
+        </div>
+      )}
+
+      {isMouse && (
+        <Row label="Axis">
+          <select
+            value={step.axis || 'x'}
+            onChange={(e) => onChange({ axis: e.target.value })}
+            style={{
+              width: '100%', height: '22px',
+              background: W.input, color: W.text,
+              border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+              fontSize: '11px',
+            }}
+          >
+            <option value="x">X (horizontal)</option>
+            <option value="y">Y (vertical)</option>
+          </select>
+        </Row>
+      )}
     </div>
   );
 }

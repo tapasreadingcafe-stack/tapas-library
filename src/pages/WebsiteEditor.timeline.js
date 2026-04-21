@@ -180,7 +180,18 @@ export function compileTimeline(steps, rootEl, opts = {}) {
 // Attribute helpers — the editor stores timelines as JSON strings on
 // data-tapas-timeline-<trigger>. Serialise / parse in one place so
 // typos can't drift between the editor and the runtime.
-export const TIMELINE_TRIGGERS = ['scroll', 'load', 'click', 'hover'];
+//
+// Triggers split into two runtime families:
+//   * "playback" triggers (scroll / load / click / hover) — fire
+//     once per activation, use duration + delay + easing, driven by
+//     compileTimeline() + WAAPI.
+//   * "drive" triggers (scroll-drive / mouse) — continuously sampled
+//     and interpolated against a 0..1 or -1..1 input, driven by
+//     driveTimeline(). Property values are written to the target's
+//     inline style every frame.
+export const TIMELINE_TRIGGERS = ['scroll', 'load', 'click', 'hover', 'scroll-drive', 'mouse'];
+export const DRIVE_TRIGGERS    = ['scroll-drive', 'mouse'];
+export function isDriveTrigger(key) { return DRIVE_TRIGGERS.includes(key); }
 
 export function timelineAttrName(trigger) {
   return `data-tapas-timeline-${trigger}`;
@@ -202,10 +213,12 @@ export function stringifyTimeline(steps) {
 }
 
 // Factory for a brand-new step seeded with sensible defaults. Used by
-// the "+ Add step" button in the InteractionsPanel.
-export function makeStep({ property = 'translateY' } = {}) {
+// the "+ Add step" button in the InteractionsPanel. Accepts the
+// active trigger so drive-mode steps start with the fields the UI
+// actually uses (progress window for scroll-drive, axis for mouse).
+export function makeStep({ property = 'translateY', trigger = 'scroll' } = {}) {
   const meta = TIMELINE_PROPERTIES.find((p) => p.key === property) || TIMELINE_PROPERTIES[0];
-  return {
+  const base = {
     id: 's_' + Math.random().toString(36).slice(2, 9),
     target: 'self',
     targetValue: '',
@@ -213,8 +226,162 @@ export function makeStep({ property = 'translateY' } = {}) {
     from: String(meta.defaults.from),
     to:   String(meta.defaults.to),
     unit: meta.unit,
-    duration: 600,
-    delay: 0,
-    easing: 'ease-out',
   };
+  if (trigger === 'scroll-drive') {
+    return { ...base, fromProgress: '0', toProgress: '1' };
+  }
+  if (trigger === 'mouse') {
+    return { ...base, axis: 'x' };
+  }
+  return { ...base, duration: 600, delay: 0, easing: 'ease-out' };
+}
+
+// ---------------------------------------------------------------------
+// driveTimeline — continuous-input runtime for scroll-drive / mouse.
+//
+// steps[] is the same JSON shape, with these additions per trigger:
+//   scroll-drive: { fromProgress, toProgress }   // 0..1 window
+//   mouse:        { axis: 'x' | 'y' }             // input direction
+//
+// Returns a cleanup function the caller runs on unmount.
+// ---------------------------------------------------------------------
+function applyDriveProperty(el, property, rawVal, unit) {
+  const num = Number(rawVal);
+  if (property === 'opacity') {
+    el.style.opacity = Number.isFinite(num) ? num : rawVal;
+    return;
+  }
+  // Multiple transform-channel steps on the same element layer into
+  // a single `transform` string. We scratch per-element so scroll
+  // steps and mouse steps on the same target don't clobber each other.
+  if (!el.__tapasDriveXform) el.__tapasDriveXform = {};
+  const u = unit || (property === 'rotate' ? 'deg' : (property.startsWith('translate') ? 'px' : ''));
+  const value = Number.isFinite(num) ? num : 0;
+  let fragment;
+  switch (property) {
+    case 'translateX': fragment = `translateX(${value}${u})`; break;
+    case 'translateY': fragment = `translateY(${value}${u})`; break;
+    case 'rotate':     fragment = `rotate(${value}${u})`;     break;
+    case 'scale':      fragment = `scale(${value || 1})`;     break;
+    case 'scaleX':     fragment = `scaleX(${value || 1})`;    break;
+    case 'scaleY':     fragment = `scaleY(${value || 1})`;    break;
+    default:           return;
+  }
+  el.__tapasDriveXform[property] = fragment;
+  el.style.transform = Object.values(el.__tapasDriveXform).join(' ');
+}
+
+function clamp01(n) { return Math.max(0, Math.min(1, n)); }
+
+function interp(from, to, t) {
+  const a = Number(from), b = Number(to);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return b;
+  return a + (b - a) * t;
+}
+
+export function driveScrollTimeline(steps, rootEl) {
+  if (!rootEl || !Array.isArray(steps) || steps.length === 0) return () => {};
+  const plan = [];
+  for (const step of steps) {
+    if (!step || !step.property) continue;
+    const el = resolveTarget(rootEl, step.target, step.targetValue);
+    if (!el) continue;
+    const fp = Number(step.fromProgress ?? 0);
+    const tp = Number(step.toProgress ?? 1);
+    plan.push({
+      el, step,
+      from: Number(step.from),
+      to:   Number(step.to),
+      fp: Number.isFinite(fp) ? clamp01(fp) : 0,
+      tp: Number.isFinite(tp) ? clamp01(tp) : 1,
+    });
+  }
+  if (plan.length === 0) return () => {};
+
+  let rafId = null;
+  let lastProgress = -1;
+
+  const tick = () => {
+    const rect = rootEl.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    // 0 = element's top just entered the viewport bottom;
+    // 1 = element's bottom just exited the viewport top.
+    const total = vh + rect.height;
+    const scrolled = vh - rect.top;
+    const progress = total > 0 ? clamp01(scrolled / total) : 0;
+
+    if (progress !== lastProgress) {
+      lastProgress = progress;
+      for (const p of plan) {
+        const span = p.tp - p.fp;
+        let t;
+        if (progress <= p.fp)      t = 0;
+        else if (progress >= p.tp) t = 1;
+        else                       t = span > 0 ? (progress - p.fp) / span : 1;
+        const val = interp(p.from, p.to, t);
+        applyDriveProperty(p.el, p.step.property, val, p.step.unit);
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  };
+
+  rafId = requestAnimationFrame(tick);
+  return () => { if (rafId != null) cancelAnimationFrame(rafId); };
+}
+
+export function driveMouseTimeline(steps, rootEl) {
+  if (!rootEl || !Array.isArray(steps) || steps.length === 0) return () => {};
+  const plan = [];
+  for (const step of steps) {
+    if (!step || !step.property) continue;
+    const el = resolveTarget(rootEl, step.target, step.targetValue);
+    if (!el) continue;
+    plan.push({ el, step, from: Number(step.from), to: Number(step.to), axis: step.axis === 'y' ? 'y' : 'x' });
+  }
+  if (plan.length === 0) return () => {};
+
+  let cx = 0, cy = 0;
+  let rafId = null;
+  let dirty = true;
+
+  const onMove = (e) => {
+    const rect = rootEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    cx = ((e.clientX - rect.left) / rect.width - 0.5) * 2;   // -1..1
+    cy = ((e.clientY - rect.top)  / rect.height - 0.5) * 2;
+    dirty = true;
+  };
+  const onLeave = () => { cx = 0; cy = 0; dirty = true; };
+
+  rootEl.addEventListener('mousemove', onMove);
+  rootEl.addEventListener('mouseleave', onLeave);
+
+  const tick = () => {
+    if (dirty) {
+      dirty = false;
+      for (const p of plan) {
+        const input = p.axis === 'y' ? cy : cx;
+        // Input [-1..1] mapped onto [from..to] with `from` at -1 and
+        // `to` at +1. Linear; smoothing left to CSS `transition`
+        // which the target can opt into via the Style panel.
+        const t = (input + 1) / 2;
+        const val = interp(p.from, p.to, t);
+        applyDriveProperty(p.el, p.step.property, val, p.step.unit);
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+
+  return () => {
+    rootEl.removeEventListener('mousemove', onMove);
+    rootEl.removeEventListener('mouseleave', onLeave);
+    if (rafId != null) cancelAnimationFrame(rafId);
+  };
+}
+
+export function driveTimeline(trigger, steps, rootEl) {
+  if (trigger === 'scroll-drive') return driveScrollTimeline(steps, rootEl);
+  if (trigger === 'mouse')        return driveMouseTimeline(steps, rootEl);
+  return () => {};
 }

@@ -133,19 +133,9 @@ export function VariablesPanel({ content }) {
   );
 }
 
-// ---- CMS / Ecommerce — pure coming-soon stubs ------------------------
+// CMSPanel moved to WebsiteEditor.cms.js (Phase I1).
 
-export function CMSPanel() {
-  return panelShell(
-    <EmptyState
-      title="CMS — coming soon"
-      body={<>
-        Collections, items, and dynamic bindings will live here. See the Phase I roadmap in the project brief.
-      </>}
-    />,
-    { title: 'CMS' }
-  );
-}
+// ---- Ecommerce — pure coming-soon stub -------------------------------
 
 export function EcommercePanel() {
   return panelShell(

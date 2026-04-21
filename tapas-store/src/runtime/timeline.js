@@ -179,9 +179,144 @@ export function mountTimelineRuntime(rootEl) {
     loadCtrls.forEach((c) => c.play());
   });
 
+  // Phase H drive triggers — continuous, so we just install them
+  // and keep the cleanup functions for the unmount return path.
+  const driveCleanups = [];
+  rootEl.querySelectorAll('[data-tapas-timeline-scroll-drive]:not([data-tapas-drive-mounted])').forEach((el) => {
+    const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll-drive'));
+    if (!steps.length) return;
+    el.setAttribute('data-tapas-drive-mounted', '');
+    driveCleanups.push(driveScrollTimeline(steps, el));
+  });
+  rootEl.querySelectorAll('[data-tapas-timeline-mouse]:not([data-tapas-drive-mounted])').forEach((el) => {
+    const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-mouse'));
+    if (!steps.length) return;
+    el.setAttribute('data-tapas-drive-mounted', '');
+    driveCleanups.push(driveMouseTimeline(steps, el));
+  });
+
   return () => {
     if (io) io.disconnect();
     cancelAnimationFrame(frame);
     controllers.forEach((c) => c.cancel());
+    driveCleanups.forEach((fn) => fn());
+  };
+}
+
+// ---------------------------------------------------------------------
+// driveScrollTimeline / driveMouseTimeline — storefront copies of the
+// editor's continuous-input runtimes. Kept in sync with
+// src/pages/WebsiteEditor.timeline.js.
+// ---------------------------------------------------------------------
+function applyDriveProperty(el, property, rawVal, unit) {
+  const num = Number(rawVal);
+  if (property === 'opacity') {
+    el.style.opacity = Number.isFinite(num) ? num : rawVal;
+    return;
+  }
+  if (!el.__tapasDriveXform) el.__tapasDriveXform = {};
+  const u = unit || (property === 'rotate' ? 'deg' : (property.startsWith('translate') ? 'px' : ''));
+  const value = Number.isFinite(num) ? num : 0;
+  let fragment;
+  switch (property) {
+    case 'translateX': fragment = `translateX(${value}${u})`; break;
+    case 'translateY': fragment = `translateY(${value}${u})`; break;
+    case 'rotate':     fragment = `rotate(${value}${u})`;     break;
+    case 'scale':      fragment = `scale(${value || 1})`;     break;
+    case 'scaleX':     fragment = `scaleX(${value || 1})`;    break;
+    case 'scaleY':     fragment = `scaleY(${value || 1})`;    break;
+    default:           return;
+  }
+  el.__tapasDriveXform[property] = fragment;
+  el.style.transform = Object.values(el.__tapasDriveXform).join(' ');
+}
+
+function clamp01(n) { return Math.max(0, Math.min(1, n)); }
+function interp(from, to, t) {
+  const a = Number(from), b = Number(to);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return b;
+  return a + (b - a) * t;
+}
+
+export function driveScrollTimeline(steps, rootEl) {
+  if (!rootEl || !Array.isArray(steps) || steps.length === 0) return () => {};
+  const plan = [];
+  for (const step of steps) {
+    if (!step || !step.property) continue;
+    const el = resolveTarget(rootEl, step.target, step.targetValue);
+    if (!el) continue;
+    const fp = Number(step.fromProgress ?? 0);
+    const tp = Number(step.toProgress ?? 1);
+    plan.push({
+      el, step,
+      from: Number(step.from),
+      to:   Number(step.to),
+      fp: Number.isFinite(fp) ? clamp01(fp) : 0,
+      tp: Number.isFinite(tp) ? clamp01(tp) : 1,
+    });
+  }
+  if (plan.length === 0) return () => {};
+  let rafId = null;
+  let last = -1;
+  const tick = () => {
+    const rect = rootEl.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const total = vh + rect.height;
+    const scrolled = vh - rect.top;
+    const progress = total > 0 ? clamp01(scrolled / total) : 0;
+    if (progress !== last) {
+      last = progress;
+      for (const p of plan) {
+        const span = p.tp - p.fp;
+        let t;
+        if (progress <= p.fp)      t = 0;
+        else if (progress >= p.tp) t = 1;
+        else                       t = span > 0 ? (progress - p.fp) / span : 1;
+        applyDriveProperty(p.el, p.step.property, interp(p.from, p.to, t), p.step.unit);
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+  return () => { if (rafId != null) cancelAnimationFrame(rafId); };
+}
+
+export function driveMouseTimeline(steps, rootEl) {
+  if (!rootEl || !Array.isArray(steps) || steps.length === 0) return () => {};
+  const plan = [];
+  for (const step of steps) {
+    if (!step || !step.property) continue;
+    const el = resolveTarget(rootEl, step.target, step.targetValue);
+    if (!el) continue;
+    plan.push({ el, step, from: Number(step.from), to: Number(step.to), axis: step.axis === 'y' ? 'y' : 'x' });
+  }
+  if (plan.length === 0) return () => {};
+  let cx = 0, cy = 0, rafId = null, dirty = true;
+  const onMove = (e) => {
+    const rect = rootEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    cx = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+    cy = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+    dirty = true;
+  };
+  const onLeave = () => { cx = 0; cy = 0; dirty = true; };
+  rootEl.addEventListener('mousemove', onMove);
+  rootEl.addEventListener('mouseleave', onLeave);
+  const tick = () => {
+    if (dirty) {
+      dirty = false;
+      for (const p of plan) {
+        const input = p.axis === 'y' ? cy : cx;
+        const t = (input + 1) / 2;
+        applyDriveProperty(p.el, p.step.property, interp(p.from, p.to, t), p.step.unit);
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  };
+  rafId = requestAnimationFrame(tick);
+  return () => {
+    rootEl.removeEventListener('mousemove', onMove);
+    rootEl.removeEventListener('mouseleave', onLeave);
+    if (rafId != null) cancelAnimationFrame(rafId);
   };
 }
