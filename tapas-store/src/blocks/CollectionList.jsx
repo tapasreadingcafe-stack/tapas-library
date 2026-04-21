@@ -39,18 +39,76 @@ function parseOrderBy(raw) {
   };
 }
 
+// Parse the filter attribute — querystring-style pairs. Each accepted
+// pair applies a `data->>key eq value` filter to the Supabase query.
+// Example: "category=fiction&featured=true".
+// We only accept simple alphanumeric+underscore keys and equality for
+// the MVP; PostgREST injection isn't a concern because .filter() uses
+// a parameterised string, but we still lock down the key shape.
+function parseFilter(raw) {
+  if (!raw) return [];
+  const out = [];
+  try {
+    const params = new URLSearchParams(raw);
+    for (const [k, v] of params) {
+      if (!/^[a-zA-Z_][\w]*$/.test(k)) continue;
+      out.push([k, v]);
+    }
+  } catch {
+    /* malformed filter string — ignore */
+  }
+  return out;
+}
+
+// 30-second in-memory cache so a page with 5 collection_list blocks
+// hits Supabase once per unique (slug, limit, order, filter) tuple
+// instead of 5 times. Keyed by a stable string; entries expire on TTL
+// or on invalidateCollectionCache().
+const COLLECTION_CACHE_TTL_MS = 30_000;
+const _collectionCache = new Map();
+function cacheKey(slug, limit, order, filter) {
+  return `${slug}|${limit}|${order.column}:${order.ascending ? 'asc' : 'desc'}|${filter}`;
+}
+function cacheGet(key) {
+  const hit = _collectionCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > COLLECTION_CACHE_TTL_MS) {
+    _collectionCache.delete(key);
+    return null;
+  }
+  return hit.items;
+}
+function cacheSet(key, items) {
+  _collectionCache.set(key, { at: Date.now(), items });
+}
+export function invalidateCollectionCache() { _collectionCache.clear(); }
+
 export default function CollectionList({ node, renderChild, components }) {
   const attrs = node?.attributes || {};
   const slug = String(attrs.collection_slug || '').trim();
   const limit = parsePositiveInt(attrs.limit, 8);
   const order = parseOrderBy(attrs.order_by);
+  const filterRaw = String(attrs.filter || '').trim();
+  const filterPairs = parseFilter(filterRaw);
   const template = (node.children || [])[0] || null;
 
-  const [state, setState] = useState({ status: 'idle', items: [], error: '' });
+  const [state, setState] = useState(() => {
+    if (!slug) return { status: 'missing-slug', items: [], error: '' };
+    const cached = cacheGet(cacheKey(slug, limit, order, filterRaw));
+    return cached
+      ? { status: 'ready', items: cached, error: '' }
+      : { status: 'idle', items: [], error: '' };
+  });
 
   useEffect(() => {
     if (!slug) {
       setState({ status: 'missing-slug', items: [], error: '' });
+      return;
+    }
+    const key = cacheKey(slug, limit, order, filterRaw);
+    const cached = cacheGet(key);
+    if (cached) {
+      setState({ status: 'ready', items: cached, error: '' });
       return;
     }
     let cancelled = false;
@@ -67,15 +125,25 @@ export default function CollectionList({ node, renderChild, components }) {
           if (!cancelled) setState({ status: 'missing-collection', items: [], error: '' });
           return;
         }
-        const { data, error } = await supabase
+        let query = supabase
           .from('store_collection_items')
           .select('*')
           .eq('collection_id', col.id)
           .eq('status', 'published')
           .order(order.column, { ascending: order.ascending })
           .limit(limit);
+        for (const [k, v] of filterPairs) {
+          // PostgREST `data->>key=eq.value`. Values come straight from
+          // the attribute; Supabase parameterises them so SQLi is a
+          // non-concern. Booleans come through as the literal strings
+          // "true" / "false" which is what json ->> returns anyway.
+          query = query.filter(`data->>${k}`, 'eq', v);
+        }
+        const { data, error } = await query;
         if (error) throw error;
-        if (!cancelled) setState({ status: 'ready', items: data || [], error: '' });
+        const items = data || [];
+        cacheSet(key, items);
+        if (!cancelled) setState({ status: 'ready', items, error: '' });
       } catch (e) {
         if (!cancelled) {
           setState({
@@ -87,7 +155,9 @@ export default function CollectionList({ node, renderChild, components }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, limit, order.column, order.ascending]);
+    // filterPairs is derived each render; filterRaw is the stable key.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, limit, order.column, order.ascending, filterRaw]);
 
   const Tag = 'section';
   const className = (node.classes || []).join(' ') || undefined;

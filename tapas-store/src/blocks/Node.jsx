@@ -183,12 +183,29 @@ function renderComposite(node, components) {
   return null;
 }
 
-export function Node({ node, components }) {
+// Max component-instance nesting depth. Mirrors
+// src/pages/WebsiteEditor.node.js — bumps here should be copied
+// there so editor + storefront agree on cycle detection.
+const MAX_COMPONENT_DEPTH = 16;
+
+export function Node({ node, components, componentDepth = 0 }) {
   if (!node || typeof node !== 'object') return null;
 
   // Component instance — render the referenced component's tree instead.
   if (node.componentRef) {
     const def = components?.[node.componentRef];
+    if (componentDepth >= MAX_COMPONENT_DEPTH) {
+      return (
+        <div style={{
+          padding: '12px 16px', background: '#FEE2E2',
+          border: '1px dashed #DC2626', color: '#7F1D1D',
+          fontSize: '13px', margin: '8px 0',
+          fontFamily: 'ui-monospace, monospace',
+        }}>
+          Component recursion limit reached.
+        </div>
+      );
+    }
     if (!def?.root) {
       return (
         <div style={{
@@ -201,7 +218,7 @@ export function Node({ node, components }) {
         </div>
       );
     }
-    return <Node node={def.root} components={components} />;
+    return <Node node={def.root} components={components} componentDepth={componentDepth + 1} />;
   }
 
   // Phase F + I2: slider / lightbox / collection_list route through
@@ -255,7 +272,7 @@ export function Node({ node, components }) {
     <>
       {hasText ? node.textContent : null}
       {children.map((child, idx) => (
-        <Node key={child.id || idx} node={child} components={components} />
+        <Node key={child.id || idx} node={child} components={components} componentDepth={componentDepth} />
       ))}
     </>
   );

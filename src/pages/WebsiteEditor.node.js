@@ -241,12 +241,19 @@ function elementFromRun(run) {
   return wrapper;
 }
 
+// Maximum component-instance nesting depth. Prevents a cycle like
+// "component A references component B references component A" from
+// recursing until the stack blows up. 16 is generous — a real design
+// rarely nests components past 3 or 4 levels.
+const MAX_COMPONENT_DEPTH = 16;
+
 export function Node({
   node, selectedId, editingNodeId,
   onCommitText, onCommitRuns, onCancelEdit,
   editableRef,
   components,
   previewSliderId,
+  componentDepth = 0,
 }) {
   if (!node || typeof node !== 'object') return null;
 
@@ -262,6 +269,18 @@ export function Node({
     outer['data-tapas-node-id'] = node.id;
     outer['data-tapas-component'] = node.componentRef;
     if (node.id === selectedId) outer['data-tapas-selected'] = '';
+    if (componentDepth >= MAX_COMPONENT_DEPTH) {
+      return (
+        <div className={className} {...outer} style={{
+          padding: '12px 16px', background: '#FEE2E2',
+          border: '1px dashed #DC2626', color: '#7F1D1D',
+          fontSize: '13px', margin: '8px 0',
+          fontFamily: 'ui-monospace, monospace',
+        }}>
+          Component recursion limit ({MAX_COMPONENT_DEPTH}) reached — check for a cycle.
+        </div>
+      );
+    }
     if (!def?.root) {
       return (
         <div className={className} {...outer} style={{
@@ -279,6 +298,7 @@ export function Node({
         <Node
           node={def.root}
           components={components}
+          componentDepth={componentDepth + 1}
           // Descendants inside a rendered instance are read-only —
           // never pass selection/edit props through. Staff edit the
           // definition explicitly via the Components panel.
@@ -317,6 +337,7 @@ export function Node({
         editableRef={editableRef}
         components={components}
         previewSliderId={previewSliderId}
+        componentDepth={componentDepth}
       />
     ));
     return (
@@ -350,6 +371,7 @@ export function Node({
             editableRef={editableRef}
             components={components}
             previewSliderId={previewSliderId}
+        componentDepth={componentDepth}
           />
         ))}
         <span
@@ -386,6 +408,7 @@ export function Node({
             editableRef={editableRef}
             components={components}
             previewSliderId={previewSliderId}
+        componentDepth={componentDepth}
           />
         ))}
         <span
@@ -462,6 +485,7 @@ export function Node({
           editableRef={editableRef}
           components={components}
           previewSliderId={previewSliderId}
+        componentDepth={componentDepth}
         />
       ))}
     </Tag>

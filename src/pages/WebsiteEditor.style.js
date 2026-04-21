@@ -1578,6 +1578,7 @@ export default function StylePanel({
   onCreateClass,
   onRenameClass,
   onSetStyle,
+  sharedClassNotice,
 }) {
   const [open, setOpen] = useState({
     layout: true, spacing: true, size: true, position: true,
@@ -1643,6 +1644,18 @@ export default function StylePanel({
         onCreateClass={onCreateClass}
         onRenameClass={onRenameClass}
       />
+      {sharedClassNotice && (
+        <div style={{
+          padding: '6px 12px',
+          background: '#2a1f0a',
+          borderBottom: `1px solid ${W.panelBorder}`,
+          color: '#f0c068',
+          fontSize: '10.5px', lineHeight: 1.45,
+        }}>
+          <span style={{ fontWeight: 700 }}>◆ </span>
+          {sharedClassNotice}
+        </div>
+      )}
 
       <ResetStrip
         styles={styles}

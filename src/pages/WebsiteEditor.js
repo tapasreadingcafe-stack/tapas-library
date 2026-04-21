@@ -1087,6 +1087,7 @@ function RightPanel({
   state, onStateChange,
   device,
   onCreateClass, onRenameClass, onSetStyle,
+  sharedClassNotice,
   onSetTag, onSetAttribute, onRenameAttribute,
   page, pageKey, siteUrl, onUpdatePageMeta,
   previewSliderId, onTogglePreviewSlider,
@@ -1150,6 +1151,7 @@ function RightPanel({
             onCreateClass={onCreateClass}
             onRenameClass={onRenameClass}
             onSetStyle={onSetStyle}
+            sharedClassNotice={sharedClassNotice}
           />
         )}
         {tab === 'settings' && (
@@ -1189,6 +1191,12 @@ function RightPanel({
 // Page  —  loads v2 content, wires the four panels together
 // =====================================================================
 const V2_KEY = 'store_content_v2';
+// Bump whenever the content tree shape changes in a way older
+// editor bundles can't read. The load effect warns the user if the
+// row's schema_version exceeds what this build supports, so a
+// newer staff tab doesn't silently clobber fields an older tab
+// will drop on next save.
+const SCHEMA_VERSION = 2;
 
 export default function WebsiteEditor() {
   const [content, setContent] = useState(null);
@@ -1289,6 +1297,20 @@ export default function WebsiteEditor() {
         if (!data?.value) {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
+        // Future-schema warning: if the stored row advertises a
+        // schema_version we don't understand yet, another staff tab
+        // (or a deployed future build) wrote it. Loading it here and
+        // saving would downgrade. Warn; still load so staff can see
+        // their page, but skip autosave until the user confirms.
+        const rowVersion = Number(data.value?.schema_version) || 1;
+        if (rowVersion > SCHEMA_VERSION) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[WebsiteEditor] Stored schema is v${rowVersion} but this build reads v${SCHEMA_VERSION}. `
+            + 'Reload or update the editor before saving to avoid clobbering newer fields.'
+          );
+          setSaveError(`Read-only: stored schema v${rowVersion} is newer than editor v${SCHEMA_VERSION}. Reload the editor.`);
+        }
         // Self-heal on load is applied below via a content-keyed
         // useEffect (robust against Vercel cache + race conditions).
         // Setting loadedRef to the raw row lets autosave detect drift
@@ -1316,6 +1338,12 @@ export default function WebsiteEditor() {
   useEffect(() => {
     if (loading || !content) return;
     if (content === loadedRef.current) return;
+    // Schema-version lockout (see load effect). Once we see a newer
+    // version than this build supports, refuse to save so we don't
+    // clobber fields the newer tab knows about. The banner nudges
+    // the user to reload.
+    const rowVersion = Number(content?.schema_version) || 1;
+    if (rowVersion > SCHEMA_VERSION) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const snapshotEpoch = contentEpochRef.current;
     const snapshot = content;
@@ -1323,8 +1351,15 @@ export default function WebsiteEditor() {
       if (snapshotEpoch !== contentEpochRef.current) return; // stale
       setSaving(true); setSaveError('');
       try {
+        // Stamp the schema version on every save. A future breaking
+        // change (e.g. children[] shape) can read this on load and
+        // run a just-in-time migration instead of corrupting data.
+        // Current schema = 2 (matches emptySiteContent + compileSiteContent).
+        const stamped = snapshot && snapshot.schema_version !== SCHEMA_VERSION
+          ? { ...snapshot, schema_version: SCHEMA_VERSION }
+          : snapshot;
         const { error: err } = await supabase.from('app_settings').upsert({
-          key: V2_KEY, value: snapshot, updated_at: new Date().toISOString(),
+          key: V2_KEY, value: stamped, updated_at: new Date().toISOString(),
         }, { onConflict: 'key' });
         if (err) throw err;
         loadedRef.current = snapshot;
@@ -1368,6 +1403,27 @@ export default function WebsiteEditor() {
   // class" CTA (handled below via handleCreateClass).
   const primaryClass = selectedNode?.classes?.[0] || null;
   const classDef = primaryClass ? classes[primaryClass] : null;
+
+  // Shared-class detector. When staff edit a class inside a component
+  // scope, they often expect edits to stay local — but classes are
+  // site-wide, so any page also using the class picks up the change.
+  // Surface a chip in the Style panel so the shared nature is obvious.
+  // Only relevant while in component-edit scope; on a page it's
+  // implied.
+  const sharedClassNotice = useMemo(() => {
+    if (!editingComponentId || !primaryClass) return null;
+    const pages = content?.pages || {};
+    const walk = (n) => {
+      if (!n) return false;
+      if (Array.isArray(n.classes) && n.classes.includes(primaryClass)) return true;
+      for (const c of n.children || []) if (walk(c)) return true;
+      return false;
+    };
+    for (const page of Object.values(pages)) {
+      if (walk(page?.tree)) return 'Used on a page too — edits apply everywhere.';
+    }
+    return null;
+  }, [editingComponentId, primaryClass, content]);
 
   // Core edit wrapper. Every user-initiated mutation flows through
   // here so the history stack stays honest. updater: content → content.
@@ -2159,6 +2215,7 @@ export default function WebsiteEditor() {
           onCreateClass={handleCreateClass}
           onRenameClass={handleRenameClass}
           onSetStyle={handleSetStyle}
+          sharedClassNotice={sharedClassNotice}
           onSetTag={handleSetTag}
           onSetAttribute={handleSetAttribute}
           onRenameAttribute={handleRenameAttribute}

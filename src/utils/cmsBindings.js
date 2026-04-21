@@ -91,11 +91,21 @@ function stampNode(node, item, itemIndex, depth) {
     next.textContent = substituteString(node.textContent, item);
   }
 
-  // Substitute in attribute values.
+  // Substitute in attribute values. If a binding resolved entirely
+  // to empty string (e.g. item has no `cover` field), drop the attr
+  // for URL-ish keys so the DOM isn't left with `<img src="">` or
+  // `<a href="">` — those render as the loud missing-image placeholder
+  // on the storefront and look worse than "no image at all".
   if (node.attributes) {
     const attrs = {};
     for (const [k, v] of Object.entries(node.attributes)) {
-      attrs[k] = typeof v === 'string' ? substituteString(v, item) : v;
+      if (typeof v !== 'string') { attrs[k] = v; continue; }
+      const hadBinding = v.includes('{{');
+      const resolved = substituteString(v, item);
+      const isUrlish = k === 'src' || k === 'href' || k === 'poster'
+        || k === 'srcset' || k === 'data-src';
+      if (hadBinding && isUrlish && resolved.trim() === '') continue;
+      attrs[k] = resolved;
     }
     next.attributes = attrs;
   }

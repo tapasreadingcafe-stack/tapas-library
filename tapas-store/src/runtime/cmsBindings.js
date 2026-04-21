@@ -48,7 +48,13 @@ function stampNode(node, item, itemIndex, depth) {
   if (node.attributes) {
     const attrs = {};
     for (const [k, v] of Object.entries(node.attributes)) {
-      attrs[k] = typeof v === 'string' ? substituteString(v, item) : v;
+      if (typeof v !== 'string') { attrs[k] = v; continue; }
+      const hadBinding = v.includes('{{');
+      const resolved = substituteString(v, item);
+      const isUrlish = k === 'src' || k === 'href' || k === 'poster'
+        || k === 'srcset' || k === 'data-src';
+      if (hadBinding && isUrlish && resolved.trim() === '') continue;
+      attrs[k] = resolved;
     }
     next.attributes = attrs;
   }

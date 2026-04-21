@@ -103,7 +103,19 @@ export function compileTimeline(steps, rootEl, opts = {}) {
         finishCallbacks.forEach((cb) => cb());
         return;
       }
-      live = plan.map(({ el, keyframes, options }) => el.animate(keyframes, options));
+      live = plan.map(({ el, keyframes, options }) => {
+        try {
+          return el.animate(keyframes, options);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('Timeline step failed to animate, falling back to ease-out:', err);
+          try {
+            return el.animate(keyframes, { ...options, easing: 'ease-out' });
+          } catch {
+            return { addEventListener() {}, cancel() {}, effect: null };
+          }
+        }
+      });
       const longest = live.reduce((a, b) => {
         const aT = (a.effect?.getTiming?.().duration || 0) + (a.effect?.getTiming?.().delay || 0);
         const bT = (b.effect?.getTiming?.().duration || 0) + (b.effect?.getTiming?.().delay || 0);

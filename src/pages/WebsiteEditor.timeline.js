@@ -133,7 +133,26 @@ export function compileTimeline(steps, rootEl, opts = {}) {
         playing = false;
         return;
       }
-      live = plan.map(({ el, keyframes, options }) => el.animate(keyframes, options));
+      // Any single step with an invalid easing / keyframe should not
+      // take down the whole timeline. If Element.animate() throws
+      // (for example, easing="cubic-bezier(2, 0, 1, 1)" — out-of-
+      // range y-coords), retry once with a conservative fallback so
+      // staff still see the rest of the sequence play.
+      live = plan.map(({ el, keyframes, options }) => {
+        try {
+          return el.animate(keyframes, options);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('Timeline step failed to animate, falling back to ease-out:', err);
+          try {
+            return el.animate(keyframes, { ...options, easing: 'ease-out' });
+          } catch {
+            // If even the fallback throws, return a dummy so the
+            // longest-animation reducer below doesn't blow up.
+            return { addEventListener() {}, cancel() {}, effect: null };
+          }
+        }
+      });
       // When the longest animation finishes, flush callbacks.
       const longest = live.reduce((a, b) => {
         const aTime = (a.effect?.getTiming?.().duration || 0) + (a.effect?.getTiming?.().delay || 0);

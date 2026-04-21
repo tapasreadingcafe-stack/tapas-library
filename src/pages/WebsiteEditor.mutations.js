@@ -624,6 +624,11 @@ export function classUsageMap(content) {
     for (const ch of node.children || []) walk(ch);
   };
   for (const p of Object.values(content?.pages || {})) walk(p.tree);
+  // Components use the same site-wide class map, so their definitions
+  // also count. Skipping them (as the previous version did) meant the
+  // ClassBrowser's "Delete unused" button would happily delete classes
+  // referenced only by a component — wiping its styling.
+  for (const def of Object.values(content?.components || {})) walk(def?.root);
   return counts;
 }
 
@@ -842,8 +847,38 @@ export function deleteComponent(content, componentId) {
   if (!content?.components?.[componentId]) return { content, deleted: false };
   const usage = componentUsage(content)[componentId] || 0;
   if (usage > 0) return { content, deleted: false, reason: 'in-use' };
-  const { [componentId]: _gone, ...rest } = content.components;
-  return { content: { ...content, components: rest }, deleted: true };
+  const def = content.components[componentId];
+
+  // Collect every class referenced inside the doomed component's tree.
+  // We'll delete classes from content.classes only if they aren't
+  // referenced anywhere else after the component is gone.
+  const classesInDoomed = new Set();
+  const walk = (n) => {
+    if (!n) return;
+    for (const c of n.classes || []) classesInDoomed.add(c);
+    for (const ch of n.children || []) walk(ch);
+  };
+  walk(def?.root);
+
+  const { [componentId]: _gone, ...restComponents } = content.components;
+  const nextContent = { ...content, components: restComponents };
+
+  // Recompute usage on the post-delete content; anything in
+  // classesInDoomed with a zero count is safe to remove from the
+  // class map. Keep it otherwise — class maps are site-wide and a
+  // page might rely on the same class name via coincidence.
+  const nextUsage = classUsageMap(nextContent);
+  let nextClasses = content.classes || {};
+  let classesTouched = false;
+  for (const name of classesInDoomed) {
+    if (!nextUsage[name] && nextClasses[name]) {
+      if (!classesTouched) { nextClasses = { ...nextClasses }; classesTouched = true; }
+      delete nextClasses[name];
+    }
+  }
+  if (classesTouched) nextContent.classes = nextClasses;
+
+  return { content: nextContent, deleted: true };
 }
 
 // Replace the component's root via the supplied updater. Editing a

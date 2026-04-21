@@ -204,16 +204,35 @@ function wrapSelectionIn(tagName) {
   }
 }
 
+// Normalise a user-typed href. Bare domains like "example.com" get
+// https://; fragment + query-only refs ("#foo", "?x=1") pass through;
+// well-formed schemes (http:, https:, mailto:, tel:, /, ./, ../)
+// pass through untouched. Empty string is used as the "unlink"
+// sentinel by applyLink().
+function normaliseHref(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (/^(https?:|mailto:|tel:|javascript:|ftp:|data:)/i.test(s)) return s;
+  if (s.startsWith('/') || s.startsWith('#') || s.startsWith('?')) return s;
+  if (s.startsWith('./') || s.startsWith('../')) return s;
+  // Looks like a bare domain (or path-under-domain)? If it has a dot
+  // before a slash and doesn't start with a space / weird char, treat
+  // as external and prepend https. Otherwise leave as-is.
+  if (/^[\w-]+(\.[\w-]+)+($|\/|\?)/.test(s)) return `https://${s}`;
+  return s;
+}
+
 // Apply or replace a link on the current selection. Empty href =
 // remove.
 export function applyLink(href) {
   const sel = window.getSelection?.();
   if (!sel || sel.rangeCount === 0) return;
-  if (!href) {
+  const normalised = normaliseHref(href);
+  if (!normalised) {
     try { document.execCommand('unlink', false, null); } catch {}
     return;
   }
-  try { document.execCommand('createLink', false, href); } catch {}
+  try { document.execCommand('createLink', false, normalised); } catch {}
 }
 
 // Clear all formatting from the selection (removeFormat + unlink).
