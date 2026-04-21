@@ -65,6 +65,7 @@ function SmartImage({ className, attrs }) {
   }
   return (
     <img
+      alt=""
       className={className}
       {...attrs}
       src={resolvedSrc}
