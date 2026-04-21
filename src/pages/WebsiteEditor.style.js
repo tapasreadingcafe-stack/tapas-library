@@ -895,20 +895,37 @@ function composeShadowLayers(layers, kind = 'box') {
   return layers.map((l) => composeShadowLayer(l, kind)).filter(Boolean).join(', ');
 }
 
-// Transform: now supports translate (X,Y), rotate, scale (X,Y), skew (X,Y).
-// 3D variants (translate3d, rotate3d, perspective) stay deferred.
+// Transform — supports 2D + basic 3D. Order matters: perspective must
+// come first in the transform chain for its effect to be honored by
+// the subsequent rotations / translations, so compose always emits
+// in this order: perspective → translate → translateZ → rotate →
+// rotateX/Y → scale → skew.
 function parseTransform(s) {
-  const out = { tx: '', ty: '', rot: '', sx: '', sy: '', kx: '', ky: '' };
+  const out = {
+    tx: '', ty: '', tz: '',
+    rot: '', rx: '', ry: '',
+    sx: '', sy: '',
+    kx: '', ky: '',
+    perspective: '',
+  };
   if (!s) return out;
-  const tr = /translate(?:X|3d)?\(([^)]+)\)/.exec(s);
+  const pv = /perspective\(([^)]+)\)/.exec(s);
+  if (pv) out.perspective = pv[1].trim();
+  const tr = /(?<!\w)translate\(([^)]+)\)/.exec(s);
   if (tr) {
     const parts = tr[1].split(',').map((p) => p.trim());
     out.tx = parts[0] || '';
     out.ty = parts[1] || '';
   }
-  const ro = /rotate\(([^)]+)\)/.exec(s);
+  const tz = /translateZ\(([^)]+)\)/.exec(s);
+  if (tz) out.tz = tz[1].trim();
+  const ro = /(?<!\w)rotate\(([^)]+)\)/.exec(s);
   if (ro) out.rot = ro[1].trim();
-  const sc = /scale\(([^)]+)\)/.exec(s);
+  const rx = /rotateX\(([^)]+)\)/.exec(s);
+  if (rx) out.rx = rx[1].trim();
+  const ry = /rotateY\(([^)]+)\)/.exec(s);
+  if (ry) out.ry = ry[1].trim();
+  const sc = /(?<!\w)scale\(([^)]+)\)/.exec(s);
   if (sc) {
     const parts = sc[1].split(',').map((p) => p.trim());
     out.sx = parts[0] || '';
@@ -922,10 +939,14 @@ function parseTransform(s) {
   }
   return out;
 }
-function composeTransform({ tx, ty, rot, sx, sy, kx, ky }) {
+function composeTransform({ tx, ty, tz, rot, rx, ry, sx, sy, kx, ky, perspective }) {
   const parts = [];
+  if (perspective) parts.push(`perspective(${perspective})`);
   if (tx || ty) parts.push(`translate(${tx || '0'}, ${ty || '0'})`);
+  if (tz) parts.push(`translateZ(${tz})`);
   if (rot) parts.push(`rotate(${rot})`);
+  if (rx)  parts.push(`rotateX(${rx})`);
+  if (ry)  parts.push(`rotateY(${ry})`);
   if (sx || sy) parts.push(`scale(${sx || '1'}${sy ? `, ${sy}` : ''})`);
   if (kx || ky) parts.push(`skew(${kx || '0'}, ${ky || '0'})`);
   return parts.join(' ');
@@ -1164,6 +1185,18 @@ function Effects({ styles, onSet }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
           <DimensionInput value={xform.kx} onChange={(v) => setXform({ kx: v })} placeholder="X" />
           <DimensionInput value={xform.ky} onChange={(v) => setXform({ ky: v })} placeholder="Y" />
+        </div>
+      </Field>
+      <Field label="3D">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput value={xform.tz} onChange={(v) => setXform({ tz: v })} placeholder="Z" />
+          <DimensionInput value={xform.perspective} onChange={(v) => setXform({ perspective: v })} placeholder="persp." />
+        </div>
+      </Field>
+      <Field label="Rot X/Y">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          <DimensionInput value={xform.rx} onChange={(v) => setXform({ rx: v })} placeholder="X deg" />
+          <DimensionInput value={xform.ry} onChange={(v) => setXform({ ry: v })} placeholder="Y deg" />
         </div>
       </Field>
 

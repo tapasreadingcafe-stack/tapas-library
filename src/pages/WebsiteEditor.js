@@ -27,7 +27,7 @@ import {
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
-  createPage, updatePageMeta,
+  createPage, updatePageMeta, deletePage,
 } from './WebsiteEditor.mutations';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
@@ -68,7 +68,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, pages }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, pages }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -159,6 +159,22 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.accent; e.currentTarget.style.color = W.accent; }}
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.topbarBorder; e.currentTarget.style.color = W.text; }}
         >+</button>
+        <button
+          onClick={onDeletePage}
+          disabled={page === 'home'}
+          title={page === 'home' ? 'The home page cannot be deleted' : 'Delete this page'}
+          style={{
+            height: '26px', padding: '0 9px',
+            background: '#111',
+            color: page === 'home' ? W.textFaint : W.text,
+            border: `1px solid ${W.topbarBorder}`, borderRadius: '3px',
+            cursor: page === 'home' ? 'not-allowed' : 'pointer',
+            fontSize: '12px', lineHeight: 1,
+            opacity: page === 'home' ? 0.5 : 1,
+          }}
+          onMouseEnter={(e) => { if (page !== 'home') { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; } }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.topbarBorder; e.currentTarget.style.color = page === 'home' ? W.textFaint : W.text; }}
+        >🗑</button>
         <div style={{
           width: '28px', height: '28px', borderRadius: '50%',
           background: W.accent, color: '#fff',
@@ -368,8 +384,10 @@ function Canvas({
   useEffect(() => {
     if (!surfaceRef.current) return;
     const surface = surfaceRef.current;
-    const els = surface.querySelectorAll('[data-tapas-anim]');
-    els.forEach((el) => {
+
+    // --- scroll-into-view ----------------------------------------
+    const scrollEls = surface.querySelectorAll('[data-tapas-anim]');
+    scrollEls.forEach((el) => {
       const setVar = (attr, cssVar) => {
         const v = el.getAttribute(attr);
         if (v) el.style.setProperty(cssVar, v);
@@ -380,17 +398,81 @@ function Canvas({
       setVar('data-tapas-anim-easing',   '--tapas-anim-easing');
     });
 
-    if (typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          // Sticky — fires once and stays, matching Webflow's default.
-          e.target.setAttribute('data-tapas-anim-in', '');
+    let io = null;
+    if (typeof IntersectionObserver !== 'undefined') {
+      io = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.setAttribute('data-tapas-anim-in', '');
+          }
         }
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      scrollEls.forEach((el) => io.observe(el));
+    }
+
+    // --- click ---------------------------------------------------
+    // One-shot: adds data-tapas-click-playing, removes on animationend.
+    // Delegated from the surface so dynamically-added elements don't
+    // need re-binding. Capture phase so user-defined click handlers
+    // (e.g. navigation <a> clicks) don't stop propagation before us.
+    const clickEls = surface.querySelectorAll('[data-tapas-click-anim]');
+    clickEls.forEach((el) => {
+      const setVar = (attr, cssVar) => {
+        const v = el.getAttribute(attr);
+        if (v) el.style.setProperty(cssVar, v);
+        else el.style.removeProperty(cssVar);
+      };
+      setVar('data-tapas-click-duration', '--tapas-click-duration');
+      setVar('data-tapas-click-easing',   '--tapas-click-easing');
+    });
+    const onSurfaceClick = (e) => {
+      let el = e.target;
+      while (el && el !== surface) {
+        if (el.hasAttribute?.('data-tapas-click-anim')) break;
+        el = el.parentElement;
       }
-    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+      if (!el || el === surface) return;
+      // Restart animation: remove then re-add on next frame.
+      el.removeAttribute('data-tapas-click-playing');
+      requestAnimationFrame(() => {
+        el.setAttribute('data-tapas-click-playing', '');
+      });
+    };
+    surface.addEventListener('click', onSurfaceClick);
+    const onAnimEnd = (e) => {
+      const el = e.target;
+      if (el?.hasAttribute?.('data-tapas-click-playing')) {
+        el.removeAttribute('data-tapas-click-playing');
+      }
+    };
+    surface.addEventListener('animationend', onAnimEnd);
+
+    // --- page-load ----------------------------------------------
+    // Fires once per tree render. Using requestAnimationFrame so the
+    // element gets its initial opacity:0 state painted before we flip
+    // it, otherwise browsers skip the transition.
+    const loadEls = surface.querySelectorAll('[data-tapas-load-anim]');
+    loadEls.forEach((el) => {
+      const setVar = (attr, cssVar) => {
+        const v = el.getAttribute(attr);
+        if (v) el.style.setProperty(cssVar, v);
+        else el.style.removeProperty(cssVar);
+      };
+      setVar('data-tapas-load-duration', '--tapas-load-duration');
+      setVar('data-tapas-load-delay',    '--tapas-load-delay');
+      setVar('data-tapas-load-easing',   '--tapas-load-easing');
+      el.removeAttribute('data-tapas-load-in');
+    });
+    const loadFrame = requestAnimationFrame(() => {
+      loadEls.forEach((el) => el.setAttribute('data-tapas-load-in', ''));
+    });
+
+    return () => {
+      if (io) io.disconnect();
+      surface.removeEventListener('click', onSurfaceClick);
+      surface.removeEventListener('animationend', onAnimEnd);
+      cancelAnimationFrame(loadFrame);
+    };
   }, [tree]);
 
   // Walk from the event target up to the nearest node element, then
@@ -895,6 +977,12 @@ export default function WebsiteEditor() {
   // persists it. No server-side history; this is purely client-local.
   const historyRef = useRef({ past: [], future: [] });
   const HISTORY_CAP = 50;
+  // Coalescing: edits made within COALESCE_MS of each other share a
+  // single history entry. Dragging a slider, typing a class name, or
+  // scrubbing opacity now collapse into one Cmd+Z step instead of
+  // flooding the stack with intermediates.
+  const COALESCE_MS = 500;
+  const lastPushAtRef = useRef(0);
   const clipboardRef = useRef(null);   // last Cmd+C'd node subtree
 
   useEffect(() => {
@@ -969,16 +1057,25 @@ export default function WebsiteEditor() {
   // here so the history stack stays honest. updater: content → content.
   // If the updater is a no-op (returns the same reference or an equal
   // blob) we skip the history push to avoid dead entries.
+  //
+  // Coalescing: if this edit lands within COALESCE_MS of the previous
+  // push, we keep `past` as-is and only update current content. Effect:
+  // dragging a number input or typing a class name produces ONE history
+  // entry covering the entire burst, not one entry per keystroke. A
+  // pause of ≥COALESCE_MS (500ms) opens a new history step naturally.
   const applyEdit = useCallback((updater) => {
     setContent((prev) => {
       if (!prev) return prev;
       const next = typeof updater === 'function' ? updater(prev) : updater;
       if (!next || next === prev) return prev;
-      const past = historyRef.current.past;
+      const now = Date.now();
+      const recent = now - lastPushAtRef.current < COALESCE_MS;
+      const { past } = historyRef.current;
       historyRef.current = {
-        past: [...past, prev].slice(-HISTORY_CAP),
+        past: recent ? past : [...past, prev].slice(-HISTORY_CAP),
         future: [], // any new edit invalidates redo stack
       };
+      lastPushAtRef.current = now;
       return next;
     });
   }, []);
@@ -993,6 +1090,9 @@ export default function WebsiteEditor() {
         past: past.slice(0, -1),
         future: [prev, ...future].slice(0, HISTORY_CAP),
       };
+      // Force the next edit to start a fresh history entry rather
+      // than coalescing into one that was just undone.
+      lastPushAtRef.current = 0;
       return last;
     });
   }, []);
@@ -1007,6 +1107,7 @@ export default function WebsiteEditor() {
         past: [...past, prev].slice(-HISTORY_CAP),
         future: future.slice(1),
       };
+      lastPushAtRef.current = 0;
       return first;
     });
   }, []);
@@ -1105,6 +1206,23 @@ export default function WebsiteEditor() {
   // Create a brand-new v2 page from a user-supplied slug. Uses the
   // native prompt for MVP — a proper modal can land with Phase 10b
   // polish. Normalization and collision detection live in createPage().
+  // Delete the current page. Refuses on 'home' (the mutation also
+  // defends this invariant, but the UI disables the button anyway).
+  // After delete, jump to home so the editor doesn't linger on a
+  // now-missing pageKey.
+  const handleDeletePage = useCallback(() => {
+    if (!pageKey || pageKey === 'home') return;
+    if (typeof window === 'undefined') return;
+    const ok = window.confirm(
+      `Delete this page? Its tree and any styles unique to it will be removed from v2. Other v2 pages keep their class references intact; this is undoable with Cmd+Z.`
+    );
+    if (!ok) return;
+    applyEdit((c) => deletePage(c, pageKey));
+    setPageKey('home');
+    setSelectedId(null);
+    setEditingNodeId(null);
+  }, [pageKey, applyEdit]);
+
   const handleCreatePage = useCallback(() => {
     if (typeof window === 'undefined') return;
     const slugInput = window.prompt(
@@ -1313,6 +1431,7 @@ export default function WebsiteEditor() {
         page={pageKey}
         onPageChange={(k) => { setPageKey(k); setSelectedId(null); }}
         onCreatePage={handleCreatePage}
+        onDeletePage={handleDeletePage}
         pages={pages}
       />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>

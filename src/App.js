@@ -273,6 +273,7 @@ const NAV_CONFIG = [
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
       { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
       { to: '/store/content',    icon: '🎨', label: 'Website Editor' },
+      { to: '/store/content-v2', icon: '⚡', label: 'Website Editor v2', badge: 'BETA' },
     ],
   },
   {

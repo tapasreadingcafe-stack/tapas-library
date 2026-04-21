@@ -77,6 +77,21 @@ const Columns = () => n('div', {
   ],
 });
 
+// CSS multi-column text flow (like a newspaper). Differs from the
+// flex "Columns" block above — this one reflows long prose across
+// column-count columns rather than placing two siblings side-by-side.
+const ColumnsMulti = () => n('div', {
+  classes: ['text-columns'],
+  attributes: {
+    style: 'column-count: 2; column-gap: 2rem;',
+  },
+  children: [
+    n('p', {
+      textContent: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla vitae elit libero, a pharetra augue. Cras mattis consectetur purus sit amet fermentum. Etiam porta sem malesuada magna mollis euismod. Maecenas faucibus mollis interdum.',
+    }),
+  ],
+});
+
 const Stack = () => n('div', {
   classes: ['stack'],
   children: [
@@ -220,6 +235,76 @@ const Search = () => n('form', {
   ],
 });
 
+// Tabs — three <details> with a shared `name` attribute. Modern
+// browsers treat those as an exclusive-open group (only one can be
+// expanded at a time), which is exactly the tab semantic without
+// needing a JS runtime or fragile CSS radio-button tricks. Each
+// tab's <summary> is the label; everything else inside is the panel.
+// The node id namespaces `name` so multiple Tabs blocks on the same
+// page don't fight each other.
+const Tabs = () => {
+  const group = 'tg-' + Math.random().toString(36).slice(2, 7);
+  return n('div', {
+    classes: ['tabs'],
+    children: [
+      n('details', {
+        classes: ['tab'],
+        attributes: { name: group, open: 'open' },
+        children: [
+          n('summary', { classes: ['tab-label'], textContent: 'Tab 1' }),
+          n('div', { classes: ['tab-body'], textContent: 'First tab content.' }),
+        ],
+      }),
+      n('details', {
+        classes: ['tab'],
+        attributes: { name: group },
+        children: [
+          n('summary', { classes: ['tab-label'], textContent: 'Tab 2' }),
+          n('div', { classes: ['tab-body'], textContent: 'Second tab content.' }),
+        ],
+      }),
+      n('details', {
+        classes: ['tab'],
+        attributes: { name: group },
+        children: [
+          n('summary', { classes: ['tab-label'], textContent: 'Tab 3' }),
+          n('div', { classes: ['tab-body'], textContent: 'Third tab content.' }),
+        ],
+      }),
+    ],
+  });
+};
+
+// Accordion — same <details> primitive without the shared `name`, so
+// any number of sections can be open at once. Dropdown / FAQ / spec
+// sheet all fit this pattern.
+const Accordion = () => n('div', {
+  classes: ['accordion'],
+  children: [
+    n('details', {
+      classes: ['accordion-item'],
+      children: [
+        n('summary', { classes: ['accordion-label'], textContent: 'Question one?' }),
+        n('div', { classes: ['accordion-body'], textContent: 'Answer one.' }),
+      ],
+    }),
+    n('details', {
+      classes: ['accordion-item'],
+      children: [
+        n('summary', { classes: ['accordion-label'], textContent: 'Question two?' }),
+        n('div', { classes: ['accordion-body'], textContent: 'Answer two.' }),
+      ],
+    }),
+    n('details', {
+      classes: ['accordion-item'],
+      children: [
+        n('summary', { classes: ['accordion-label'], textContent: 'Question three?' }),
+        n('div', { classes: ['accordion-body'], textContent: 'Answer three.' }),
+      ],
+    }),
+  ],
+});
+
 // ---------------------------------------------------------------------
 // Catalogue — registered as a flat list so AddPanel.search can filter
 // linearly without traversing nested groups.
@@ -232,6 +317,7 @@ export const BLOCK_CATALOGUE = [
   { key: 'grid',      group: 'Layout', label: 'Grid',       glyph: '▦', keywords: 'grid layout',              create: GridBlock },
   { key: 'flex',      group: 'Layout', label: 'Flex',       glyph: '▨', keywords: 'flex flexbox',             create: FlexBlock },
   { key: 'columns',   group: 'Layout', label: 'Columns',    glyph: '‖', keywords: 'columns two-col split',    create: Columns   },
+  { key: 'text-cols', group: 'Layout', label: 'Text columns',glyph: '▥', keywords: 'text columns newspaper multicolumn', create: ColumnsMulti },
   { key: 'stack',     group: 'Layout', label: 'Quick stack',glyph: '≡', keywords: 'stack vertical',           create: Stack     },
 
   // Basic
@@ -259,8 +345,10 @@ export const BLOCK_CATALOGUE = [
   { key: 'recaptcha', group: 'Forms',  label: 'reCAPTCHA',      glyph: '✓', keywords: 'recaptcha captcha spam',  create: Recaptcha    },
 
   // Advanced (light)
-  { key: 'embed',     group: 'Advanced', label: 'HTML embed',   glyph: '</>', keywords: 'embed html code raw',   create: HtmlEmbed    },
-  { key: 'search',    group: 'Advanced', label: 'Search',       glyph: '⌕',   keywords: 'search input',          create: Search       },
+  { key: 'embed',     group: 'Advanced', label: 'HTML embed',   glyph: '</>', keywords: 'embed html code raw',             create: HtmlEmbed },
+  { key: 'search',    group: 'Advanced', label: 'Search',       glyph: '⌕',   keywords: 'search input',                    create: Search    },
+  { key: 'tabs',      group: 'Advanced', label: 'Tabs',         glyph: '▤',   keywords: 'tabs tabbed sections switch',     create: Tabs      },
+  { key: 'accordion', group: 'Advanced', label: 'Accordion',    glyph: '≡',   keywords: 'accordion faq collapse expand dropdown', create: Accordion },
 ];
 
 // Used by AddPanel to render groups in a stable order.

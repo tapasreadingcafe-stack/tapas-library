@@ -28,6 +28,7 @@ const ALLOWED_TAGS = new Set([
   'img', 'video', 'iframe', 'audio', 'picture', 'source',
   'button', 'form', 'input', 'textarea', 'select', 'option', 'label',
   'blockquote', 'code', 'pre', 'em', 'strong', 'small',
+  'details', 'summary',
   'br', 'hr',
   'body', // compiler uses body as the page root; we rewrite to div
 ]);

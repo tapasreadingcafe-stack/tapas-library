@@ -101,6 +101,8 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
   const attrs = node.attributes || {};
   const hasEntrance = !!attrs['data-tapas-anim'];
   const hasHover    = !!attrs['data-tapas-hover'];
+  const hasClick    = !!attrs['data-tapas-click-anim'];
+  const hasLoad     = !!attrs['data-tapas-load-anim'];
 
   return (
     <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -179,11 +181,110 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
         )}
       </Section>
 
+      {/* Click — one-shot animation on click */}
+      <Section title="Click">
+        <Row label="Effect">
+          <Select
+            value={attrs['data-tapas-click-anim']}
+            onChange={(v) => {
+              onSetAttribute('data-tapas-click-anim', v);
+              if (!v) {
+                onSetAttribute('data-tapas-click-duration', '');
+                onSetAttribute('data-tapas-click-easing', '');
+              }
+            }}
+            options={ENTRANCE_PRESETS}
+            placeholder="None"
+          />
+        </Row>
+        {hasClick && (
+          <>
+            <Row label="Duration">
+              <DurationInput
+                value={attrs['data-tapas-click-duration']}
+                onChange={(v) => onSetAttribute('data-tapas-click-duration', v)}
+                placeholder="400ms"
+              />
+            </Row>
+            <Row label="Easing">
+              <Select
+                value={attrs['data-tapas-click-easing']}
+                onChange={(v) => onSetAttribute('data-tapas-click-easing', v)}
+                options={EASING_PRESETS}
+                placeholder="ease-out"
+              />
+            </Row>
+            <div style={{
+              marginTop: '6px', padding: '6px 8px',
+              background: W.accentDim, color: W.accent,
+              border: `1px solid ${W.accent}`, borderRadius: '3px',
+              fontSize: '10.5px', lineHeight: 1.4,
+            }}>
+              Fires every time the element is clicked.
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* Page-load — fires once per render */}
+      <Section title="Page load">
+        <Row label="Effect">
+          <Select
+            value={attrs['data-tapas-load-anim']}
+            onChange={(v) => {
+              onSetAttribute('data-tapas-load-anim', v);
+              if (!v) {
+                onSetAttribute('data-tapas-load-duration', '');
+                onSetAttribute('data-tapas-load-delay', '');
+                onSetAttribute('data-tapas-load-easing', '');
+              }
+            }}
+            options={ENTRANCE_PRESETS}
+            placeholder="None"
+          />
+        </Row>
+        {hasLoad && (
+          <>
+            <Row label="Duration">
+              <DurationInput
+                value={attrs['data-tapas-load-duration']}
+                onChange={(v) => onSetAttribute('data-tapas-load-duration', v)}
+                placeholder="600ms"
+              />
+            </Row>
+            <Row label="Delay">
+              <DurationInput
+                value={attrs['data-tapas-load-delay']}
+                onChange={(v) => onSetAttribute('data-tapas-load-delay', v)}
+                placeholder="0ms"
+              />
+            </Row>
+            <Row label="Easing">
+              <Select
+                value={attrs['data-tapas-load-easing']}
+                onChange={(v) => onSetAttribute('data-tapas-load-easing', v)}
+                options={EASING_PRESETS}
+                placeholder="ease-out"
+              />
+            </Row>
+            <div style={{
+              marginTop: '6px', padding: '6px 8px',
+              background: W.accentDim, color: W.accent,
+              border: `1px solid ${W.accent}`, borderRadius: '3px',
+              fontSize: '10.5px', lineHeight: 1.4,
+            }}>
+              Fires once when the page finishes rendering. Stagger
+              hero elements by giving each a different delay.
+            </div>
+          </>
+        )}
+      </Section>
+
       <div style={{
         padding: '16px 12px', borderTop: `1px solid ${W.panelBorder}`,
         color: W.textFaint, fontSize: '10.5px', lineHeight: 1.5,
       }}>
-        Click, page-load, timed, and mouse-move triggers — plus
+        Timed, mouse-move, and while-scrolling triggers — plus
         multi-step timelines with custom cubic-bezier — land in
         Phase 8b.
       </div>

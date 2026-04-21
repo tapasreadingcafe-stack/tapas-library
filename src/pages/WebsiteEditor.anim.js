@@ -78,6 +78,39 @@ export const ANIM_CSS = `
 [data-tapas-hover="scale"]:hover { transform: scale(1.04); }
 [data-tapas-hover="glow"]:hover  { box-shadow: 0 0 0 3px rgba(20,110,245,0.35); }
 [data-tapas-hover="tilt"]:hover  { transform: rotate(-2deg); }
+
+/* Click presets — one-shot. A delegated click listener in the Canvas
+   sets data-tapas-click-playing which triggers the keyframe; an
+   animationend listener removes it so the next click can re-fire. */
+[data-tapas-click-anim][data-tapas-click-playing] {
+  animation-name: var(--tapas-click-name, tapas-fade);
+  animation-duration: var(--tapas-click-duration, 400ms);
+  animation-timing-function: var(--tapas-click-easing, ease-out);
+  animation-fill-mode: both;
+}
+[data-tapas-click-anim="fade"]        { --tapas-click-name: tapas-fade        }
+[data-tapas-click-anim="slide-up"]    { --tapas-click-name: tapas-slide-up    }
+[data-tapas-click-anim="slide-down"]  { --tapas-click-name: tapas-slide-down  }
+[data-tapas-click-anim="slide-left"]  { --tapas-click-name: tapas-slide-left  }
+[data-tapas-click-anim="slide-right"] { --tapas-click-name: tapas-slide-right }
+[data-tapas-click-anim="zoom"]        { --tapas-click-name: tapas-zoom        }
+
+/* Page-load presets — fires once when the page renders. Uses the
+   same keyframes; the runtime adds data-tapas-load-in on mount. */
+[data-tapas-load-anim]:not([data-tapas-load-in]) { opacity: 0; }
+[data-tapas-load-anim][data-tapas-load-in] {
+  animation-name: var(--tapas-load-name, tapas-fade);
+  animation-duration: var(--tapas-load-duration, 600ms);
+  animation-delay:    var(--tapas-load-delay, 0ms);
+  animation-timing-function: var(--tapas-load-easing, ease-out);
+  animation-fill-mode: both;
+}
+[data-tapas-load-anim="fade"]        { --tapas-load-name: tapas-fade        }
+[data-tapas-load-anim="slide-up"]    { --tapas-load-name: tapas-slide-up    }
+[data-tapas-load-anim="slide-down"]  { --tapas-load-name: tapas-slide-down  }
+[data-tapas-load-anim="slide-left"]  { --tapas-load-name: tapas-slide-left  }
+[data-tapas-load-anim="slide-right"] { --tapas-load-name: tapas-slide-right }
+[data-tapas-load-anim="zoom"]        { --tapas-load-name: tapas-zoom        }
 `;
 
 // Used by InteractionsPanel's dropdowns and Canvas's observer.

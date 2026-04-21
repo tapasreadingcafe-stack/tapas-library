@@ -30,6 +30,7 @@ const ALLOWED_TAGS = new Set([
   'img', 'video', 'iframe', 'audio', 'picture', 'source',
   'button', 'form', 'input', 'textarea', 'select', 'option', 'label',
   'blockquote', 'code', 'pre', 'em', 'strong', 'small',
+  'details', 'summary',
   'br', 'hr',
   // body is used by the compiler as the tree root; React won't render a
   // nested <body> so we rewrite it to <div class="tapas-page-root">.
