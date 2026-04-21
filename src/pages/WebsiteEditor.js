@@ -23,8 +23,10 @@ import {
 } from './WebsiteEditor.tree';
 import {
   ensureNodeClass, setClassStyle, renameClass,
+  setNodeTag, setNodeAttribute, renameNodeAttribute,
 } from './WebsiteEditor.mutations';
 import StylePanel from './WebsiteEditor.style';
+import SettingsPanel from './WebsiteEditor.settings';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -548,6 +550,7 @@ function RightPanel({
   selectedNode, className, classDef,
   state, onStateChange,
   onCreateClass, onRenameClass, onSetStyle,
+  onSetTag, onSetAttribute, onRenameAttribute,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -607,9 +610,12 @@ function RightPanel({
           />
         )}
         {tab === 'settings' && (
-          <div style={{ padding: '14px 12px', color: W.textDim, fontSize: '11px', lineHeight: 1.6 }}>
-            Tag, ID, attributes, ARIA, link, embed fields land in <b style={{ color: W.text }}>Phase 5</b>.
-          </div>
+          <SettingsPanel
+            node={selectedNode}
+            onSetTag={onSetTag}
+            onSetAttribute={onSetAttribute}
+            onRenameAttribute={onRenameAttribute}
+          />
         )}
         {tab === 'interactions' && (
           <div style={{ padding: '14px 12px', color: W.textDim, fontSize: '11px', lineHeight: 1.6 }}>
@@ -733,6 +739,21 @@ export default function WebsiteEditor() {
     });
   }, [selectedId, pageKey, styleState]);
 
+  const handleSetTag = useCallback((tag) => {
+    if (!selectedId) return;
+    setContent((c) => setNodeTag(c, pageKey, selectedId, tag));
+  }, [selectedId, pageKey]);
+
+  const handleSetAttribute = useCallback((key, value) => {
+    if (!selectedId) return;
+    setContent((c) => setNodeAttribute(c, pageKey, selectedId, key, value));
+  }, [selectedId, pageKey]);
+
+  const handleRenameAttribute = useCallback((oldKey, newKey) => {
+    if (!selectedId) return;
+    setContent((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
+  }, [selectedId, pageKey]);
+
   // Keyboard — spec § 2. Selection-only moves ship here; mutation
   // shortcuts (Cmd+D duplicate, Delete, Cmd+Shift+D reset) land with
   // the write pipeline in Phase 3.
@@ -797,6 +818,9 @@ export default function WebsiteEditor() {
           onCreateClass={handleCreateClass}
           onRenameClass={handleRenameClass}
           onSetStyle={handleSetStyle}
+          onSetTag={handleSetTag}
+          onSetAttribute={handleSetAttribute}
+          onRenameAttribute={handleRenameAttribute}
         />
       </div>
       {(saving || saveError) && (

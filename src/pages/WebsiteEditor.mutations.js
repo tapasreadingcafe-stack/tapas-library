@@ -129,6 +129,59 @@ export function setClassStyle(content, className, state, prop, value) {
   return { ...content, classes: { ...content.classes, [className]: nextCls } };
 }
 
+// --- Node-level writes (Phase 5 Settings tab) -------------------------
+// Change the HTML tag of a node. The Node renderer silently falls back
+// to <div> for unknown tags, so invalid writes are non-destructive —
+// but we still validate here to keep the stored tree clean.
+const SAFE_TAGS = new Set([
+  'div', 'section', 'header', 'nav', 'aside', 'main', 'article', 'footer',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'p', 'span', 'a', 'ul', 'ol', 'li',
+  'img', 'video', 'iframe', 'picture',
+  'button', 'form', 'input', 'textarea', 'select', 'option', 'label',
+  'blockquote', 'code', 'pre', 'em', 'strong', 'small',
+]);
+
+export function setNodeTag(content, pageKey, nodeId, tag) {
+  const safe = String(tag || '').toLowerCase();
+  if (!SAFE_TAGS.has(safe)) return content;
+  return withNode(content, pageKey, nodeId, (node) => {
+    if (node.tag === safe) return node;
+    return { ...node, tag: safe };
+  });
+}
+
+// Set / clear a single attribute on a node. Empty-string and null
+// values delete the key so the stored blob stays tidy.
+export function setNodeAttribute(content, pageKey, nodeId, key, value) {
+  if (!key) return content;
+  return withNode(content, pageKey, nodeId, (node) => {
+    const attrs = node.attributes || {};
+    if (value === '' || value === null || value === undefined) {
+      if (!(key in attrs)) return node;
+      const { [key]: _gone, ...rest } = attrs;
+      return { ...node, attributes: rest };
+    }
+    if (attrs[key] === value) return node;
+    return { ...node, attributes: { ...attrs, [key]: value } };
+  });
+}
+
+// Rename an attribute key (preserves value + ordering position). Used
+// when editing the left cell of a key/value row.
+export function renameNodeAttribute(content, pageKey, nodeId, oldKey, newKey) {
+  if (!oldKey || !newKey || oldKey === newKey) return content;
+  return withNode(content, pageKey, nodeId, (node) => {
+    const attrs = node.attributes || {};
+    if (!(oldKey in attrs) || newKey in attrs) return node;
+    const next = {};
+    for (const [k, v] of Object.entries(attrs)) {
+      next[k === oldKey ? newKey : k] = v;
+    }
+    return { ...node, attributes: next };
+  });
+}
+
 // Rename a class across the classes map AND every node's classes[] on
 // every page's tree. Used when the user edits the class badge.
 export function renameClass(content, oldName, newName) {
