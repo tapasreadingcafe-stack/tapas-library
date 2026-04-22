@@ -15,6 +15,7 @@
 // =====================================================================
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useLandingContent } from '../utils/landingContent';
 
 // Styles kept as a single template string so the 500+ line CSS stays
 // readable. Loaded via dangerouslySetInnerHTML to avoid JSX curly-brace
@@ -467,26 +468,6 @@ const LANDING_CSS = `
 
 const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
 
-const NEW_ARRIVALS = [
-  { cover: 'cover-1', title: 'The Magic Mountain', author: 'Thomas Mann',             badge: 'Slow Fiction' },
-  { cover: 'cover-2', title: 'The Years',          author: 'Annie Ernaux',            badge: 'Memoir' },
-  { cover: 'cover-3', title: 'Solenoid',           author: 'Mircea Cărtărescu',       badge: 'Translation' },
-  { cover: 'cover-4', title: 'Bluets',             author: 'Maggie Nelson',           badge: 'Poetry' },
-  { cover: 'cover-5', title: "A Room of One's Own", author: 'Virginia Woolf',         badge: 'Essays', coverTitleBreak: true },
-  { cover: 'cover-6', title: 'The Waves',          author: 'Virginia Woolf',          badge: 'Novel' },
-  { cover: 'cover-2', title: 'Minor Detail',       author: 'Adania Shibli',           badge: 'Translation' },
-  { cover: 'cover-1', title: 'Checkout 19',        author: 'C.-L. Bennett',           badge: 'Novel', coverAuthor: 'Claire-Louise Bennett' },
-];
-
-const EVENTS = [
-  { m: 'Apr', d: '23', title: 'Slow Fiction',           emph: 'Club',            copy: 'Opening pages of The Magic Mountain. Sherry & olives.',        tag: 'p', tagText: 'Weekly · Thu 7p' },
-  { m: 'Apr', d: '27', title: 'Translators &',          emph: 'Twilight',        copy: 'An evening with translator Margaret Jull Costa on Saramago.',   tag: 'o', tagText: 'Guest · Mon 7:30p' },
-  { m: 'May', d: '02', title: 'Saturday',               emph: 'Silent Reading',  copy: 'Two quiet hours, a pot of coffee, a plate of toast. No phones.', tag: 'l', tagText: 'Weekly · Sat 10a' },
-  { m: 'May', d: '08', title: 'Poetry on',              emph: 'Small Plates',    copy: 'A tasting menu paired to six poems. Lorca, Szymborska, Berry.',  tag: 'k', tagText: 'Prix Fixe · Fri 8p' },
-  { m: 'May', d: '15', title: 'First-Draft',            emph: 'Friday',          copy: 'One page of work-in-progress. Two minutes each, then we eat.',   tag: 'p', tagText: 'Members · Fri 7p' },
-  { m: 'May', d: '21', title: 'The',                    emph: 'Novella',         copy: 'Read a novella that afternoon; meet for dinner to discuss.',    tag: 'o', tagText: 'Single Session · Thu 4p',  titleAfterEmph: 'Supper' },
-];
-
 const SHELF_BOOKS = [
   { h: '82%', c: '#8F4FD6' }, { h: '96%', c: '#1a1a1a' }, { h: '70%', c: '#FF934A' },
   { h: '88%', c: '#E0004F' }, { h: '76%', c: '#C9F27F' }, { h: '92%', c: '#3a3a3a' },
@@ -494,22 +475,39 @@ const SHELF_BOOKS = [
   { h: '72%', c: '#E0004F' }, { h: '86%', c: '#C9F27F' }, { h: '78%', c: '#3a3a3a' },
 ];
 
+// Render helpers ------------------------------------------------------
+const isExternal = (href) => typeof href === 'string' && /^https?:|^#|^mailto:/.test(href);
+const A = ({ href, children, className, ariaLabel }) => {
+  if (!href) return <span className={className}>{children}</span>;
+  if (isExternal(href)) return <a href={href} className={className} aria-label={ariaLabel}>{children}</a>;
+  return <Link to={href} className={className} aria-label={ariaLabel}>{children}</Link>;
+};
+
 export default function LandingPage() {
-  const [newsletterState, setNewsletterState] = useState('idle'); // idle | done
+  const { content } = useLandingContent();
+  const [newsletterState, setNewsletterState] = useState('idle');
   const onNewsletter = (e) => {
     e.preventDefault();
     setNewsletterState('done');
   };
 
+  const hero = content.hero;
+  const services = content.services;
+  const arrivals = content.arrivals;
+  const membership = content.membership;
+  const events = content.events;
+  const t = content.testimonial;
+  const nl = content.newsletter;
+  const f = content.footer;
+  const marquee = content.marquee || '';
+
   return (
     <div className="landing">
-      {/* Inject Google Fonts once — stylesheet is idempotent. */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link rel="stylesheet" href={FONTS_HREF} />
       <style dangerouslySetInnerHTML={{ __html: LANDING_CSS }} />
 
-      {/* NAV + HERO share the lime band */}
       <div className="nav-band hero-band">
         <div className="wrap">
           <nav className="nav">
@@ -521,8 +519,8 @@ export default function LandingPage() {
               <a href="#blog">Journal</a>
             </div>
             <div className="brand">
-              <span className="row1">Tapas reading</span>
-              <span className="row2">cafe</span>
+              <span className="row1">{f.brand_name.split(' ').slice(0, -1).join(' ') || 'Tapas reading'}</span>
+              <span className="row2">{f.brand_name.split(' ').slice(-1)[0] || 'cafe'}</span>
             </div>
             <div className="right">
               <Link to="/login" className="sign">Sign in</Link>
@@ -539,27 +537,25 @@ export default function LandingPage() {
 
           <section className="hero">
             <div className="hero-copy">
-              <div className="tag">Reading room · Book club · Small plates</div>
+              {hero.tag && <div className="tag">{hero.tag}</div>}
               <h1>
-                A quiet room for <span className="accent">big books</span> &amp;{' '}
-                <span className="u">small plates.</span>
+                {hero.heading_lead}{' '}
+                <span className="accent">{hero.heading_accent}</span>{' '}
+                {hero.heading_middle}{' '}
+                <span className="u">{hero.heading_underlined}</span>
               </h1>
-              <p>
-                Tapas Reading Cafe is a neighborhood library-cafe — borrow a book, order a plate,
-                and stay as long as the chapter asks for. Weekly book clubs, silent reading hours,
-                and a shelf that's always rotating.
-              </p>
+              <p>{hero.copy}</p>
               <div className="hero-ctas">
-                <Link className="btn primary" to="/books">
-                  Browse the library
+                <A className="btn primary" href={hero.primary_href}>
+                  {hero.primary_cta}
                   <span className="arrow">→</span>
-                </Link>
-                <a className="btn ghost" href="#events">See events</a>
+                </A>
+                <A className="btn ghost" href={hero.secondary_href}>{hero.secondary_cta}</A>
               </div>
               <div className="hero-meta">
-                <div className="stat"><b>2,400+</b><span>BOOKS ON SHELF</span></div>
-                <div className="stat"><b>6</b><span>WEEKLY CLUBS</span></div>
-                <div className="stat"><b>312</b><span>ACTIVE MEMBERS</span></div>
+                {(hero.stats || []).map((s, i) => (
+                  <div key={i} className="stat"><b>{s.value}</b><span>{s.label}</span></div>
+                ))}
               </div>
             </div>
             <div className="hero-art">
@@ -569,8 +565,8 @@ export default function LandingPage() {
                   <div key={i} className="book" style={{ height: b.h, background: b.c }} />
                 ))}
               </div>
-              <div className="ph-label">library.jpg — our wall of books</div>
-              <div className="hero-sticker">Open today<i>10a – 11p</i></div>
+              <div className="ph-label">{hero.art_caption}</div>
+              <div className="hero-sticker">{hero.sticker_line1}<i>{hero.sticker_line2}</i></div>
             </div>
           </section>
         </div>
@@ -579,76 +575,64 @@ export default function LandingPage() {
         </svg>
       </div>
 
-      {/* MARQUEE */}
-      <div className="marquee">
-        <div className="marquee-row">
-          <span>
-            Borrow a book <span className="dot" /> stay for a plate <span className="dot" /> join a club <span className="dot" /> read on the house <span className="dot" />
-            Borrow a book <span className="dot" /> stay for a plate <span className="dot" /> join a club <span className="dot" /> read on the house <span className="dot" />
-          </span>
-          <span>
-            Borrow a book <span className="dot" /> stay for a plate <span className="dot" /> join a club <span className="dot" /> read on the house <span className="dot" />
-            Borrow a book <span className="dot" /> stay for a plate <span className="dot" /> join a club <span className="dot" /> read on the house <span className="dot" />
-          </span>
+      {marquee && (
+        <div className="marquee">
+          <div className="marquee-row">
+            {[0, 1].map(rep => (
+              <span key={rep}>
+                {(marquee.split(/\s*·\s*/).filter(Boolean)).map((phrase, i, arr) => (
+                  <React.Fragment key={i}>
+                    {phrase} <span className="dot" />{i === arr.length - 1 ? '' : ' '}
+                  </React.Fragment>
+                ))}
+                {(marquee.split(/\s*·\s*/).filter(Boolean)).map((phrase, i, arr) => (
+                  <React.Fragment key={`r-${i}`}>
+                    {phrase} <span className="dot" />{i === arr.length - 1 ? '' : ' '}
+                  </React.Fragment>
+                ))}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* SERVICES */}
       <section className="section" id="services">
         <div className="wrap">
           <div className="head">
             <div>
-              <div className="kicker">Our Services</div>
-              <h2>Everything a reader needs, <span className="p">under one roof.</span></h2>
+              <div className="kicker">{services.kicker}</div>
+              <h2>{services.heading_lead} <span className="p">{services.heading_accent}</span></h2>
             </div>
-            <p className="lede">
-              Three ways to use the room: take a book home, borrow one for a week, or come read with a group.
-              Coffee, wine, and tapas served throughout.
-            </p>
+            <p className="lede">{services.lede}</p>
           </div>
           <div className="services">
-            <div className="service">
-              <div className="ic">Aa</div>
-              <h3>Buying Books</h3>
-              <p>A small, carefully-chosen shelf for purchase — new releases, small presses, and staff favorites. Always 10% off for members.</p>
-              <Link className="more" to="/books">Visit the shop <span className="a">→</span></Link>
-            </div>
-            <div className="service">
-              <div className="ic">↺</div>
-              <h3>Lending Library</h3>
-              <p>Over 2,400 books you can borrow on the honor system. Take two home at a time, return within three weeks.</p>
-              <Link className="more" to="/books">Browse the library <span className="a">→</span></Link>
-            </div>
-            <div className="service">
-              <div className="ic">☕</div>
-              <h3>Events &amp; Book Clubs</h3>
-              <p>Six weekly clubs, poetry suppers, and silent reading Saturdays. Come once as a guest — decide later.</p>
-              <a className="more" href="#events">See the calendar <span className="a">→</span></a>
-            </div>
+            {(services.items || []).map((s, i) => (
+              <div key={i} className="service">
+                <div className="ic">{s.icon}</div>
+                <h3>{s.title}</h3>
+                <p>{s.copy}</p>
+                <A className="more" href={s.href}>{s.cta} <span className="a">→</span></A>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* NEW ARRIVALS */}
       <section className="section" id="library" style={{ paddingTop: '20px' }}>
         <div className="wrap">
           <div className="head">
             <div>
-              <div className="kicker">New on the shelf</div>
-              <h2>This week's <span className="p">arrivals.</span></h2>
+              <div className="kicker">{arrivals.kicker}</div>
+              <h2>{arrivals.heading_lead} <span className="p">{arrivals.heading_accent}</span></h2>
             </div>
-            <p className="lede">
-              Freshly unpacked from the small-press boxes and the translators' stacks. Borrow for free, or take one home.
-            </p>
+            <p className="lede">{arrivals.lede}</p>
           </div>
           <div className="arrivals">
-            {NEW_ARRIVALS.map((b, i) => (
+            {(arrivals.books || []).map((b, i) => (
               <div key={i} className="book-card">
-                <div className={`cover ${b.cover}`}>
-                  <div className="title-line">
-                    {b.coverTitleBreak ? (<>A Room of<br />One's Own</>) : b.title}
-                  </div>
-                  <div className="author-line">{b.coverAuthor || b.author}</div>
+                <div className={`cover ${b.cover || 'cover-1'}`}>
+                  <div className="title-line">{b.title}</div>
+                  <div className="author-line">{b.author}</div>
                 </div>
                 <div>
                   <div className="name">{b.title}</div>
@@ -664,73 +648,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* MEMBERSHIP SPLIT */}
       <section className="section" id="membership" style={{ paddingTop: '40px' }}>
         <div className="wrap">
           <div className="head">
             <div>
-              <div className="kicker">Pricing &amp; Plans</div>
-              <h2>Two ways to <span className="p">pull up a chair.</span></h2>
+              <div className="kicker">{membership.kicker}</div>
+              <h2>{membership.heading_lead} <span className="p">{membership.heading_accent}</span></h2>
             </div>
-            <p className="lede">
-              Drop in whenever you like — or become a member and unlock every club, a quarterly book, and 10% off the kitchen.
-            </p>
+            <p className="lede">{membership.lede}</p>
           </div>
           <div className="split">
-            <div className="panel lime">
-              <div className="k">Drop-in</div>
-              <h3>The Reading Room</h3>
-              <p>Free to enter. Borrow one book at a time, read all afternoon. Buy a coffee or a plate if the mood strikes.</p>
-              <ul className="list">
-                <li>Lending library, honor system</li>
-                <li>Wi-Fi, quiet tables, long hours</li>
-                <li>One guest club visit per month</li>
-              </ul>
-              <div className="foot">
-                <div className="price-big">Free<small /></div>
-                <a className="btn-local" href="#visit">Visit today <span className="a">→</span></a>
+            {[['lime', membership.free], ['ink', membership.paid]].map(([variant, plan], idx) => (
+              <div key={idx} className={`panel ${variant}`}>
+                <div className="k">{plan.kicker}</div>
+                <h3>{plan.title}</h3>
+                <p>{plan.copy}</p>
+                <ul className="list">
+                  {(plan.features || []).map((feat, i) => <li key={i}>{feat}</li>)}
+                </ul>
+                <div className="foot">
+                  <div className="price-big">
+                    {plan.price}{plan.price_suffix ? <small>{plan.price_suffix}</small> : <small />}
+                  </div>
+                  <A className="btn-local" href={plan.cta_href}>{plan.cta} <span className="a">→</span></A>
+                </div>
               </div>
-            </div>
-            <div className="panel ink">
-              <div className="k">Membership</div>
-              <h3>The Chair</h3>
-              <p>A seat at every club, a book of your choice each quarter, 10% off the kitchen, and first dibs on supper events.</p>
-              <ul className="list">
-                <li>All six weekly book clubs</li>
-                <li>One book per quarter, on us</li>
-                <li>10% off food, wine &amp; coffee</li>
-                <li>Priority RSVP for supper events</li>
-              </ul>
-              <div className="foot">
-                <div className="price-big">$18<small>/month</small></div>
-                <a className="btn-local" href="#join">Become a member <span className="a">→</span></a>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* EVENTS */}
       <section className="section" id="events" style={{ paddingTop: '40px' }}>
         <div className="wrap">
           <div className="head">
             <div>
-              <div className="kicker">Upcoming Events</div>
-              <h2>On the calendar <span className="p">this season.</span></h2>
+              <div className="kicker">{events.kicker}</div>
+              <h2>{events.heading_lead} <span className="p">{events.heading_accent}</span></h2>
             </div>
-            <p className="lede">
-              Weekly clubs, translator evenings, poetry suppers, and the occasional quiet Saturday. All welcome, members first.
-            </p>
+            <p className="lede">{events.lede}</p>
           </div>
           <div className="calendar">
-            {EVENTS.map((e, i) => (
+            {(events.items || []).map((e, i) => (
               <div key={i} className="row-ev">
-                <div className="d">{e.m}<b>{e.d}</b></div>
+                <div className="d">{e.month}<b>{e.day}</b></div>
                 <div className="t">
-                  <h4>{e.title} <em>{e.emph}</em>{e.titleAfterEmph ? ` ${e.titleAfterEmph}` : ''}</h4>
+                  <h4>{e.title} <em>{e.emph}</em>{e.title_suffix ? ` ${e.title_suffix}` : ''}</h4>
                   <p>{e.copy}</p>
                 </div>
-                <span className={`tag ${e.tag}`}>{e.tagText}</span>
+                <span className={`tag ${e.tag || 'p'}`}>{e.tag_text}</span>
                 <span className="go">→</span>
               </div>
             ))}
@@ -738,7 +703,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* TESTIMONIAL */}
       <section className="section" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="testimonial">
@@ -750,14 +714,13 @@ export default function LandingPage() {
             </div>
             <div>
               <blockquote>
-                I came in on a Tuesday for a coffee and ended up finishing my novel. Three months later I'm
-                hosting the Silent Reading club. It is the <i>warmest quiet place</i> I've ever found.
+                {t.quote}<i>{t.emph}</i>{t.quote_after}
               </blockquote>
               <div className="who">
-                <div className="ava">RK</div>
+                <div className="ava">{t.author_initials}</div>
                 <div>
-                  <b>Rukmini K.</b>
-                  <span>Member since 2024 · Silent Reading host</span>
+                  <b>{t.author_name}</b>
+                  <span>{t.author_role}</span>
                 </div>
               </div>
             </div>
@@ -765,61 +728,55 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* NEWSLETTER */}
       <section className="section" id="join" style={{ paddingTop: 0 }}>
         <div className="wrap">
           <div className="newsletter">
             <div>
               <div style={{ fontFamily: 'var(--f-mono)', fontSize: '12px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--lime)', marginBottom: '14px' }}>
-                The Dispatch
+                {nl.kicker}
               </div>
-              <h3>A letter on <em>what we're reading.</em></h3>
-              <p>One email a month. This week's shelf, next week's clubs, and a paragraph we couldn't stop thinking about.</p>
+              <h3>{nl.heading_lead} <em>{nl.heading_emph}</em></h3>
+              <p>{nl.copy}</p>
             </div>
             <form className="nl-form" onSubmit={onNewsletter}>
-              <input type="email" placeholder="your@email.com" required />
-              <button type="submit">{newsletterState === 'done' ? 'Thanks — see you soon' : 'Subscribe'}</button>
+              <input type="email" placeholder={nl.placeholder} required />
+              <button type="submit">{newsletterState === 'done' ? nl.success_label : nl.button_label}</button>
             </form>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="wrap site-foot">
         <div className="foot-grid">
           <div className="foot-brand">
-            <div className="name">Tapas reading cafe<i>a small room for big books</i></div>
-            <p>A neighborhood library-cafe serving small plates, natural wine, and six weekly book clubs.</p>
+            <div className="name">{f.brand_name}<i>{f.brand_tagline}</i></div>
+            <p>{f.brand_blurb}</p>
           </div>
           <div className="foot-col">
-            <h5>Visit</h5>
+            <h5>{f.visit_heading}</h5>
             <ul>
-              <li>14 Haven Street</li>
-              <li>Reading, MA 01867</li>
-              <li>Tue–Sun · 10a–11p</li>
+              {(f.visit_lines || []).map((line, i) => <li key={i}>{line}</li>)}
             </ul>
           </div>
           <div className="foot-col">
-            <h5>Read</h5>
+            <h5>{f.read_heading}</h5>
             <ul>
-              <li><Link to="/books">Library</Link></li>
-              <li><a href="#events">Book Clubs</a></li>
-              <li><Link to="/blog">The Journal</Link></li>
-              <li><a href="#archive">Archive</a></li>
+              {(f.read_links || []).map((l, i) => (
+                <li key={i}><A href={l.href}>{l.label}</A></li>
+              ))}
             </ul>
           </div>
           <div className="foot-col">
-            <h5>More</h5>
+            <h5>{f.more_heading}</h5>
             <ul>
-              <li><a href="#events">Private Events</a></li>
-              <li><a href="#gift">Gift Cards</a></li>
-              <li><a href="#careers">Careers</a></li>
-              <li><a href="#contact">Contact</a></li>
+              {(f.more_links || []).map((l, i) => (
+                <li key={i}><A href={l.href}>{l.label}</A></li>
+              ))}
             </ul>
           </div>
         </div>
         <div className="foot-bottom">
-          <span>© {new Date().getFullYear()} Tapas Reading Cafe · Reading, MA</span>
+          <span>{f.copyright.replace('©', `© ${new Date().getFullYear()}`)}</span>
           <div className="socials">
             <a href="#ig">IG</a><a href="#fb">FB</a><a href="#sp">SP</a>
           </div>
