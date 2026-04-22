@@ -35,6 +35,50 @@ const W = {
 // ---------------------------------------------------------------------
 // Small shared UI atoms
 // ---------------------------------------------------------------------
+// Class-scope reset strip — shows "N props · Reset" whenever the
+// active state/breakpoint bucket has any declarations. Clicking
+// confirms and then clears every property the Style panel can see
+// for that bucket. Scoped: it never touches other states or other
+// breakpoints, and never touches other classes.
+function ResetStrip({ styles, label, onReset }) {
+  const count = Object.keys(styles || {}).length;
+  if (count === 0) return null;
+  const confirm = () => {
+    const ok = typeof window === 'undefined'
+      ? true
+      : window.confirm(`Clear ${count} style${count === 1 ? '' : 's'} from ${label}?`);
+    if (ok) onReset();
+  };
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '6px 12px',
+      background: '#1a1a1a',
+      borderTop: `1px solid ${W.panelBorder}`,
+      borderBottom: `1px solid ${W.panelBorder}`,
+      color: W.textDim, fontSize: '10.5px',
+    }}>
+      <span>
+        <span style={{ color: W.text, fontWeight: 600 }}>{count}</span>
+        {' '}{count === 1 ? 'property' : 'properties'} set in {label}
+      </span>
+      <button
+        onClick={confirm}
+        title={`Reset all ${count} ${count === 1 ? 'property' : 'properties'}`}
+        style={{
+          padding: '2px 8px',
+          background: 'transparent',
+          color: '#ff9a9a',
+          border: '1px solid #5a2a2a',
+          borderRadius: '3px',
+          cursor: 'pointer',
+          fontSize: '10.5px', fontWeight: 600,
+        }}
+      >Reset</button>
+    </div>
+  );
+}
+
 function SectionHeader({ label, collapsed, onToggle }) {
   return (
     <button
@@ -148,20 +192,64 @@ function DimensionInput({ value, onChange, placeholder }) {
   );
 }
 
-// Color picker — native swatch + hex text input. Accepts any CSS color
-// string on read, round-trips hex to the swatch and leaves other forms
-// (rgba, hsl, var(…), named) untouched in the text input.
+// Resolve any CSS color string (rgba(...), hsl(...), var(...), named,
+// keywords) to #rrggbb for the native swatch. Uses the canvas2d API's
+// built-in parser — anything invalid falls back to black.
+function cssToHex(cssColor) {
+  const s = String(cssColor || '').trim();
+  if (!s) return '#000000';
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s;
+  // var(…) and keyword-substituted values won't resolve at edit time;
+  // just show the neutral swatch rather than guessing.
+  if (s.startsWith('var(')) return '#000000';
+  try {
+    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    if (!canvas) return '#000000';
+    canvas.width = 1; canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = s;
+    const resolved = ctx.fillStyle;
+    if (resolved.startsWith('#') && resolved.length === 7) return resolved;
+    const m = /rgba?\(([0-9.]+),\s*([0-9.]+),\s*([0-9.]+)/.exec(resolved);
+    if (!m) return '#000000';
+    const toHex = (n) => Math.max(0, Math.min(255, Math.round(Number(n))))
+      .toString(16).padStart(2, '0');
+    return `#${toHex(m[1])}${toHex(m[2])}${toHex(m[3])}`;
+  } catch {
+    return '#000000';
+  }
+}
+
+// Color picker — native swatch + free-form text input. Accepts any CSS
+// color string on read (rgba / hsl / named / var(…)); the swatch now
+// reflects the *actual* colour instead of black-for-anything-non-hex.
+// A one-click × unsets the property entirely.
 function ColorInput({ value, onChange }) {
-  // The native swatch only understands #rrggbb. If the current value
-  // isn't that form, fall back to #000000 for the swatch but preserve
-  // the real value in the text input.
-  const hex = /^#[0-9a-fA-F]{6}$/.test((value || '').trim()) ? value.trim() : '#000000';
+  const hex = cssToHex(value);
+  const isSet = Boolean(value && String(value).trim());
+  // Feature-detect the EyeDropper API — currently Chromium-only
+  // (Chrome, Edge, Opera). Non-supported browsers just hide the
+  // button, leaving the swatch + text input as the pickers.
+  const hasEyedropper = typeof window !== 'undefined'
+    && typeof window.EyeDropper === 'function';
+  const pickFromScreen = async () => {
+    try {
+      // eslint-disable-next-line no-undef
+      const ed = new window.EyeDropper();
+      const { sRGBHex } = await ed.open();
+      if (sRGBHex) onChange(sRGBHex);
+    } catch {
+      // User cancelled or API unavailable — nothing to do.
+    }
+  };
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
       <input
         type="color"
         value={hex}
         onChange={(e) => onChange(e.target.value)}
+        title={isSet ? value : 'Pick a colour'}
         style={{
           width: '22px', height: '22px', padding: 0,
           background: W.input, border: `1px solid ${W.inputBorder}`,
@@ -181,6 +269,30 @@ function ColorInput({ value, onChange }) {
           outline: 'none',
         }}
       />
+      {hasEyedropper && (
+        <button
+          onClick={pickFromScreen}
+          title="Pick colour from anywhere on screen"
+          style={{
+            width: '22px', height: '22px', padding: 0,
+            background: 'transparent', color: W.textDim,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '12px',
+          }}
+        >⎋</button>
+      )}
+      {isSet && (
+        <button
+          onClick={() => onChange('')}
+          title="Unset colour"
+          style={{
+            width: '22px', height: '22px', padding: 0,
+            background: 'transparent', color: W.textDim,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            cursor: 'pointer', fontSize: '13px',
+          }}
+        >×</button>
+      )}
     </div>
   );
 }
@@ -217,12 +329,42 @@ function Selector({ node, className, classDef, onRenameClass, onCreateClass, sta
         </span>
       </div>
       {className ? (
-        <TextInput
-          value={draft}
-          onChange={setDraft}
-          onCommit={commitRename}
-          placeholder="class-name"
-        />
+        <>
+          <TextInput
+            value={draft}
+            onChange={setDraft}
+            onCommit={commitRename}
+            placeholder="class-name"
+          />
+          {/* Combo-class readout. The v2 schema stores classes[] per
+              node, so a node can carry multiple. The Style panel
+              edits only the first (primary); this chip row makes the
+              rest visible so staff don't wonder why their ".is-
+              highlighted" overrides aren't showing up in the Style
+              panel rules list. Read-only for now — editing combos
+              needs a first-class UI. */}
+          {(node?.classes || []).length > 1 && (
+            <div style={{
+              marginTop: '6px', display: 'flex', flexWrap: 'wrap',
+              gap: '4px', alignItems: 'center',
+            }}>
+              <span style={{ color: W.textFaint, fontSize: '10px', marginRight: '2px' }}>
+                +
+              </span>
+              {(node.classes || []).slice(1).map((c) => (
+                <span key={c} style={{
+                  padding: '1px 6px',
+                  background: W.input, color: W.textDim,
+                  border: `1px solid ${W.inputBorder}`, borderRadius: '2px',
+                  fontSize: '10px', fontFamily: 'ui-monospace, monospace',
+                }}>.{c}</span>
+              ))}
+              <span style={{ color: W.textFaint, fontSize: '9.5px', marginLeft: '4px' }}>
+                (edit primary only)
+              </span>
+            </div>
+          )}
+        </>
       ) : (
         <button
           onClick={onCreateClass}
@@ -494,6 +636,32 @@ function Position({ styles, onSet }) {
       <Field label="Z-index">
         <DimensionInput value={styles['z-index'] || ''} onChange={(v) => onSet('z-index', v)} placeholder="auto" />
       </Field>
+      {/* z-index is a no-op on static-positioned elements. Surface a
+          one-click fix so staff aren't left wondering why their "5"
+          isn't stacking anything. */}
+      {(styles['z-index'] || '').trim()
+        && (!styles.position || styles.position === 'static') && (
+        <div style={{
+          margin: '4px 12px 8px',
+          padding: '6px 8px',
+          background: '#2a1f0a', color: '#f0c068',
+          border: `1px solid #6a5020`,
+          borderRadius: '3px',
+          fontSize: '10.5px', lineHeight: 1.4,
+          display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          <span>z-index needs a non-static position to take effect.</span>
+          <button
+            onClick={() => onSet('position', 'relative')}
+            style={{
+              padding: '2px 6px',
+              background: 'transparent', color: W.accent,
+              border: `1px solid ${W.accent}`, borderRadius: '2px',
+              cursor: 'pointer', fontSize: '10px', fontWeight: 700,
+            }}
+          >Set relative</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1483,6 +1651,13 @@ function Effects({ styles, onSet }) {
 // ---------------------------------------------------------------------
 // StylePanel — top-level composition
 // ---------------------------------------------------------------------
+const STYLE_DEVICES = [
+  { key: 'desktop', label: 'Desktop', glyph: '▭' },
+  { key: 'tablet',  label: 'Tablet',  glyph: '▯' },
+  { key: 'mobileL', label: 'Mobile L', glyph: '▯' },
+  { key: 'mobileP', label: 'Mobile P', glyph: '▯' },
+];
+
 export default function StylePanel({
   node,
   className,
@@ -1490,9 +1665,11 @@ export default function StylePanel({
   state,
   onStateChange,
   device,
+  onDeviceChange,
   onCreateClass,
   onRenameClass,
   onSetStyle,
+  sharedClassNotice,
 }) {
   const [open, setOpen] = useState({
     layout: true, spacing: true, size: true, position: true,
@@ -1533,6 +1710,37 @@ export default function StylePanel({
 
   return (
     <div style={{ overflowY: 'auto', flex: 1 }}>
+      {/* Inline device switcher so staff don't have to hunt up the
+          canvas toolbar when they want to flip to tablet / mobile
+          mid-edit. Mirrors the top-bar device picker; both write to
+          the same `device` state. */}
+      {onDeviceChange && (
+        <div style={{
+          display: 'flex', gap: '2px',
+          padding: '6px 12px',
+          borderBottom: `1px solid ${W.panelBorder}`,
+          background: '#1a1a1a',
+        }}>
+          {STYLE_DEVICES.map((d) => {
+            const active = d.key === (device || 'desktop');
+            return (
+              <button
+                key={d.key}
+                onClick={() => onDeviceChange(d.key)}
+                title={d.label}
+                style={{
+                  flex: 1, height: '22px',
+                  background: active ? W.accentDim : 'transparent',
+                  color: active ? W.accent : W.textDim,
+                  border: `1px solid ${active ? W.accent : W.inputBorder}`,
+                  borderRadius: '3px', cursor: 'pointer',
+                  fontSize: '10.5px',
+                }}
+              >{d.label}</button>
+            );
+          })}
+        </div>
+      )}
       {bp && (
         <div style={{
           padding: '8px 12px',
@@ -1557,6 +1765,35 @@ export default function StylePanel({
         isBaseBreakpoint={isBaseBreakpoint}
         onCreateClass={onCreateClass}
         onRenameClass={onRenameClass}
+      />
+      {sharedClassNotice && (
+        <div style={{
+          padding: '6px 12px',
+          background: '#2a1f0a',
+          borderBottom: `1px solid ${W.panelBorder}`,
+          color: '#f0c068',
+          fontSize: '10.5px', lineHeight: 1.45,
+        }}>
+          <span style={{ fontWeight: 700 }}>◆ </span>
+          {sharedClassNotice}
+        </div>
+      )}
+
+      <ResetStrip
+        styles={styles}
+        label={isBaseBreakpoint
+          ? `${state === 'base' ? 'Base' : state} styles`
+          : `${bp?.label || device} styles`}
+        onReset={() => {
+          // Clear every property the current bucket holds. onSetStyle
+          // routes through setClassStyle with value='' which deletes
+          // the key from the StyleBlock, so this collapses the whole
+          // bucket back to "inherit parent defaults" without touching
+          // other states or breakpoints.
+          for (const prop of Object.keys(styles || {})) {
+            onSetStyle(prop, '');
+          }
+        }}
       />
 
       <SectionHeader

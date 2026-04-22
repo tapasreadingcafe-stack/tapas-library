@@ -701,6 +701,243 @@ function compileTapasGroup(props = {}) {
   return { root, classes: mergedClasses };
 }
 
+// ---- Navbar ---------------------------------------------------------
+// Global chrome in v1 was rendered outside the blocks array; here we
+// compile to a real tree so v2 pages own their own nav. Class names
+// follow the Webflow-parity spec: tapas-navbar / -logo / -links /
+// -link / -toggle. The mobile hamburger is a button with a data-*
+// hook so the Canvas runtime (see WebsiteEditor.js surface click
+// handler) can flip data-tapas-navbar-open on the nav root.
+
+function compileTapasNavbar(props = {}) {
+  const {
+    brand_name = 'TAPAS',
+    logo_emoji = '',
+    links = [
+      { label: 'Home',    href: '/' },
+      { label: 'About',   href: '/about' },
+      { label: 'Books',   href: '/books' },
+      { label: 'Events',  href: '/events' },
+      { label: 'Contact', href: '/contact' },
+    ],
+    login_label = 'Login',
+  } = props;
+
+  const classes = {
+    ...cls('tapas-navbar', {
+      position: 'sticky', top: '0', 'z-index': '50',
+      background: '#ffffff',
+      'border-bottom': '1px solid #E5E7EB',
+      display: 'flex', 'align-items': 'center',
+      'justify-content': 'space-between',
+      padding: '14px clamp(20px, 5vw, 48px)',
+      'font-family': 'Inter, -apple-system, sans-serif',
+    }),
+    ...cls('tapas-navbar-logo', {
+      'font-family': 'var(--tapas-heading-font, Newsreader, serif)',
+      'font-size': '22px', 'font-weight': '700',
+      color: INK, 'text-decoration': 'none',
+      'letter-spacing': '0.01em',
+    }),
+    ...cls('tapas-navbar-links', {
+      display: 'flex', gap: '28px', 'align-items': 'center',
+      'list-style': 'none', margin: '0', padding: '0',
+    }),
+    ...cls('tapas-navbar-link', {
+      color: INK, 'text-decoration': 'none',
+      'font-size': '14px', 'font-weight': '500',
+    }),
+    ...cls('tapas-navbar-toggle', {
+      display: 'none', background: 'transparent', border: 'none',
+      cursor: 'pointer', padding: '8px', color: INK,
+      'font-size': '20px',
+    }),
+  };
+
+  const linkItems = (links || []).map((l) =>
+    makeNode({
+      tag: 'li',
+      children: [
+        makeNode({
+          tag: 'a', classes: ['tapas-navbar-link'],
+          attributes: { href: l.href || '/' },
+          textContent: l.label || 'Link',
+        }),
+      ],
+    })
+  );
+
+  // Login/CTA appended to the links list so the whole row shares the
+  // same mobile collapse.
+  if (login_label) {
+    linkItems.push(
+      makeNode({
+        tag: 'li',
+        children: [
+          makeNode({
+            tag: 'a', classes: ['tapas-navbar-link'],
+            attributes: { href: '/login' },
+            textContent: login_label,
+          }),
+        ],
+      })
+    );
+  }
+
+  const root = makeNode({
+    tag: 'nav', classes: ['tapas-navbar'],
+    attributes: { 'data-tapas-navbar': '' },
+    children: [
+      makeNode({
+        tag: 'a', classes: ['tapas-navbar-logo'],
+        attributes: { href: '/' },
+        textContent: logo_emoji ? `${logo_emoji} ${brand_name}` : brand_name,
+      }),
+      makeNode({
+        tag: 'ul', classes: ['tapas-navbar-links'],
+        children: linkItems,
+      }),
+      makeNode({
+        tag: 'button', classes: ['tapas-navbar-toggle'],
+        attributes: { 'data-tapas-navbar-toggle': '', 'aria-label': 'Open menu' },
+        textContent: '☰',
+      }),
+    ],
+  });
+
+  return { root, classes };
+}
+
+// ---- Footer ---------------------------------------------------------
+// Site-wide footer, compiled into the per-page tree. Four columns of
+// links + a copyright bar. Matches the 'classic' v1 template.
+
+function compileTapasFooter(props = {}) {
+  const {
+    tagline = '',
+    brand_name = 'TAPAS',
+    copyright_text = 'All rights reserved.',
+    quick_links_heading = 'Quick Links',
+    contact_heading = 'Contact',
+    hours_heading = 'Opening Hours',
+    columns = [
+      { heading: 'Shop',  links: [
+        { label: 'All books', href: '/books' },
+        { label: 'New arrivals', href: '/books?sort=new' },
+        { label: 'Offers', href: '/offers' },
+      ] },
+      { heading: 'About', links: [
+        { label: 'Our story', href: '/about' },
+        { label: 'Events',    href: '/events' },
+        { label: 'Blog',      href: '/blog' },
+      ] },
+      { heading: 'Visit', links: [
+        { label: 'Contact',  href: '/contact' },
+        { label: 'Hours',    href: '/about#hours' },
+      ] },
+    ],
+  } = props;
+
+  const classes = {
+    ...cls('tapas-footer', {
+      background: '#1F1F1F', color: '#E5E7EB',
+      padding: 'clamp(48px, 7vw, 96px) clamp(20px, 5vw, 48px) 32px',
+    }),
+    ...cls('tapas-footer-cols', {
+      'max-width': '1180px', margin: '0 auto',
+      display: 'grid',
+      'grid-template-columns': 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '48px',
+      'padding-bottom': '36px',
+      'border-bottom': '1px solid #333',
+    }),
+    ...cls('tapas-footer-col', {
+      display: 'flex', 'flex-direction': 'column', gap: '14px',
+    }),
+    ...cls('tapas-footer-heading', {
+      'font-size': '13px', 'font-weight': '700',
+      'letter-spacing': '0.1em', 'text-transform': 'uppercase',
+      color: '#ffffff', margin: '0 0 4px 0',
+    }),
+    ...cls('tapas-footer-link', {
+      color: '#A0A0A0', 'text-decoration': 'none',
+      'font-size': '14px', 'line-height': '1.8',
+    }),
+    ...cls('tapas-footer-copyright', {
+      'max-width': '1180px', margin: '28px auto 0',
+      display: 'flex', 'justify-content': 'space-between',
+      'flex-wrap': 'wrap', gap: '12px',
+      color: '#6A6A6A', 'font-size': '12px',
+    }),
+  };
+
+  const columnNodes = (columns || []).map((col) =>
+    makeNode({
+      tag: 'div', classes: ['tapas-footer-col'],
+      children: [
+        makeNode({
+          tag: 'h4', classes: ['tapas-footer-heading'],
+          textContent: col.heading || '',
+        }),
+        ...((col.links || []).map((l) =>
+          makeNode({
+            tag: 'a', classes: ['tapas-footer-link'],
+            attributes: { href: l.href || '/' },
+            textContent: l.label || '',
+          })
+        )),
+      ],
+    })
+  );
+
+  // Prepend a brand/tagline column if tagline is set.
+  if (tagline || brand_name) {
+    columnNodes.unshift(
+      makeNode({
+        tag: 'div', classes: ['tapas-footer-col'],
+        children: [
+          makeNode({
+            tag: 'h4', classes: ['tapas-footer-heading'],
+            textContent: brand_name,
+          }),
+          tagline
+            ? makeNode({
+                tag: 'p', classes: ['tapas-footer-link'],
+                textContent: tagline,
+              })
+            : null,
+        ].filter(Boolean),
+      })
+    );
+  }
+
+  const year = new Date().getFullYear();
+  const root = makeNode({
+    tag: 'footer', classes: ['tapas-footer'],
+    children: [
+      makeNode({
+        tag: 'div', classes: ['tapas-footer-cols'],
+        children: columnNodes,
+      }),
+      makeNode({
+        tag: 'div', classes: ['tapas-footer-copyright'],
+        children: [
+          makeNode({
+            tag: 'span',
+            textContent: `© ${year} ${brand_name}. ${copyright_text}`,
+          }),
+        ],
+      }),
+    ],
+  });
+
+  // Classes referenced by hidden headings so callers can override them
+  // without re-plumbing — kept to match the spec's named class list.
+  void quick_links_heading; void contact_heading; void hours_heading;
+
+  return { root, classes };
+}
+
 function compilePlaceholder(block) {
   const classes = cls('tapas-compile-placeholder', {
     padding: '40px 20px', background: '#FEF3C7',
@@ -724,7 +961,136 @@ const COMPILERS = {
   tapas_newsletter:   compileTapasNewsletter,
   tapas_section:      compileTapasSection,
   tapas_group:        compileTapasGroup,
+  // v1 block-level navbar / footer overrides. The default site-wide
+  // chrome lives outside page blocks (see scripts/migrateNavFooter.mjs);
+  // these handle the rare per-page override case.
+  navbar:             compileTapasNavbar,
+  footer:             compileTapasFooter,
+  tapas_navbar:       compileTapasNavbar,
+  tapas_footer:       compileTapasFooter,
 };
+
+// Export defaults so the nav/footer migration script can reuse them.
+export { compileTapasNavbar, compileTapasFooter };
+
+// =====================================================================
+// ensureSiteDefaults
+//
+// Runs on every editor load (see WebsiteEditor.js) so staff don't have
+// to remember the migration script. Two guarantees:
+//
+//   1. Every standard page exists (home, catalog, about, offers,
+//      contact, blog, events). Missing ones are minted with an empty
+//      body that the self-heal then populates with navbar + footer.
+//   2. Every page's tree starts with a tapas-navbar and ends with a
+//      tapas-footer. Classes merge additively (existing wins) so
+//      user customisations aren't clobbered.
+//
+// Idempotent — re-running against already-healed content returns the
+// same reference identity so autosave can diff and skip the write.
+// =====================================================================
+
+const STANDARD_PAGES = [
+  { key: 'home',    slug: '/',         name: 'Home' },
+  { key: 'catalog', slug: '/catalog',  name: 'Catalog' },
+  { key: 'about',   slug: '/about',    name: 'About' },
+  { key: 'offers',  slug: '/offers',   name: 'Offers' },
+  { key: 'contact', slug: '/contact',  name: 'Contact' },
+  { key: 'blog',    slug: '/blog',     name: 'Blog' },
+  { key: 'events',  slug: '/events',   name: 'Events' },
+];
+
+// Previously walked the full subtree, which meant a nested
+// `tapas-navbar` class buried inside a slider satisfied the check
+// and the heal skipped seeding the real chrome. Now strict: looks
+// at a single child node (first for navbar, last for footer).
+function childHasClass(child, name) {
+  return !!child
+    && Array.isArray(child.classes)
+    && child.classes.includes(name);
+}
+
+function seedPage({ key, slug, name, brandName }) {
+  return {
+    id: `p_${key}`,
+    name,
+    slug,
+    tree: makeNode({
+      id: `body_${key}`,
+      tag: 'body',
+      children: [],
+    }),
+    meta: {
+      title: name, description: '', og_image: '',
+      canonical_url: '', robots_noindex: false,
+    },
+  };
+}
+
+export function ensureSiteDefaults(content) {
+  if (!content || typeof content !== 'object') return content;
+
+  const brandName = content.brand?.name || 'TAPAS';
+  const navProps    = { brand_name: brandName };
+  const footerProps = { brand_name: brandName };
+
+  let nextPages = content.pages || {};
+  let nextClasses = content.classes || {};
+  let mutated = false;
+
+  // Step 1: seed the standard page set ONLY when the content has no
+  // pages at all. Once the site has been initialised, missing
+  // individual pages stay missing — staff might have deleted them on
+  // purpose and we'd be "possessing" the editor by re-seeding them
+  // on every reload.
+  if (Object.keys(nextPages).length === 0) {
+    nextPages = {};
+    for (const def of STANDARD_PAGES) {
+      nextPages[def.key] = seedPage({ ...def, brandName });
+    }
+    mutated = true;
+  }
+
+  // Step 2: each page gets a navbar + footer if missing.
+  for (const [key, page] of Object.entries(nextPages)) {
+    if (!page?.tree || !Array.isArray(page.tree.children)) continue;
+
+    const kids = page.tree.children;
+    const needsNav    = !childHasClass(kids[0], 'tapas-navbar');
+    const needsFooter = !childHasClass(kids[kids.length - 1], 'tapas-footer');
+    if (!needsNav && !needsFooter) continue;
+
+    if (!mutated) {
+      nextPages = { ...nextPages };
+      nextClasses = { ...nextClasses };
+      mutated = true;
+    }
+    const newChildren = page.tree.children.slice();
+
+    if (needsNav) {
+      const { root, classes } = compileTapasNavbar(navProps);
+      newChildren.unshift(root);
+      for (const [k, def] of Object.entries(classes)) {
+        if (!nextClasses[k]) nextClasses[k] = def;
+      }
+    }
+    if (needsFooter) {
+      const { root, classes } = compileTapasFooter(footerProps);
+      newChildren.push(root);
+      for (const [k, def] of Object.entries(classes)) {
+        if (!nextClasses[k]) nextClasses[k] = def;
+      }
+    }
+
+    nextPages[key] = {
+      ...page,
+      tree: { ...page.tree, children: newChildren },
+    };
+  }
+
+  if (!mutated) return content;
+  return { ...content, pages: nextPages, classes: nextClasses };
+}
 
 // Compile a single block to a { root, classes } bundle.
 export function compileBlock(block) {

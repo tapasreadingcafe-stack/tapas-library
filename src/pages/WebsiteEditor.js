@@ -18,18 +18,30 @@ import { supabase } from '../utils/supabase';
 import { Node as TreeNode } from './WebsiteEditor.node';
 import { compileClassesToCSS } from './WebsiteEditor.css';
 import {
-  flattenTree, pathToNode, findNode, parentOf, firstChildOf,
-  prevInFlat, nextInFlat, labelOf,
+  flattenTree, pathToNode, findNode, findNodeIn, buildNodeIndex,
+  parentOf, firstChildOf, prevInFlat, nextInFlat, labelOf,
 } from './WebsiteEditor.tree';
 import {
   ensureNodeClass, setClassStyle, setClassBreakpointStyle, renameClass,
   setNodeTag, setNodeAttribute, renameNodeAttribute, setNodeTextContent,
+  setNodeRuns,
   insertNode, duplicateNode, removeNode,
   insertNodeAfter, insertNodeBefore,
   cloneWithFreshIds, siblingOf,
   createPage, updatePageMeta, deletePage, renamePage,
   classUsageMap, deleteClass, deleteUnusedClasses,
+  saveAsComponent, detachComponent, insertComponentInstance,
+  renameComponent, deleteComponent, componentUsage,
+  getEffectivePage, componentScopeKey,
 } from './WebsiteEditor.mutations';
+import {
+  FloatingTextToolbar, toggleMark, clearFormatting, applyLink,
+} from './WebsiteEditor.richtext';
+import {
+  compileTimeline, parseTimelineAttr, timelineAttrName,
+  driveTimeline,
+} from './WebsiteEditor.timeline';
+import { ensureSiteDefaults } from '../editor/compileBlocksToTree';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
 import StylePanel from './WebsiteEditor.style';
@@ -39,6 +51,15 @@ import InteractionsPanel from './WebsiteEditor.interactions';
 import PagePanel from './WebsiteEditor.page';
 import PagesPanel from './WebsiteEditor.pages';
 import ClassBrowser from './WebsiteEditor.classes';
+import {
+  InteractionsListPanel,
+  VariablesPanel, EcommercePanel,
+  SiteSettingsPanel, SearchPanel, HelpPanel, CommandPalette,
+} from './WebsiteEditor.stubs';
+import AssetsPanel from './WebsiteEditor.assets';
+import ComponentsPanel from './WebsiteEditor.components';
+import CMSPanel from './WebsiteEditor.cms';
+import AccessibilityPanel from './WebsiteEditor.a11y';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -71,7 +92,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -136,6 +157,22 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
       </div>
       {/* Right cluster */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 12px' }}>
+        {unsavedCount > 0 && (
+          <span
+            title="Edits pending autosave — saved within 900ms of your last change"
+            style={{
+              padding: '2px 8px',
+              background: 'rgba(20, 110, 245, 0.12)',
+              color: W.accent,
+              border: `1px solid ${W.accent}`,
+              borderRadius: '999px',
+              fontSize: '10.5px', fontWeight: 600,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {unsavedCount} unsaved {unsavedCount === 1 ? 'edit' : 'edits'}
+          </span>
+        )}
         <select
           value={page}
           onChange={(e) => onPageChange(e.target.value)}
@@ -216,6 +253,7 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
 // =====================================================================
 // Left rail  —  spec § 1: 48 px icon strip, #146ef5 active accent
 // =====================================================================
+// Webflow-parity 13-icon rail. Order matches the spec.
 const RAIL_ICONS = [
   { key: 'add',          label: 'Add',          glyph: '+' },
   { key: 'pages',        label: 'Pages',        glyph: '▤' },
@@ -227,10 +265,9 @@ const RAIL_ICONS = [
   { key: 'variables',    label: 'Variables',    glyph: 'V' },
   { key: 'cms',          label: 'CMS',          glyph: '▦' },
   { key: 'ecommerce',    label: 'Ecommerce',    glyph: '$' },
-  { key: 'accounts',     label: 'Accounts',     glyph: '◉' },
-  { key: 'apps',         label: 'Apps',         glyph: '▥' },
 ];
 const RAIL_FOOTER = [
+  { key: 'a11y',     label: 'Accessibility', glyph: '♿' },
   { key: 'settings', label: 'Settings', glyph: '⚙' },
   { key: 'search',   label: 'Search',   glyph: '⌕' },
   { key: 'help',     label: 'Help',     glyph: '?' },
@@ -367,6 +404,21 @@ const DEVICES = [
   { key: 'mobileP',  label: 'Mobile P', width: '375px',  glyph: '▯' },
 ];
 
+// Grid / flex overlay CSS. Activates only on elements carrying
+// data-tapas-grid-overlay (the scanning useEffect sets it whenever
+// the toolbar ▦ toggle is on). Draws a subtle accent-colored outline
+// on direct children so staff see cell boundaries.
+const GRID_OVERLAY_CSS = `
+[data-tapas-grid-overlay] {
+  outline: 1px dashed rgba(20, 110, 245, 0.55);
+  outline-offset: -1px;
+}
+[data-tapas-grid-overlay] > * {
+  outline: 1px dashed rgba(20, 110, 245, 0.35);
+  outline-offset: -1px;
+}
+`;
+
 // Tags the Node renderer treats as void — a drop INSIDE them is
 // nonsensical, so the drag handler rewrites "inside" to before/after
 // when the cursor is over one of these.
@@ -375,18 +427,43 @@ const VOID_DROP_TAGS = new Set([
   'area', 'embed', 'iframe',
 ]);
 
+// Escape a value so it can be embedded inside
+// `[data-tapas-node-id="…"]` selectors without breaking out of the
+// attribute context. Current node ids come from newId() (alphanumeric
+// + underscore), so this is mostly insurance against ids pasted from
+// other systems or future schema changes. Inside a quoted attribute
+// value selector only "\" and '"' need escaping.
+function escapeAttrValue(v) {
+  return String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function Canvas({
   tree, classes, selectedId, onSelect, device, onDeviceChange,
-  onDropBlock,
-  editingNodeId, onStartEdit, onCommitEdit, onCancelEdit,
+  onDropBlock, onDropAsset,
+  editingNodeId, onStartEdit, onCommitEdit, onCommitRuns, onCancelEdit,
+  editableRef, components, onContextMenu, previewSliderId,
 }) {
   const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
   const [hoverId, setHoverId] = useState(null);
   const [dropHover, setDropHover] = useState(null); // { targetId, position }
+  // Preview interactions — when on, the editor canvas installs the
+  // runtime for scroll-drive + mouse triggers so staff can sanity-
+  // check parallax / tilt effects. Off by default because drive
+  // triggers on the hovered element make it impossible to style
+  // (the element tilts away every time you try to click it).
+  const [previewInteractions, setPreviewInteractions] = useState(false);
+  // Grid overlay — when on, the canvas injects outlines on direct
+  // children of every element whose computed display is `grid` or
+  // `flex`. Lets staff see row + column layout without inspecting
+  // DOM. Toolbar ▦ button toggles it.
+  const [gridOverlay, setGridOverlay] = useState(false);
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
   const surfaceRef = useRef(null);
+  // Overlays (selection outline, drop indicator) are mounted inside
+  // this ref so they share the zoomed canvas's coord space.
+  const canvasInnerRef = useRef(null);
 
   // Phase-8 runtime. For every element with data-tapas-anim:
   //   - mirror its timing data-* attributes into CSS variables so
@@ -508,18 +585,118 @@ function Canvas({
       loadEls.forEach((el) => el.setAttribute('data-tapas-load-in', ''));
     });
 
+    // --- Phase G timelines ---------------------------------------
+    // Scroll-into-view timelines: compile once, reset to initial so
+    // elements don't flash their final state, then play when the
+    // observer first intersects the viewport.
+    const timelineControllers = [];
+    const scrollTimelineEls = surface.querySelectorAll('[data-tapas-timeline-scroll]');
+    let timelineIo = null;
+    if (scrollTimelineEls.length && typeof IntersectionObserver !== 'undefined') {
+      scrollTimelineEls.forEach((el) => {
+        const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll'));
+        if (!steps.length) return;
+        const ctrl = compileTimeline(steps, el, { resetToInitial: true });
+        el.__tapasTimelineCtrl = ctrl;
+        timelineControllers.push(ctrl);
+      });
+      timelineIo = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.__tapasTimelineCtrl?.play();
+          timelineIo.unobserve(e.target);
+        }
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      scrollTimelineEls.forEach((el) => {
+        if (el.__tapasTimelineCtrl) timelineIo.observe(el);
+      });
+    }
+
+    // Page-load timelines fire once on the next frame, after the
+    // reset-to-initial paint so the transition is visible.
+    const loadTimelineEls = surface.querySelectorAll('[data-tapas-timeline-load]');
+    const loadTimelineCtrls = [];
+    loadTimelineEls.forEach((el) => {
+      const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-load'));
+      if (!steps.length) return;
+      const ctrl = compileTimeline(steps, el, { resetToInitial: true });
+      loadTimelineCtrls.push(ctrl);
+      timelineControllers.push(ctrl);
+    });
+    const loadTimelineFrame = requestAnimationFrame(() => {
+      loadTimelineCtrls.forEach((ctrl) => ctrl.play());
+    });
+
+    // --- Phase H drive triggers ----------------------------------
+    // scroll-drive and mouse triggers are continuous — they install
+    // rAF loops and listener cleanup functions instead of playing
+    // once. Gated behind the Preview-interactions toolbar button:
+    // running them by default means a mouse-tilt card tilts away
+    // whenever staff hover it to click, which makes editing
+    // impossible. Opt-in previewing is the saner default.
+    const driveCleanups = [];
+    if (previewInteractions) {
+      surface.querySelectorAll('[data-tapas-timeline-scroll-drive]').forEach((el) => {
+        const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-scroll-drive'));
+        if (steps.length) driveCleanups.push(driveTimeline('scroll-drive', steps, el));
+      });
+      surface.querySelectorAll('[data-tapas-timeline-mouse]').forEach((el) => {
+        const steps = parseTimelineAttr(el.getAttribute('data-tapas-timeline-mouse'));
+        if (steps.length) driveCleanups.push(driveTimeline('mouse', steps, el));
+      });
+    }
+
     return () => {
       if (io) io.disconnect();
+      if (timelineIo) timelineIo.disconnect();
       surface.removeEventListener('click', onSurfaceClick);
       surface.removeEventListener('animationend', onAnimEnd);
       cancelAnimationFrame(loadFrame);
+      cancelAnimationFrame(loadTimelineFrame);
+      timelineControllers.forEach((ctrl) => ctrl.cancel());
+      driveCleanups.forEach((fn) => fn());
     };
-  }, [tree]);
+  }, [tree, previewInteractions]);
+
+  // Grid / flex overlay — toolbar ▦. Walk the rendered DOM, tag
+  // containers whose computed display is grid/flex, and let CSS
+  // outline their children. Runs on every tree change *and* on
+  // toggle; on unmount / toggle-off we strip the tags so the outlines
+  // disappear cleanly.
+  useEffect(() => {
+    if (!surfaceRef.current) return undefined;
+    const surface = surfaceRef.current;
+    if (!gridOverlay) {
+      surface.querySelectorAll('[data-tapas-grid-overlay]').forEach((el) => {
+        el.removeAttribute('data-tapas-grid-overlay');
+      });
+      return undefined;
+    }
+    const nodes = surface.querySelectorAll('[data-tapas-node-id]');
+    const tagged = [];
+    nodes.forEach((el) => {
+      const disp = window.getComputedStyle(el).display;
+      if (disp === 'grid' || disp === 'flex' || disp === 'inline-grid' || disp === 'inline-flex') {
+        el.setAttribute('data-tapas-grid-overlay', '');
+        tagged.push(el);
+      }
+    });
+    return () => {
+      tagged.forEach((el) => el.removeAttribute('data-tapas-grid-overlay'));
+    };
+  }, [tree, gridOverlay]);
 
   // Walk from the event target up to the nearest node element, then
   // classify the cursor's vertical band into before / after / inside.
   // Returns null if the cursor isn't over any node (drop falls back
   // to append-to-root in the caller).
+  //
+  // Void tags (img, input, br, hr, video, iframe, …) can't carry
+  // children, so hovering one anchors the drop to its *parent*
+  // with a before/after position relative to the void element's
+  // bounds — that way the indicator never claims "inside" for a
+  // target that couldn't accept it, and the user sees a meaningful
+  // preview (a thin bar at the side of the image / input).
   const classifyDropTarget = (e) => {
     let el = e.target;
     while (el && el !== e.currentTarget) {
@@ -527,27 +704,44 @@ function Canvas({
       el = el.parentElement;
     }
     if (!el || el === e.currentTarget) return null;
+    const tag = el.tagName.toLowerCase();
+    if (VOID_DROP_TAGS.has(tag)) {
+      // Anchor to the parent node so "inside" can never happen; the
+      // side of the void element the cursor is on decides before vs
+      // after.
+      let parent = el.parentElement;
+      while (parent && parent !== e.currentTarget) {
+        if (parent.dataset?.tapasNodeId) break;
+        parent = parent.parentElement;
+      }
+      if (!parent || parent === e.currentTarget) return null;
+      const rect = el.getBoundingClientRect();
+      if (!rect.height) return null;
+      const relY = (e.clientY - rect.top) / rect.height;
+      // Use the void element's own rect as the visual anchor target
+      // so the indicator draws beside the image / input.
+      return {
+        targetId: el.dataset.tapasNodeId,
+        position: relY < 0.5 ? 'before' : 'after',
+      };
+    }
     const rect = el.getBoundingClientRect();
     if (!rect.height) return null;
     const relY = (e.clientY - rect.top) / rect.height;
-    const tag = el.tagName.toLowerCase();
-    const isVoid = VOID_DROP_TAGS.has(tag);
     let position;
-    if (isVoid) position = relY < 0.5 ? 'before' : 'after';
-    else if (relY < 0.25)      position = 'before';
-    else if (relY > 0.75)      position = 'after';
-    else                       position = 'inside';
+    if (relY < 0.25)      position = 'before';
+    else if (relY > 0.75) position = 'after';
+    else                  position = 'inside';
     return { targetId: el.dataset.tapasNodeId, position };
   };
 
   const handleDragOver = (e) => {
-    // Only accept drops carrying our custom type — other drag payloads
-    // (text selection, file drop) pass through.
-    const types = e.dataTransfer?.types;
-    if (!types || !(types.contains ? types.contains('application/x-tapas-block') : Array.from(types).includes('application/x-tapas-block'))) {
-      // Firefox's DataTransferItemList has contains(); Chrome has an array.
-      if (!Array.from(types || []).includes('application/x-tapas-block')) return;
-    }
+    // Accept drops carrying either a block-catalogue key (AddPanel) or
+    // an asset-library payload (AssetsPanel). Other drags pass through.
+    const types = Array.from(e.dataTransfer?.types || []);
+    const accepts = types.includes('application/x-tapas-block')
+                 || types.includes('application/x-tapas-asset');
+    if (!accepts) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     const next = classifyDropTarget(e);
@@ -562,11 +756,19 @@ function Canvas({
 
   const handleDrop = (e) => {
     e.preventDefault();
+    const assetData = e.dataTransfer.getData('application/x-tapas-asset');
     const blockKey =
       e.dataTransfer.getData('application/x-tapas-block') ||
-      e.dataTransfer.getData('text/plain');
+      (!assetData ? e.dataTransfer.getData('text/plain') : '');
     const target = dropHover;
     setDropHover(null);
+    if (assetData) {
+      try {
+        const payload = JSON.parse(assetData);
+        onDropAsset?.(payload, target?.targetId ?? null, target?.position ?? 'append');
+      } catch { /* malformed — ignore */ }
+      return;
+    }
     if (!blockKey) return;
     if (!target) { onDropBlock?.(blockKey, null, 'append'); return; }
     onDropBlock?.(blockKey, target.targetId, target.position);
@@ -616,8 +818,29 @@ function Canvas({
           >+</button>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={toolbarBtn(W)} title="Preview">◉</button>
-        <button style={toolbarBtn(W)} title="Grid overlay">▦</button>
+        <button
+          onClick={() => setPreviewInteractions((p) => !p)}
+          title={previewInteractions ? 'Interactions running — click to pause' : 'Preview interactions (runs scroll-drive + mouse triggers)'}
+          style={{
+            ...toolbarBtn(W),
+            background: previewInteractions ? W.accentDim : 'transparent',
+            color:      previewInteractions ? W.accent    : W.textDim,
+            border: `1px solid ${previewInteractions ? W.accent : 'transparent'}`,
+            width: 'auto', padding: '0 8px',
+          }}
+        >
+          {previewInteractions ? '◼ Preview on' : '▶ Preview'}
+        </button>
+        <button
+          onClick={() => setGridOverlay((g) => !g)}
+          title={gridOverlay ? 'Hide grid / flex outlines' : 'Show grid / flex outlines'}
+          style={{
+            ...toolbarBtn(W),
+            background: gridOverlay ? W.accentDim : 'transparent',
+            color:      gridOverlay ? W.accent    : W.textDim,
+            border: `1px solid ${gridOverlay ? W.accent : 'transparent'}`,
+          }}
+        >▦</button>
       </div>
       {/* Canvas surface */}
       <div
@@ -631,15 +854,18 @@ function Canvas({
           padding: '24px',
         }}
       >
-        <div style={{
-          width: vp.width, maxWidth: '100%',
-          transform: `scale(${zoom / 100})`, transformOrigin: 'top center',
-          background: '#fff', minHeight: '80vh',
-          boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)',
-          transition: 'width 0.15s ease',
-          position: 'relative',
-        }}>
-          <style>{ANIM_CSS}{cssText}</style>
+        <div
+          ref={canvasInnerRef}
+          style={{
+            width: vp.width, maxWidth: '100%',
+            transform: `scale(${zoom / 100})`, transformOrigin: 'top center',
+            background: '#fff', minHeight: '80vh',
+            boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)',
+            transition: 'width 0.15s ease',
+            position: 'relative',
+          }}
+        >
+          <style>{ANIM_CSS}{cssText}{GRID_OVERLAY_CSS}</style>
           <CanvasSelectionShell
             tree={tree}
             selectedId={selectedId}
@@ -648,30 +874,37 @@ function Canvas({
             editingNodeId={editingNodeId}
             onStartEdit={onStartEdit}
             onCommitText={onCommitEdit}
+            onCommitRuns={onCommitRuns}
             onCancelEdit={onCancelEdit}
+            editableRef={editableRef}
+            components={components}
+            onContextMenu={onContextMenu}
+            previewSliderId={previewSliderId}
+          />
+          {/* Overlays live *inside* the zoomed canvas so they share
+              the same coord space as the rendered tree. Using
+              element.offsetTop / offsetLeft (unscaled CSS pixels
+              relative to the canvas inner div) means the outlines
+              stay pixel-perfect at every zoom level. While an
+              inline edit is active, both overlays hide so they
+              don't obscure the caret. */}
+          <SelectionOverlay
+            targetId={editingNodeId ? null : selectedId}
+            rootRef={canvasInnerRef}
+            tree={tree}
+            kind="selected"
+          />
+          <SelectionOverlay
+            targetId={!editingNodeId && hoverId && hoverId !== selectedId ? hoverId : null}
+            rootRef={canvasInnerRef}
+            tree={tree}
+            kind="hover"
+          />
+          <DropIndicator
+            drop={dropHover}
+            rootRef={canvasInnerRef}
           />
         </div>
-        {/* Overlays live in surface space so they scroll with the
-            canvas. Rect measurements already account for the zoom
-            transform because getBoundingClientRect returns visual
-            pixels. While an inline edit is active, both overlays
-            hide so they don't obscure the caret. */}
-        <SelectionOverlay
-          targetId={editingNodeId ? null : selectedId}
-          surfaceRef={surfaceRef}
-          tree={tree}
-          kind="selected"
-        />
-        <SelectionOverlay
-          targetId={!editingNodeId && hoverId && hoverId !== selectedId ? hoverId : null}
-          surfaceRef={surfaceRef}
-          tree={tree}
-          kind="hover"
-        />
-        <DropIndicator
-          drop={dropHover}
-          surfaceRef={surfaceRef}
-        />
       </div>
     </div>
   );
@@ -684,41 +917,51 @@ function Canvas({
 // surface-local coords. Re-measures on scroll, resize, and whenever the
 // target changes.
 // =====================================================================
-function SelectionOverlay({ targetId, surfaceRef, tree, kind }) {
+function SelectionOverlay({ targetId, rootRef, tree, kind }) {
   const [rect, setRect] = useState(null);
   const [nodeLabel, setNodeLabel] = useState('');
 
   const measure = useCallback(() => {
-    if (!targetId || !surfaceRef.current) { setRect(null); return; }
-    const el = surfaceRef.current.querySelector(
-      `[data-tapas-node-id="${targetId}"]`
+    if (!targetId || !rootRef?.current) { setRect(null); return; }
+    const root = rootRef.current;
+    const el = root.querySelector(
+      `[data-tapas-node-id="${escapeAttrValue(targetId)}"]`
     );
     if (!el) { setRect(null); return; }
-    const er = el.getBoundingClientRect();
-    const sr = surfaceRef.current.getBoundingClientRect();
-    setRect({
-      top: er.top - sr.top + surfaceRef.current.scrollTop,
-      left: er.left - sr.left + surfaceRef.current.scrollLeft,
-      width: er.width,
-      height: er.height,
-    });
+    // offsetLeft / offsetTop are unscaled CSS pixels relative to the
+    // nearest positioned ancestor. The canvas inner div is position:
+    // relative, so these stay accurate at every zoom level. Walk up
+    // manually in case an offsetParent boundary (e.g. a transformed
+    // composite) sits between the element and the root.
+    let top = 0, left = 0;
+    let cur = el;
+    while (cur && cur !== root) {
+      top  += cur.offsetTop;
+      left += cur.offsetLeft;
+      cur = cur.offsetParent;
+    }
+    setRect({ top, left, width: el.offsetWidth, height: el.offsetHeight });
     const n = findNode(tree, targetId);
     setNodeLabel(n ? labelOf(n) : '');
-  }, [targetId, surfaceRef, tree]);
+  }, [targetId, rootRef, tree]);
 
   useLayoutEffect(() => { measure(); }, [measure]);
 
   useEffect(() => {
     if (!targetId) return;
-    const surface = surfaceRef.current;
-    if (!surface) return;
+    const root = rootRef?.current;
+    if (!root) return;
     const onScroll = () => measure();
-    surface.addEventListener('scroll', onScroll);
+    // Scroll happens on the outer surface, not the inner canvas —
+    // but offset-based math is unaffected by scroll. Listen anyway
+    // so re-measures happen if layout shifts (e.g. lazy images
+    // finish loading while the user is scrolled).
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', measure);
     // Re-measure after layout settles — fonts, images, etc.
     const t = setTimeout(measure, 50);
     return () => {
-      surface.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', measure);
       clearTimeout(t);
     };
@@ -729,20 +972,28 @@ function SelectionOverlay({ targetId, surfaceRef, tree, kind }) {
   const color = '#146ef5';
   const isSelected = kind === 'selected';
 
+  // Body-root selection is a special case — drawing a 1px outline
+  // around the entire page makes it visually noisy and near-invisible
+  // at the top + left corners. Show only the label chip so the user
+  // still gets confirmation that the root is selected.
+  const isBodyRoot = !!(tree && targetId && tree.id === targetId);
+
   return (
     <>
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: rect.top, left: rect.left,
-          width: rect.width, height: rect.height,
-          outline: `1px ${isSelected ? 'solid' : 'dashed'} ${color}`,
-          outlineOffset: '-1px',
-          pointerEvents: 'none',
-          zIndex: 10,
-        }}
-      />
+      {!isBodyRoot && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: rect.top, left: rect.left,
+            width: rect.width, height: rect.height,
+            outline: `1px ${isSelected ? 'solid' : 'dashed'} ${color}`,
+            outlineOffset: '-1px',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        />
+      )}
       {isSelected && (
         <div
           aria-hidden
@@ -783,24 +1034,25 @@ function toolbarBtn(W) {
 //   inside         → blue dashed outline over the whole target rect
 // Measures identically to SelectionOverlay so coordinates account for
 // canvas zoom and scroll.
-function DropIndicator({ drop, surfaceRef }) {
+function DropIndicator({ drop, rootRef }) {
   const [rect, setRect] = useState(null);
 
   useLayoutEffect(() => {
-    if (!drop?.targetId || !surfaceRef.current) { setRect(null); return; }
-    const el = surfaceRef.current.querySelector(
-      `[data-tapas-node-id="${drop.targetId}"]`
+    if (!drop?.targetId || !rootRef?.current) { setRect(null); return; }
+    const root = rootRef.current;
+    const el = root.querySelector(
+      `[data-tapas-node-id="${escapeAttrValue(drop.targetId)}"]`
     );
     if (!el) { setRect(null); return; }
-    const er = el.getBoundingClientRect();
-    const sr = surfaceRef.current.getBoundingClientRect();
-    setRect({
-      top: er.top - sr.top + surfaceRef.current.scrollTop,
-      left: er.left - sr.left + surfaceRef.current.scrollLeft,
-      width: er.width,
-      height: er.height,
-    });
-  }, [drop, surfaceRef]);
+    let top = 0, left = 0;
+    let cur = el;
+    while (cur && cur !== root) {
+      top  += cur.offsetTop;
+      left += cur.offsetLeft;
+      cur = cur.offsetParent;
+    }
+    setRect({ top, left, width: el.offsetWidth, height: el.offsetHeight });
+  }, [drop, rootRef]);
 
   if (!drop || !rect) return null;
   const color = '#146ef5';
@@ -843,7 +1095,8 @@ function DropIndicator({ drop, surfaceRef }) {
 
 function CanvasSelectionShell({
   tree, selectedId, onSelect, onHover,
-  editingNodeId, onStartEdit, onCommitText, onCancelEdit,
+  editingNodeId, onStartEdit, onCommitText, onCommitRuns, onCancelEdit,
+  editableRef, components, onContextMenu, previewSliderId,
 }) {
   const nearestNodeId = (target, stopAt) => {
     let el = target;
@@ -857,7 +1110,17 @@ function CanvasSelectionShell({
     // Clicks inside the editable element are already stopped by
     // EditableText; this only fires for clicks elsewhere on the canvas.
     const id = nearestNodeId(e.target, e.currentTarget);
-    if (id) { onSelect(id); e.preventDefault(); e.stopPropagation(); }
+    if (!id) return;
+    // Alt+Click escalates to the parent of the clicked node — matches
+    // Webflow's "click into parent" escape hatch. Falls back to the
+    // clicked id if no parent exists (e.g. clicking the body root).
+    if (e.altKey) {
+      const parent = parentOf(tree, id);
+      onSelect(parent?.id || id);
+    } else {
+      onSelect(id);
+    }
+    e.preventDefault(); e.stopPropagation();
   };
   const onDoubleClick = (e) => {
     // Double-click enters inline edit mode. Only text-leaf-ish nodes
@@ -873,14 +1136,28 @@ function CanvasSelectionShell({
     if (onHover) onHover(id);
   };
   const onMouseLeave = () => { if (onHover) onHover(null); };
+  const onRightClick = (e) => {
+    if (!onContextMenu) return;
+    const id = nearestNodeId(e.target, e.currentTarget);
+    if (id) {
+      e.preventDefault();
+      e.stopPropagation();
+      onSelect(id);
+      onContextMenu(id, e.clientX, e.clientY);
+    }
+  };
   return (
-    <div onClick={onClick} onDoubleClick={onDoubleClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave}>
+    <div onClick={onClick} onDoubleClick={onDoubleClick} onMouseOver={onMouseOver} onMouseLeave={onMouseLeave} onContextMenu={onRightClick}>
       <TreeNode
         node={tree}
         selectedId={selectedId}
         editingNodeId={editingNodeId}
         onCommitText={onCommitText}
+        onCommitRuns={onCommitRuns}
         onCancelEdit={onCancelEdit}
+        editableRef={editableRef}
+        components={components}
+        previewSliderId={previewSliderId}
       />
     </div>
   );
@@ -893,10 +1170,14 @@ function CanvasSelectionShell({
 function RightPanel({
   selectedNode, className, classDef,
   state, onStateChange,
-  device,
+  device, onDeviceChange,
   onCreateClass, onRenameClass, onSetStyle,
+  sharedClassNotice,
   onSetTag, onSetAttribute, onRenameAttribute,
   page, pageKey, siteUrl, onUpdatePageMeta,
+  previewSliderId, onTogglePreviewSlider,
+  onPlayTimeline,
+  tree, onSetTextContent,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -952,23 +1233,31 @@ function RightPanel({
             state={state}
             onStateChange={onStateChange}
             device={device}
+            onDeviceChange={onDeviceChange}
             onCreateClass={onCreateClass}
             onRenameClass={onRenameClass}
             onSetStyle={onSetStyle}
+            sharedClassNotice={sharedClassNotice}
           />
         )}
         {tab === 'settings' && (
           <SettingsPanel
             node={selectedNode}
+            pageId={pageKey}
             onSetTag={onSetTag}
             onSetAttribute={onSetAttribute}
             onRenameAttribute={onRenameAttribute}
+            previewSliderId={previewSliderId}
+            onTogglePreviewSlider={onTogglePreviewSlider}
+            tree={tree}
+            onSetTextContent={onSetTextContent}
           />
         )}
         {tab === 'interactions' && (
           <InteractionsPanel
             node={selectedNode}
             onSetAttribute={onSetAttribute}
+            onPlayTimeline={onPlayTimeline}
           />
         )}
         {tab === 'page' && (
@@ -988,6 +1277,12 @@ function RightPanel({
 // Page  —  loads v2 content, wires the four panels together
 // =====================================================================
 const V2_KEY = 'store_content_v2';
+// Bump whenever the content tree shape changes in a way older
+// editor bundles can't read. The load effect warns the user if the
+// row's schema_version exceeds what this build supports, so a
+// newer staff tab doesn't silently clobber fields an older tab
+// will drop on next save.
+const SCHEMA_VERSION = 2;
 
 export default function WebsiteEditor() {
   const [content, setContent] = useState(null);
@@ -996,6 +1291,12 @@ export default function WebsiteEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [pageKey, setPageKey] = useState('home');
+  // When set, the canvas renders the component's definition tree and
+  // every tree edit routes through withPage's component-scope branch
+  // (which rewrites the component def in place). Set via the
+  // Components panel's Edit button; cleared via the Done chip in the
+  // top bar.
+  const [editingComponentId, setEditingComponentId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [railActive, setRailActive] = useState('navigator');
   const [styleState, setStyleState] = useState('base');
@@ -1004,13 +1305,101 @@ export default function WebsiteEditor() {
   // breakpoints.<bp>). Lives on the main editor so the Style panel can
   // read from the right bucket.
   const [device, setDevice] = useState('desktop');
+  // State tabs (None / Hover / Pressed / Focused) are only meaningful
+  // at the Desktop breakpoint because non-desktop writes land in a
+  // flat breakpoints.<bp> bucket that has no per-state slots. When
+  // the user switches to a non-desktop device, collapse state back
+  // to 'base' so subsequent writes can't silently target the wrong
+  // bucket and the Style panel UI matches what's being stored.
+  useEffect(() => {
+    if (device !== 'desktop' && styleState !== 'base') setStyleState('base');
+  }, [device, styleState]);
+
   // Inline text edit. When set, the Node renderer makes that node's
   // element contentEditable and hides the selection/hover overlays so
   // the caret isn't obscured. Commit on blur / Enter, cancel on Esc.
   const [editingNodeId, setEditingNodeId] = useState(null);
+  // Command palette overlay (Cmd+K). Mounted at the editor root so it
+  // overlays everything including the right panel.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Context menu state — { x, y, nodeId }. Opened on right-click via
+  // the CanvasSelectionShell; closed on outside click or Esc.
+  const [contextMenu, setContextMenu] = useState(null);
+  // Phase G — active timeline controller. Kept in a ref so the Play
+  // preview button can cancel the previous run before starting a new
+  // one, and so scroll / load observers can own their own controllers
+  // without stepping on each other.
+  const timelinePreviewRef = useRef(null);
+
+  const handlePlayTimeline = useCallback((triggerKey) => {
+    if (!selectedId || typeof document === 'undefined') return;
+    const el = document.querySelector(`[data-tapas-node-id="${escapeAttrValue(selectedId)}"]`);
+    if (!el) return;
+    const raw = el.getAttribute(timelineAttrName(triggerKey));
+    const steps = parseTimelineAttr(raw);
+    if (steps.length === 0) return;
+    if (timelinePreviewRef.current) {
+      timelinePreviewRef.current.cancel();
+    }
+    const controller = compileTimeline(steps, el, { resetToInitial: true });
+    timelinePreviewRef.current = controller;
+    // Defer one frame so the reset paints before the animation starts,
+    // otherwise the browser may fold the two into a single commit and
+    // the user sees no transition on the first step.
+    requestAnimationFrame(() => controller.play());
+  }, [selectedId]);
+
+  // Phase F — "Preview slider" toggle in the Settings tab. When set
+  // to a slider node's id, the editor canvas swaps that node from
+  // stacked-edit mode into a lightweight runtime carousel so staff
+  // can sanity-check autoplay / arrows / swipe without leaving the
+  // editor.
+  const [previewSliderId, setPreviewSliderId] = useState(null);
 
   const loadedRef = useRef(null);      // last server blob we loaded (no re-save)
   const saveTimerRef = useRef(null);
+  // Tracks the row's updated_at timestamp from the last successful
+  // load / save. Used as an optimistic lock: before upserting, we
+  // re-check the remote value and abort if someone else persisted a
+  // newer row (i.e. another tab beat us).
+  const lastUpdatedAtRef = useRef(null);
+  const [conflict, setConflict] = useState(false);
+  // Pending-edits count for the topbar chip. Incremented by
+  // applyEdit, zeroed by autosave success.
+  const [unsavedCount, setUnsavedCount] = useState(0);
+  // Transient ✓ shown right after a successful autosave so staff
+  // get an explicit "done" signal. Auto-clears after ~1500ms.
+  const [savedFlash, setSavedFlash] = useState(false);
+  useEffect(() => {
+    if (!savedFlash) return undefined;
+    const t = setTimeout(() => setSavedFlash(false), 1500);
+    return () => clearTimeout(t);
+  }, [savedFlash]);
+
+  // Guard against accidental tab close / reload while edits are
+  // pending autosave. Browsers ignore the returned string (they
+  // show their own generic prompt), but we still need to call
+  // preventDefault + set returnValue for the dialog to appear.
+  useEffect(() => {
+    if (unsavedCount === 0) return undefined;
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsavedCount]);
+  // Transient toast shown at the bottom-right. Used for "can't do
+  // that on the page body" and similar soft blocks — previously the
+  // app just silently ignored the shortcut.
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef(null);
+  const flashToast = useCallback((msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(''), 2400);
+  }, []);
 
   // Undo/redo history. Snapshot-based, capped at 50 entries each way.
   // Autosave still observes content changes identically — undoing just
@@ -1031,11 +1420,30 @@ export default function WebsiteEditor() {
       setLoading(true); setError('');
       try {
         const { data, error: err } = await supabase
-          .from('app_settings').select('value').eq('key', V2_KEY).maybeSingle();
+          .from('app_settings').select('value, updated_at').eq('key', V2_KEY).maybeSingle();
         if (err) throw err;
         if (!data?.value) {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
+        lastUpdatedAtRef.current = data.updated_at || null;
+        // Future-schema warning: if the stored row advertises a
+        // schema_version we don't understand yet, another staff tab
+        // (or a deployed future build) wrote it. Loading it here and
+        // saving would downgrade. Warn; still load so staff can see
+        // their page, but skip autosave until the user confirms.
+        const rowVersion = Number(data.value?.schema_version) || 1;
+        if (rowVersion > SCHEMA_VERSION) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[WebsiteEditor] Stored schema is v${rowVersion} but this build reads v${SCHEMA_VERSION}. `
+            + 'Reload or update the editor before saving to avoid clobbering newer fields.'
+          );
+          setSaveError(`Read-only: stored schema v${rowVersion} is newer than editor v${SCHEMA_VERSION}. Reload the editor.`);
+        }
+        // Self-heal on load is applied below via a content-keyed
+        // useEffect (robust against Vercel cache + race conditions).
+        // Setting loadedRef to the raw row lets autosave detect drift
+        // on the first tick after the heal runs.
         setContent(data.value);
         loadedRef.current = data.value;
       } catch (err) {
@@ -1049,18 +1457,64 @@ export default function WebsiteEditor() {
   // --- Autosave: debounced upsert back to app_settings.store_content_v2 --
   // Mirrors the legacy editor's pattern: 900 ms after the last edit, push
   // the whole blob. Skips if we haven't drifted from what we loaded.
+  //
+  // Epoch guard: if `content` is replaced between scheduling the save
+  // and the 900 ms timer firing, we abandon the stale snapshot instead
+  // of persisting the wrong value. This stops a fast page-swap from
+  // racing with an in-flight save and overwriting the wrong row.
+  const contentEpochRef = useRef(0);
+  useEffect(() => { contentEpochRef.current += 1; }, [content]);
   useEffect(() => {
     if (loading || !content) return;
     if (content === loadedRef.current) return;
+    // Once a conflict with another tab is detected we stop saving
+    // entirely — further writes would overwrite the other tab's
+    // changes. User has to reload; the banner explains.
+    if (conflict) return;
+    // Schema-version lockout (see load effect). Once we see a newer
+    // version than this build supports, refuse to save so we don't
+    // clobber fields the newer tab knows about. The banner nudges
+    // the user to reload.
+    const rowVersion = Number(content?.schema_version) || 1;
+    if (rowVersion > SCHEMA_VERSION) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const snapshotEpoch = contentEpochRef.current;
+    const snapshot = content;
     saveTimerRef.current = setTimeout(async () => {
+      if (snapshotEpoch !== contentEpochRef.current) return; // stale
       setSaving(true); setSaveError('');
       try {
+        // Optimistic lock: fetch the row's current updated_at and
+        // compare against what we saw at load / last successful save.
+        // If a second tab (or someone else's session) beat us, we
+        // refuse to clobber their work — surface a banner + lock
+        // further saves until the user reloads.
+        const { data: remote, error: headErr } = await supabase
+          .from('app_settings').select('updated_at').eq('key', V2_KEY).maybeSingle();
+        if (headErr) throw headErr;
+        if (remote?.updated_at
+            && lastUpdatedAtRef.current
+            && remote.updated_at !== lastUpdatedAtRef.current) {
+          setConflict(true);
+          setSaveError('Another tab saved newer changes. Reload before editing to avoid overwriting their work.');
+          return;
+        }
+        // Stamp the schema version on every save. A future breaking
+        // change (e.g. children[] shape) can read this on load and
+        // run a just-in-time migration instead of corrupting data.
+        // Current schema = 2 (matches emptySiteContent + compileSiteContent).
+        const stamped = snapshot && snapshot.schema_version !== SCHEMA_VERSION
+          ? { ...snapshot, schema_version: SCHEMA_VERSION }
+          : snapshot;
+        const nextUpdatedAt = new Date().toISOString();
         const { error: err } = await supabase.from('app_settings').upsert({
-          key: V2_KEY, value: content, updated_at: new Date().toISOString(),
+          key: V2_KEY, value: stamped, updated_at: nextUpdatedAt,
         }, { onConflict: 'key' });
         if (err) throw err;
-        loadedRef.current = content;
+        loadedRef.current = snapshot;
+        lastUpdatedAtRef.current = nextUpdatedAt;
+        setUnsavedCount(0);
+        setSavedFlash(true);
       } catch (err) {
         setSaveError(err.message || 'Failed to save.');
       } finally {
@@ -1068,23 +1522,35 @@ export default function WebsiteEditor() {
       }
     }, 900);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [content, loading]);
+  }, [content, loading, conflict]);
 
   const pages = useMemo(() => {
     if (!content?.pages) return [];
     return Object.entries(content.pages).map(([key, p]) => ({ key, name: p.name || key }));
   }, [content]);
 
-  const tree = content?.pages?.[pageKey]?.tree || null;
+  // Active scope key — what mutations actually target. Equals pageKey
+  // normally; switches to a component-shim key while editing a
+  // component so withPage / withNode rewrite content.components[id]
+  // instead of content.pages[pageKey].
+  const activePageKey = editingComponentId
+    ? componentScopeKey(editingComponentId)
+    : pageKey;
+
+  const tree = getEffectivePage(content, activePageKey)?.tree || null;
   const classes = content?.classes || {};
 
+  // Re-usable id → node index. Built once per tree reference so
+  // every downstream lookup (selectedNode, findNode-based callbacks)
+  // resolves in O(1) instead of walking the whole tree.
+  const nodeIndex = useMemo(() => buildNodeIndex(tree), [tree]);
   const breadcrumb = useMemo(
     () => pathToNode(tree, selectedId),
     [tree, selectedId]
   );
   const selectedNode = useMemo(
-    () => findNode(tree, selectedId),
-    [tree, selectedId]
+    () => findNodeIn(nodeIndex, selectedId),
+    [nodeIndex, selectedId]
   );
   const flat = useMemo(() => flattenTree(tree), [tree]);
 
@@ -1093,6 +1559,27 @@ export default function WebsiteEditor() {
   // class" CTA (handled below via handleCreateClass).
   const primaryClass = selectedNode?.classes?.[0] || null;
   const classDef = primaryClass ? classes[primaryClass] : null;
+
+  // Shared-class detector. When staff edit a class inside a component
+  // scope, they often expect edits to stay local — but classes are
+  // site-wide, so any page also using the class picks up the change.
+  // Surface a chip in the Style panel so the shared nature is obvious.
+  // Only relevant while in component-edit scope; on a page it's
+  // implied.
+  const sharedClassNotice = useMemo(() => {
+    if (!editingComponentId || !primaryClass) return null;
+    const pages = content?.pages || {};
+    const walk = (n) => {
+      if (!n) return false;
+      if (Array.isArray(n.classes) && n.classes.includes(primaryClass)) return true;
+      for (const c of n.children || []) if (walk(c)) return true;
+      return false;
+    };
+    for (const page of Object.values(pages)) {
+      if (walk(page?.tree)) return 'Used on a page too — edits apply everywhere.';
+    }
+    return null;
+  }, [editingComponentId, primaryClass, content]);
 
   // Core edit wrapper. Every user-initiated mutation flows through
   // here so the history stack stays honest. updater: content → content.
@@ -1117,9 +1604,27 @@ export default function WebsiteEditor() {
         future: [], // any new edit invalidates redo stack
       };
       lastPushAtRef.current = now;
+      setUnsavedCount((n) => n + 1);
       return next;
     });
   }, []);
+
+  // Self-heal runs exactly once per load, not on every content
+  // change. If staff delete a navbar manually, we must NOT re-insert
+  // it the moment the content ref changes — the heal would fight
+  // the user on every undo / redo / edit. Gated via a ref that gets
+  // cleared only when a fresh Supabase row lands (see load effect).
+  const healRunRef = useRef(false);
+  useEffect(() => {
+    if (healRunRef.current) return;
+    if (!content || loading) return;
+    const healed = ensureSiteDefaults(content);
+    healRunRef.current = true;
+    if (healed === content) return;
+    // eslint-disable-next-line no-console
+    console.log('[WebsiteEditor] Self-heal: seeding navbar/footer and any missing standard pages');
+    applyEdit(() => healed);
+  }, [content, loading, applyEdit]);
 
   const undo = useCallback(() => {
     const { past, future } = historyRef.current;
@@ -1156,10 +1661,10 @@ export default function WebsiteEditor() {
   const handleCreateClass = useCallback(() => {
     if (!selectedId) return;
     applyEdit((c) => {
-      const { content: next } = ensureNodeClass(c, pageKey, selectedId);
+      const { content: next } = ensureNodeClass(c, activePageKey, selectedId);
       return next;
     });
-  }, [selectedId, pageKey, applyEdit]);
+  }, [selectedId, activePageKey, applyEdit]);
 
   const handleRenameClass = useCallback((newName) => {
     if (!primaryClass || !newName) return;
@@ -1178,29 +1683,38 @@ export default function WebsiteEditor() {
   const handleSetStyle = useCallback((prop, value) => {
     if (!selectedId) return;
     applyEdit((c) => {
-      const { content: withClass, className } = ensureNodeClass(c, pageKey, selectedId);
+      const { content: withClass, className } = ensureNodeClass(c, activePageKey, selectedId);
       if (!className) return c;
       if (device === 'desktop') {
         return setClassStyle(withClass, className, styleState, prop, value);
       }
       return setClassBreakpointStyle(withClass, className, device, prop, value);
     });
-  }, [selectedId, pageKey, styleState, device, applyEdit]);
+  }, [selectedId, activePageKey, styleState, device, applyEdit]);
 
   const handleSetTag = useCallback((tag) => {
     if (!selectedId) return;
-    applyEdit((c) => setNodeTag(c, pageKey, selectedId, tag));
-  }, [selectedId, pageKey, applyEdit]);
+    applyEdit((c) => setNodeTag(c, activePageKey, selectedId, tag));
+  }, [selectedId, activePageKey, applyEdit]);
 
   const handleSetAttribute = useCallback((key, value) => {
     if (!selectedId) return;
-    applyEdit((c) => setNodeAttribute(c, pageKey, selectedId, key, value));
-  }, [selectedId, pageKey, applyEdit]);
+    applyEdit((c) => setNodeAttribute(c, activePageKey, selectedId, key, value));
+  }, [selectedId, activePageKey, applyEdit]);
+
+  // Node-explicit attribute setter — needed by surfaces like the
+  // AccessibilityPanel's bulk alt editor where the target node isn't
+  // the current selection (staff are editing several images without
+  // clicking each on the canvas first).
+  const handleSetAttributeOn = useCallback((nodeId, key, value) => {
+    if (!nodeId) return;
+    applyEdit((c) => setNodeAttribute(c, activePageKey, nodeId, key, value));
+  }, [activePageKey, applyEdit]);
 
   const handleRenameAttribute = useCallback((oldKey, newKey) => {
     if (!selectedId) return;
-    applyEdit((c) => renameNodeAttribute(c, pageKey, selectedId, oldKey, newKey));
-  }, [selectedId, pageKey, applyEdit]);
+    applyEdit((c) => renameNodeAttribute(c, activePageKey, selectedId, oldKey, newKey));
+  }, [selectedId, activePageKey, applyEdit]);
 
   // Lane A item 3: Page-level meta (SEO) updates. Partial patch; the
   // mutation drops empty-string values so the stored blob stays tidy.
@@ -1208,6 +1722,85 @@ export default function WebsiteEditor() {
     if (!pageKey) return;
     applyEdit((c) => updatePageMeta(c, pageKey, patch));
   }, [pageKey, applyEdit]);
+
+  // Site-level patch. Used by the Settings rail panel to write
+  // brand.* and global_css.* fields through the same history-aware
+  // applyEdit so Cmd+Z unwinds them.
+  const handleSitePatch = useCallback((path, value) => {
+    if (!Array.isArray(path) || path.length === 0) return;
+    applyEdit((c) => {
+      const next = { ...c };
+      let cursor = next;
+      for (let i = 0; i < path.length - 1; i += 1) {
+        const k = path[i];
+        cursor[k] = { ...(cursor[k] || {}) };
+        cursor = cursor[k];
+      }
+      cursor[path[path.length - 1]] = value;
+      return next;
+    });
+  }, [applyEdit]);
+
+  // Phase E — component usage map. Re-derives on every content change
+  // (single tree walk; no keyed memo needed).
+  const componentUsageMap = useMemo(() => componentUsage(content), [content]);
+
+  const handleSaveAsComponent = useCallback(() => {
+    if (!selectedId || typeof window === 'undefined') return;
+    const name = window.prompt('Component name:', '');
+    if (name === null) return;
+    let newInstanceId = null;
+    applyEdit((c) => {
+      const { content: next, instanceId } = saveAsComponent(c, activePageKey, selectedId, { name });
+      if (!instanceId) return c;
+      newInstanceId = instanceId;
+      return next;
+    });
+    if (newInstanceId) setSelectedId(newInstanceId);
+  }, [selectedId, activePageKey, applyEdit]);
+
+  const handleDetachComponent = useCallback(() => {
+    if (!selectedId) return;
+    let newChildId = null;
+    applyEdit((c) => {
+      const { content: next, newId } = detachComponent(c, activePageKey, selectedId);
+      if (!newId) return c;
+      newChildId = newId;
+      return next;
+    });
+    if (newChildId) setSelectedId(newChildId);
+  }, [selectedId, activePageKey, applyEdit]);
+
+  const handleInsertComponent = useCallback((componentId) => {
+    let newInstanceId = null;
+    applyEdit((c) => {
+      const { content: next, newId } = insertComponentInstance(c, activePageKey, null, componentId);
+      if (!newId) return c;
+      newInstanceId = newId;
+      return next;
+    });
+    if (newInstanceId) setSelectedId(newInstanceId);
+  }, [activePageKey, applyEdit]);
+
+  const handleRenameComponent = useCallback((componentId, name) => {
+    applyEdit((c) => renameComponent(c, componentId, name));
+  }, [applyEdit]);
+
+  const handleDeleteComponent = useCallback((componentId) => {
+    applyEdit((c) => {
+      const { content: next, deleted } = deleteComponent(c, componentId);
+      return deleted ? next : c;
+    });
+  }, [applyEdit]);
+
+  // Enter / exit component-scope edit mode. When entering, selection +
+  // editing-node state resets so the user lands in a clean canvas. The
+  // actual tree swap happens transparently via activePageKey.
+  const handleEditComponent = useCallback((componentId) => {
+    setEditingComponentId(componentId || null);
+    setSelectedId(null);
+    setEditingNodeId(null);
+  }, []);
 
   // Lane G4 — class browser. Usage map re-derives on every content
   // change; cheap (flat walk, same cost as compileClassesToCSS).
@@ -1241,9 +1834,9 @@ export default function WebsiteEditor() {
     const entry = BLOCK_CATALOGUE.find((b) => b.key === blockKey);
     if (!entry) return;
     const newNode = entry.create();
-    applyEdit((c) => insertNode(c, pageKey, null, newNode));
+    applyEdit((c) => insertNode(c, activePageKey, null, newNode));
     setSelectedId(newNode.id);
-  }, [pageKey, applyEdit]);
+  }, [activePageKey, applyEdit]);
 
   // Drag-drop insert. `position` ∈ { 'before', 'after', 'inside', 'append' }.
   // 'append' is the "dropped on empty canvas" fallback and just pushes
@@ -1260,13 +1853,58 @@ export default function WebsiteEditor() {
 
   const handleCommitEdit = useCallback((nodeId, text) => {
     if (!nodeId) { setEditingNodeId(null); return; }
-    applyEdit((c) => setNodeTextContent(c, pageKey, nodeId, text));
+    applyEdit((c) => setNodeTextContent(c, activePageKey, nodeId, text));
     setEditingNodeId(null);
-  }, [pageKey, applyEdit]);
+  }, [activePageKey, applyEdit]);
+
+  // Phase D — inline rich-text edit commits TextRun[] instead of a
+  // plain string. Normalisation + strip-textContent happens inside
+  // setNodeRuns so the caller stays simple.
+  const handleCommitRuns = useCallback((nodeId, runs) => {
+    if (!nodeId) { setEditingNodeId(null); return; }
+    applyEdit((c) => setNodeRuns(c, activePageKey, nodeId, runs));
+    setEditingNodeId(null);
+  }, [activePageKey, applyEdit]);
+
+  // Phase I3 — used by the Settings-tab "Bind to CMS field" picker
+  // to overwrite a leaf's text with a single {{field}} run. Writes
+  // via setNodeRuns because every Phase-D-migrated leaf stores runs,
+  // not plain textContent; using setNodeTextContent would leave a
+  // stale run shadowing the new value.
+  const handleSetLeafText = useCallback((nodeId, text) => {
+    if (!nodeId) return;
+    applyEdit((c) => setNodeRuns(c, activePageKey, nodeId, [
+      { text: String(text ?? ''), marks: [] },
+    ]));
+  }, [activePageKey, applyEdit]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingNodeId(null);
   }, []);
+
+  // Ref to the currently-editing contentEditable element. Populated
+  // by the Node renderer on mount, nulled on unmount. The floating
+  // text toolbar anchors off it so selections outside the editable
+  // never surface a rogue toolbar.
+  const editableRef = useRef(null);
+
+  // Fires when the user clicks a toolbar button (or presses a
+  // Cmd+B/I/U/K shortcut). The contentEditable owns the DOM, so we
+  // just call execCommand and let blur parse the result later.
+  const runRichTextCommand = useCallback((cmd) => {
+    if (!editingNodeId) return;
+    if (cmd === 'clear') { clearFormatting(); return; }
+    if (cmd === 'link') {
+      // Inline prompt — the toolbar has its own inline input; this
+      // path is used by the ⌘K shortcut inside edit mode.
+      if (typeof window === 'undefined') return;
+      const href = window.prompt('Link URL (empty to remove):', '');
+      if (href === null) return;
+      applyLink(href.trim());
+      return;
+    }
+    toggleMark(cmd);
+  }, [editingNodeId]);
 
   // Create a brand-new v2 page from a user-supplied slug. Uses the
   // native prompt for MVP — a proper modal can land with Phase 10b
@@ -1288,8 +1926,18 @@ export default function WebsiteEditor() {
       page.slug || '/'
     );
     if (nextSlug === null) return;
-    applyEdit((c) => renamePage(c, targetKey, { name: nextName, slug: nextSlug }));
-  }, [pageKey, content, applyEdit]);
+    let reason = null;
+    applyEdit((c) => {
+      const { content: next, reason: r } = renamePage(c, targetKey, { name: nextName, slug: nextSlug });
+      reason = r;
+      return next || c;
+    });
+    if (reason === 'slug-collision') {
+      flashToast(`Slug "${nextSlug}" is already in use by another page.`);
+    } else if (reason === 'missing') {
+      flashToast("That page no longer exists.");
+    }
+  }, [pageKey, content, applyEdit, flashToast]);
 
   // Delete the current page. Refuses on 'home' (the mutation also
   // defends this invariant, but the UI disables the button anyway).
@@ -1350,45 +1998,112 @@ export default function WebsiteEditor() {
     const newNode = entry.create();
     applyEdit((c) => {
       if (!targetId || position === 'append') {
-        return insertNode(c, pageKey, null, newNode);
+        return insertNode(c, activePageKey, null, newNode);
       }
       if (position === 'inside') {
-        return insertNode(c, pageKey, targetId, newNode);
+        return insertNode(c, activePageKey, targetId, newNode);
       }
       if (position === 'before') {
-        const { content: next } = insertNodeBefore(c, pageKey, targetId, newNode);
+        const { content: next } = insertNodeBefore(c, activePageKey, targetId, newNode);
         return next;
       }
       // after
-      const { content: next } = insertNodeAfter(c, pageKey, targetId, newNode);
+      const { content: next } = insertNodeAfter(c, activePageKey, targetId, newNode);
       return next;
     });
     setSelectedId(newNode.id);
-  }, [pageKey, applyEdit]);
+  }, [activePageKey, applyEdit]);
+
+  // Drop-from-asset-library onto canvas. Builds an <img> block
+  // pre-populated with the asset's public URL and inserts it with the
+  // same position semantics as handleDropBlock. Videos and SVGs go
+  // through the same img path for now (browsers render SVG in <img>;
+  // videos would need <video> but staff rarely drop raw mp4s — we can
+  // handle them when the need comes up).
+  const handleDropAsset = useCallback((payload, targetId, position) => {
+    if (!payload?.url) return;
+    // Asset kind drives which block type to create. Previously every
+    // asset became an <img>, so dragging an mp4 produced <img src="v.mp4">
+    // which renders as a broken-image placeholder on the storefront.
+    const kind = payload.kind || 'image';
+    let newNode;
+    if (kind === 'video') {
+      newNode = {
+        id: 'n_' + Math.random().toString(36).slice(2, 9),
+        tag: 'video',
+        classes: ['video'],
+        attributes: {
+          src: payload.url,
+          controls: '',
+          playsInline: '',
+          preload: 'metadata',
+        },
+        children: [],
+      };
+    } else {
+      const assetEntry = BLOCK_CATALOGUE.find((b) => b.key === 'image');
+      if (!assetEntry) return;
+      newNode = assetEntry.create();
+      newNode.attributes = {
+        ...(newNode.attributes || {}),
+        src: payload.url,
+        alt: payload.alt || '',
+      };
+    }
+    applyEdit((c) => {
+      if (!targetId || position === 'append') {
+        return insertNode(c, activePageKey, null, newNode);
+      }
+      if (position === 'inside') {
+        return insertNode(c, activePageKey, targetId, newNode);
+      }
+      if (position === 'before') {
+        const { content: next } = insertNodeBefore(c, activePageKey, targetId, newNode);
+        return next;
+      }
+      const { content: next } = insertNodeAfter(c, activePageKey, targetId, newNode);
+      return next;
+    });
+    setSelectedId(newNode.id);
+  }, [activePageKey, applyEdit]);
+
+  // Click handler for the AssetsPanel's "insert here" button — inserts
+  // at root, no drop target required.
+  const handleInsertAsset = useCallback((asset) => {
+    handleDropAsset({ url: asset.url, alt: asset.name, kind: asset.kind }, null, 'append');
+  }, [handleDropAsset]);
 
   // --- Phase 9 mutation handlers (duplicate / remove / paste) ---------
   const handleDuplicate = useCallback(() => {
-    if (!selectedId || !tree || selectedId === tree.id) return;
+    if (!selectedId || !tree) return;
+    if (selectedId === tree.id) {
+      flashToast("Can't duplicate the page body.");
+      return;
+    }
     let created = null;
     applyEdit((c) => {
-      const { content: next, newId } = duplicateNode(c, pageKey, selectedId);
+      const { content: next, newId } = duplicateNode(c, activePageKey, selectedId);
       if (newId) created = newId;
       return next;
     });
     if (created) setSelectedId(created);
-  }, [selectedId, tree, pageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit, flashToast]);
 
   const handleDelete = useCallback(() => {
-    if (!selectedId || !tree || selectedId === tree.id) return;
+    if (!selectedId || !tree) return;
+    if (selectedId === tree.id) {
+      flashToast("Can't delete the page body.");
+      return;
+    }
     let fallbackParent = null;
     applyEdit((c) => {
-      const { content: next, parentId } = removeNode(c, pageKey, selectedId);
+      const { content: next, parentId } = removeNode(c, activePageKey, selectedId);
       fallbackParent = parentId;
       return next;
     });
     // Move selection to the parent so the Inspector has something to show.
     setSelectedId(fallbackParent);
-  }, [selectedId, tree, pageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit, flashToast]);
 
   const handleCopy = useCallback(() => {
     if (!selectedId || !tree) return;
@@ -1407,16 +2122,16 @@ export default function WebsiteEditor() {
     applyEdit((c) => {
       if (selectedId && tree && selectedId !== tree.id) {
         // Paste as next sibling of the current selection.
-        const { content: next, newId } = insertNodeAfter(c, pageKey, selectedId, fresh);
+        const { content: next, newId } = insertNodeAfter(c, activePageKey, selectedId, fresh);
         if (newId) created = newId;
         return next;
       }
       // Nothing selected (or root) → append to page root.
       created = fresh.id;
-      return insertNode(c, pageKey, null, fresh);
+      return insertNode(c, activePageKey, null, fresh);
     });
     if (created) setSelectedId(created);
-  }, [selectedId, tree, pageKey, applyEdit]);
+  }, [selectedId, tree, activePageKey, applyEdit]);
 
   // Keyboard — spec § 2 + § 10.
   // Selection-only moves (Esc, Enter, Arrow keys, Tab) work without the
@@ -1439,6 +2154,32 @@ export default function WebsiteEditor() {
     const onKey = (e) => {
       const mod = e.metaKey || e.ctrlKey;
 
+      // Rich-text shortcuts — only fire while a contentEditable is
+      // active so the same keys stay available for the global palette
+      // / undo when editing isn't happening.
+      if (editingNodeId && mod) {
+        if (e.key === 'b' || e.key === 'B') { runRichTextCommand('bold');      e.preventDefault(); return; }
+        if (e.key === 'i' || e.key === 'I') { runRichTextCommand('italic');    e.preventDefault(); return; }
+        if (e.key === 'u' || e.key === 'U') { runRichTextCommand('underline'); e.preventDefault(); return; }
+        if (e.key === 'k' || e.key === 'K') { runRichTextCommand('link');      e.preventDefault(); return; }
+      }
+
+      // Cmd+K — command palette. Skipped while editing (see above).
+      if (mod && (e.key === 'k' || e.key === 'K')) {
+        setPaletteOpen((o) => !o);
+        e.preventDefault();
+        return;
+      }
+
+      // Cmd+/ — open the Add rail panel. Matches Webflow's "insert
+      // anywhere" shortcut: fastest way to drop a block without
+      // taking a hand off the keyboard.
+      if (mod && e.key === '/') {
+        setRailActive('add');
+        e.preventDefault();
+        return;
+      }
+
       // Undo / redo — fires regardless of focus so keyboard still
       // rescues users when they're editing inside the Inspector.
       if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
@@ -1450,6 +2191,16 @@ export default function WebsiteEditor() {
 
       // Everything else defers to input focus.
       if (isTyping(e.target)) return;
+
+      // `?` opens the Help rail panel from anywhere (matches the
+      // Webflow shortcut). Fires before the `!selectedId` guard
+      // below so it works on a fresh canvas with nothing selected.
+      if (!mod && !e.altKey && e.key === '?') {
+        setRailActive('help');
+        e.preventDefault();
+        return;
+      }
+
       if (!selectedId) return;
 
       // Selection moves (no meta key)
@@ -1476,13 +2227,19 @@ export default function WebsiteEditor() {
         }
         if (e.key === 'Tab') {
           const dir = e.shiftKey ? 'prev' : 'next';
-          const sib = siblingOf(content, pageKey, selectedId, dir);
+          const sib = siblingOf(content, activePageKey, selectedId, dir);
           if (sib) { setSelectedId(sib.id); e.preventDefault(); }
           return;
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
           handleDelete(); e.preventDefault(); return;
         }
+      }
+
+      // Cmd+Option+C — save selection as component. Matches the
+      // Webflow shortcut so staff muscle memory carries over.
+      if (mod && e.altKey && (e.key === 'c' || e.key === 'C' || e.code === 'KeyC')) {
+        handleSaveAsComponent(); e.preventDefault(); return;
       }
 
       // Mutation shortcuts (meta + letter)
@@ -1498,7 +2255,7 @@ export default function WebsiteEditor() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tree, flat, selectedId, content, pageKey, undo, redo, handleDelete, handleDuplicate, handleCopy, handlePaste]);
+  }, [tree, flat, selectedId, content, activePageKey, undo, redo, handleDelete, handleDuplicate, handleCopy, handlePaste, editingNodeId, runRichTextCommand, handleSaveAsComponent]);
 
   if (loading) {
     return <div style={fullScreenMessage(W, 'Loading v2 content…')} />;
@@ -1518,36 +2275,119 @@ export default function WebsiteEditor() {
         breadcrumb={breadcrumb}
         onBreadcrumbClick={(id) => setSelectedId(id)}
         page={pageKey}
-        onPageChange={(k) => { setPageKey(k); setSelectedId(null); }}
+        onPageChange={(k) => { setPageKey(k); setSelectedId(null); setEditingComponentId(null); }}
         onCreatePage={handleCreatePage}
         onDeletePage={handleDeletePage}
         onRenamePage={handleRenamePage}
         pages={pages}
+        unsavedCount={unsavedCount}
       />
+      {editingComponentId && (
+        <div style={{
+          flexShrink: 0, height: '28px',
+          padding: '0 14px',
+          background: '#146ef522',
+          borderBottom: `1px solid #146ef5`,
+          color: W.accent, fontSize: '11.5px', fontWeight: 600,
+          letterSpacing: '0.02em',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>
+            ◆ Editing component:{' '}
+            <span style={{ color: W.text }}>
+              {content?.components?.[editingComponentId]?.name || editingComponentId}
+            </span>
+            <span style={{ color: W.textFaint, marginLeft: '10px', fontWeight: 500 }}>
+              Changes apply to every instance.
+            </span>
+          </span>
+          <button
+            onClick={() => handleEditComponent(null)}
+            style={{
+              background: W.accent, color: '#fff',
+              border: 'none', borderRadius: '3px',
+              padding: '2px 10px', fontSize: '11px', fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            title="Return to page"
+          >Done</button>
+        </div>
+      )}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <LeftRail active={railActive} onChange={setRailActive} />
-        {railActive === 'add' ? (
-          <AddPanel onInsert={handleInsertBlock} />
-        ) : railActive === 'pages' ? (
-          <PagesPanel
-            pages={pages}
-            activeKey={pageKey}
-            onPick={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); }}
-            onCreate={handleCreatePage}
-            onRename={handleRenamePage}
-            onDelete={handleDeletePage}
-          />
-        ) : railActive === 'styleguide' ? (
-          <ClassBrowser
-            classes={classes}
-            usage={usageMap}
-            onRename={handleRenameClassByName}
-            onDelete={handleDeleteClass}
-            onCleanup={handleCleanupClasses}
-          />
-        ) : (
-          <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />
-        )}
+        {(() => {
+          switch (railActive) {
+            case 'add':
+              return <AddPanel onInsert={handleInsertBlock} />;
+            case 'pages':
+              return (
+                <PagesPanel
+                  pages={pages}
+                  activeKey={pageKey}
+                  onPick={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
+                  onCreate={handleCreatePage}
+                  onRename={handleRenamePage}
+                  onDelete={handleDeletePage}
+                />
+              );
+            case 'styleguide':
+              return (
+                <ClassBrowser
+                  classes={classes}
+                  usage={usageMap}
+                  onRename={handleRenameClassByName}
+                  onDelete={handleDeleteClass}
+                  onCleanup={handleCleanupClasses}
+                />
+              );
+            case 'components':
+              return (
+                <ComponentsPanel
+                  content={content}
+                  usage={componentUsageMap}
+                  editingComponentId={editingComponentId}
+                  onInsert={handleInsertComponent}
+                  onEdit={handleEditComponent}
+                  onRename={handleRenameComponent}
+                  onDelete={handleDeleteComponent}
+                />
+              );
+            case 'assets':
+              return <AssetsPanel pageId={pageKey} onInsertAsset={handleInsertAsset} />;
+            case 'interactions':
+              return <InteractionsListPanel />;
+            case 'variables':
+              return <VariablesPanel content={content} />;
+            case 'cms':
+              return <CMSPanel />;
+            case 'ecommerce':
+              return <EcommercePanel />;
+            case 'settings':
+              return <SiteSettingsPanel content={content} onPatch={handleSitePatch} />;
+            case 'search':
+              return (
+                <SearchPanel
+                  content={content}
+                  tree={tree}
+                  onSelect={setSelectedId}
+                  onPickPage={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
+                />
+              );
+            case 'help':
+              return <HelpPanel />;
+            case 'a11y':
+              return (
+                <AccessibilityPanel
+                  tree={tree}
+                  onSelect={setSelectedId}
+                  onSetAttributeOn={handleSetAttributeOn}
+                />
+              );
+            case 'navigator':
+            default:
+              return <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />;
+          }
+        })()}
         <Canvas
           tree={tree}
           classes={classes}
@@ -1556,10 +2396,16 @@ export default function WebsiteEditor() {
           device={device}
           onDeviceChange={setDevice}
           onDropBlock={handleDropBlock}
+          onDropAsset={handleDropAsset}
           editingNodeId={editingNodeId}
           onStartEdit={handleStartEdit}
           onCommitEdit={handleCommitEdit}
+          onCommitRuns={handleCommitRuns}
           onCancelEdit={handleCancelEdit}
+          editableRef={editableRef}
+          components={content?.components}
+          onContextMenu={(id, x, y) => setContextMenu({ nodeId: id, x, y })}
+          previewSliderId={previewSliderId}
         />
         <RightPanel
           selectedNode={selectedNode}
@@ -1568,9 +2414,11 @@ export default function WebsiteEditor() {
           state={styleState}
           onStateChange={setStyleState}
           device={device}
+          onDeviceChange={setDevice}
           onCreateClass={handleCreateClass}
           onRenameClass={handleRenameClass}
           onSetStyle={handleSetStyle}
+          sharedClassNotice={sharedClassNotice}
           onSetTag={handleSetTag}
           onSetAttribute={handleSetAttribute}
           onRenameAttribute={handleRenameAttribute}
@@ -1578,8 +2426,39 @@ export default function WebsiteEditor() {
           pageKey={pageKey}
           siteUrl={content?.brand?.site_url || ''}
           onUpdatePageMeta={handleUpdatePageMeta}
+          previewSliderId={previewSliderId}
+          onTogglePreviewSlider={(id) => {
+            setPreviewSliderId((prev) => (prev === id ? null : id));
+          }}
+          onPlayTimeline={handlePlayTimeline}
+          tree={tree}
+          onSetTextContent={handleSetLeafText}
         />
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        content={content}
+        tree={tree}
+        onSelect={setSelectedId}
+        onPickPage={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
+      />
+      <FloatingTextToolbar
+        active={!!editingNodeId}
+        anchorRef={editableRef}
+        onCommand={runRichTextCommand}
+      />
+      <ContextMenu
+        open={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onSaveAsComponent={() => { setContextMenu(null); handleSaveAsComponent(); }}
+        onDetach={() => { setContextMenu(null); handleDetachComponent(); }}
+        isInstance={(() => {
+          if (!contextMenu?.nodeId || !tree) return false;
+          const hit = findNode(tree, contextMenu.nodeId);
+          return !!hit?.componentRef;
+        })()}
+      />
       {(saving || saveError) && (
         <div style={{
           position: 'absolute', bottom: 8, right: 12,
@@ -1593,7 +2472,100 @@ export default function WebsiteEditor() {
           {saveError ? `⚠ ${saveError}` : 'Saving…'}
         </div>
       )}
+      {toast && !saveError && !saving && (
+        <div style={{
+          position: 'absolute', bottom: 8, right: 12,
+          padding: '6px 10px', borderRadius: '4px',
+          background: '#2a2a2a', color: W.text,
+          fontSize: '11px',
+          border: `1px solid ${W.panelBorder}`,
+          zIndex: 20,
+          pointerEvents: 'none',
+        }}>
+          {toast}
+        </div>
+      )}
+      {savedFlash && !saving && !saveError && !toast && (
+        <div style={{
+          position: 'absolute', bottom: 8, right: 12,
+          padding: '6px 10px', borderRadius: '4px',
+          background: '#173a23', color: '#86e08b',
+          fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+          border: '1px solid #2a7a4a',
+          zIndex: 20,
+          pointerEvents: 'none',
+        }}>
+          ✓ Saved
+        </div>
+      )}
     </div>
+  );
+}
+
+// Small right-click menu anchored to the click position. Options are
+// gated on whether the selection is already a component instance —
+// staff can Detach an instance or Save a regular node as a new
+// component. Closes on Esc or any click outside.
+function ContextMenu({ open, onClose, onSaveAsComponent, onDetach, isInstance }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = () => onClose?.();
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+  if (!open) return null;
+  // Clamp the anchor to the viewport so a right-click near the
+  // bottom / right edge doesn't push the menu off-screen.
+  const MENU_W = 200;
+  const MENU_H = 80;
+  const vw = (typeof window !== 'undefined' ? window.innerWidth  : 1200) - 8;
+  const vh = (typeof window !== 'undefined' ? window.innerHeight : 800)  - 8;
+  const x = Math.max(4, Math.min(open.x, vw - MENU_W));
+  const y = Math.max(4, Math.min(open.y, vh - MENU_H));
+  return (
+    <div
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        position: 'fixed', top: y, left: x, zIndex: 3200,
+        minWidth: '180px',
+        background: '#1e1e1e', color: '#e5e5e5',
+        border: '1px solid #333', borderRadius: '4px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+        padding: '4px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, Inter, sans-serif',
+      }}
+    >
+      {isInstance ? (
+        <MenuItem onClick={onDetach}>Detach component</MenuItem>
+      ) : (
+        <MenuItem onClick={onSaveAsComponent} hint="⌘⌥C">Save as component</MenuItem>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ children, hint, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', gap: '16px',
+        padding: '6px 10px', background: 'transparent',
+        color: '#e5e5e5', border: 'none', cursor: 'pointer',
+        textAlign: 'left', fontSize: '12px',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#2a2a2a'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span>{children}</span>
+      {hint && <span style={{ color: '#6a6a6a', fontSize: '11px', fontFamily: 'ui-monospace, monospace' }}>{hint}</span>}
+    </button>
   );
 }
 

@@ -9,3 +9,6 @@ tapas-store/build/
 tapas-store/.env
 tapas-store/.env.local
 tapas-store/.env.*.local
+
+# Visual-regression harness output — regenerated on every run.
+tests/visual/output/

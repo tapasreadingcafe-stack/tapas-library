@@ -37,6 +37,23 @@ export function pathToNode(root, id) {
   return out;
 }
 
+// Build an id → node Map for a tree. Callers should wrap in useMemo
+// keyed by the tree reference so one walk services every selection
+// change instead of O(n) per lookup. 1k-node pages still resolve in
+// a few ms; the previous full-tree recursion inside findNode became a
+// bottleneck for breadcrumb + selectedNode memos firing on every
+// keystroke.
+export function buildNodeIndex(root) {
+  const map = new Map();
+  const rec = (n) => {
+    if (!n) return;
+    if (n.id) map.set(n.id, n);
+    for (const c of n.children || []) rec(c);
+  };
+  rec(root);
+  return map;
+}
+
 export function findNode(root, id) {
   if (!root || !id) return null;
   let hit = null;
@@ -47,6 +64,13 @@ export function findNode(root, id) {
   };
   rec(root);
   return hit;
+}
+
+// Same as findNode but takes a prebuilt index. O(1) — preferred when
+// the caller already memoises the index against the tree reference.
+export function findNodeIn(index, id) {
+  if (!index || !id) return null;
+  return index.get(id) || null;
 }
 
 export function parentOf(root, id) {
@@ -74,6 +98,14 @@ export function nextInFlat(flat, id) {
 
 export function labelOf(n) {
   if (!n) return '';
+  // Component instances carry a componentRef — prefix the label so
+  // staff can tell at a glance that clicks inside won't select
+  // descendants (they have to open the component via the Components
+  // panel to edit its internals).
+  if (n.componentRef) {
+    const base = n.classes?.[0] ? `.${n.classes[0]}` : (n.tag || 'instance');
+    return `◆ ${base}`;
+  }
   if (n.classes?.[0]) return `.${n.classes[0]}`;
   return n.tag || '?';
 }

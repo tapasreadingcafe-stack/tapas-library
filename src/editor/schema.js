@@ -94,10 +94,35 @@ export function makePage({ id, name, slug, tree, meta = {} } = {}) {
   };
 }
 
+// ---- Rich text --------------------------------------------------------
+// Phase D adds inline formatting to leaf text nodes. A TextRun is a
+// span of characters with a flat list of applied marks; the renderer
+// wraps each run in <strong>/<em>/<u>/<s>/<code>/<sup>/<sub>/<a>.
+//
+// Data shape: a leaf text node's `children` array holds either plain
+// Nodes (branch) or TextRuns (rich text). We never mix. Old nodes
+// store text in `textContent: string` — the renderer treats that as
+// a single zero-mark run so pre-migration data keeps rendering.
+export const RUN_MARKS = ['bold', 'italic', 'underline', 'strike', 'code', 'sup', 'sub'];
+
+export function makeRun({ text = '', marks = [], href } = {}) {
+  const r = { text, marks: Array.isArray(marks) ? marks.slice() : [] };
+  if (href) r.href = href;
+  return r;
+}
+
+// A run is any object whose `text` key is a string. A Node has `tag`
+// instead, so the two are structurally distinguishable and can coexist
+// in a single `children` array (though the editor never mixes them).
+export function isRun(x) {
+  return !!x && typeof x === 'object' && typeof x.text === 'string' && !x.tag;
+}
+
 // Walker — visit every node in a tree, parent-first. Return false from
-// `visit` to stop descending into children.
+// `visit` to stop descending into children. TextRuns are skipped —
+// they're leaves of leaves, not Nodes.
 export function walkTree(node, visit) {
-  if (!node) return;
+  if (!node || isRun(node)) return;
   const keepGoing = visit(node) !== false;
   if (!keepGoing) return;
   for (const child of node.children || []) walkTree(child, visit);

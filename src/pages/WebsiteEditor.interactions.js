@@ -10,11 +10,16 @@
 // own careful session.
 // =====================================================================
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ENTRANCE_PRESETS, HOVER_PRESETS,
 } from './WebsiteEditor.anim';
 import { EasingField } from './WebsiteEditor.bezier';
+import {
+  TIMELINE_PROPERTIES, TIMELINE_TARGETS, TIMELINE_TRIGGERS,
+  makeStep, parseTimelineAttr, stringifyTimeline, timelineAttrName,
+  isDriveTrigger,
+} from './WebsiteEditor.timeline';
 
 const W = {
   panelBorder: '#2a2a2a',
@@ -91,7 +96,64 @@ function DurationInput({ value, onChange, placeholder }) {
   );
 }
 
-export default function InteractionsPanel({ node, onSetAttribute }) {
+// Buffered input — the timeline step editor writes JSON back to the
+// attribute on every change, which (through applyEdit) coalesces
+// rapid edits into one history entry but still burns a Supabase
+// round-trip per keystroke. Committing on blur / Enter instead lets
+// the user type "600" without three intermediate saves, AND gives
+// us a single point to apply clamping / parsing.
+function CommitInput({ value, onCommit, placeholder, parse }) {
+  const [draft, setDraft] = useState(String(value ?? ''));
+  const lastCommittedRef = useRef(String(value ?? ''));
+  // If the external value changes (reorder, reset), sync in.
+  useEffect(() => {
+    const next = String(value ?? '');
+    if (next !== lastCommittedRef.current) {
+      setDraft(next);
+      lastCommittedRef.current = next;
+    }
+  }, [value]);
+  const commit = () => {
+    const parsed = typeof parse === 'function' ? parse(draft) : draft;
+    const normalised = String(parsed ?? '');
+    if (normalised === lastCommittedRef.current) return;
+    lastCommittedRef.current = normalised;
+    setDraft(normalised);
+    onCommit(parsed);
+  };
+  return (
+    <input
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.currentTarget.blur(); }
+        if (e.key === 'Escape') {
+          setDraft(lastCommittedRef.current);
+          e.currentTarget.blur();
+        }
+      }}
+      style={{
+        width: '100%', height: '22px',
+        padding: '0 6px',
+        background: W.input, color: W.text,
+        border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+        fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+      }}
+    />
+  );
+}
+
+// Clamp string input to 0..1 inclusive. Non-numeric input falls back
+// to "0" so the stored JSON always deserialises cleanly.
+function parseProgress(raw) {
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return '0';
+  return String(Math.max(0, Math.min(1, n)));
+}
+
+export default function InteractionsPanel({ node, onSetAttribute, onPlayTimeline }) {
   if (!node) {
     return (
       <div style={{ padding: '24px 12px', color: W.textFaint, fontSize: '11px', textAlign: 'center' }}>
@@ -275,14 +337,355 @@ export default function InteractionsPanel({ node, onSetAttribute }) {
         )}
       </Section>
 
+      <TimelineEditor
+        node={node}
+        onSetAttribute={onSetAttribute}
+        onPlayTimeline={onPlayTimeline}
+      />
+
       <div style={{
         padding: '16px 12px', borderTop: `1px solid ${W.panelBorder}`,
         color: W.textFaint, fontSize: '10.5px', lineHeight: 1.5,
       }}>
-        Timed, mouse-move, and while-scrolling triggers — plus
-        multi-step timelines with custom cubic-bezier — land in
-        Phase 8b.
+        Timed, mouse-move, and while-scrolling triggers land in a
+        follow-up phase.
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TimelineEditor — Phase G multi-step timeline UI.
+//
+// A single Section that lets staff pick a trigger (scroll / load /
+// click / hover) and edit its step list. The list is stored JSON-
+// encoded on data-tapas-timeline-<trigger>; every mutation writes
+// through onSetAttribute so undo / redo already works.
+// ---------------------------------------------------------------------
+function TimelineEditor({ node, onSetAttribute, onPlayTimeline }) {
+  const [trigger, setTrigger] = useState('scroll');
+  const attrs = node?.attributes || {};
+  const rawAttr = attrs[timelineAttrName(trigger)];
+  const steps = parseTimelineAttr(rawAttr);
+
+  const writeSteps = (next) => {
+    onSetAttribute(timelineAttrName(trigger), stringifyTimeline(next));
+  };
+
+  const updateStep = (index, patch) => {
+    const next = steps.slice();
+    next[index] = { ...next[index], ...patch };
+    writeSteps(next);
+  };
+
+  const removeStep = (index) => {
+    const next = steps.slice();
+    next.splice(index, 1);
+    writeSteps(next);
+  };
+
+  const moveStep = (index, dir) => {
+    const target = index + dir;
+    if (target < 0 || target >= steps.length) return;
+    const next = steps.slice();
+    [next[index], next[target]] = [next[target], next[index]];
+    writeSteps(next);
+  };
+
+  const addStep = () => {
+    const next = steps.slice();
+    next.push(makeStep({ trigger }));
+    writeSteps(next);
+  };
+  const drive = isDriveTrigger(trigger);
+
+  return (
+    <Section title="Timeline">
+      <Row label="Trigger">
+        <select
+          value={trigger}
+          onChange={(e) => setTrigger(e.target.value)}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          {TIMELINE_TRIGGERS.map((t) => (
+            <option key={t} value={t}>{triggerLabel(t)}</option>
+          ))}
+        </select>
+      </Row>
+
+      {steps.length === 0 ? (
+        <div style={{
+          padding: '10px 0', color: W.textFaint, fontSize: '11px',
+          lineHeight: 1.5,
+        }}>
+          No steps yet. Add one below to build a multi-step animation.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '6px 0' }}>
+          {steps.map((step, i) => (
+            <StepCard
+              key={step.id || i}
+              index={i}
+              step={step}
+              trigger={trigger}
+              canMoveUp={i > 0}
+              canMoveDown={i < steps.length - 1}
+              onChange={(patch) => updateStep(i, patch)}
+              onRemove={() => removeStep(i)}
+              onMoveUp={() => moveStep(i, -1)}
+              onMoveDown={() => moveStep(i, 1)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+        <button
+          onClick={addStep}
+          style={{
+            flex: 1, padding: '6px', fontSize: '11px', fontWeight: 600,
+            background: W.accentDim, color: W.accent,
+            border: `1px solid ${W.accent}`, borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >+ Add step</button>
+        <button
+          onClick={() => onPlayTimeline?.(trigger)}
+          disabled={steps.length === 0 || drive}
+          title={
+            drive ? 'Drive triggers run live — scroll or move the mouse over the element'
+            : steps.length === 0 ? 'Add a step first' : 'Preview on canvas'
+          }
+          style={{
+            flex: 1, padding: '6px', fontSize: '11px', fontWeight: 600,
+            background: (steps.length && !drive) ? '#146ef5' : '#222',
+            color: (steps.length && !drive) ? '#fff' : W.textFaint,
+            border: `1px solid ${(steps.length && !drive) ? '#146ef5' : W.inputBorder}`,
+            borderRadius: '3px',
+            cursor: (steps.length && !drive) ? 'pointer' : 'not-allowed',
+          }}
+        >▶ Play preview</button>
+      </div>
+      {drive && (
+        <div style={{
+          marginTop: '6px', padding: '6px 8px',
+          background: W.accentDim, color: W.accent,
+          border: `1px solid ${W.accent}`, borderRadius: '3px',
+          fontSize: '10.5px', lineHeight: 1.4,
+        }}>
+          {trigger === 'scroll-drive'
+            ? 'Properties interpolate between From and To as the element scrolls through the viewport. Use the progress window (0–1) to pick the active range.'
+            : 'Properties track the cursor position over the element. From = pointer at left/top edge, To = right/bottom edge.'}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function triggerLabel(key) {
+  switch (key) {
+    case 'scroll': return 'Scroll into view';
+    case 'load':   return 'Page load';
+    case 'click':  return 'Click';
+    case 'hover':  return 'Hover';
+    default:       return key;
+  }
+}
+
+function StepCard({ index, step, trigger, canMoveUp, canMoveDown, onChange, onRemove, onMoveUp, onMoveDown }) {
+  const prop = TIMELINE_PROPERTIES.find((p) => p.key === step.property) || TIMELINE_PROPERTIES[0];
+  const isScrollDrive = trigger === 'scroll-drive';
+  const isMouse       = trigger === 'mouse';
+  return (
+    <div style={{
+      border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+      padding: '8px', background: '#1f1f1f',
+      display: 'flex', flexDirection: 'column', gap: '6px',
+    }}>
+      {/* Header row — index + reorder + delete */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        paddingBottom: '4px', borderBottom: `1px solid ${W.panelBorder}`,
+      }}>
+        <span style={{ color: W.textDim, fontSize: '10.5px', fontWeight: 700 }}>
+          STEP {index + 1}
+        </span>
+        <span style={{ flex: 1 }} />
+        <MiniBtn onClick={onMoveUp}   disabled={!canMoveUp}   title="Move up">↑</MiniBtn>
+        <MiniBtn onClick={onMoveDown} disabled={!canMoveDown} title="Move down">↓</MiniBtn>
+        <MiniBtn onClick={onRemove} title="Remove step">×</MiniBtn>
+      </div>
+
+      <Row label="Target">
+        <select
+          value={step.target || 'self'}
+          onChange={(e) => onChange({ target: e.target.value, targetValue: e.target.value === 'self' ? '' : step.targetValue })}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          {TIMELINE_TARGETS.map((t) => (
+            <option key={t.key} value={t.key}>{t.label}</option>
+          ))}
+        </select>
+      </Row>
+      {step.target && step.target !== 'self' && (
+        <Row label={step.target === 'class' ? 'Class' : 'Selector'}>
+          <CommitInput
+            value={step.targetValue}
+            onCommit={(v) => onChange({ targetValue: v })}
+            placeholder={step.target === 'class' ? '.card' : '.hero > h1'}
+          />
+        </Row>
+      )}
+
+      <Row label="Property">
+        <select
+          value={step.property}
+          onChange={(e) => {
+            const nextProp = TIMELINE_PROPERTIES.find((p) => p.key === e.target.value);
+            onChange({
+              property: e.target.value,
+              unit: nextProp?.unit || '',
+            });
+          }}
+          style={{
+            width: '100%', height: '22px',
+            background: W.input, color: W.text,
+            border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+            fontSize: '11px',
+          }}
+        >
+          {TIMELINE_PROPERTIES.map((p) => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+        </select>
+      </Row>
+
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <Row label="From">
+          <CommitInput
+            value={step.from}
+            onCommit={(v) => onChange({ from: v })}
+            placeholder="0"
+          />
+        </Row>
+        <Row label="To">
+          <CommitInput
+            value={step.to}
+            onCommit={(v) => onChange({ to: v })}
+            placeholder="0"
+          />
+        </Row>
+      </div>
+
+      {prop.unit && (
+        <Row label="Unit">
+          <CommitInput
+            value={step.unit}
+            onCommit={(v) => onChange({ unit: v })}
+            placeholder={prop.unit}
+          />
+        </Row>
+      )}
+
+      {!isScrollDrive && !isMouse && (
+        <>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <Row label="Duration">
+              <CommitInput
+                value={step.duration}
+                onCommit={(v) => onChange({ duration: clampMs(v) })}
+                placeholder="600"
+              />
+            </Row>
+            <Row label="Delay">
+              <CommitInput
+                value={step.delay}
+                onCommit={(v) => onChange({ delay: clampMs(v) })}
+                placeholder="0"
+              />
+            </Row>
+          </div>
+          <Row label="Easing">
+            <EasingField
+              value={step.easing}
+              onChange={(v) => onChange({ easing: v })}
+            />
+          </Row>
+        </>
+      )}
+
+      {isScrollDrive && (
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <Row label="Start">
+            <CommitInput
+              value={step.fromProgress}
+              parse={parseProgress}
+              onCommit={(v) => onChange({ fromProgress: v })}
+              placeholder="0"
+            />
+          </Row>
+          <Row label="End">
+            <CommitInput
+              value={step.toProgress}
+              parse={parseProgress}
+              onCommit={(v) => onChange({ toProgress: v })}
+              placeholder="1"
+            />
+          </Row>
+        </div>
+      )}
+
+      {isMouse && (
+        <Row label="Axis">
+          <select
+            value={step.axis || 'x'}
+            onChange={(e) => onChange({ axis: e.target.value })}
+            style={{
+              width: '100%', height: '22px',
+              background: W.input, color: W.text,
+              border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+              fontSize: '11px',
+            }}
+          >
+            <option value="x">X (horizontal)</option>
+            <option value="y">Y (vertical)</option>
+          </select>
+        </Row>
+      )}
+    </div>
+  );
+}
+
+function clampMs(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, n);
+}
+
+function MiniBtn({ children, onClick, disabled, title }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: '22px', height: '22px', padding: 0,
+        background: disabled ? 'transparent' : '#2a2a2a',
+        color: disabled ? W.textFaint : W.text,
+        border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fontSize: '12px', fontWeight: 700, lineHeight: 1,
+      }}
+    >{children}</button>
   );
 }
