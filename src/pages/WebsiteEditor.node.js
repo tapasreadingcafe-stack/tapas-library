@@ -92,6 +92,10 @@ const ALLOWED_TAGS = new Set([
   'details', 'summary',
   'u', 's', 'code', 'sup', 'sub', // rich-text mark tags (Phase D)
   'br', 'hr',
+  // <style> is the escape hatch for raw CSS (keyframes, ::before,
+  // gradients) that the class compiler can't express. The editor
+  // renders it too so the canvas matches the storefront.
+  'style',
   'body', // compiler uses body as the page root; we rewrite to div
 ]);
 
@@ -109,11 +113,51 @@ const COMPOSITE_TAG_REWRITE = {
 
 const ATTR_ALIASES = { class: 'className', for: 'htmlFor' };
 
+// Parse an inline-CSS string "color: red; padding: 10px" into the
+// React style-object shape. React throws invariant #62 if `style` is
+// a string, so tree imports written as HTML-style inline CSS would
+// otherwise crash on the canvas.
+function parseStyleString(str) {
+  if (!str || typeof str !== 'string') return {};
+  const out = {};
+  for (const decl of str.split(';')) {
+    const idx = decl.indexOf(':');
+    if (idx < 0) continue;
+    const prop = decl.slice(0, idx).trim();
+    const val = decl.slice(idx + 1).trim();
+    if (!prop || !val) continue;
+    const camel = prop.startsWith('--')
+      ? prop
+      : prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = val;
+  }
+  return out;
+}
+
+const BOOLEAN_ATTRS = new Set([
+  'required', 'disabled', 'readonly', 'checked', 'selected', 'hidden',
+  'autofocus', 'multiple', 'novalidate', 'open', 'reversed', 'loop',
+  'autoplay', 'controls', 'muted', 'playsinline', 'default',
+]);
+
 function attrsToProps(attrs) {
   const out = {};
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v === undefined || v === null) continue;
-    out[ATTR_ALIASES[k] || k] = v;
+    const outKey = ATTR_ALIASES[k] || k;
+    if (outKey === 'style' && typeof v === 'string') {
+      out.style = parseStyleString(v);
+      continue;
+    }
+    if (outKey === 'readonly') {
+      out.readOnly = true;
+      continue;
+    }
+    if (BOOLEAN_ATTRS.has(outKey) && (v === '' || v === outKey || v === 'true')) {
+      out[outKey] = true;
+      continue;
+    }
+    out[outKey] = v;
   }
   return out;
 }

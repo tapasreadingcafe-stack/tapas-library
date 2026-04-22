@@ -137,6 +137,12 @@ const ALLOWED_TAGS = new Set([
   'details', 'summary',
   'u', 's', 'code', 'sup', 'sub',   // rich-text mark tags (Phase D)
   'br', 'hr',
+  // <style> inside the tree is the escape hatch for raw CSS that the
+  // class compiler can't express: @keyframes, ::before / ::after, @font-face
+  // imports, complex gradients. Staff can keep the style node in the
+  // tree and the class compiler's output layers on top — cascade wins
+  // follow normal CSS precedence (order in the tree + specificity).
+  'style',
   // body is used by the compiler as the tree root; React won't render a
   // nested <body> so we rewrite it to <div class="tapas-page-root">.
   'body',
@@ -300,11 +306,54 @@ const ATTR_ALIASES = {
   for:   'htmlFor',
 };
 
+// HTML-style "color: red; padding-top: 12px" → React style object.
+// React throws invariant #62 when `style` is a string; tree authors
+// (editor + raw HTML imports) commonly write inline CSS as strings, so
+// we parse it here instead of forcing each tree to use objects.
+function parseStyleString(str) {
+  if (!str || typeof str !== 'string') return {};
+  const out = {};
+  for (const decl of str.split(';')) {
+    const idx = decl.indexOf(':');
+    if (idx < 0) continue;
+    const prop = decl.slice(0, idx).trim();
+    const val = decl.slice(idx + 1).trim();
+    if (!prop || !val) continue;
+    const camel = prop.startsWith('--')
+      ? prop
+      : prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = val;
+  }
+  return out;
+}
+
+// HTML booleans — an empty-string attribute like required="" is valid
+// HTML but React wants `true` instead. Normalize the common cases so
+// imported trees don't trip React validation.
+const BOOLEAN_ATTRS = new Set([
+  'required', 'disabled', 'readonly', 'checked', 'selected', 'hidden',
+  'autofocus', 'multiple', 'novalidate', 'open', 'reversed', 'loop',
+  'autoplay', 'controls', 'muted', 'playsinline', 'default',
+]);
+
 function attrsToReactProps(attrs) {
   const out = {};
   for (const [k, v] of Object.entries(attrs)) {
     if (v === undefined || v === null) continue;
     const outKey = ATTR_ALIASES[k] || k;
+    if (outKey === 'style' && typeof v === 'string') {
+      out.style = parseStyleString(v);
+      continue;
+    }
+    // readonly is the HTML spelling; React expects readOnly.
+    if (outKey === 'readonly') {
+      out.readOnly = BOOLEAN_ATTRS.has(outKey) ? true : v;
+      continue;
+    }
+    if (BOOLEAN_ATTRS.has(outKey) && (v === '' || v === outKey || v === 'true')) {
+      out[outKey] = true;
+      continue;
+    }
     out[outKey] = v;
   }
   return out;
