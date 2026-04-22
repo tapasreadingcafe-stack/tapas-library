@@ -92,7 +92,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount, onSave, saving, savedFlash }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount, onSave, onPublish, saving, savedFlash, conflict }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -233,7 +233,18 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '11px', fontWeight: 700,
         }}>T</div>
-        {(() => {
+        {conflict ? (
+          <button
+            onClick={() => window.location.reload()}
+            title="Another tab saved newer changes. Click to reload and resume editing."
+            style={{
+              height: '26px', padding: '0 14px',
+              background: '#b91c1c', color: '#fff',
+              border: '1px solid #ef4444', borderRadius: '3px',
+              cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+            }}
+          >Reload to resume</button>
+        ) : (() => {
           const canSave = unsavedCount > 0 && !saving;
           const label = saving ? 'Saving…' : (savedFlash && unsavedCount === 0 ? 'Saved ✓' : 'Save');
           return (
@@ -260,12 +271,22 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           border: `1px solid ${W.topbarBorder}`, borderRadius: '3px',
           cursor: 'pointer', fontSize: '11px',
         }}>Share</button>
-        <button style={{
-          height: '26px', padding: '0 14px',
-          background: W.accent, color: '#fff',
-          border: 'none', borderRadius: '3px',
-          cursor: 'pointer', fontSize: '11px', fontWeight: 600,
-        }}>Publish</button>
+        <button
+          onClick={conflict ? undefined : onPublish}
+          disabled={conflict || saving}
+          title={conflict
+            ? 'Reload before publishing — another tab has newer changes.'
+            : 'Publish: flushes pending edits to the live storefront.'}
+          style={{
+            height: '26px', padding: '0 14px',
+            background: conflict || saving ? 'rgba(20,110,245,0.45)' : W.accent,
+            color: '#fff',
+            border: 'none', borderRadius: '3px',
+            cursor: conflict || saving ? 'not-allowed' : 'pointer',
+            fontSize: '11px', fontWeight: 600,
+            opacity: conflict || saving ? 0.7 : 1,
+          }}
+        >Publish</button>
       </div>
     </div>
   );
@@ -1585,6 +1606,20 @@ export default function WebsiteEditor() {
     persistSnapshot(content);
   }, [content, conflict, persistSnapshot]);
 
+  // Publish — in this schema the storefront reads store_content_v2
+  // directly, so "publish" is a confirmed save-now. If nothing is
+  // pending we still show a toast so the action has feedback.
+  const handlePublish = useCallback(async () => {
+    if (!content || conflict) return;
+    const rowVersion = Number(content?.schema_version) || 1;
+    if (rowVersion > SCHEMA_VERSION) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    if (content !== loadedRef.current) {
+      await persistSnapshot(content);
+    }
+    flashToast('Published to the live storefront.');
+  }, [content, conflict, persistSnapshot, flashToast]);
+
   // --- Autosave: debounced upsert back to app_settings.store_content_v2 --
   // Mirrors the legacy editor's pattern: 900 ms after the last edit, push
   // the whole blob. Skips if we haven't drifted from what we loaded.
@@ -2369,8 +2404,10 @@ export default function WebsiteEditor() {
         pages={pages}
         unsavedCount={unsavedCount}
         onSave={handleSaveNow}
+        onPublish={handlePublish}
         saving={saving}
         savedFlash={savedFlash}
+        conflict={conflict}
       />
       {editingComponentId && (
         <div style={{
