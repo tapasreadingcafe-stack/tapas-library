@@ -62,7 +62,8 @@ const RAW_CSS = `
 .tapas-landing h1 em, .tapas-landing h2 em, .tapas-landing h3 em { font-style: italic; font-weight: 500; }
 .tapas-landing p { line-height: 1.6; margin: 0; }
 
-.tapas-landing .nav-band { background: var(--lime); }
+.tapas-landing .nav-band { background: var(--lime); position: sticky; top: 0; z-index: 50; }
+.tapas-landing .hero-band { background: var(--lime); }
 .tapas-landing .nav { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 20px 0; gap: 40px; }
 .tapas-landing .nav .links { display: flex; gap: 36px; align-items: center; font-size: 14.5px; font-weight: 500; }
 .tapas-landing .nav .links a:hover { color: var(--pink); }
@@ -567,8 +568,15 @@ const root = () => node('body', {
   classes: ['tapas-landing'],
   children: [
     styleNode(RAW_CSS),
-    node('div', { classes: ['nav-band', 'hero-band'], children: [
-      node('div', { classes: ['wrap'], children: [nav(), hero()] }),
+    // Sticky nav band — sits at body level so position:sticky resolves
+    // against the page viewport, not the hero section's height. Before
+    // this split, the nav lived inside hero-band and stopped being
+    // pinned the moment the user scrolled past the hero.
+    node('div', { classes: ['nav-band'], children: [
+      node('div', { classes: ['wrap'], children: [nav()] }),
+    ]}),
+    node('div', { classes: ['hero-band'], children: [
+      node('div', { classes: ['wrap'], children: [hero()] }),
     ]}),
     marquee(),
     services(),

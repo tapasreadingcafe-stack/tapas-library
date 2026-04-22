@@ -1010,6 +1010,45 @@ function childHasClass(child, name) {
     && child.classes.includes(name);
 }
 
+// Hand-authored pages (e.g. the landing page built by
+// scripts/buildLandingTree.mjs) open with a raw <style> node carrying
+// their scoped CSS. Skip over those so the nav/footer check lands on
+// the first real chrome element.
+function firstContentChild(kids) {
+  if (!Array.isArray(kids)) return null;
+  for (const k of kids) { if (k?.tag !== 'style') return k; }
+  return null;
+}
+function lastContentChild(kids) {
+  if (!Array.isArray(kids)) return null;
+  for (let i = kids.length - 1; i >= 0; i--) {
+    if (kids[i]?.tag !== 'style') return kids[i];
+  }
+  return null;
+}
+
+// A page is considered to already own its navbar when its first
+// meaningful child is either our seeded tapas-navbar, a raw <nav>
+// tag, or a wrapper explicitly marked as a nav band (as the landing
+// page uses). Without this the self-heal fights hand-authored trees
+// and stacks a second white navbar on top of the real one.
+function pageHasNavbar(kids) {
+  const first = firstContentChild(kids);
+  if (!first) return false;
+  if (first.tag === 'nav') return true;
+  if (childHasClass(first, 'tapas-navbar')) return true;
+  if (childHasClass(first, 'nav-band')) return true;
+  return false;
+}
+function pageHasFooter(kids) {
+  const last = lastContentChild(kids);
+  if (!last) return false;
+  if (last.tag === 'footer') return true;
+  if (childHasClass(last, 'tapas-footer')) return true;
+  if (childHasClass(last, 'site-foot')) return true;
+  return false;
+}
+
 function seedPage({ key, slug, name, brandName }) {
   return {
     id: `p_${key}`,
@@ -1056,8 +1095,8 @@ export function ensureSiteDefaults(content) {
     if (!page?.tree || !Array.isArray(page.tree.children)) continue;
 
     const kids = page.tree.children;
-    const needsNav    = !childHasClass(kids[0], 'tapas-navbar');
-    const needsFooter = !childHasClass(kids[kids.length - 1], 'tapas-footer');
+    const needsNav    = !pageHasNavbar(kids);
+    const needsFooter = !pageHasFooter(kids);
     if (!needsNav && !needsFooter) continue;
 
     if (!mutated) {
