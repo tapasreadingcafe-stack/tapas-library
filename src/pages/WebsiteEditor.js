@@ -288,21 +288,21 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           cursor: 'pointer', fontSize: '11px',
         }}>Share</button>
         <button
-          onClick={conflict ? undefined : onPublish}
-          disabled={conflict || saving}
+          onClick={saving ? undefined : onPublish}
+          disabled={saving}
           title={conflict
-            ? 'Reload before publishing — another tab has newer changes.'
+            ? 'Publish this tab\'s version — overwrites the other tab\'s newer changes.'
             : 'Publish: flushes pending edits to the live storefront.'}
           style={{
             height: '26px', padding: '0 14px',
-            background: conflict || saving ? 'rgba(20,110,245,0.45)' : W.accent,
+            background: saving ? 'rgba(20,110,245,0.45)' : (conflict ? '#ef4444' : W.accent),
             color: '#fff',
             border: 'none', borderRadius: '3px',
-            cursor: conflict || saving ? 'not-allowed' : 'pointer',
+            cursor: saving ? 'not-allowed' : 'pointer',
             fontSize: '11px', fontWeight: 600,
-            opacity: conflict || saving ? 0.7 : 1,
+            opacity: saving ? 0.7 : 1,
           }}
-        >Publish</button>
+        >{conflict ? 'Publish anyway' : 'Publish'}</button>
       </div>
     </div>
   );
@@ -1570,7 +1570,7 @@ export default function WebsiteEditor() {
   // Save button so both paths stay in lockstep on conflict detection,
   // schema stamping, and the loadedRef/updatedAt bookkeeping.
   const persistSnapshot = useCallback(async (snapshot, { overwrite = false } = {}) => {
-    if (!snapshot) return;
+    if (!snapshot) return { ok: false, reason: 'no-content' };
     setSaving(true); setSaveError('');
     try {
       // Optimistic lock: fetch the row's current updated_at and
@@ -1588,7 +1588,7 @@ export default function WebsiteEditor() {
       if (remoteAhead && !overwrite) {
         setConflict(true);
         setSaveError('Another tab saved newer changes. Reload before editing to avoid overwriting their work.');
-        return;
+        return { ok: false, reason: 'conflict' };
       }
       if (remoteAhead && overwrite) {
         // User chose to overwrite. Adopt the remote timestamp as our
@@ -1611,8 +1611,10 @@ export default function WebsiteEditor() {
       setUnsavedCount(0);
       setSavedFlash(true);
       if (overwrite) setConflict(false);
+      return { ok: true };
     } catch (err) {
       setSaveError(err.message || 'Failed to save.');
+      return { ok: false, reason: 'error', error: err };
     } finally {
       setSaving(false);
     }
@@ -1631,11 +1633,12 @@ export default function WebsiteEditor() {
       return;
     }
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    await persistSnapshot(content, { overwrite: true });
-    // saveError is set inside persistSnapshot on failure — re-read via
-    // the closure isn't reliable, so rely on the flash rendered in the
-    // top bar. Success clears conflict + shows the Saved ✓ chip.
-    flashToast('Saved (overwrote other tab\'s changes).');
+    const result = await persistSnapshot(content, { overwrite: true });
+    if (result?.ok) {
+      flashToast('Saved (overwrote other tab\'s changes).');
+    } else {
+      flashToast(`Save failed: ${result?.error?.message || 'unknown error — check DevTools.'}`);
+    }
   }, [content, persistSnapshot, flashToast]);
 
   // Manual Save — cancels the pending debounce and flushes the current
@@ -1651,17 +1654,33 @@ export default function WebsiteEditor() {
   }, [content, conflict, persistSnapshot]);
 
   // Publish — in this schema the storefront reads store_content_v2
-  // directly, so "publish" is a confirmed save-now. If nothing is
-  // pending we still show a toast so the action has feedback.
+  // directly, so "publish" is a confirmed save-now. When a remote-ahead
+  // conflict is latched we still let the user publish, but they're
+  // explicitly overwriting (button label becomes "Publish anyway").
   const handlePublish = useCallback(async () => {
-    if (!content || conflict) return;
-    const rowVersion = Number(content?.schema_version) || 1;
-    if (rowVersion > SCHEMA_VERSION) return;
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    if (content !== loadedRef.current) {
-      await persistSnapshot(content);
+    if (!content) {
+      flashToast('Nothing to publish — content still loading.');
+      return;
     }
-    flashToast('Published to the live storefront.');
+    const rowVersion = Number(content?.schema_version) || 1;
+    if (rowVersion > SCHEMA_VERSION) {
+      flashToast('Read-only: stored schema is newer than this editor build.');
+      return;
+    }
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    const nothingToFlush = content === loadedRef.current && !conflict;
+    if (nothingToFlush) {
+      flashToast('Already published — storefront has the latest version.');
+      return;
+    }
+    const result = await persistSnapshot(content, { overwrite: conflict });
+    if (result?.ok) {
+      flashToast(conflict
+        ? 'Published (overwrote other tab\'s changes).'
+        : 'Published to the live storefront.');
+    } else {
+      flashToast(`Publish failed: ${result?.error?.message || 'unknown error — check DevTools.'}`);
+    }
   }, [content, conflict, persistSnapshot, flashToast]);
 
   // --- Autosave: debounced upsert back to app_settings.store_content_v2 --
