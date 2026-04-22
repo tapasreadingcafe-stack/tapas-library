@@ -157,6 +157,21 @@ function PageLoader() {
 }
 
 function AppShell() {
+  const v2 = useV2Content();
+  // Hold the first paint until we know whether v2 is enabled. Without
+  // this, the shell renders the global HeaderTemplate + LegacyHome for
+  // ~300ms before v2 arrives and swaps them out — the user sees a flash
+  // of the old UI on every reload. A blank frame against --bg is
+  // kinder than that flash; once v2.loaded flips we render normally.
+  if (!v2?.loaded) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--bg, #faf8f4)',
+        transition: 'background 200ms',
+      }} />
+    );
+  }
   return (
     <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" />
