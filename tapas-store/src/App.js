@@ -62,10 +62,16 @@ function currentV2PageTree(v2, pathname) {
   return v2.content.pages[key]?.tree || null;
 }
 
+// Routes whose page component renders its own navbar + footer, so the
+// global app shell must step aside. `/` is the hand-authored landing
+// page (LandingPage.js). Add other bespoke routes here as they land.
+const FULL_BLEED_ROUTES = new Set(['/']);
+
 function GlobalHeader() {
   const location = useLocation();
   const content = useSiteContent();
   const v2 = useV2Content();
+  if (FULL_BLEED_ROUTES.has(location.pathname)) return null;
   const v2Tree = currentV2PageTree(v2, location.pathname);
   if (v2Tree && v2TreeHas(v2Tree, hasNavbarNode)) return null;
   if (!v2Tree) {
@@ -79,6 +85,7 @@ function GlobalFooter() {
   const location = useLocation();
   const content = useSiteContent();
   const v2 = useV2Content();
+  if (FULL_BLEED_ROUTES.has(location.pathname)) return null;
   const v2Tree = currentV2PageTree(v2, location.pathname);
   if (v2Tree && v2TreeHas(v2Tree, hasFooterNode)) return null;
   if (!v2Tree) {
@@ -113,6 +120,7 @@ function lazyWithRetry(importFn) {
   );
 }
 
+const LandingPage     = lazyWithRetry(() => import('./pages/LandingPage'));
 const Home            = lazyWithRetry(() => import('./pages/Home'));
 const Catalog         = lazyWithRetry(() => import('./pages/Catalog'));
 const BookDetail      = lazyWithRetry(() => import('./pages/BookDetail'));
@@ -187,7 +195,8 @@ function AppShell() {
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/"              element={<Home />} />
+            <Route path="/"              element={<LandingPage />} />
+            <Route path="/home-legacy"   element={<Home />} />
             <Route path="/books"         element={<Catalog />} />
             <Route path="/books/:id"     element={<BookDetail />} />
             <Route path="/offers"        element={<Offers />} />
