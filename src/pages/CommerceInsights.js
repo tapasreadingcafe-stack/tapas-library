@@ -442,7 +442,7 @@ export default function CommerceInsights() {
                   </div>
                 ) : (data.topBlogPosts || []).map(p => (
                   <div key={p.slug} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 4px', borderBottom: '1px solid #f3f3f3', fontSize: '13px' }}>
-                    <Link to={`/store/content`} style={{ color: '#667eea', textDecoration: 'none' }}>{p.slug}</Link>
+                    <Link to={`/store/content-v2`} style={{ color: '#667eea', textDecoration: 'none' }}>{p.slug}</Link>
                     <span style={{ color: '#2c3e50', fontWeight: 700 }}>{p.count} views</span>
                   </div>
                 ))}

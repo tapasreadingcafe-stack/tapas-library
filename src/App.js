@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { HintBubble } from './components/HintTooltip';
 import { supabase } from './utils/supabase';
 import GlobalTooltip from './components/GlobalTooltip';
@@ -104,7 +104,6 @@ const KioskMode             = lazyWithRetry(() => import('./pages/KioskMode'));
 
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
 const CustomerOrders        = lazyWithRetry(() => import('./pages/CustomerOrders'));
-const SiteContent           = lazyWithRetry(() => import('./pages/SiteContent'));
 const WebsiteEditor         = lazyWithRetry(() => import('./pages/WebsiteEditor'));
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
@@ -272,8 +271,7 @@ const NAV_CONFIG = [
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
       { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
-      { to: '/store/content',    icon: '🎨', label: 'Website Editor' },
-      { to: '/store/content-v2', icon: '⚡', label: 'Website Editor v2', badge: 'BETA' },
+      { to: '/store/content-v2', icon: '🎨', label: 'Website Editor' },
     ],
   },
   {
@@ -769,7 +767,7 @@ function DashboardShell() {
             <Route path="/store/newsletter"                   element={<NewsletterInbox />} />
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/commerce-insights"                  element={<CommerceInsights />} />
-            <Route path="/store/content"                      element={<SiteContent />} />
+            <Route path="/store/content"                      element={<Navigate to="/store/content-v2" replace />} />
             <Route path="/store/content-v2"                   element={<WebsiteEditor />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
