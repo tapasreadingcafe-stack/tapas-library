@@ -199,6 +199,38 @@ export function SiteSettingsPanel({ content, onPatch }) {
           />
         </Field>
       </Section>
+      <Section title="Backup">
+        <button
+          onClick={() => {
+            // Snapshots the full v2 content blob as JSON so staff can
+            // tuck it away before a big restructure. Restoring is a
+            // manual Supabase paste for now; a proper import flow
+            // can come in a later session.
+            const payload = JSON.stringify(content ?? {}, null, 2);
+            const blob = new Blob([payload], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const date = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `store_content_v2_${date}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+          }}
+          disabled={!content}
+          style={{
+            padding: '6px 10px', fontSize: '11px', fontWeight: 600,
+            background: P.accentDim, color: P.accent,
+            border: `1px solid ${P.accent}`, borderRadius: '3px',
+            cursor: content ? 'pointer' : 'not-allowed',
+          }}
+        >⬇ Download content as JSON</button>
+        <div style={{ color: P.textFaint, fontSize: '10.5px', lineHeight: 1.4 }}>
+          The whole <code>store_content_v2</code> row, ready to paste
+          back into Supabase if you need to roll back.
+        </div>
+      </Section>
     </div>,
     { title: 'Settings' }
   );
@@ -479,6 +511,7 @@ const SHORTCUTS = [
   ]},
   { group: 'Navigation', items: [
     ['⌘K',          'Open command palette'],
+    ['⌘/',          'Open Add panel (insert block)'],
     ['?',           'Open this help sheet'],
   ]},
 ];

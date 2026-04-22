@@ -73,6 +73,11 @@ export default function AssetsPanel({ pageId, onInsertAsset }) {
         kind={grid.kind}
         onKind={grid.setKind}
       />
+      <FolderRow
+        folders={grid.folders}
+        folder={grid.folder}
+        onFolder={grid.setFolder}
+      />
       <GridSurface
         state={grid}
         onInsertAsset={onInsertAsset}
@@ -139,6 +144,11 @@ export function AssetPicker({ open, pageId, onPick, onClose }) {
           kind={grid.kind}
           onKind={grid.setKind}
         />
+        <FolderRow
+          folders={grid.folders}
+          folder={grid.folder}
+          onFolder={grid.setFolder}
+        />
         <GridSurface
           state={grid}
           variant="picker"
@@ -166,6 +176,7 @@ function useGridState({ pageId, enabled = true }) {
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
+  const [folder, setFolder] = useState('all');
   const [uploads, setUploads] = useState([]);   // { id, name, progress, error? }
   const [toast, setToast] = useState('');
   const toastTimerRef = useRef(null);
@@ -233,17 +244,28 @@ function useGridState({ pageId, enabled = true }) {
     }
   }, [notify]);
 
+  // Derive the distinct folder list (by uploading page) straight
+  // from the asset set so new uploads add folders without a re-fetch.
+  const folders = useMemo(() => {
+    const names = new Set();
+    for (const a of assets) if (a.page_id) names.add(a.page_id);
+    return Array.from(names).sort();
+  }, [assets]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return assets.filter((a) => {
       if (kind !== 'all' && a.kind !== kind) return false;
+      if (folder !== 'all' && a.page_id !== folder) return false;
       if (!q) return true;
       return (a.name || '').toLowerCase().includes(q)
           || (a.page_id || '').toLowerCase().includes(q);
     });
-  }, [assets, query, kind]);
+  }, [assets, query, kind, folder]);
 
   return {
+    folders,
+    folder, setFolder,
     assets: filtered,
     loading,
     loadError,
@@ -316,6 +338,37 @@ function btnStyle(primary) {
 // ---------------------------------------------------------------------
 // Filter row — search + kind tabs
 // ---------------------------------------------------------------------
+// Folder chips — upload paths use the uploading page's key as a
+// prefix, so grouping by page_id gives staff a lightweight folders
+// UI without needing an explicit move operation. Hidden when there's
+// just one folder (usual fresh-site state).
+function FolderRow({ folders, folder, onFolder }) {
+  if (!folders || folders.length <= 1) return null;
+  const all = [{ key: 'all', label: `All · ${folders.length} folders` }]
+    .concat(folders.map((f) => ({ key: f, label: f })));
+  return (
+    <div style={{
+      padding: '6px 10px', display: 'flex', gap: '4px', flexWrap: 'wrap',
+      borderBottom: `1px solid ${P.border}`,
+    }}>
+      {all.map((f) => (
+        <button
+          key={f.key}
+          onClick={() => onFolder(f.key)}
+          style={{
+            padding: '3px 8px', fontSize: '10.5px',
+            background: folder === f.key ? P.accentDim : 'transparent',
+            color:      folder === f.key ? P.accent    : P.textDim,
+            border: `1px solid ${folder === f.key ? P.accent : P.inputBorder}`,
+            borderRadius: '3px', cursor: 'pointer',
+            fontFamily: f.key === 'all' ? 'inherit' : 'ui-monospace, monospace',
+          }}
+        >{f.label}</button>
+      ))}
+    </div>
+  );
+}
+
 function FilterRow({ query, onQuery, kind, onKind }) {
   return (
     <div style={{

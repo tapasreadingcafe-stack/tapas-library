@@ -59,6 +59,7 @@ import {
 import AssetsPanel from './WebsiteEditor.assets';
 import ComponentsPanel from './WebsiteEditor.components';
 import CMSPanel from './WebsiteEditor.cms';
+import AccessibilityPanel from './WebsiteEditor.a11y';
 
 // =====================================================================
 // Webflow palette — pulled straight from the spec. Every pixel and
@@ -266,6 +267,7 @@ const RAIL_ICONS = [
   { key: 'ecommerce',    label: 'Ecommerce',    glyph: '$' },
 ];
 const RAIL_FOOTER = [
+  { key: 'a11y',     label: 'Accessibility', glyph: '♿' },
   { key: 'settings', label: 'Settings', glyph: '⚙' },
   { key: 'search',   label: 'Search',   glyph: '⌕' },
   { key: 'help',     label: 'Help',     glyph: '?' },
@@ -402,6 +404,21 @@ const DEVICES = [
   { key: 'mobileP',  label: 'Mobile P', width: '375px',  glyph: '▯' },
 ];
 
+// Grid / flex overlay CSS. Activates only on elements carrying
+// data-tapas-grid-overlay (the scanning useEffect sets it whenever
+// the toolbar ▦ toggle is on). Draws a subtle accent-colored outline
+// on direct children so staff see cell boundaries.
+const GRID_OVERLAY_CSS = `
+[data-tapas-grid-overlay] {
+  outline: 1px dashed rgba(20, 110, 245, 0.55);
+  outline-offset: -1px;
+}
+[data-tapas-grid-overlay] > * {
+  outline: 1px dashed rgba(20, 110, 245, 0.35);
+  outline-offset: -1px;
+}
+`;
+
 // Tags the Node renderer treats as void — a drop INSIDE them is
 // nonsensical, so the drag handler rewrites "inside" to before/after
 // when the cursor is over one of these.
@@ -436,6 +453,11 @@ function Canvas({
   // triggers on the hovered element make it impossible to style
   // (the element tilts away every time you try to click it).
   const [previewInteractions, setPreviewInteractions] = useState(false);
+  // Grid overlay — when on, the canvas injects outlines on direct
+  // children of every element whose computed display is `grid` or
+  // `flex`. Lets staff see row + column layout without inspecting
+  // DOM. Toolbar ▦ button toggles it.
+  const [gridOverlay, setGridOverlay] = useState(false);
   const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
   const cssText = useMemo(() => compileClassesToCSS(classes || {}), [classes]);
   const surfaceRef = useRef(null);
@@ -636,6 +658,34 @@ function Canvas({
     };
   }, [tree, previewInteractions]);
 
+  // Grid / flex overlay — toolbar ▦. Walk the rendered DOM, tag
+  // containers whose computed display is grid/flex, and let CSS
+  // outline their children. Runs on every tree change *and* on
+  // toggle; on unmount / toggle-off we strip the tags so the outlines
+  // disappear cleanly.
+  useEffect(() => {
+    if (!surfaceRef.current) return undefined;
+    const surface = surfaceRef.current;
+    if (!gridOverlay) {
+      surface.querySelectorAll('[data-tapas-grid-overlay]').forEach((el) => {
+        el.removeAttribute('data-tapas-grid-overlay');
+      });
+      return undefined;
+    }
+    const nodes = surface.querySelectorAll('[data-tapas-node-id]');
+    const tagged = [];
+    nodes.forEach((el) => {
+      const disp = window.getComputedStyle(el).display;
+      if (disp === 'grid' || disp === 'flex' || disp === 'inline-grid' || disp === 'inline-flex') {
+        el.setAttribute('data-tapas-grid-overlay', '');
+        tagged.push(el);
+      }
+    });
+    return () => {
+      tagged.forEach((el) => el.removeAttribute('data-tapas-grid-overlay'));
+    };
+  }, [tree, gridOverlay]);
+
   // Walk from the event target up to the nearest node element, then
   // classify the cursor's vertical band into before / after / inside.
   // Returns null if the cursor isn't over any node (drop falls back
@@ -781,7 +831,16 @@ function Canvas({
         >
           {previewInteractions ? '◼ Preview on' : '▶ Preview'}
         </button>
-        <button style={toolbarBtn(W)} title="Grid overlay">▦</button>
+        <button
+          onClick={() => setGridOverlay((g) => !g)}
+          title={gridOverlay ? 'Hide grid / flex outlines' : 'Show grid / flex outlines'}
+          style={{
+            ...toolbarBtn(W),
+            background: gridOverlay ? W.accentDim : 'transparent',
+            color:      gridOverlay ? W.accent    : W.textDim,
+            border: `1px solid ${gridOverlay ? W.accent : 'transparent'}`,
+          }}
+        >▦</button>
       </div>
       {/* Canvas surface */}
       <div
@@ -806,7 +865,7 @@ function Canvas({
             position: 'relative',
           }}
         >
-          <style>{ANIM_CSS}{cssText}</style>
+          <style>{ANIM_CSS}{cssText}{GRID_OVERLAY_CSS}</style>
           <CanvasSelectionShell
             tree={tree}
             selectedId={selectedId}
@@ -1308,6 +1367,29 @@ export default function WebsiteEditor() {
   // Pending-edits count for the topbar chip. Incremented by
   // applyEdit, zeroed by autosave success.
   const [unsavedCount, setUnsavedCount] = useState(0);
+  // Transient ✓ shown right after a successful autosave so staff
+  // get an explicit "done" signal. Auto-clears after ~1500ms.
+  const [savedFlash, setSavedFlash] = useState(false);
+  useEffect(() => {
+    if (!savedFlash) return undefined;
+    const t = setTimeout(() => setSavedFlash(false), 1500);
+    return () => clearTimeout(t);
+  }, [savedFlash]);
+
+  // Guard against accidental tab close / reload while edits are
+  // pending autosave. Browsers ignore the returned string (they
+  // show their own generic prompt), but we still need to call
+  // preventDefault + set returnValue for the dialog to appear.
+  useEffect(() => {
+    if (unsavedCount === 0) return undefined;
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsavedCount]);
   // Transient toast shown at the bottom-right. Used for "can't do
   // that on the page body" and similar soft blocks — previously the
   // app just silently ignored the shortcut.
@@ -1432,6 +1514,7 @@ export default function WebsiteEditor() {
         loadedRef.current = snapshot;
         lastUpdatedAtRef.current = nextUpdatedAt;
         setUnsavedCount(0);
+        setSavedFlash(true);
       } catch (err) {
         setSaveError(err.message || 'Failed to save.');
       } finally {
@@ -1618,6 +1701,15 @@ export default function WebsiteEditor() {
     if (!selectedId) return;
     applyEdit((c) => setNodeAttribute(c, activePageKey, selectedId, key, value));
   }, [selectedId, activePageKey, applyEdit]);
+
+  // Node-explicit attribute setter — needed by surfaces like the
+  // AccessibilityPanel's bulk alt editor where the target node isn't
+  // the current selection (staff are editing several images without
+  // clicking each on the canvas first).
+  const handleSetAttributeOn = useCallback((nodeId, key, value) => {
+    if (!nodeId) return;
+    applyEdit((c) => setNodeAttribute(c, activePageKey, nodeId, key, value));
+  }, [activePageKey, applyEdit]);
 
   const handleRenameAttribute = useCallback((oldKey, newKey) => {
     if (!selectedId) return;
@@ -2079,6 +2171,15 @@ export default function WebsiteEditor() {
         return;
       }
 
+      // Cmd+/ — open the Add rail panel. Matches Webflow's "insert
+      // anywhere" shortcut: fastest way to drop a block without
+      // taking a hand off the keyboard.
+      if (mod && e.key === '/') {
+        setRailActive('add');
+        e.preventDefault();
+        return;
+      }
+
       // Undo / redo — fires regardless of focus so keyboard still
       // rescues users when they're editing inside the Inspector.
       if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
@@ -2274,6 +2375,14 @@ export default function WebsiteEditor() {
               );
             case 'help':
               return <HelpPanel />;
+            case 'a11y':
+              return (
+                <AccessibilityPanel
+                  tree={tree}
+                  onSelect={setSelectedId}
+                  onSetAttributeOn={handleSetAttributeOn}
+                />
+              );
             case 'navigator':
             default:
               return <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />;
@@ -2374,6 +2483,19 @@ export default function WebsiteEditor() {
           pointerEvents: 'none',
         }}>
           {toast}
+        </div>
+      )}
+      {savedFlash && !saving && !saveError && !toast && (
+        <div style={{
+          position: 'absolute', bottom: 8, right: 12,
+          padding: '6px 10px', borderRadius: '4px',
+          background: '#173a23', color: '#86e08b',
+          fontSize: '11px', fontFamily: 'ui-monospace, monospace',
+          border: '1px solid #2a7a4a',
+          zIndex: 20,
+          pointerEvents: 'none',
+        }}>
+          ✓ Saved
         </div>
       )}
     </div>

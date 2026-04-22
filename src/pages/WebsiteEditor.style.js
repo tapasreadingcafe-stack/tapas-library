@@ -636,6 +636,32 @@ function Position({ styles, onSet }) {
       <Field label="Z-index">
         <DimensionInput value={styles['z-index'] || ''} onChange={(v) => onSet('z-index', v)} placeholder="auto" />
       </Field>
+      {/* z-index is a no-op on static-positioned elements. Surface a
+          one-click fix so staff aren't left wondering why their "5"
+          isn't stacking anything. */}
+      {(styles['z-index'] || '').trim()
+        && (!styles.position || styles.position === 'static') && (
+        <div style={{
+          margin: '4px 12px 8px',
+          padding: '6px 8px',
+          background: '#2a1f0a', color: '#f0c068',
+          border: `1px solid #6a5020`,
+          borderRadius: '3px',
+          fontSize: '10.5px', lineHeight: 1.4,
+          display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          <span>z-index needs a non-static position to take effect.</span>
+          <button
+            onClick={() => onSet('position', 'relative')}
+            style={{
+              padding: '2px 6px',
+              background: 'transparent', color: W.accent,
+              border: `1px solid ${W.accent}`, borderRadius: '2px',
+              cursor: 'pointer', fontSize: '10px', fontWeight: 700,
+            }}
+          >Set relative</button>
+        </div>
+      )}
     </div>
   );
 }

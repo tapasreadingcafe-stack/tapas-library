@@ -17,6 +17,27 @@
 import React, { useMemo, useState } from 'react';
 import { BLOCK_CATALOGUE, BLOCK_GROUPS } from './WebsiteEditor.library';
 
+// Session-level recency cache of inserted blocks. Lives in
+// localStorage so it survives reloads but doesn't follow the staff
+// across devices — MRU-style lists work best when they're quick and
+// personal. Cap at 8 so the row stays scannable.
+const RECENT_KEY = 'tapas.editor.recentBlocks';
+const RECENT_CAP = 8;
+function readRecent() {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(RECENT_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.slice(0, RECENT_CAP) : [];
+  } catch { return []; }
+}
+function writeRecent(keys) {
+  try {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(RECENT_KEY, JSON.stringify(keys.slice(0, RECENT_CAP)));
+    }
+  } catch { /* quota / disabled — no-op */ }
+}
+
 const W = {
   navBg:       '#2a2a2a',
   topbarBorder:'#2a2a2a',
@@ -37,6 +58,20 @@ const W = {
 export default function AddPanel({ onInsert }) {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState({});
+  const [recent, setRecent] = useState(() => readRecent());
+
+  // Wrap the caller's insert handler so we can track MRU selections.
+  const handleInsert = (key) => {
+    const next = [key, ...recent.filter((k) => k !== key)].slice(0, RECENT_CAP);
+    setRecent(next);
+    writeRecent(next);
+    onInsert(key);
+  };
+
+  const recentEntries = useMemo(() => {
+    const byKey = Object.fromEntries(BLOCK_CATALOGUE.map((b) => [b.key, b]));
+    return recent.map((k) => byKey[k]).filter(Boolean);
+  }, [recent]);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -95,6 +130,54 @@ export default function AddPanel({ onInsert }) {
 
       {/* Groups */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '8px' }}>
+        {!query && recentEntries.length > 0 && (
+          <div>
+            <div style={{
+              padding: '0 12px', height: '26px',
+              display: 'flex', alignItems: 'center',
+              color: W.textDim, fontSize: '10.5px', fontWeight: 700,
+              letterSpacing: W.labelLetter, textTransform: 'uppercase',
+            }}>Recent</div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '4px',
+              padding: '4px 8px',
+            }}>
+              {recentEntries.map((b) => (
+                <button
+                  key={`recent-${b.key}`}
+                  draggable
+                  onDragStart={(e) => onTileDragStart(e, b.key)}
+                  onClick={() => handleInsert(b.key)}
+                  title={b.label}
+                  style={{
+                    height: '56px',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: '4px',
+                    background: W.input, color: W.textDim,
+                    border: `1px solid ${W.inputBorder}`, borderRadius: '3px',
+                    cursor: 'grab', fontSize: '10.5px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = W.accentDim;
+                    e.currentTarget.style.borderColor = W.accent;
+                    e.currentTarget.style.color = W.accent;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = W.input;
+                    e.currentTarget.style.borderColor = W.inputBorder;
+                    e.currentTarget.style.color = W.textDim;
+                  }}
+                >
+                  <span style={{ fontSize: '16px', lineHeight: 1 }}>{b.glyph}</span>
+                  <span>{b.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {BLOCK_GROUPS.map((g) => {
           const items = groups[g] || [];
           if (items.length === 0) return null;
@@ -130,7 +213,7 @@ export default function AddPanel({ onInsert }) {
                       key={b.key}
                       draggable
                       onDragStart={(e) => onTileDragStart(e, b.key)}
-                      onClick={() => onInsert(b.key)}
+                      onClick={() => handleInsert(b.key)}
                       title={b.label}
                       style={{
                         height: '56px',

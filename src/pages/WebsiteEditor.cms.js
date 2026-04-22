@@ -21,6 +21,7 @@ import {
   listItems, createItem, updateItem, deleteItem,
   makeField, coerceFieldValue, FIELD_TYPES,
 } from '../utils/cms';
+import { supabase } from '../utils/supabase';
 
 const P = {
   bg:          '#2a2a2a',
@@ -305,6 +306,16 @@ function SchemaView({ collection, onBack, onSave }) {
               />
               <button onClick={() => remove(i)} style={iconBtn()} title="Remove">×</button>
             </div>
+            {f.type === 'reference' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: P.textDim, fontSize: '10.5px', width: '64px' }}>Target</span>
+                <Input
+                  value={f.collection || ''}
+                  onChange={(v) => update(i, { collection: v })}
+                  placeholder="collection-slug (e.g. authors)"
+                />
+              </div>
+            )}
             <div style={{ color: collides ? '#ff9a9a' : P.textFaint, fontSize: '10.5px' }}>
               key: <code>{f.key || '(empty)'}</code>
               {collides && ' · ⚠ duplicate key — rename to avoid losing data'}
@@ -556,6 +567,16 @@ function FieldInput({ field, value, onChange }) {
           />
         </Row>
       );
+    case 'reference':
+      return (
+        <Row label={label}>
+          <ReferencePicker
+            value={value}
+            targetSlug={field.collection || ''}
+            onChange={onChange}
+          />
+        </Row>
+      );
     default:
       return (
         <Row label={label}>
@@ -567,6 +588,74 @@ function FieldInput({ field, value, onChange }) {
         </Row>
       );
   }
+}
+
+// ReferencePicker — for `reference` fields. Fetches items from the
+// target collection (by slug) and renders a searchable dropdown. The
+// stored value is the referenced item's UUID, matching PostgREST /
+// foreign-key conventions if we ever upgrade the column to a real FK.
+function ReferencePicker({ value, targetSlug, onChange }) {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!targetSlug) { setItems([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: col, error: colErr } = await supabase
+          .from('store_collections')
+          .select('id')
+          .eq('slug', targetSlug)
+          .maybeSingle();
+        if (colErr) throw colErr;
+        if (!col) { if (!cancelled) { setItems([]); setErr(`Collection "${targetSlug}" not found`); } return; }
+        const { data, error } = await supabase
+          .from('store_collection_items')
+          .select('id, slug, data, status')
+          .eq('collection_id', col.id)
+          .order('slug');
+        if (error) throw error;
+        if (!cancelled) setItems(data || []);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || String(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [targetSlug]);
+
+  if (!targetSlug) {
+    return (
+      <div style={{ color: P.textFaint, fontSize: '10.5px' }}>
+        Set a target collection in the schema first.
+      </div>
+    );
+  }
+  if (err) {
+    return <div style={{ color: '#ff9a9a', fontSize: '10.5px' }}>⚠ {err}</div>;
+  }
+  if (items == null) {
+    return <div style={{ color: P.textFaint, fontSize: '10.5px' }}>Loading…</div>;
+  }
+  return (
+    <select
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: '100%', height: '22px',
+        background: P.input, color: P.text,
+        border: `1px solid ${P.inputBorder}`, borderRadius: '3px',
+        fontSize: '11px',
+      }}
+    >
+      <option value="">— none —</option>
+      {items.map((it) => (
+        <option key={it.id} value={it.id}>
+          {(it.data?.title) || it.slug}
+          {it.status !== 'published' ? ' (draft)' : ''}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 function Row({ label, children, stack }) {
