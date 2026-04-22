@@ -23,6 +23,7 @@ const P = {
   textFaint:   '#6a6a6a',
   rowHover:    '#333',
   accent:      '#146ef5',
+  accentDim:   '#146ef522',
   labelSize:   '11px',
   labelLetter: '0.05em',
 };

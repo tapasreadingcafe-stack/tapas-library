@@ -109,19 +109,28 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
       }}>
         <span style={{ color: W.accent, fontSize: '16px', fontWeight: 700 }}>◼</span>
       </div>
-      {/* 4 top tabs */}
+      {/* 4 top tabs — only Design ships in this build. The other three
+          are placeholders mirrored from the spec; mark them disabled
+          until the features actually land so they don't look broken. */}
       <div style={{ display: 'flex', height: '100%' }}>
-        {['Design', 'CMS', 'App Gen', 'Insights'].map((t, i) => (
-          <button key={t}
-            style={{
-              height: '100%', padding: '0 16px',
-              background: i === 0 ? '#111' : 'transparent',
-              color: i === 0 ? W.text : W.textDim,
-              border: 'none', borderBottom: i === 0 ? `2px solid ${W.accent}` : '2px solid transparent',
-              cursor: 'pointer', fontSize: '12px', fontWeight: 500,
-            }}
-          >{t}</button>
-        ))}
+        {['Design', 'CMS', 'App Gen', 'Insights'].map((t, i) => {
+          const active = i === 0;
+          return (
+            <button key={t}
+              disabled={!active}
+              title={active ? undefined : `${t} — coming soon`}
+              style={{
+                height: '100%', padding: '0 16px',
+                background: active ? '#111' : 'transparent',
+                color: active ? W.text : W.textFaint,
+                border: 'none', borderBottom: active ? `2px solid ${W.accent}` : '2px solid transparent',
+                cursor: active ? 'pointer' : 'not-allowed',
+                fontSize: '12px', fontWeight: 500,
+                opacity: active ? 1 : 0.55,
+              }}
+            >{t}</button>
+          );
+        })}
       </div>
       {/* Breadcrumb centered */}
       <div style={{
@@ -281,12 +290,17 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
             >{label}</button>
           );
         })()}
-        <button style={{
-          height: '26px', padding: '0 14px',
-          background: 'transparent', color: W.text,
-          border: `1px solid ${W.topbarBorder}`, borderRadius: '3px',
-          cursor: 'pointer', fontSize: '11px',
-        }}>Share</button>
+        <button
+          disabled
+          title="Share — coming soon"
+          style={{
+            height: '26px', padding: '0 14px',
+            background: 'transparent', color: W.textFaint,
+            border: `1px solid ${W.topbarBorder}`, borderRadius: '3px',
+            cursor: 'not-allowed', fontSize: '11px',
+            opacity: 0.55,
+          }}
+        >Share</button>
         <button
           onClick={saving ? undefined : onPublish}
           disabled={saving}
@@ -1396,12 +1410,19 @@ const V2_KEY = 'store_content_v2';
 // will drop on next save.
 const SCHEMA_VERSION = 2;
 
+const CONTENT_SYSTEM_KEY = 'content_system';
+
 export default function WebsiteEditor() {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Which of {v1, v2} the live storefront is currently reading. Editor
+  // writes v2, but unless this flag is 'v2' the customer site keeps
+  // rendering legacy v1 content — the "published" toast would lie.
+  const [contentSystem, setContentSystem] = useState(null);
+  const [flippingFlag, setFlippingFlag] = useState(false);
   const [pageKey, setPageKey] = useState('home');
   // When set, the canvas renders the component's definition tree and
   // every tree edit routes through withPage's component-scope branch
@@ -1531,19 +1552,28 @@ export default function WebsiteEditor() {
     (async () => {
       setLoading(true); setError('');
       try {
-        const { data, error: err } = await supabase
-          .from('app_settings').select('value, updated_at').eq('key', V2_KEY).maybeSingle();
+        const { data: rows, error: err } = await supabase
+          .from('app_settings')
+          .select('key, value, updated_at')
+          .in('key', [V2_KEY, CONTENT_SYSTEM_KEY]);
         if (err) throw err;
-        if (!data?.value) {
+        const byKey = Object.fromEntries((rows || []).map(r => [r.key, r]));
+        const v2Row = byKey[V2_KEY];
+        if (!v2Row?.value) {
           throw new Error(`No ${V2_KEY} row. Run scripts/migrateBlocksToTree.mjs.`);
         }
-        lastUpdatedAtRef.current = data.updated_at || null;
+        const flagRaw = byKey[CONTENT_SYSTEM_KEY]?.value;
+        const flag = typeof flagRaw === 'string'
+          ? flagRaw
+          : (flagRaw?.value || null);
+        setContentSystem(flag === 'v2' ? 'v2' : (flag === 'v1' ? 'v1' : null));
+        lastUpdatedAtRef.current = v2Row.updated_at || null;
         // Future-schema warning: if the stored row advertises a
         // schema_version we don't understand yet, another staff tab
         // (or a deployed future build) wrote it. Loading it here and
         // saving would downgrade. Warn; still load so staff can see
         // their page, but skip autosave until the user confirms.
-        const rowVersion = Number(data.value?.schema_version) || 1;
+        const rowVersion = Number(v2Row.value?.schema_version) || 1;
         if (rowVersion > SCHEMA_VERSION) {
           // eslint-disable-next-line no-console
           console.warn(
@@ -1552,12 +1582,8 @@ export default function WebsiteEditor() {
           );
           setSaveError(`Read-only: stored schema v${rowVersion} is newer than editor v${SCHEMA_VERSION}. Reload the editor.`);
         }
-        // Self-heal on load is applied below via a content-keyed
-        // useEffect (robust against Vercel cache + race conditions).
-        // Setting loadedRef to the raw row lets autosave detect drift
-        // on the first tick after the heal runs.
-        setContent(data.value);
-        loadedRef.current = data.value;
+        setContent(v2Row.value);
+        loadedRef.current = v2Row.value;
       } catch (err) {
         setError(err.message || String(err));
       } finally {
@@ -1565,6 +1591,28 @@ export default function WebsiteEditor() {
       }
     })();
   }, []);
+
+  // Flip app_settings.content_system → 'v2' so the live storefront
+  // starts rendering what the editor writes. Until this runs, every
+  // "Publish" click persists v2 but customers keep seeing the legacy
+  // v1 content — the banner below surfaces that state.
+  const handleEnableLiveStorefront = useCallback(async () => {
+    setFlippingFlag(true);
+    try {
+      const { error: err } = await supabase.from('app_settings').upsert({
+        key: CONTENT_SYSTEM_KEY,
+        value: 'v2',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+      if (err) throw err;
+      setContentSystem('v2');
+      flashToast('Live storefront now reads the editor output.');
+    } catch (err) {
+      flashToast(`Switch failed: ${err.message || 'unknown error'}`);
+    } finally {
+      setFlippingFlag(false);
+    }
+  }, [flashToast]);
 
   // Core persist step. Shared by the 900ms debounce and the manual
   // Save button so both paths stay in lockstep on conflict detection,
@@ -1610,6 +1658,7 @@ export default function WebsiteEditor() {
       lastUpdatedAtRef.current = nextUpdatedAt;
       setUnsavedCount(0);
       setSavedFlash(true);
+      setSaveError('');           // clear any prior failure banner on success
       if (overwrite) setConflict(false);
       return { ok: true };
     } catch (err) {
@@ -1644,14 +1693,27 @@ export default function WebsiteEditor() {
   // Manual Save — cancels the pending debounce and flushes the current
   // content immediately. Guarded against the same conflict + schema
   // lockouts as autosave so the button can't be used to bypass them.
-  const handleSaveNow = useCallback(() => {
-    if (!content || conflict) return;
-    if (content === loadedRef.current) return;
+  const handleSaveNow = useCallback(async () => {
+    if (!content) {
+      flashToast('Nothing to save — content still loading.');
+      return;
+    }
+    if (conflict) return; // TopBar swaps to Save-anyway/Reload in this state
+    if (content === loadedRef.current) {
+      flashToast('Already saved — no pending edits.');
+      return;
+    }
     const rowVersion = Number(content?.schema_version) || 1;
-    if (rowVersion > SCHEMA_VERSION) return;
+    if (rowVersion > SCHEMA_VERSION) {
+      flashToast('Read-only: stored schema is newer than this editor build.');
+      return;
+    }
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    persistSnapshot(content);
-  }, [content, conflict, persistSnapshot]);
+    const result = await persistSnapshot(content);
+    if (!result?.ok && result?.reason === 'error') {
+      flashToast(`Save failed: ${result.error?.message || 'unknown error'}`);
+    }
+  }, [content, conflict, persistSnapshot, flashToast]);
 
   // Publish — in this schema the storefront reads store_content_v2
   // directly, so "publish" is a confirmed save-now. When a remote-ahead
@@ -2460,7 +2522,7 @@ export default function WebsiteEditor() {
         breadcrumb={breadcrumb}
         onBreadcrumbClick={(id) => setSelectedId(id)}
         page={pageKey}
-        onPageChange={(k) => { setPageKey(k); setSelectedId(null); setEditingComponentId(null); }}
+        onPageChange={(k) => { setPageKey(k); setSelectedId(null); setEditingNodeId(null); setEditingComponentId(null); }}
         onCreatePage={handleCreatePage}
         onDeletePage={handleDeletePage}
         onRenamePage={handleRenamePage}
@@ -2473,6 +2535,34 @@ export default function WebsiteEditor() {
         savedFlash={savedFlash}
         conflict={conflict}
       />
+      {contentSystem === 'v1' && (
+        <div style={{
+          flexShrink: 0, padding: '6px 14px',
+          background: '#4a2d0f',
+          borderBottom: '1px solid #8a5620',
+          color: '#fbbf24',
+          fontSize: '11.5px', fontWeight: 500,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: '12px',
+        }}>
+          <span>
+            ⚠ Storefront is still rendering legacy (v1) content. Publishes from this editor
+            save to the v2 row but customers won&apos;t see them until you switch the storefront.
+          </span>
+          <button
+            onClick={handleEnableLiveStorefront}
+            disabled={flippingFlag}
+            style={{
+              height: '24px', padding: '0 12px',
+              background: flippingFlag ? '#444' : '#fbbf24',
+              color: '#1a1a1a', fontWeight: 700,
+              border: 'none', borderRadius: '3px',
+              cursor: flippingFlag ? 'not-allowed' : 'pointer',
+              fontSize: '11px', whiteSpace: 'nowrap',
+            }}
+          >{flippingFlag ? 'Switching…' : 'Switch storefront to v2'}</button>
+        </div>
+      )}
       {editingComponentId && (
         <div style={{
           flexShrink: 0, height: '28px',
