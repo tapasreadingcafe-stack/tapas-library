@@ -92,7 +92,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount, onSave, saving, savedFlash }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -233,6 +233,27 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '11px', fontWeight: 700,
         }}>T</div>
+        {(() => {
+          const canSave = unsavedCount > 0 && !saving;
+          const label = saving ? 'Saving…' : (savedFlash && unsavedCount === 0 ? 'Saved ✓' : 'Save');
+          return (
+            <button
+              onClick={canSave ? onSave : undefined}
+              disabled={!canSave}
+              title={unsavedCount > 0 ? 'Save pending edits now (autosave runs every ~1s)' : 'Nothing to save — autosave keeps edits in sync'}
+              style={{
+                height: '26px', padding: '0 14px',
+                background: 'transparent',
+                color: canSave ? W.text : W.textFaint,
+                border: `1px solid ${canSave ? W.accent : W.topbarBorder}`,
+                borderRadius: '3px',
+                cursor: canSave ? 'pointer' : 'default',
+                fontSize: '11px', fontWeight: 600,
+                opacity: canSave || savedFlash ? 1 : 0.7,
+              }}
+            >{label}</button>
+          );
+        })()}
         <button style={{
           height: '26px', padding: '0 14px',
           background: 'transparent', color: W.text,
@@ -1508,6 +1529,62 @@ export default function WebsiteEditor() {
     })();
   }, []);
 
+  // Core persist step. Shared by the 900ms debounce and the manual
+  // Save button so both paths stay in lockstep on conflict detection,
+  // schema stamping, and the loadedRef/updatedAt bookkeeping.
+  const persistSnapshot = useCallback(async (snapshot) => {
+    if (!snapshot) return;
+    setSaving(true); setSaveError('');
+    try {
+      // Optimistic lock: fetch the row's current updated_at and
+      // compare against what we saw at load / last successful save.
+      // If a second tab (or someone else's session) beat us, we
+      // refuse to clobber their work — surface a banner + lock
+      // further saves until the user reloads.
+      const { data: remote, error: headErr } = await supabase
+        .from('app_settings').select('updated_at').eq('key', V2_KEY).maybeSingle();
+      if (headErr) throw headErr;
+      if (remote?.updated_at
+          && lastUpdatedAtRef.current
+          && remote.updated_at !== lastUpdatedAtRef.current) {
+        setConflict(true);
+        setSaveError('Another tab saved newer changes. Reload before editing to avoid overwriting their work.');
+        return;
+      }
+      // Stamp the schema version on every save. A future breaking
+      // change (e.g. children[] shape) can read this on load and
+      // run a just-in-time migration instead of corrupting data.
+      const stamped = snapshot.schema_version !== SCHEMA_VERSION
+        ? { ...snapshot, schema_version: SCHEMA_VERSION }
+        : snapshot;
+      const nextUpdatedAt = new Date().toISOString();
+      const { error: err } = await supabase.from('app_settings').upsert({
+        key: V2_KEY, value: stamped, updated_at: nextUpdatedAt,
+      }, { onConflict: 'key' });
+      if (err) throw err;
+      loadedRef.current = snapshot;
+      lastUpdatedAtRef.current = nextUpdatedAt;
+      setUnsavedCount(0);
+      setSavedFlash(true);
+    } catch (err) {
+      setSaveError(err.message || 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  // Manual Save — cancels the pending debounce and flushes the current
+  // content immediately. Guarded against the same conflict + schema
+  // lockouts as autosave so the button can't be used to bypass them.
+  const handleSaveNow = useCallback(() => {
+    if (!content || conflict) return;
+    if (content === loadedRef.current) return;
+    const rowVersion = Number(content?.schema_version) || 1;
+    if (rowVersion > SCHEMA_VERSION) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    persistSnapshot(content);
+  }, [content, conflict, persistSnapshot]);
+
   // --- Autosave: debounced upsert back to app_settings.store_content_v2 --
   // Mirrors the legacy editor's pattern: 900 ms after the last edit, push
   // the whole blob. Skips if we haven't drifted from what we loaded.
@@ -1521,62 +1598,18 @@ export default function WebsiteEditor() {
   useEffect(() => {
     if (loading || !content) return;
     if (content === loadedRef.current) return;
-    // Once a conflict with another tab is detected we stop saving
-    // entirely — further writes would overwrite the other tab's
-    // changes. User has to reload; the banner explains.
     if (conflict) return;
-    // Schema-version lockout (see load effect). Once we see a newer
-    // version than this build supports, refuse to save so we don't
-    // clobber fields the newer tab knows about. The banner nudges
-    // the user to reload.
     const rowVersion = Number(content?.schema_version) || 1;
     if (rowVersion > SCHEMA_VERSION) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const snapshotEpoch = contentEpochRef.current;
     const snapshot = content;
-    saveTimerRef.current = setTimeout(async () => {
+    saveTimerRef.current = setTimeout(() => {
       if (snapshotEpoch !== contentEpochRef.current) return; // stale
-      setSaving(true); setSaveError('');
-      try {
-        // Optimistic lock: fetch the row's current updated_at and
-        // compare against what we saw at load / last successful save.
-        // If a second tab (or someone else's session) beat us, we
-        // refuse to clobber their work — surface a banner + lock
-        // further saves until the user reloads.
-        const { data: remote, error: headErr } = await supabase
-          .from('app_settings').select('updated_at').eq('key', V2_KEY).maybeSingle();
-        if (headErr) throw headErr;
-        if (remote?.updated_at
-            && lastUpdatedAtRef.current
-            && remote.updated_at !== lastUpdatedAtRef.current) {
-          setConflict(true);
-          setSaveError('Another tab saved newer changes. Reload before editing to avoid overwriting their work.');
-          return;
-        }
-        // Stamp the schema version on every save. A future breaking
-        // change (e.g. children[] shape) can read this on load and
-        // run a just-in-time migration instead of corrupting data.
-        // Current schema = 2 (matches emptySiteContent + compileSiteContent).
-        const stamped = snapshot && snapshot.schema_version !== SCHEMA_VERSION
-          ? { ...snapshot, schema_version: SCHEMA_VERSION }
-          : snapshot;
-        const nextUpdatedAt = new Date().toISOString();
-        const { error: err } = await supabase.from('app_settings').upsert({
-          key: V2_KEY, value: stamped, updated_at: nextUpdatedAt,
-        }, { onConflict: 'key' });
-        if (err) throw err;
-        loadedRef.current = snapshot;
-        lastUpdatedAtRef.current = nextUpdatedAt;
-        setUnsavedCount(0);
-        setSavedFlash(true);
-      } catch (err) {
-        setSaveError(err.message || 'Failed to save.');
-      } finally {
-        setSaving(false);
-      }
+      persistSnapshot(snapshot);
     }, 900);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [content, loading, conflict]);
+  }, [content, loading, conflict, persistSnapshot]);
 
   const pages = useMemo(() => {
     if (!content?.pages) return [];
@@ -2335,6 +2368,9 @@ export default function WebsiteEditor() {
         onRenamePage={handleRenamePage}
         pages={pages}
         unsavedCount={unsavedCount}
+        onSave={handleSaveNow}
+        saving={saving}
+        savedFlash={savedFlash}
       />
       {editingComponentId && (
         <div style={{
