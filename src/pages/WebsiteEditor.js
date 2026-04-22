@@ -965,7 +965,7 @@ function SelectionOverlay({ targetId, rootRef, tree, kind }) {
       window.removeEventListener('resize', measure);
       clearTimeout(t);
     };
-  }, [targetId, surfaceRef, measure]);
+  }, [targetId, rootRef, measure]);
 
   if (!rect) return null;
 
