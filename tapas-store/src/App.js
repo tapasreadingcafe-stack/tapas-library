@@ -63,9 +63,13 @@ function currentV2PageTree(v2, pathname) {
 }
 
 // Routes whose page component renders its own navbar + footer, so the
-// global app shell must step aside. Empty now that the landing page is
-// owned by the editor — keep the hook here for future bespoke pages.
-const FULL_BLEED_ROUTES = new Set();
+// global app shell must step aside. The landing page owns its own
+// navbar + footer via the v2 tree (see scripts/buildLandingTree.mjs),
+// so the tag-based detection below isn't enough on its own — the
+// authored tree can drift (classes renamed, wrapper swapped) and
+// silently re-stack the global chrome. Listing '/' here keeps the home
+// page single-chrome even if the tree is edited.
+const FULL_BLEED_ROUTES = new Set(['/']);
 
 function GlobalHeader() {
   const location = useLocation();
