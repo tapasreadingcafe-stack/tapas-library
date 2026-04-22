@@ -92,7 +92,7 @@ const W = {
 // =====================================================================
 // Top bar  —  spec § 1: 48 px tall, 4 tabs, breadcrumb, Publish
 // =====================================================================
-function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount, onSave, onPublish, saving, savedFlash, conflict }) {
+function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePage, onDeletePage, onRenamePage, pages, unsavedCount, onSave, onForceSave, onPublish, saving, savedFlash, conflict }) {
   return (
     <div style={{
       height: '48px', flexShrink: 0,
@@ -234,16 +234,35 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
           fontSize: '11px', fontWeight: 700,
         }}>T</div>
         {conflict ? (
-          <button
-            onClick={() => window.location.reload()}
-            title="Another tab saved newer changes. Click to reload and resume editing."
-            style={{
-              height: '26px', padding: '0 14px',
-              background: '#b91c1c', color: '#fff',
-              border: '1px solid #ef4444', borderRadius: '3px',
-              cursor: 'pointer', fontSize: '11px', fontWeight: 600,
-            }}
-          >Reload to resume</button>
+          <>
+            <button
+              onClick={() => {
+                if (window.confirm('Save your changes and overwrite the other tab\'s edits? This cannot be undone.')) {
+                  onForceSave && onForceSave();
+                }
+              }}
+              disabled={saving}
+              title="Persist this tab's version and discard the other tab's newer changes."
+              style={{
+                height: '26px', padding: '0 12px',
+                background: 'transparent', color: '#fca5a5',
+                border: '1px solid #ef4444', borderRadius: '3px',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                fontSize: '11px', fontWeight: 600,
+                opacity: saving ? 0.6 : 1,
+              }}
+            >{saving ? 'Saving…' : 'Save anyway'}</button>
+            <button
+              onClick={() => window.location.reload()}
+              title="Discard this tab's edits and reload the newer version from the other tab."
+              style={{
+                height: '26px', padding: '0 12px',
+                background: '#b91c1c', color: '#fff',
+                border: '1px solid #ef4444', borderRadius: '3px',
+                cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+              }}
+            >Reload</button>
+          </>
         ) : (() => {
           const canSave = unsavedCount > 0 && !saving;
           const label = saving ? 'Saving…' : (savedFlash && unsavedCount === 0 ? 'Saved ✓' : 'Save');
@@ -1553,7 +1572,7 @@ export default function WebsiteEditor() {
   // Core persist step. Shared by the 900ms debounce and the manual
   // Save button so both paths stay in lockstep on conflict detection,
   // schema stamping, and the loadedRef/updatedAt bookkeeping.
-  const persistSnapshot = useCallback(async (snapshot) => {
+  const persistSnapshot = useCallback(async (snapshot, { overwrite = false } = {}) => {
     if (!snapshot) return;
     setSaving(true); setSaveError('');
     try {
@@ -1561,16 +1580,23 @@ export default function WebsiteEditor() {
       // compare against what we saw at load / last successful save.
       // If a second tab (or someone else's session) beat us, we
       // refuse to clobber their work — surface a banner + lock
-      // further saves until the user reloads.
+      // further saves until the user reloads. `overwrite` is the
+      // explicit user-confirmed escape hatch (Save-anyway button).
       const { data: remote, error: headErr } = await supabase
         .from('app_settings').select('updated_at').eq('key', V2_KEY).maybeSingle();
       if (headErr) throw headErr;
-      if (remote?.updated_at
-          && lastUpdatedAtRef.current
-          && remote.updated_at !== lastUpdatedAtRef.current) {
+      const remoteAhead = remote?.updated_at
+        && lastUpdatedAtRef.current
+        && remote.updated_at !== lastUpdatedAtRef.current;
+      if (remoteAhead && !overwrite) {
         setConflict(true);
         setSaveError('Another tab saved newer changes. Reload before editing to avoid overwriting their work.');
         return;
+      }
+      if (remoteAhead && overwrite) {
+        // User chose to overwrite. Adopt the remote timestamp as our
+        // baseline so the upsert below isn't itself blocked as a drift.
+        lastUpdatedAtRef.current = remote.updated_at;
       }
       // Stamp the schema version on every save. A future breaking
       // change (e.g. children[] shape) can read this on load and
@@ -1587,12 +1613,23 @@ export default function WebsiteEditor() {
       lastUpdatedAtRef.current = nextUpdatedAt;
       setUnsavedCount(0);
       setSavedFlash(true);
+      if (overwrite) setConflict(false);
     } catch (err) {
       setSaveError(err.message || 'Failed to save.');
     } finally {
       setSaving(false);
     }
   }, []);
+
+  // Save-anyway — user-confirmed overwrite of a remote-ahead row. Used
+  // when the other tab's changes are known-stale or intentional trash.
+  const handleForceSave = useCallback(() => {
+    if (!content) return;
+    const rowVersion = Number(content?.schema_version) || 1;
+    if (rowVersion > SCHEMA_VERSION) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    persistSnapshot(content, { overwrite: true });
+  }, [content, persistSnapshot]);
 
   // Manual Save — cancels the pending debounce and flushes the current
   // content immediately. Guarded against the same conflict + schema
@@ -2404,6 +2441,7 @@ export default function WebsiteEditor() {
         pages={pages}
         unsavedCount={unsavedCount}
         onSave={handleSaveNow}
+        onForceSave={handleForceSave}
         onPublish={handlePublish}
         saving={saving}
         savedFlash={savedFlash}
