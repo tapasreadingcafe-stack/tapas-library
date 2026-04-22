@@ -236,20 +236,17 @@ function TopBar({ breadcrumb, onBreadcrumbClick, page, onPageChange, onCreatePag
         {conflict ? (
           <>
             <button
-              onClick={() => {
-                if (window.confirm('Save your changes and overwrite the other tab\'s edits? This cannot be undone.')) {
-                  onForceSave && onForceSave();
-                }
-              }}
+              onClick={() => onForceSave && onForceSave()}
               disabled={saving}
               title="Persist this tab's version and discard the other tab's newer changes."
               style={{
                 height: '26px', padding: '0 12px',
-                background: 'transparent', color: '#fca5a5',
+                background: saving ? 'rgba(239,68,68,0.15)' : '#ef4444',
+                color: '#fff',
                 border: '1px solid #ef4444', borderRadius: '3px',
                 cursor: saving ? 'not-allowed' : 'pointer',
                 fontSize: '11px', fontWeight: 600,
-                opacity: saving ? 0.6 : 1,
+                opacity: saving ? 0.7 : 1,
               }}
             >{saving ? 'Saving…' : 'Save anyway'}</button>
             <button
@@ -1623,13 +1620,23 @@ export default function WebsiteEditor() {
 
   // Save-anyway — user-confirmed overwrite of a remote-ahead row. Used
   // when the other tab's changes are known-stale or intentional trash.
-  const handleForceSave = useCallback(() => {
-    if (!content) return;
+  const handleForceSave = useCallback(async () => {
+    if (!content) {
+      flashToast('Nothing to save — content still loading.');
+      return;
+    }
     const rowVersion = Number(content?.schema_version) || 1;
-    if (rowVersion > SCHEMA_VERSION) return;
+    if (rowVersion > SCHEMA_VERSION) {
+      flashToast('Read-only: stored schema is newer than this editor build.');
+      return;
+    }
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    persistSnapshot(content, { overwrite: true });
-  }, [content, persistSnapshot]);
+    await persistSnapshot(content, { overwrite: true });
+    // saveError is set inside persistSnapshot on failure — re-read via
+    // the closure isn't reliable, so rely on the flash rendered in the
+    // top bar. Success clears conflict + shows the Saved ✓ chip.
+    flashToast('Saved (overwrote other tab\'s changes).');
+  }, [content, persistSnapshot, flashToast]);
 
   // Manual Save — cancels the pending debounce and flushes the current
   // content immediately. Guarded against the same conflict + schema
