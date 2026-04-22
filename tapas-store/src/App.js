@@ -2,7 +2,8 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { SiteContentProvider, useSiteContent } from './context/SiteContent';
+import { SiteContentProvider, useSiteContent, useV2Content } from './context/SiteContent';
+import { findV2PageByPath } from './utils/findPage';
 import { ThemeProvider } from './context/ThemeContext';
 import StoreEditorSync from './components/StoreEditorSync';
 import HeaderTemplate from './components/HeaderTemplates';
@@ -23,21 +24,67 @@ function currentPageBlocks(content, pathname) {
   return Array.isArray(blocks) ? blocks : [];
 }
 
+// v2 equivalent: walk the Node tree for the current page and look for
+// any node whose semantic tag (or authored class) indicates a navbar
+// or footer. Without this check, every page authored in the v2 editor
+// would double-stack chrome against the global HeaderTemplate /
+// FooterTemplate app shell.
+function v2TreeHas(tree, predicate) {
+  if (!tree) return false;
+  const stack = [tree];
+  while (stack.length) {
+    const n = stack.pop();
+    if (!n) continue;
+    if (predicate(n)) return true;
+    if (Array.isArray(n.children)) stack.push(...n.children);
+  }
+  return false;
+}
+
+function hasNavbarNode(n) {
+  if (n?.tag === 'nav') return true;
+  const cls = n?.classes;
+  if (!Array.isArray(cls)) return false;
+  return cls.some(c => /(^|-)navbar(-|$)|(^|-)header(-|$)/i.test(c || ''));
+}
+
+function hasFooterNode(n) {
+  if (n?.tag === 'footer') return true;
+  const cls = n?.classes;
+  if (!Array.isArray(cls)) return false;
+  return cls.some(c => /(^|-)footer(-|$)/i.test(c || ''));
+}
+
+function currentV2PageTree(v2, pathname) {
+  if (!v2?.enabled || !v2?.content?.pages) return null;
+  const key = findV2PageByPath(v2.content.pages, pathname);
+  if (!key) return null;
+  return v2.content.pages[key]?.tree || null;
+}
+
 function GlobalHeader() {
   const location = useLocation();
   const content = useSiteContent();
-  const blocks = currentPageBlocks(content, location.pathname);
-  const hasBlockNavbar = blocks.some(b => b?.type === 'navbar' && !b?.props?.hidden);
-  if (hasBlockNavbar) return null;
+  const v2 = useV2Content();
+  const v2Tree = currentV2PageTree(v2, location.pathname);
+  if (v2Tree && v2TreeHas(v2Tree, hasNavbarNode)) return null;
+  if (!v2Tree) {
+    const blocks = currentPageBlocks(content, location.pathname);
+    if (blocks.some(b => b?.type === 'navbar' && !b?.props?.hidden)) return null;
+  }
   return <HeaderTemplate />;
 }
 
 function GlobalFooter() {
   const location = useLocation();
   const content = useSiteContent();
-  const blocks = currentPageBlocks(content, location.pathname);
-  const hasBlockFooter = blocks.some(b => b?.type === 'footer' && !b?.props?.hidden);
-  if (hasBlockFooter) return null;
+  const v2 = useV2Content();
+  const v2Tree = currentV2PageTree(v2, location.pathname);
+  if (v2Tree && v2TreeHas(v2Tree, hasFooterNode)) return null;
+  if (!v2Tree) {
+    const blocks = currentPageBlocks(content, location.pathname);
+    if (blocks.some(b => b?.type === 'footer' && !b?.props?.hidden)) return null;
+  }
   return <FooterTemplate />;
 }
 
