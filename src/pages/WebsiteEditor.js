@@ -312,8 +312,47 @@ function LeftRail({ active, onChange }) {
 // Navigator  —  spec § 1: 240 px, element tree. Phase 1 = read-only.
 // =====================================================================
 function Navigator({ tree, selectedId, onSelect }) {
-  const rows = useMemo(() => flattenTree(tree), [tree]);
+  const [collapsed, setCollapsed] = useState(() => new Set());
   const selectedRef = useRef(null);
+
+  // Auto-expand ancestors of the selected node so it stays visible after
+  // clicks on canvas or Arrow-key moves. pathToNode is inclusive — drop
+  // the last entry so the selected row itself keeps its current state.
+  useEffect(() => {
+    if (!selectedId || collapsed.size === 0) return;
+    const path = pathToNode(tree, selectedId);
+    const ancestors = path.slice(0, -1).map(p => p.id);
+    let changed = false;
+    for (const id of ancestors) if (collapsed.has(id)) { changed = true; break; }
+    if (!changed) return;
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      for (const id of ancestors) next.delete(id);
+      return next;
+    });
+  }, [selectedId, tree, collapsed]);
+
+  const rows = useMemo(() => {
+    const out = [];
+    const rec = (n, depth) => {
+      if (!n) return;
+      const hasChildren = (n.children?.length || 0) > 0;
+      out.push({ node: n, depth, hasChildren });
+      if (hasChildren && !collapsed.has(n.id)) {
+        for (const c of n.children) rec(c, depth + 1);
+      }
+    };
+    rec(tree, 0);
+    return out;
+  }, [tree, collapsed]);
+
+  const toggleCollapse = (id) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Scroll the selected row into view whenever selection changes —
   // covers clicks on canvas and Esc/Enter/Arrow key moves.
@@ -347,8 +386,9 @@ function Navigator({ tree, selectedId, onSelect }) {
             Empty page
           </div>
         )}
-        {rows.map(({ node, depth }) => {
+        {rows.map(({ node, depth, hasChildren }) => {
           const isSelected = node.id === selectedId;
+          const isCollapsed = collapsed.has(node.id);
           const label = node.classes?.[0] || node.tag || 'unnamed';
           return (
             <button key={node.id}
@@ -357,7 +397,7 @@ function Navigator({ tree, selectedId, onSelect }) {
               style={{
                 width: '100%', height: '26px',
                 paddingLeft: `${8 + depth * 16}px`, paddingRight: '12px',
-                display: 'flex', alignItems: 'center', gap: '6px',
+                display: 'flex', alignItems: 'center', gap: '4px',
                 background: isSelected ? W.selectionBg : 'transparent',
                 color: isSelected ? '#fff' : W.text,
                 border: 'none', cursor: 'pointer', textAlign: 'left',
@@ -366,7 +406,21 @@ function Navigator({ tree, selectedId, onSelect }) {
               onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = W.hoverBg; }}
               onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
             >
-              <span style={{ fontSize: '10px', color: isSelected ? '#fff' : W.textFaint }}>
+              <span
+                onClick={(e) => { if (hasChildren) { e.stopPropagation(); toggleCollapse(node.id); } }}
+                aria-label={hasChildren ? (isCollapsed ? 'Expand' : 'Collapse') : undefined}
+                style={{
+                  width: '12px', flexShrink: 0,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '9px', lineHeight: 1,
+                  color: isSelected ? '#fff' : W.textFaint,
+                  cursor: hasChildren ? 'pointer' : 'default',
+                  userSelect: 'none',
+                }}
+              >
+                {hasChildren ? (isCollapsed ? '▸' : '▾') : ''}
+              </span>
+              <span style={{ fontSize: '10px', color: isSelected ? '#fff' : W.textFaint, flexShrink: 0 }}>
                 {tagGlyph(node.tag)}
               </span>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
