@@ -63,9 +63,9 @@ function currentV2PageTree(v2, pathname) {
 }
 
 // Routes whose page component renders its own navbar + footer, so the
-// global app shell must step aside. `/` is the hand-authored landing
-// page (LandingPage.js). Add other bespoke routes here as they land.
-const FULL_BLEED_ROUTES = new Set(['/']);
+// global app shell must step aside. Empty now that the landing page is
+// owned by the editor — keep the hook here for future bespoke pages.
+const FULL_BLEED_ROUTES = new Set();
 
 function GlobalHeader() {
   const location = useLocation();
@@ -120,7 +120,6 @@ function lazyWithRetry(importFn) {
   );
 }
 
-const LandingPage     = lazyWithRetry(() => import('./pages/LandingPage'));
 const Home            = lazyWithRetry(() => import('./pages/Home'));
 const Catalog         = lazyWithRetry(() => import('./pages/Catalog'));
 const BookDetail      = lazyWithRetry(() => import('./pages/BookDetail'));
@@ -195,8 +194,7 @@ function AppShell() {
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/"              element={<LandingPage />} />
-            <Route path="/home-legacy"   element={<Home />} />
+            <Route path="/"              element={<Home />} />
             <Route path="/books"         element={<Catalog />} />
             <Route path="/books/:id"     element={<BookDetail />} />
             <Route path="/offers"        element={<Offers />} />

@@ -137,6 +137,12 @@ const ALLOWED_TAGS = new Set([
   'details', 'summary',
   'u', 's', 'code', 'sup', 'sub',   // rich-text mark tags (Phase D)
   'br', 'hr',
+  // <style> inside the tree is the escape hatch for raw CSS that the
+  // class compiler can't express: @keyframes, ::before / ::after, @font-face
+  // imports, complex gradients. Staff can keep the style node in the
+  // tree and the class compiler's output layers on top — cascade wins
+  // follow normal CSS precedence (order in the tree + specificity).
+  'style',
   // body is used by the compiler as the tree root; React won't render a
   // nested <body> so we rewrite it to <div class="tapas-page-root">.
   'body',

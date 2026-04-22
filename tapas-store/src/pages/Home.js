@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useSiteContent } from '../context/SiteContent';
+import { useSiteContent, useV2Content } from '../context/SiteContent';
 import PageRenderer from '../blocks/PageRenderer';
-import { findPageByPath } from '../utils/findPage';
+import { findPageByPath, findV2PageByPath } from '../utils/findPage';
 
 // =====================================================================
 // Home — Tapas reading cafe landing page (Figma conversion).
@@ -484,6 +484,13 @@ function LegacyHome() {
 // in the editor; otherwise render the LegacyHome layout above.
 export default function Home() {
   const content = useSiteContent();
+  const v2 = useV2Content();
+  // v2 takes over as soon as it resolves — its own PageRenderer branch
+  // handles the blank-during-loading case so there's no flash of v1.
+  if (v2?.enabled && v2.loaded) {
+    const v2Key = findV2PageByPath(v2?.content?.pages, '/');
+    if (v2Key) return <PageRenderer pageKey={v2Key} />;
+  }
   const matchKey = findPageByPath(content?.pages, '/');
   if (matchKey) {
     const blocks = content.pages[matchKey].blocks;

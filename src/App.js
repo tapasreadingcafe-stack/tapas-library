@@ -105,7 +105,6 @@ const KioskMode             = lazyWithRetry(() => import('./pages/KioskMode'));
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
 const CustomerOrders        = lazyWithRetry(() => import('./pages/CustomerOrders'));
 const WebsiteEditor         = lazyWithRetry(() => import('./pages/WebsiteEditor'));
-const LandingEditor         = lazyWithRetry(() => import('./pages/LandingEditor'));
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
 const StoreAnalytics        = lazyWithRetry(() => import('./pages/StoreAnalytics'));
@@ -272,7 +271,6 @@ const NAV_CONFIG = [
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
       { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
-      { to: '/store/landing',    icon: '✨', label: 'Landing Page' },
       { to: '/store/content-v2', icon: '🎨', label: 'Website Editor' },
     ],
   },
@@ -771,7 +769,6 @@ function DashboardShell() {
             <Route path="/commerce-insights"                  element={<CommerceInsights />} />
             <Route path="/store/content"                      element={<Navigate to="/store/content-v2" replace />} />
             <Route path="/store/content-v2"                   element={<WebsiteEditor />} />
-            <Route path="/store/landing"                      element={<LandingEditor />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
             {/* Marketing */}

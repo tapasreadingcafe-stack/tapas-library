@@ -92,6 +92,10 @@ const ALLOWED_TAGS = new Set([
   'details', 'summary',
   'u', 's', 'code', 'sup', 'sub', // rich-text mark tags (Phase D)
   'br', 'hr',
+  // <style> is the escape hatch for raw CSS (keyframes, ::before,
+  // gradients) that the class compiler can't express. The editor
+  // renders it too so the canvas matches the storefront.
+  'style',
   'body', // compiler uses body as the page root; we rewrite to div
 ]);
 
