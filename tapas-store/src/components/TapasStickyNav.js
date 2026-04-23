@@ -15,6 +15,7 @@ const INK = '#1a1a1a';
 const NAV_LINKS = [
   { to: '/about',   label: 'About Us' },
   { to: '/shop',    label: 'Shop' },
+  { to: '/library', label: 'Library' },
   { to: '/events',  label: 'Events' },
   { to: '/blog',    label: 'Blogs' },
   { to: '/contact', label: 'Contact Us' },
