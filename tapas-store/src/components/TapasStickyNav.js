@@ -87,7 +87,7 @@ export default function TapasStickyNav() {
           line-height: 1;
         }
         .tapas-snav-logo-img {
-          height: 44px;
+          height: 58px;
           width: auto;
           display: block;
           /* Logo is dark on a transparent background; reads well on the
@@ -184,7 +184,7 @@ export default function TapasStickyNav() {
           .tapas-snav-hamburger { display: inline-flex; }
           .tapas-snav-mobile { display: block; }
           .tapas-snav-inner { padding: 12px 20px; }
-          .tapas-snav-logo-img { height: 38px; }
+          .tapas-snav-logo-img { height: 48px; }
         }
       `}</style>
       <nav className="tapas-snav" aria-label="Primary">

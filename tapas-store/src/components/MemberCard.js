@@ -116,7 +116,7 @@ export const MEMBER_CARD_CSS = `
   color: rgba(255,255,255,0.72);
 }
 .mc-head-logo-img {
-  height: 36px;
+  height: 48px;
   width: auto;
   display: block;
   /* Logo is dark-on-transparent; the card is #1a1a1a. Invert turns

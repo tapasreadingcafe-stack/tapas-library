@@ -69,10 +69,10 @@ export default function SiteFooter() {
           padding-bottom: 44px;
         }
         .site-footer-logo {
-          height: 60px;
+          height: 84px;
           width: auto;
           display: block;
-          margin-bottom: 14px;
+          margin-bottom: 18px;
         }
         .site-footer-brand-headline {
           font-family: 'Fraunces', Georgia, serif;
