@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 
 // Primary site nav. Sticky, green, matches the Figma redesign.
 // Lives outside the v2 tree so active-state styling can react to the
@@ -57,6 +58,7 @@ const CloseIcon = () => (
 export default function TapasStickyNav() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { itemCount } = useCart();
 
   return (
     <>
@@ -116,6 +118,23 @@ export default function TapasStickyNav() {
           transition: background 150ms;
         }
         .tapas-snav-icon:hover { background: rgba(0,0,0,0.08); }
+        .tapas-snav-icon { position: relative; }
+        .tapas-snav-badge {
+          position: absolute;
+          top: 2px; right: 2px;
+          min-width: 18px; height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          background: ${PINK};
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          line-height: 18px;
+          text-align: center;
+          border: 2px solid ${LIME};
+          font-variant-numeric: tabular-nums;
+          pointer-events: none;
+        }
         .tapas-snav-signin {
           color: ${INK}; text-decoration: underline;
           font-size: 15px; font-weight: 500;
@@ -196,8 +215,17 @@ export default function TapasStickyNav() {
             <Link to="/search" className="tapas-snav-icon" aria-label="Search">
               <SearchIcon />
             </Link>
-            <Link to="/cart" className="tapas-snav-icon" aria-label="Shopping bag">
+            <Link
+              to="/cart"
+              className="tapas-snav-icon"
+              aria-label={itemCount > 0 ? `Shopping bag (${itemCount})` : 'Shopping bag'}
+            >
               <BagIcon />
+              {itemCount > 0 && (
+                <span className="tapas-snav-badge" aria-hidden="true">
+                  {itemCount > 99 ? '99+' : itemCount}
+                </span>
+              )}
             </Link>
             <Link to="/login" className="tapas-snav-signin">Sign In</Link>
             <Link to="/login" className="tapas-snav-signup">Sign Up</Link>
