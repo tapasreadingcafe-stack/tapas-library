@@ -6,8 +6,8 @@ import { SiteContentProvider, useSiteContent, useV2Content } from './context/Sit
 import { findV2PageByPath } from './utils/findPage';
 import { ThemeProvider } from './context/ThemeContext';
 import StoreEditorSync from './components/StoreEditorSync';
-import HeaderTemplate from './components/HeaderTemplates';
 import FooterTemplate from './components/FooterTemplates';
+import TapasStickyNav from './components/TapasStickyNav';
 import InstallPrompt from './components/InstallPrompt';
 import { findPageByPath } from './utils/findPage';
 import './App.css';
@@ -41,13 +41,6 @@ function v2TreeHas(tree, predicate) {
   return false;
 }
 
-function hasNavbarNode(n) {
-  if (n?.tag === 'nav') return true;
-  const cls = n?.classes;
-  if (!Array.isArray(cls)) return false;
-  return cls.some(c => /(^|-)navbar(-|$)|(^|-)header(-|$)/i.test(c || ''));
-}
-
 function hasFooterNode(n) {
   if (n?.tag === 'footer') return true;
   const cls = n?.classes;
@@ -62,27 +55,17 @@ function currentV2PageTree(v2, pathname) {
   return v2.content.pages[key]?.tree || null;
 }
 
-// Routes whose page component renders its own navbar + footer, so the
-// global app shell must step aside. The landing page owns its own
-// navbar + footer via the v2 tree (see scripts/buildLandingTree.mjs),
-// so the tag-based detection below isn't enough on its own — the
-// authored tree can drift (classes renamed, wrapper swapped) and
-// silently re-stack the global chrome. Listing '/' here keeps the home
-// page single-chrome even if the tree is edited.
-const FULL_BLEED_ROUTES = new Set(['/']);
+// Routes whose page component renders its own footer, so the global
+// app shell must step aside. Kept for the footer only — the header is
+// now a single React component (TapasStickyNav) that renders across
+// every route so active-state styling can follow the router.
+const FULL_BLEED_ROUTES = new Set();
 
 function GlobalHeader() {
-  const location = useLocation();
-  const content = useSiteContent();
-  const v2 = useV2Content();
-  if (FULL_BLEED_ROUTES.has(location.pathname)) return null;
-  const v2Tree = currentV2PageTree(v2, location.pathname);
-  if (v2Tree && v2TreeHas(v2Tree, hasNavbarNode)) return null;
-  if (!v2Tree) {
-    const blocks = currentPageBlocks(content, location.pathname);
-    if (blocks.some(b => b?.type === 'navbar' && !b?.props?.hidden)) return null;
-  }
-  return <HeaderTemplate />;
+  // TapasStickyNav owns the header for the entire site now. It has
+  // its own active-route logic via useLocation, so we no longer route
+  // through HeaderTemplate / the v2-tree nav detection.
+  return <TapasStickyNav />;
 }
 
 function GlobalFooter() {

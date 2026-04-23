@@ -1000,55 +1000,6 @@ const STANDARD_PAGES = [
   { key: 'events',  slug: '/events',   name: 'Events' },
 ];
 
-// Previously walked the full subtree, which meant a nested
-// `tapas-navbar` class buried inside a slider satisfied the check
-// and the heal skipped seeding the real chrome. Now strict: looks
-// at a single child node (first for navbar, last for footer).
-function childHasClass(child, name) {
-  return !!child
-    && Array.isArray(child.classes)
-    && child.classes.includes(name);
-}
-
-// Hand-authored pages (e.g. the landing page built by
-// scripts/buildLandingTree.mjs) open with a raw <style> node carrying
-// their scoped CSS. Skip over those so the nav/footer check lands on
-// the first real chrome element.
-function firstContentChild(kids) {
-  if (!Array.isArray(kids)) return null;
-  for (const k of kids) { if (k?.tag !== 'style') return k; }
-  return null;
-}
-function lastContentChild(kids) {
-  if (!Array.isArray(kids)) return null;
-  for (let i = kids.length - 1; i >= 0; i--) {
-    if (kids[i]?.tag !== 'style') return kids[i];
-  }
-  return null;
-}
-
-// A page is considered to already own its navbar when its first
-// meaningful child is either our seeded tapas-navbar, a raw <nav>
-// tag, or a wrapper explicitly marked as a nav band (as the landing
-// page uses). Without this the self-heal fights hand-authored trees
-// and stacks a second white navbar on top of the real one.
-function pageHasNavbar(kids) {
-  const first = firstContentChild(kids);
-  if (!first) return false;
-  if (first.tag === 'nav') return true;
-  if (childHasClass(first, 'tapas-navbar')) return true;
-  if (childHasClass(first, 'nav-band')) return true;
-  return false;
-}
-function pageHasFooter(kids) {
-  const last = lastContentChild(kids);
-  if (!last) return false;
-  if (last.tag === 'footer') return true;
-  if (childHasClass(last, 'tapas-footer')) return true;
-  if (childHasClass(last, 'site-foot')) return true;
-  return false;
-}
-
 function seedPage({ key, slug, name, brandName }) {
   return {
     id: `p_${key}`,
@@ -1070,8 +1021,6 @@ export function ensureSiteDefaults(content) {
   if (!content || typeof content !== 'object') return content;
 
   const brandName = content.brand?.name || 'TAPAS';
-  const navProps    = { brand_name: brandName };
-  const footerProps = { brand_name: brandName };
 
   let nextPages = content.pages || {};
   let nextClasses = content.classes || {};
@@ -1090,42 +1039,14 @@ export function ensureSiteDefaults(content) {
     mutated = true;
   }
 
-  // Step 2: each page gets a navbar + footer if missing.
-  for (const [key, page] of Object.entries(nextPages)) {
-    if (!page?.tree || !Array.isArray(page.tree.children)) continue;
-
-    const kids = page.tree.children;
-    const needsNav    = !pageHasNavbar(kids);
-    const needsFooter = !pageHasFooter(kids);
-    if (!needsNav && !needsFooter) continue;
-
-    if (!mutated) {
-      nextPages = { ...nextPages };
-      nextClasses = { ...nextClasses };
-      mutated = true;
-    }
-    const newChildren = page.tree.children.slice();
-
-    if (needsNav) {
-      const { root, classes } = compileTapasNavbar(navProps);
-      newChildren.unshift(root);
-      for (const [k, def] of Object.entries(classes)) {
-        if (!nextClasses[k]) nextClasses[k] = def;
-      }
-    }
-    if (needsFooter) {
-      const { root, classes } = compileTapasFooter(footerProps);
-      newChildren.push(root);
-      for (const [k, def] of Object.entries(classes)) {
-        if (!nextClasses[k]) nextClasses[k] = def;
-      }
-    }
-
-    nextPages[key] = {
-      ...page,
-      tree: { ...page.tree, children: newChildren },
-    };
-  }
+  // Step 2 intentionally removed. The storefront's primary navbar and
+  // footer are now React components mounted in the app shell
+  // (tapas-store/src/components/TapasStickyNav.js + FooterTemplates),
+  // not nodes baked into each page tree. Re-adding a tapas-navbar /
+  // tapas-footer here would stack a second chrome row on top of the
+  // React one on every editor load. The compileTapasNavbar /
+  // compileTapasFooter helpers stay exported for any legacy migration
+  // scripts that still want to emit chrome nodes explicitly.
 
   if (!mutated) return content;
   return { ...content, pages: nextPages, classes: nextClasses };
