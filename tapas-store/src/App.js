@@ -75,6 +75,9 @@ const Events          = lazyWithRetry(() => import('./pages/Events'));
 const SignIn          = lazyWithRetry(() => import('./pages/SignIn'));
 const SignUp          = lazyWithRetry(() => import('./pages/SignUp'));
 const ForgotPassword  = lazyWithRetry(() => import('./pages/ForgotPassword'));
+const Welcome         = lazyWithRetry(() => import('./pages/Welcome'));
+const CodeOfTheRoom   = lazyWithRetry(() => import('./pages/CodeOfTheRoom'));
+const Privacy         = lazyWithRetry(() => import('./pages/Privacy'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -157,6 +160,9 @@ function AppShell() {
             <Route path="/sign-in"       element={<SignIn />} />
             <Route path="/sign-up"       element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/welcome"       element={<Welcome />} />
+            <Route path="/code-of-the-room" element={<CodeOfTheRoom />} />
+            <Route path="/privacy"       element={<Privacy />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
             <Route path="*"              element={<CustomPage />} />

@@ -250,7 +250,16 @@ const SIGN_IN_CSS = `
   bottom: -120px;
 }
 
-/* Member card */
+/* Member card positioning (shared MemberCard component supplies the
+   card's own styling; we just place it inside the lime panel). */
+.si-memcard {
+  position: relative;
+  margin: 40px auto 0;
+  width: min(460px, 100%);
+  z-index: 2;
+}
+/* Legacy .si-card selectors — kept so the style block parses the
+   same whether or not the shared MemberCard is in use yet. */
 .si-card {
   position: relative;
   margin: 40px auto 0;
