@@ -491,13 +491,15 @@ const newsletter = () => node('section', {
 // so baking a `<footer>` into the landing tree would just stack two
 // footers on the home page.
 
+// No hero here \u2014 the /cart-style split-layout LandingHero React
+// component (tapas-store/src/components/LandingHero.js) renders
+// above whatever the tree emits, so baking a hero-band into the
+// tree would stack two heroes on the home page.
+
 const root = () => node('body', {
   classes: ['tapas-landing'],
   children: [
     styleNode(RAW_CSS),
-    node('div', { classes: ['hero-band'], children: [
-      node('div', { classes: ['wrap'], children: [hero()] }),
-    ]}),
     marquee(),
     services(),
     arrivals(),
