@@ -66,6 +66,7 @@ const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
 const SearchPage      = lazyWithRetry(() => import('./pages/Search'));
 const Shop            = lazyWithRetry(() => import('./pages/Shop'));
 const Library         = lazyWithRetry(() => import('./pages/Library'));
+const Contact         = lazyWithRetry(() => import('./pages/Contact'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -143,6 +144,7 @@ function AppShell() {
             <Route path="/search"        element={<SearchPage />} />
             <Route path="/shop"          element={<Shop />} />
             <Route path="/library"       element={<Library />} />
+            <Route path="/contact"       element={<Contact />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
             <Route path="*"              element={<CustomPage />} />
