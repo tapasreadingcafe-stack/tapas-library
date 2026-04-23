@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 // Lives outside the v2 tree so active-state styling can react to the
 // current route — the tree renderer is static and can't do that.
 
-const LIME = '#CFF389';
+const LIME = '#caf27e';
 const PINK = '#E0004F';
 const PINK_DARK = '#B8003F';
 const PURPLE = '#7C3AED';

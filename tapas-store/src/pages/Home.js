@@ -10,7 +10,7 @@ import { findPageByPath, findV2PageByPath } from '../utils/findPage';
 // New Arrivals (4 product cards), Room inspiration, Testimonials.
 // =====================================================================
 
-const LIME = '#CFF389';
+const LIME = '#caf27e';
 const PINK = '#EF3D7B';
 const PINK_DARK = '#D02A65';
 const INK = '#1F2937';

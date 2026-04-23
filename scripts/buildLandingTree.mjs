@@ -37,7 +37,7 @@ const RAW_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .tapas-landing {
-  --lime: #C9F27F; --lime-2: #DCF59A;
+  --lime: #caf27e; --lime-2: #DCF59A;
   --orange: #FF934A; --purple: #8F4FD6; --pink: #E0004F;
   --ink: #1a1a1a; --ink-2: #3a3a3a; --muted: #6e6e6e;
   --rule: #ececea; --landing-bg: #faf8f4; --card: #ffffff;

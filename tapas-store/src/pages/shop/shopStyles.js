@@ -7,7 +7,7 @@ const SHOP_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .shop-root {
-  --shop-lime:   #C9F27F;
+  --shop-lime:   #caf27e;
   --shop-orange: #FF934A;
   --shop-purple: #8F4FD6;
   --shop-pink:   #E0004F;
