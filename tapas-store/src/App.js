@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { SiteContentProvider, useV2Content } from './context/SiteContent';
@@ -10,10 +10,14 @@ import SiteFooter from './components/SiteFooter';
 import InstallPrompt from './components/InstallPrompt';
 import './App.css';
 
+// Auth flows get a dedicated split-screen layout; stacking the
+// sticky navbar on top would compete with the focused form. Add any
+// new auth routes to this set to hide the nav there.
+const HIDE_NAV_ROUTES = new Set(['/sign-in', '/sign-up', '/forgot-password']);
+
 function GlobalHeader() {
-  // TapasStickyNav owns the header for the entire site. It has its
-  // own active-route logic via useLocation, so we don't route
-  // through the old template dispatch.
+  const { pathname } = useLocation();
+  if (HIDE_NAV_ROUTES.has(pathname)) return null;
   return <TapasStickyNav />;
 }
 
@@ -68,6 +72,9 @@ const Shop            = lazyWithRetry(() => import('./pages/Shop'));
 const Library         = lazyWithRetry(() => import('./pages/Library'));
 const Contact         = lazyWithRetry(() => import('./pages/Contact'));
 const Events          = lazyWithRetry(() => import('./pages/Events'));
+const SignIn          = lazyWithRetry(() => import('./pages/SignIn'));
+const SignUp          = lazyWithRetry(() => import('./pages/SignUp'));
+const ForgotPassword  = lazyWithRetry(() => import('./pages/ForgotPassword'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -147,6 +154,9 @@ function AppShell() {
             <Route path="/library"       element={<Library />} />
             <Route path="/contact"       element={<Contact />} />
             <Route path="/events"        element={<Events />} />
+            <Route path="/sign-in"       element={<SignIn />} />
+            <Route path="/sign-up"       element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
             <Route path="*"              element={<CustomPage />} />
