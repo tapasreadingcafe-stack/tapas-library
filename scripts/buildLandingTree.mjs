@@ -486,53 +486,10 @@ const newsletter = () => node('section', {
   ],
 });
 
-const footer = () => node('footer', {
-  classes: ['wrap', 'site-foot'], children: [
-    node('div', { classes: ['foot-grid'], children: [
-      node('div', { classes: ['foot-brand'], children: [
-        node('div', { classes: ['name'], children: [
-          { text: 'Tapas reading cafe', marks: [] },
-          node('i', { textContent: 'a small room for big books' }),
-        ]}),
-        node('p', { textContent: 'A neighborhood library-cafe serving small plates, natural wine, and six weekly book clubs.' }),
-      ]}),
-      node('div', { classes: ['foot-col'], children: [
-        node('h5', { textContent: 'Visit' }),
-        node('ul', { children: [
-          node('li', { textContent: '14 Haven Street' }),
-          node('li', { textContent: 'Reading, MA 01867' }),
-          node('li', { textContent: 'Tue–Sun · 10a–11p' }),
-        ]}),
-      ]}),
-      node('div', { classes: ['foot-col'], children: [
-        node('h5', { textContent: 'Read' }),
-        node('ul', { children: [
-          node('li', { children: [node('a', { attributes: { href: '/books' },  textContent: 'Library' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#events' }, textContent: 'Book Clubs' })] }),
-          node('li', { children: [node('a', { attributes: { href: '/blog' },   textContent: 'The Journal' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#archive' }, textContent: 'Archive' })] }),
-        ]}),
-      ]}),
-      node('div', { classes: ['foot-col'], children: [
-        node('h5', { textContent: 'More' }),
-        node('ul', { children: [
-          node('li', { children: [node('a', { attributes: { href: '#events' },  textContent: 'Private Events' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#gift' },    textContent: 'Gift Cards' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#careers' }, textContent: 'Careers' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#contact' }, textContent: 'Contact' })] }),
-        ]}),
-      ]}),
-    ]}),
-    node('div', { classes: ['foot-bottom'], children: [
-      node('span', { textContent: `© ${new Date().getFullYear()} Tapas Reading Cafe · Reading, MA` }),
-      node('div', { classes: ['socials'], children: [
-        node('a', { attributes: { href: '#ig' }, textContent: 'IG' }),
-        node('a', { attributes: { href: '#fb' }, textContent: 'FB' }),
-        node('a', { attributes: { href: '#sp' }, textContent: 'SP' }),
-      ]}),
-    ]}),
-  ],
-});
+// No footer here — the global React SiteFooter
+// (tapas-store/src/components/SiteFooter.js) renders on every route,
+// so baking a `<footer>` into the landing tree would just stack two
+// footers on the home page.
 
 const root = () => node('body', {
   classes: ['tapas-landing'],
@@ -548,7 +505,6 @@ const root = () => node('body', {
     events(),
     testimonial(),
     newsletter(),
-    footer(),
   ],
 });
 

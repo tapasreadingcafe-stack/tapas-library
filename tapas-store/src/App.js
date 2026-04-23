@@ -1,85 +1,27 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { SiteContentProvider, useSiteContent, useV2Content } from './context/SiteContent';
-import { findV2PageByPath } from './utils/findPage';
+import { SiteContentProvider, useV2Content } from './context/SiteContent';
 import { ThemeProvider } from './context/ThemeContext';
 import StoreEditorSync from './components/StoreEditorSync';
-import FooterTemplate from './components/FooterTemplates';
 import TapasStickyNav from './components/TapasStickyNav';
+import SiteFooter from './components/SiteFooter';
 import InstallPrompt from './components/InstallPrompt';
-import { findPageByPath } from './utils/findPage';
 import './App.css';
 
-// When the current page has a Navbar/Footer block in its block tree,
-// the global app-chrome Header/Footer should get out of the way — we'd
-// otherwise render two navbars or two footers, one from the app shell
-// and one from the block. These helpers check the current URL against
-// content.pages and hide the global chrome if a block version exists.
-function currentPageBlocks(content, pathname) {
-  const matchKey = findPageByPath(content?.pages, pathname);
-  if (!matchKey) return [];
-  const blocks = content.pages[matchKey]?.blocks;
-  return Array.isArray(blocks) ? blocks : [];
-}
-
-// v2 equivalent: walk the Node tree for the current page and look for
-// any node whose semantic tag (or authored class) indicates a navbar
-// or footer. Without this check, every page authored in the v2 editor
-// would double-stack chrome against the global HeaderTemplate /
-// FooterTemplate app shell.
-function v2TreeHas(tree, predicate) {
-  if (!tree) return false;
-  const stack = [tree];
-  while (stack.length) {
-    const n = stack.pop();
-    if (!n) continue;
-    if (predicate(n)) return true;
-    if (Array.isArray(n.children)) stack.push(...n.children);
-  }
-  return false;
-}
-
-function hasFooterNode(n) {
-  if (n?.tag === 'footer') return true;
-  const cls = n?.classes;
-  if (!Array.isArray(cls)) return false;
-  return cls.some(c => /(^|-)footer(-|$)/i.test(c || ''));
-}
-
-function currentV2PageTree(v2, pathname) {
-  if (!v2?.enabled || !v2?.content?.pages) return null;
-  const key = findV2PageByPath(v2.content.pages, pathname);
-  if (!key) return null;
-  return v2.content.pages[key]?.tree || null;
-}
-
-// Routes whose page component renders its own footer, so the global
-// app shell must step aside. Kept for the footer only — the header is
-// now a single React component (TapasStickyNav) that renders across
-// every route so active-state styling can follow the router.
-const FULL_BLEED_ROUTES = new Set();
-
 function GlobalHeader() {
-  // TapasStickyNav owns the header for the entire site now. It has
-  // its own active-route logic via useLocation, so we no longer route
-  // through HeaderTemplate / the v2-tree nav detection.
+  // TapasStickyNav owns the header for the entire site. It has its
+  // own active-route logic via useLocation, so we don't route
+  // through the old template dispatch.
   return <TapasStickyNav />;
 }
 
 function GlobalFooter() {
-  const location = useLocation();
-  const content = useSiteContent();
-  const v2 = useV2Content();
-  if (FULL_BLEED_ROUTES.has(location.pathname)) return null;
-  const v2Tree = currentV2PageTree(v2, location.pathname);
-  if (v2Tree && v2TreeHas(v2Tree, hasFooterNode)) return null;
-  if (!v2Tree) {
-    const blocks = currentPageBlocks(content, location.pathname);
-    if (blocks.some(b => b?.type === 'footer' && !b?.props?.hidden)) return null;
-  }
-  return <FooterTemplate />;
+  // SiteFooter owns the footer for the entire site. The landing tree
+  // no longer carries its own footer node, so nothing else renders
+  // below; SiteFooter always takes over.
+  return <SiteFooter />;
 }
 
 // Recover from ChunkLoadError by forcing one hard reload. Prevents a
