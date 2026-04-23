@@ -81,18 +81,17 @@ export default function TapasStickyNav() {
           padding: 14px 32px; gap: 24px;
         }
         .tapas-snav-logo {
-          display: flex; flex-direction: column;
+          display: inline-flex;
+          align-items: center;
           text-decoration: none; color: ${INK};
           line-height: 1;
         }
-        .tapas-snav-logo .logo-tapas {
-          font-family: 'Fraunces', Georgia, serif;
-          font-weight: 800; font-size: 30px;
-          letter-spacing: 0.02em;
-        }
-        .tapas-snav-logo .logo-sub {
-          font-size: 13px; font-weight: 400;
-          margin-top: 4px; letter-spacing: 0.01em;
+        .tapas-snav-logo-img {
+          height: 44px;
+          width: auto;
+          display: block;
+          /* Logo is dark on a transparent background; reads well on the
+             lime nav (#caf27e) with no filter. */
         }
         .tapas-snav-links {
           display: flex; gap: 30px; align-items: center;
@@ -185,15 +184,17 @@ export default function TapasStickyNav() {
           .tapas-snav-hamburger { display: inline-flex; }
           .tapas-snav-mobile { display: block; }
           .tapas-snav-inner { padding: 12px 20px; }
-          .tapas-snav-logo .logo-tapas { font-size: 26px; }
-          .tapas-snav-logo .logo-sub   { font-size: 12px; }
+          .tapas-snav-logo-img { height: 38px; }
         }
       `}</style>
       <nav className="tapas-snav" aria-label="Primary">
         <div className="tapas-snav-inner">
-          <Link to="/" className="tapas-snav-logo" aria-label="Tapas reading cafe — home">
-            <span className="logo-tapas">TAPAS</span>
-            <span className="logo-sub">reading cafe</span>
+          <Link to="/" className="tapas-snav-logo" aria-label="Tapas Reading Cafe — home">
+            <img
+              src={`${process.env.PUBLIC_URL || ''}/logo.png`}
+              alt="Tapas Reading Cafe"
+              className="tapas-snav-logo-img"
+            />
           </Link>
 
           <div className="tapas-snav-links">

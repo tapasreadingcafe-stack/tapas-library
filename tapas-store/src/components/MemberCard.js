@@ -43,10 +43,11 @@ export default function MemberCard({
       <header className="mc-head">
         <span>Member card \u00b7 2026</span>
         {variant === 'stacked' ? (
-          <span className="mc-head-logo">
-            <span className="mc-logo-tapas">TAPAS</span>
-            <span className="mc-logo-sub">reading cafe</span>
-          </span>
+          <img
+            src={`${process.env.PUBLIC_URL || ''}/logo.png`}
+            alt="Tapas Reading Cafe"
+            className="mc-head-logo-img"
+          />
         ) : (
           <span>{cardNumber}</span>
         )}
@@ -114,23 +115,13 @@ export const MEMBER_CARD_CSS = `
   text-transform: uppercase;
   color: rgba(255,255,255,0.72);
 }
-.mc-head-logo { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.mc-logo-tapas {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 0.02em;
-  color: #fff;
-  line-height: 1;
-}
-.mc-logo-sub {
-  font-family: "Fraunces", Georgia, serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: rgba(255,255,255,0.72);
-  text-transform: none;
+.mc-head-logo-img {
+  height: 36px;
+  width: auto;
+  display: block;
+  /* Logo is dark-on-transparent; the card is #1a1a1a. Invert turns
+     the ink white so the mark reads cleanly on the dark field. */
+  filter: brightness(0) invert(1);
 }
 .mc-rule {
   display: block;

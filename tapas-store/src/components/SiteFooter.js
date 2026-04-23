@@ -68,13 +68,20 @@ export default function SiteFooter() {
           gap: 48px;
           padding-bottom: 44px;
         }
+        .site-footer-logo {
+          height: 60px;
+          width: auto;
+          display: block;
+          margin-bottom: 14px;
+        }
         .site-footer-brand-headline {
           font-family: 'Fraunces', Georgia, serif;
-          font-weight: 700;
-          font-size: 24px;
-          line-height: 1.2;
-          letter-spacing: -0.01em;
-          color: ${INK};
+          font-weight: 500;
+          font-style: italic;
+          font-size: 16px;
+          line-height: 1.4;
+          letter-spacing: -0.005em;
+          color: ${INK_2};
           margin: 0 0 14px;
         }
         .site-footer-brand-body {
@@ -170,9 +177,14 @@ export default function SiteFooter() {
         <div className="site-footer-wrap">
           <div className="site-footer-grid">
             <div className="site-footer-brand">
-              <h2 id="site-footer-brand" className="site-footer-brand-headline">
+              <img
+                src={`${process.env.PUBLIC_URL || ''}/logo.png`}
+                alt="Tapas Reading Cafe"
+                className="site-footer-logo"
+              />
+              <p id="site-footer-brand" className="site-footer-brand-headline">
                 a small room for big books
-              </h2>
+              </p>
               <p className="site-footer-brand-body">
                 A neighborhood library-cafe serving small plates,
                 natural wine, and six weekly book clubs.
