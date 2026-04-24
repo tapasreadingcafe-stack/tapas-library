@@ -12,7 +12,7 @@ export default function MemberCardIllustration() {
   return (
     <aside className="si-card" aria-label="Member card preview">
       <header className="si-card-head">
-        <span>Member card Â· 2026</span>
+        <span>Member card · 2026</span>
         <span>No. 0318</span>
       </header>
       <h3 className="si-card-title">The <em>perks,</em> all of them.</h3>
@@ -25,7 +25,7 @@ export default function MemberCardIllustration() {
         ))}
       </ul>
       <div className="si-card-foot">
-        <span>â¹350 / month Â· cancel anytime</span>
+        <span>₹350 / month · cancel anytime</span>
         <span className="si-card-foot-plus" aria-hidden="true">+</span>
       </div>
     </aside>

@@ -4,16 +4,17 @@ import { Link } from 'react-router-dom';
 // Split-layout landing hero.
 //
 // Layout from bottom to top:
-//   1. Section background: cream (#faf8f4) â the page's natural bg.
-//   2. Photo: absolute rectangle pinned to the right ~55%, object-fit
-//      cover. Clean rectangle; no masking.
-//   3. Lime S-curve SVG: absolute over the whole section, fills the
-//      left region with a smooth wavy right edge that overlaps the
-//      photo's left edge â that overlap is the organic divider.
-//   4. Copy + CTAs: absolute on the left, sits on top of the lime
-//      region.
-// The sticky nav above the hero is its own lime band (TapasStickyNav)
-// and spans full width without any gap over the photo.
+//   1. Section background: cream (--bg).
+//   2. Photo: absolute rectangle pinned to the right 50%, natural
+//      aspect, object-fit cover.
+//   3. Lime S-curve SVG: overlays the left region, rolling across the
+//      middle; its right edge overlaps the photo's left edge.
+//   4. Content (kicker + H1 + lede + CTAs): max-width 560, vertically
+//      centered in the hero.
+//
+// The sticky nav above sits at z-index 50. The hero pulls itself up
+// under the nav with a negative margin so the photo + lime curve
+// start at viewport Y=0 and the nav floats on top.
 
 const LIME = '#caf27e';
 const PINK = '#E0004F';
@@ -23,6 +24,7 @@ const ORANGE_DARK = '#de7628';
 const INK = '#1a1a1a';
 const INK_2 = '#3a3a3a';
 const CREAM = '#faf8f4';
+const NAV_H = 87; // Keep in sync with TapasStickyNav's measured height.
 
 export default function LandingHero() {
   const photoSrc = `${process.env.PUBLIC_URL || ''}/HERO-LIBRARY.png`;
@@ -32,34 +34,46 @@ export default function LandingHero() {
       <style>{`
         .lh-root {
           position: relative;
-          overflow: hidden;
-          background: ${CREAM};
-          min-height: 560px;
+          overflow-x: hidden;
+          overflow-y: visible;
+          background: ${LIME};
+          min-height: 100vh;
           isolation: isolate;
+          /* Full-bleed: root spans the full viewport width. margin-
+             left:0 anchors to body's left edge (x=0); width:100vw
+             extends 8–15px past body's right (into the scrollbar
+             gutter) so the photo truly reaches the viewport edge.
+             The sibling <style> below hides body's horizontal
+             overflow so this bleed never produces an h-scrollbar. */
+          width: 100vw;
+          margin-left: 0;
+          margin-top: -${NAV_H}px;
         }
+        /* Prevent horizontal page scroll caused by the full-bleed
+           root extending into the scrollbar gutter. */
+        html, body { overflow-x: hidden; }
 
-        /* Clean rectangle for the photo, right 55%. */
+        /* Image displayed in full, no crop, fitted inside the wrap.
+           The PNG has organic curves baked into two corners; those
+           curves show against the lime hero background as part of
+           the design. */
         .lh-photo-wrap {
           position: absolute;
-          top: 0;
-          right: 0;
-          width: 55%;
-          height: 100%;
+          top: 0; right: 0; bottom: 0;
+          width: 70%;
           z-index: 1;
-          overflow: hidden;
-          background: ${CREAM};
         }
         .lh-photo {
           width: 100%;
           height: 100%;
-          object-fit: cover;
-          object-position: center;
+          object-fit: contain;
+          object-position: right center;
           display: block;
         }
 
-        /* The single lime S-curve: fills the left region with a wavy
-           right edge that sweeps across the middle of the hero and
-           overlaps the photoâs left edge. One <path>, one fill. */
+        /* Single lazy S-curve lime overlay. Anchored top-left, sweeps
+           through the middle, exits bottom-left; the wavy right edge
+           overlaps the photo's left edge as the organic divider. */
         .lh-lime {
           position: absolute;
           inset: 0;
@@ -70,37 +84,63 @@ export default function LandingHero() {
           z-index: 2;
         }
 
-        /* Text column, on top of the lime region. */
-        .lh-copy {
-          position: absolute;
-          top: 0;
-          left: 0;
-          bottom: 0;
-          width: 50%;
+        /* Content frame: full-viewport tall, flex-centered so the
+           block sits in the vertical middle regardless of hero size.
+           padding-top accounts for the pulled-up nav space so the
+           content never ends up under the nav bar. */
+        .lh-content {
+          position: relative;
           z-index: 3;
+          max-width: 1280px;
+          margin: 0 auto;
+          /* top padding clears the pulled-up nav area and pushes
+             the text block into the upper-middle of the hero
+             (~35-40% from top). */
+          padding: ${NAV_H + 140}px 64px 0;
+          min-height: 100vh;
           display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 72px 56px 72px 64px;
+          align-items: flex-start;
         }
+        .lh-block { max-width: 560px; }
+
+        .lh-kicker {
+          font-family: "JetBrains Mono", ui-monospace, monospace;
+          font-size: 12px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: ${INK};
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+        .lh-kicker::before {
+          content: '';
+          display: inline-block;
+          width: 7px; height: 7px;
+          border-radius: 999px;
+          background: ${PINK};
+        }
+
         .lh-title {
-          font-family: "Fraunces", Georgia, serif;
-          font-weight: 700;
-          font-size: clamp(40px, 4.6vw, 66px);
+          font-family: "DM Serif Display", Georgia, serif;
+          font-weight: 400;
+          font-size: clamp(44px, 5.5vw, 72px);
           line-height: 1.05;
           letter-spacing: -0.02em;
           color: ${INK};
           margin: 0;
-          max-width: 14ch;
         }
+
         .lh-lede {
           font-family: "Inter", system-ui, sans-serif;
           font-size: 15px;
           line-height: 1.6;
           color: ${INK_2};
-          margin: 18px 0 0;
-          max-width: 52ch;
+          margin: 20px 0 0;
+          max-width: 44ch;
         }
+
         .lh-ctas {
           display: flex;
           flex-wrap: wrap;
@@ -131,9 +171,6 @@ export default function LandingHero() {
         .lh-btn.is-orange {
           background: ${ORANGE};
           box-shadow: 0 8px 18px -10px rgba(255,147,74,0.6);
-          /* Subtle text-shadow holds the white above WCAG AA on the
-             light-orange field. Dropped on hover when we darken the
-             background anyway. */
           text-shadow: 0 1px 1px rgba(0,0,0,0.28);
         }
         .lh-btn:hover { transform: translateY(-1px); }
@@ -145,12 +182,9 @@ export default function LandingHero() {
         }
 
         @media (max-width: 1023px) {
-          .lh-photo-wrap { width: 50%; }
-          .lh-copy {
-            width: 55%;
-            padding: 56px 32px 56px 48px;
-          }
-          .lh-title { font-size: clamp(36px, 4.6vw, 48px); }
+          .lh-content { padding-left: 40px; padding-right: 40px; }
+          .lh-block { max-width: 440px; }
+          .lh-title { font-size: clamp(40px, 5.5vw, 56px); }
         }
         @media (max-width: 767px) {
           .lh-root { min-height: auto; }
@@ -158,24 +192,24 @@ export default function LandingHero() {
             position: relative;
             width: 100%;
             height: 320px;
+            top: auto; right: auto; bottom: auto;
           }
-          .lh-copy {
+          .lh-lime { display: none; }
+          .lh-content {
             position: relative;
-            width: 100%;
-            padding: 48px 28px 36px;
+            padding: ${NAV_H}px 24px 48px;
+            min-height: auto;
             text-align: center;
-            align-items: center;
+            justify-content: center;
           }
-          .lh-title { font-size: 34px; max-width: none; }
-          .lh-lede { max-width: none; }
+          .lh-block { max-width: none; }
+          .lh-kicker { justify-content: center; }
           .lh-ctas { justify-content: center; }
-          /* On mobile the curve flows along the photo's TOP edge. */
-          .lh-lime { height: 80px; top: auto; bottom: 320px; }
+          .lh-title { font-size: 38px; }
         }
       `}</style>
 
       <section className="lh-root" aria-label="Welcome to Tapas Reading Cafe">
-        {/* 1. Photo rectangle, right 55%. */}
         <div className="lh-photo-wrap">
           <img
             src={photoSrc}
@@ -185,39 +219,36 @@ export default function LandingHero() {
           />
         </div>
 
-        {/* 2. Single lime S-curve over the whole hero. Starts
-             top-left, sweeps across the middle, exits bottom-left â
-             its right edge overlaps the photo. */}
         <svg
           className="lh-lime"
-          viewBox="0 0 1440 700"
+          viewBox="0 0 1440 900"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
           <path
             d="M 0,0
-               L 760,0
-               C 860,180 620,360 820,540
-               C 900,620 780,660 720,700
-               L 0,700 Z"
+               L 820,0
+               C 780,220 900,480 760,700
+               C 680,820 780,900 720,900
+               L 0,900 Z"
             fill={LIME}
           />
         </svg>
 
-        {/* 3. Copy + CTAs. Em dash is a real character so it renders
-             as â in the output (JSX text doesnât interpret
-             \\u escape sequences). */}
-        <div className="lh-copy">
-          <h1 className="lh-title">
-            Where Stories Begin &amp;<br />Families Connect
-          </h1>
-          <p className="lh-lede">
-            A cozy reading space for kids and parents — discover books,
-            enjoy simple treats, and build a love for reading together.
-          </p>
-          <div className="lh-ctas">
-            <Link to="/sign-up" className="lh-btn is-pink">Join now!</Link>
-            <Link to="/shop"    className="lh-btn is-orange">Explore books</Link>
+        <div className="lh-content">
+          <div className="lh-block">
+            <div className="lh-kicker">Welcome to Tapas</div>
+            <h1 className="lh-title">
+              Where Stories Begin &amp; Families Connect
+            </h1>
+            <p className="lh-lede">
+              A cozy reading space for kids and parents — discover books,
+              enjoy simple treats, and build a love for reading together.
+            </p>
+            <div className="lh-ctas">
+              <Link to="/sign-up" className="lh-btn is-pink">Join now!</Link>
+              <Link to="/shop"    className="lh-btn is-orange">Explore books</Link>
+            </div>
           </div>
         </div>
       </section>

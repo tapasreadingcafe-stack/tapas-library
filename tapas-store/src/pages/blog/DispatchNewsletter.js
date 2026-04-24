@@ -9,7 +9,7 @@ export default function DispatchNewsletter() {
   const onSubmit = (e) => {
     e.preventDefault();
     if (!isValidEmail(email)) {
-      setError('That email doesnât look right.');
+      setError('That email doesn’t look right.');
       return;
     }
     setError(null);
@@ -29,15 +29,15 @@ export default function DispatchNewsletter() {
           One <em>letter</em> a month.
         </h2>
         <p className="blog-dispatch-lede">
-          This weekâs shelf, next weekâs clubs, and a paragraph
-          we couldnât stop thinking about.
+          This week’s shelf, next week’s clubs, and a paragraph
+          we couldn’t stop thinking about.
         </p>
       </div>
 
       <div>
         {sent ? (
           <div className="blog-dispatch-success" role="status">
-            Youâre on the list â see you on the first of the month.
+            You’re on the list — see you on the first of the month.
           </div>
         ) : (
           <>

@@ -4,8 +4,8 @@ export default function TestimonialCard() {
   return (
     <aside className="si-testimonial" aria-label="Member testimonial">
       <p className="si-testimonial-quote">
-        \u201CThe only place Iâve ever wanted to stay until
-        closing, and the only place thatâs ever let me.\u201D
+        \u201CThe only place I’ve ever wanted to stay until
+        closing, and the only place that’s ever let me.\u201D
       </p>
       <div className="si-testimonial-author">
         <span className="si-avatar" aria-hidden="true">H</span>

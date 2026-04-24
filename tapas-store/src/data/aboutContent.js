@@ -21,7 +21,7 @@ export const ABOUT_MANIFESTO = {
     },
     {
       dropCap: 'W',
-      body: "e are a three-person team with a standing rule: if a book is worth our shelves, itâs worth a paragraph in our staff notes. We hand-write them on cream cards, we update them every Monday, and weâve never lost a single one.",
+      body: "e are a three-person team with a standing rule: if a book is worth our shelves, it’s worth a paragraph in our staff notes. We hand-write them on cream cards, we update them every Monday, and we’ve never lost a single one.",
     },
   ],
 };
@@ -63,7 +63,7 @@ export const ABOUT_HISTORY = {
     {
       year: '2023',
       heading: 'Lending library, no cards.',
-      body: 'The ledger went up. We promised no late fees, no paperwork â just a name, a date, and a return window of three weeks.',
+      body: 'The ledger went up. We promised no late fees, no paperwork — just a name, a date, and a return window of three weeks.',
     },
     {
       year: String(CURRENT_YEAR),
@@ -77,10 +77,10 @@ export const ABOUT_COMPROMISES = {
   kicker: 'What we actually believe',
   title: [
     { t: 'Three things ' },
-    { t: 'we wonât compromise', em: true },
+    { t: 'we won’t compromise', em: true },
     { t: ' on.' },
   ],
-  lede: "Weâre small enough that everything we do fits inside one of these three sentences. If something doesnât, we probably shouldnât be doing it.",
+  lede: "We’re small enough that everything we do fits inside one of these three sentences. If something doesn’t, we probably shouldn’t be doing it.",
   cards: [
     {
       n: '01',
@@ -89,7 +89,7 @@ export const ABOUT_COMPROMISES = {
         { t: 'The room ' },
         { t: 'takes its time.', em: 'purple' },
       ],
-      body: "No table turns. No laptops after five. Coffee refills are on us. If youâre reading something long, weâd rather you finished the chapter than opened your wallet again.",
+      body: "No table turns. No laptops after five. Coffee refills are on us. If you’re reading something long, we’d rather you finished the chapter than opened your wallet again.",
     },
     {
       n: '02',
@@ -98,7 +98,7 @@ export const ABOUT_COMPROMISES = {
         { t: 'Books ' },
         { t: 'are for borrowing.', em: 'purple' },
       ],
-      body: 'The lending library is free, without cards, without sign-up. We trust you. We have never, in five years, lost more than eleven books â and nine of those came back.',
+      body: 'The lending library is free, without cards, without sign-up. We trust you. We have never, in five years, lost more than eleven books — and nine of those came back.',
     },
     {
       n: '03',
@@ -118,34 +118,34 @@ export const ABOUT_TEAM = {
     { t: 'Four humans, ' },
     { t: 'one long table.', em: true },
   ],
-  lede: 'Weâre a small team. We all pour, we all stock the shelves, and one of us cooks. Find us on the floor if you want to talk about a book.',
+  lede: 'We’re a small team. We all pour, we all stock the shelves, and one of us cooks. Find us on the floor if you want to talk about a book.',
   members: [
     {
       initials: 'MR',
       color: '#e8dfcb',
       name: 'Marisol Reyes',
-      role: 'Founder Â· Slow Fiction host',
+      role: 'Founder · Slow Fiction host',
       reading: 'The Magic Mountain (again)',
     },
     {
       initials: 'RA',
       color: '#caf27e',
       name: 'Rafa Alvarado',
-      role: 'Kitchen Â· Menu',
+      role: 'Kitchen · Menu',
       reading: 'Chang, Lispector, a knife catalog',
     },
     {
       initials: 'AP',
       color: '#FF934A',
       name: 'Ava Park',
-      role: 'Bookseller Â· Journal editor',
+      role: 'Bookseller · Journal editor',
       reading: 'Minor Detail, then Austerlitz',
     },
     {
       initials: 'JG',
       color: '#E8D9FF',
       name: 'Julien Gagn\u00E9',
-      role: 'Translators host Â· Bar',
+      role: 'Translators host · Bar',
       reading: 'Saramago in the original',
     },
   ],
@@ -157,27 +157,27 @@ export const ABOUT_PRESS = {
     { t: 'What ' },
     { t: 'people said.', em: true },
   ],
-  lede: 'We donât mind a good review. We mind a careless one. These stuck.',
+  lede: 'We don’t mind a good review. We mind a careless one. These stuck.',
   quotes: [
     {
       source: 'The Boston Globe',
-      body: 'The rare bookshop that expects you to stay for dinner â and makes it worth your while.',
-      footer: 'Dining Â· 2024',
+      body: 'The rare bookshop that expects you to stay for dinner — and makes it worth your while.',
+      footer: 'Dining · 2024',
     },
     {
       source: 'Boston Magazine',
       body: 'A room so quiet you can hear the pages turn, with tapas sharp enough to cut through it.',
-      footer: 'Best of Â· 2025',
+      footer: 'Best of · 2025',
     },
     {
       source: 'Eater Boston',
-      body: 'The menu is short. The wine list is shorter. The book list is enormous. Thatâs the whole pitch.',
-      footer: 'First look Â· 2023',
+      body: 'The menu is short. The wine list is shorter. The book list is enormous. That’s the whole pitch.',
+      footer: 'First look · 2023',
     },
     {
       source: 'A regular, on Google',
-      body: 'I have read more in the last year at Tapas than in the five before it. I donât know what that says about me.',
-      footer: 'âââââ Â· 2026',
+      body: 'I have read more in the last year at Tapas than in the five before it. I don’t know what that says about me.',
+      footer: '★★★★★ · 2026',
     },
   ],
 };

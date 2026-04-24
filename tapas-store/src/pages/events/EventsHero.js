@@ -15,9 +15,8 @@ export default function EventsHero() {
           </h1>
         </div>
         <p className="ev-hero-lede">
-          Weekly book clubs, poetry suppers, silent reading Saturdays,
-          and the occasional translator in conversation. Drop in once
-          as a guest â decide later whether a chair is yours.
+          Weekly clubs, poetry suppers, and silent reading Saturdays.
+          Drop in once as a guest.
         </p>
       </div>
       <svg

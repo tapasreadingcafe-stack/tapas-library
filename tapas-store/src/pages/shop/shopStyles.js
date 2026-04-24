@@ -4,7 +4,7 @@
 // spec) so they don't collide with other pages.
 
 const SHOP_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .shop-root {
   --shop-lime:   #caf27e;
@@ -17,7 +17,7 @@ const SHOP_CSS = `
   --shop-rule:   #ececea;
   --shop-bg:     #faf8f4;
   --shop-card:   #ffffff;
-  --shop-f-display: "Fraunces", Georgia, serif;
+  --shop-f-display: "DM Serif Display", Georgia, serif;
   --shop-f-ui:      "Inter", system-ui, sans-serif;
   --shop-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -34,18 +34,21 @@ const SHOP_CSS = `
 .shop-hero-band {
   position: relative;
   background: var(--shop-lime);
-  padding: 72px 0 88px;
+  padding: 72px 0 96px;
   overflow: hidden;
 }
 .shop-hero-wrap {
-  max-width: 1320px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 64px;
+  padding: 0 32px;
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 64px;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px;
   align-items: end;
 }
+.shop-hero-wrap > div:first-child { grid-column: 1 / span 7; }
+.shop-hero-_placeholder
+
 .shop-hero-kicker {
   font-family: var(--shop-f-mono);
   font-size: 12px;
@@ -55,7 +58,7 @@ const SHOP_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 .shop-hero-dot {
   display: inline-block;
@@ -65,10 +68,10 @@ const SHOP_CSS = `
 }
 .shop-hero-title {
   font-family: var(--shop-f-display);
-  font-weight: 800;
-  font-size: clamp(36px, 5vw, 72px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  font-size: clamp(48px, 6vw, 80px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   color: var(--shop-ink);
   margin: 0;
 }
@@ -81,8 +84,10 @@ const SHOP_CSS = `
   font-size: 15px;
   line-height: 1.6;
   color: var(--shop-ink-2);
-  margin: 0 0 6px;
-  max-width: 44ch;
+  margin: 0;
+  max-width: 42ch;
+  grid-column: 8 / span 5;
+  padding-bottom: 12px;
 }
 .shop-hero-curve {
   position: absolute;
@@ -120,10 +125,10 @@ const SHOP_CSS = `
 }
 .shop-featured-title {
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 44px;
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   margin: 0;
   color: var(--shop-ink);
 }
@@ -185,7 +190,7 @@ const SHOP_CSS = `
 }
 .shop-featured-cover-title {
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 36px;
   line-height: 1.05;
   letter-spacing: -0.01em;
@@ -203,7 +208,7 @@ const SHOP_CSS = `
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: 48px;
-  padding: 0 0 100px;
+  padding: 0;
 }
 
 /* ---- Filter sidebar ---- */
@@ -360,7 +365,7 @@ const SHOP_CSS = `
 .shop-empty-emoji { font-size: 40px; margin-bottom: 10px; }
 .shop-empty h3 {
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   color: var(--shop-ink);
   margin: 0 0 8px;
@@ -414,7 +419,7 @@ const SHOP_CSS = `
 }
 .shop-cover-title {
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 19px;
   line-height: 1.08;
   letter-spacing: -0.01em;
@@ -444,7 +449,7 @@ const SHOP_CSS = `
 .shop-card-meta { display: flex; flex-direction: column; gap: 2px; }
 .shop-card-title {
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 17px;
   line-height: 1.15;
   color: var(--shop-ink);
@@ -467,7 +472,7 @@ const SHOP_CSS = `
 }
 .shop-card-price-now {
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   color: var(--shop-ink);
 }
@@ -572,7 +577,7 @@ const SHOP_CSS = `
 .shop-drawer-head h3 {
   margin: 0;
   font-family: var(--shop-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 20px;
   color: var(--shop-ink);
 }
@@ -633,6 +638,16 @@ const SHOP_CSS = `
   .shop-featured-cover { max-width: 240px; }
   .shop-grid { grid-template-columns: 1fr; }
   .shop-toolbar { align-items: flex-start; }
+}
+
+@media (max-width: 1023px) {
+  .shop-hero-wrap { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .shop-hero-wrap > div:first-child { grid-column: auto !important; }
+  .shop-hero-lede { grid-column: auto !important; padding-bottom: 0 !important; max-width: 100% !important; }
+}
+@media (max-width: 767px) {
+  .shop-hero-band { padding: 48px 0 64px !important; }
+  .shop-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
 }
 `;
 

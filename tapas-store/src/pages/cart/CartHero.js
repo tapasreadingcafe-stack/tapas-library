@@ -14,9 +14,7 @@ export default function CartHero() {
           </h1>
         </div>
         <p className="ct-hero-lede">
-          Free shipping over â¹999, or pick up at the cafe. We
-          hand-wrap with paper from the Reading Public Library sale,
-          and tuck a staff note inside every order.
+          Free shipping over ₹999, or pick up at the cafe.
         </p>
       </div>
       <svg

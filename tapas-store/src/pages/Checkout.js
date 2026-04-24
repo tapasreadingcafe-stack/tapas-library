@@ -29,7 +29,7 @@ export default function Checkout() {
       <div className="ct-checkout-stub">
         <div className="ct-summary-kicker">Checkout</div>
         <h1>Checkout flow <em>coming next.</em></h1>
-        <p>Your basket is safe. Hereâs the summary you just confirmed:</p>
+        <p>Your basket is safe. Here’s the summary you just confirmed:</p>
 
         <div className="ct-checkout-stub-box">
           {items.length === 0 ? (
@@ -39,7 +39,7 @@ export default function Checkout() {
             </div>
           ) : items.map((i) => (
             <div key={i.key} className="ct-checkout-stub-row">
-              <span>{i.title} Â· {i.author} \u00d7 {i.quantity}</span>
+              <span>{i.title} · {i.author} \u00d7 {i.quantity}</span>
               <span>{rupees(i.unit_price * i.quantity)}</span>
             </div>
           ))}
@@ -52,7 +52,7 @@ export default function Checkout() {
           )}
           {promoDiscount > 0 && (
             <div className="ct-checkout-stub-row">
-              <span>Promo Â· {promoCode?.code}</span>
+              <span>Promo · {promoCode?.code}</span>
               <span>\u2212{rupees(promoDiscount)}</span>
             </div>
           )}
@@ -83,7 +83,7 @@ export default function Checkout() {
         </div>
 
         <Link to="/cart" className="ct-checkout-stub-back">
-          â Back to the basket
+          ← Back to the basket
         </Link>
       </div>
     </div>

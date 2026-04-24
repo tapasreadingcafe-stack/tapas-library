@@ -14,9 +14,7 @@ export default function ContactHero() {
           </h1>
         </div>
         <p className="contact-hero-lede">
-          14 Haven Street, right off the square. No reservations for
-          reading â just walk in. For supper events, private
-          bookings, and press, use the form below.
+          14 Haven Street, right off the square. Walk in anytime.
         </p>
       </div>
       <svg

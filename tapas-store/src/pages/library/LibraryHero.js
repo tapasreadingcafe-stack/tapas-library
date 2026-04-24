@@ -14,9 +14,8 @@ export default function LibraryHero() {
           </h1>
         </div>
         <p className="library-hero-lede">
-          Take two home at a time. Keep them for three weeks. Return
-          them to the drop-box by the door. No late fees â we
-          trust you. Donations always welcome on the orange shelf.
+          Take two home at a time. Three weeks to return. No late
+          fees, no paperwork.
         </p>
       </div>
       <svg

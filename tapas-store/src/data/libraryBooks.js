@@ -22,10 +22,10 @@ export const LIBRARY_STATS = [
 ];
 
 export const LIBRARY_FEATURED = {
-  kicker: 'Featured shelf Â· April',
+  kicker: 'Featured shelf · April',
   headline: 'Books in translation,',
   accent: 'chosen by translators.',
-  body: "Fourteen titles picked by the translators whoâd kill for them. Margaret Jull Costa, Sean Cotter, Sophie Hughes, and Jennifer Croft each pulled three.",
+  body: "Fourteen titles picked by the translators who’d kill for them. Margaret Jull Costa, Sean Cotter, Sophie Hughes, and Jennifer Croft each pulled three.",
   ctaLabel: 'Browse the shelf',
   ctaTarget: 'shelf-translation',
   // Spines for the illustration. Each entry is [coverVariant, heightPct].
@@ -75,7 +75,7 @@ export const LIBRARY_SHELVES = [
     totals: { titles: 176, outOnLoan: 3 },
     books: [
       { id: 'bluets',              title: 'Bluets',             author: 'M. Nelson',   cover: 'pink',   status: available(),  categories: ['Essays', 'Poetry', "Members' Picks"] },
-      { id: 'a-room-of-ones-own',  title: "A Room of Oneâs Own", author: 'V. Woolf',  cover: 'lime',  status: available(),  categories: ['Essays', "Members' Picks"] },
+      { id: 'a-room-of-ones-own',  title: "A Room of One’s Own", author: 'V. Woolf',  cover: 'lime',  status: available(),  categories: ['Essays', "Members' Picks"] },
       { id: 'citizen',             title: 'Citizen',            author: 'C. Rankine',  cover: 'purple', status: available(),  categories: ['Poetry', 'Essays', "Members' Picks"] },
       { id: 'devotions',           title: 'Devotions',          author: 'M. Oliver',   cover: 'orange', status: out('4/26'),  categories: ['Poetry'] },
       { id: 'the-argonauts',       title: 'The Argonauts',      author: 'M. Nelson',   cover: 'ink',    status: available(),  categories: ['Essays', 'Memoir'] },

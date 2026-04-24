@@ -15,9 +15,8 @@ export default function AboutHero() {
           </h1>
         </div>
         <p className="ab-hero-lede">
-          A library-cafe on Haven Street, open since 2021. We cook,
-          we pour, we press books into hands. Six clubs, 2,400 books,
-          one long table, and a door thatâs nearly always open.
+          A library-cafe on Haven Street since 2021. Six clubs,
+          2,400 books, one long table.
         </p>
       </div>
       <svg

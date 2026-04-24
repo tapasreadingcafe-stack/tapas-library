@@ -10,13 +10,12 @@ export default function HeroBand() {
             The Shop
           </div>
           <h1 id="shop-hero-h1" className="shop-hero-title">
-            Books we keep <em>pressing</em> into peopleâs hands.
+            Books we keep <em>pressing</em> into people’s hands.
           </h1>
         </div>
         <p className="shop-hero-lede">
-          A small, considered shelf â new releases, small presses, and staff
-          favorites. Every title here has a paragraph from one of us
-          explaining why. Free shipping over â¹999, or pick up at the cafe.
+          A considered shelf of new releases, small presses, and staff
+          favorites. Free shipping over ₹999.
         </p>
       </div>
       <svg

@@ -22,7 +22,7 @@ export default function PricingTiers({ tier, onTier }) {
             <span className="su-tier-kicker">{t.kicker}</span>
             <span className="su-tier-name">{t.name}</span>
             <span className="su-tier-price">
-              <span className="su-tier-price-num">â¹{t.price.toLocaleString('en-IN')}</span>
+              <span className="su-tier-price-num">₹{t.price.toLocaleString('en-IN')}</span>
               <span className="su-tier-price-sfx">{t.suffix}</span>
             </span>
           </button>

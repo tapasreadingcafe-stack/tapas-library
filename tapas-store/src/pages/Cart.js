@@ -113,7 +113,7 @@ export default function Cart() {
           <div>
             <div className="ct-toolbar">
               <div className="ct-toolbar-count">
-                {itemCount} {pluralItems(itemCount)} Â· {titleCount} {pluralTitles(titleCount)}
+                {itemCount} {pluralItems(itemCount)} · {titleCount} {pluralTitles(titleCount)}
               </div>
               {items.length > 0 && (
                 <button
@@ -177,7 +177,7 @@ export default function Cart() {
             <h3 id="ct-clear-h">Clear everything?</h3>
             <p>
               This empties the basket and resets any notes or promos
-              youâve added. You canât undo this.
+              you’ve added. You can’t undo this.
             </p>
             <div className="ct-modal-actions">
               <button
@@ -203,7 +203,7 @@ export default function Cart() {
       {mobileBarVisible && items.length > 0 && (
         <div className="ct-mobile-bar" role="region" aria-label="Checkout">
           <button type="button" onClick={() => navigate('/checkout')}>
-            Checkout Â· {rupees(total)}
+            Checkout · {rupees(total)}
             <span className="ct-mobile-bar-arrow" aria-hidden="true">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12" />

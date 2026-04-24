@@ -25,7 +25,7 @@ export default function FeaturedBook({ memberDiscount }) {
       <div className="shop-featured-left">
         <div className="shop-featured-kicker">Book of the Month</div>
         <h2 id="featured-h" className="shop-featured-title">
-          {book.title} <em>Â· {book.author}</em>
+          {book.title} <em>· {book.author}</em>
         </h2>
         <p className="shop-featured-body">
           A diary-novel the size of a cathedral. Translator Sean Cotter
@@ -34,7 +34,7 @@ export default function FeaturedBook({ memberDiscount }) {
         </p>
         <button type="button" className="shop-featured-cta" onClick={onAdd}>
           <span className="shop-featured-cta-label">
-            Add to cart Â· {formatInr(effective)}
+            Add to cart · {formatInr(effective)}
           </span>
           <span className="shop-featured-cta-arrow" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">

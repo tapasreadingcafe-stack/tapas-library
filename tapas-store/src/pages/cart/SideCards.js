@@ -9,7 +9,7 @@ export function PickupCard() {
         Or pick it up <em>in person.</em>
       </h4>
       <p>
-        Free pickup at 14 Haven Street, TueâSun. Weâll hold
+        Free pickup at 14 Haven Street, Tue–Sun. We’ll hold
         it for seven days.
       </p>
       <label className="ct-pickup-row">
@@ -31,7 +31,7 @@ export function GiftWrapCard() {
       <div className="ct-giftwrap-row">
         <div className="ct-gw-label">
           <b id="ct-gw-h">Gift wrap</b>
-          <span>Cream paper, lime ribbon, handwritten tag. â¹50.</span>
+          <span>Cream paper, lime ribbon, handwritten tag. ₹50.</span>
         </div>
         <button
           type="button"
@@ -55,7 +55,7 @@ export function NoteCard() {
       <textarea
         className="ct-note-input"
         rows={3}
-        placeholder="Handwritten on a cream card and tucked inside. Keep it short â we like it that way."
+        placeholder="Handwritten on a cream card and tucked inside. Keep it short — we like it that way."
         value={note}
         maxLength={140}
         onChange={(e) => updateNote(e.target.value)}

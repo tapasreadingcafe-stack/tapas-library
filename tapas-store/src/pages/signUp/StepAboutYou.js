@@ -17,7 +17,7 @@ export default function StepAboutYou({ state, dispatch, errors }) {
       <h2 className="su-step-title">Tell us <em>who you are.</em></h2>
       <p className="su-step-sub">
         We keep this short. You can fill out the rest at the counter
-        if youâd rather.
+        if you’d rather.
       </p>
 
       <div className="su-fields">
@@ -64,7 +64,7 @@ export default function StepAboutYou({ state, dispatch, errors }) {
             autoComplete="email"
           />
           <span className="su-help">
-            Weâll send one dispatch a month and nothing else.
+            We’ll send one dispatch a month and nothing else.
           </span>
           {errors.email && <div className="su-error">{errors.email}</div>}
         </div>
@@ -135,7 +135,7 @@ export default function StepAboutYou({ state, dispatch, errors }) {
         </div>
 
         <div className="su-field">
-          <label htmlFor="su-reading">One sentence â what are you reading right now? (optional)</label>
+          <label htmlFor="su-reading">One sentence — what are you reading right now? (optional)</label>
           <textarea
             id="su-reading"
             className="su-textarea"

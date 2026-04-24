@@ -13,11 +13,11 @@ export default function Welcome() {
           </div>
           <h1>Welcome to the <em>long table.</em></h1>
           <p>
-            Youâre in. Check your email for the welcome dispatch
-            â and weâll see you Thursday at 7p.
+            You’re in. Check your email for the welcome dispatch
+            — and we’ll see you Thursday at 7p.
           </p>
           <Link to="/events" className="su-stub-back">
-            See whatâs on this week â
+            See what’s on this week →
           </Link>
         </div>
       </div>

@@ -19,7 +19,7 @@ export default function SignIn() {
           <MemberCard
             className="si-memcard"
             variant="compact"
-            priceLine="â¹467 / month Â· cancel anytime"
+            priceLine="₹467 / month · cancel anytime"
           />
           <TestimonialCard />
         </div>

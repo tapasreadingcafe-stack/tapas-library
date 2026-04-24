@@ -20,7 +20,7 @@ export default function ContactForm() {
       return;
     }
     if (!isValidEmail(values.email)) {
-      setError('That email doesnât look right.');
+      setError('That email doesn’t look right.');
       return;
     }
     setError(null);
@@ -86,7 +86,7 @@ export default function ContactForm() {
       <label htmlFor="contact-message">Message</label>
       <textarea
         id="contact-message"
-        placeholder="Tell us a littleâ¦"
+        placeholder="Tell us a little…"
         rows={4}
         disabled={sent}
         value={values.message}
@@ -99,9 +99,9 @@ export default function ContactForm() {
 
       <button type="submit" disabled={sent}>
         {sent ? (
-          <>Sent â weâll write back soon</>
+          <>Sent — we’ll write back soon</>
         ) : (
-          <>Send <span className="contact-form-arrow" aria-hidden="true">â</span></>
+          <>Send <span className="contact-form-arrow" aria-hidden="true">→</span></>
         )}
       </button>
     </form>

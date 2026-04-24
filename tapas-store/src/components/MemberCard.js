@@ -10,7 +10,7 @@ import { MEMBERSHIP_PERKS } from '../data/signUpConfig';
 //   /sign-in  uses variant="compact" with a price line.
 //   /sign-up  uses variant="stacked" with Starts today / No contract.
 
-const DEFAULT_PRICE_LINE = 'â¹467 / month Â· cancel anytime';
+const DEFAULT_PRICE_LINE = '₹467 / month · cancel anytime';
 
 export default function MemberCard({
   className = '',
@@ -41,7 +41,7 @@ export default function MemberCard({
       )}
 
       <header className="mc-head">
-        <span>Member card Â· 2026</span>
+        <span>Member card · 2026</span>
         {variant === 'stacked' ? (
           <img
             src={`${process.env.PUBLIC_URL || ''}/logo.png`}
@@ -131,8 +131,8 @@ export const MEMBER_CARD_CSS = `
 }
 .mc-rule-foot { margin: 26px 0 0; }
 .mc-title {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 700;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-weight: 400;
   font-size: 24px;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -192,8 +192,8 @@ export const MEMBER_CARD_CSS = `
   margin-top: 18px;
 }
 .mc-foot-title {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 700;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-weight: 400;
   font-size: 20px;
   color: #fff;
   letter-spacing: -0.01em;

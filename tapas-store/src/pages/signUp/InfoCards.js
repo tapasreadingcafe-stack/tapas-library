@@ -4,7 +4,7 @@ export default function InfoCards() {
   return (
     <>
       <section className="su-info">
-        <h3>What you <em>wonât</em> get.</h3>
+        <h3>What you <em>won’t</em> get.</h3>
         <p>
           No email blasts, no loyalty points, no app to install, no
           birthday coupons, no upsells at the counter. We promise.

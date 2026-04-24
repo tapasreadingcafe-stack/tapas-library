@@ -53,12 +53,12 @@ export default function CartItemCard({
       <div className="ct-item-meta">
         <h3 className="ct-item-title">{item.title}</h3>
         <div className="ct-item-author">
-          {item.author}{categories ? ` Â· ${categories}` : ''}
+          {item.author}{categories ? ` · ${categories}` : ''}
         </div>
         <div className={`ct-item-info${inStock ? '' : ' is-oos'}`}>
           {inStock
-            ? `${format} Â· Ships in 2â3 days`
-            : `${format} Â· Out of stock â notify me`}
+            ? `${format} · Ships in 2–3 days`
+            : `${format} · Out of stock — notify me`}
         </div>
         {memberDiscountApplied && (
           <span className="ct-item-disc">Member 10% off</span>

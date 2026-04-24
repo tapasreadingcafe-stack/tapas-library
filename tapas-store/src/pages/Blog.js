@@ -70,7 +70,7 @@ export default function Blog() {
             </h2>
           </div>
           <p className="blog-archive-lede">
-            Essays and interviews, sorted howeverâs useful.
+            Essays and interviews, sorted however’s useful.
           </p>
         </header>
 

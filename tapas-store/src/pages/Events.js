@@ -50,7 +50,7 @@ export default function Events() {
           <>
             <EventsCalendar category={category} onJumpToEvent={onJumpToEvent} />
             <div className="ev-cal-hint" aria-hidden="true">
-              Calendar isnât shown on narrow screens â the
+              Calendar isn’t shown on narrow screens — the
               upcoming events are listed below.
             </div>
           </>
@@ -67,8 +67,8 @@ export default function Events() {
             </h2>
           </div>
           <p className="ev-head-lede">
-            All events are free for members; guest seats are â¹650
-            and include a drink. Book ahead â our room holds 24.
+            All events are free for members; guest seats are ₹650
+            and include a drink. Book ahead — our room holds 24.
           </p>
         </header>
 
@@ -91,7 +91,7 @@ export default function Events() {
           </div>
           <p className="ev-head-lede">
             Six ongoing groups. Come once as a guest to find your
-            people, then keep your seat â we hold it.
+            people, then keep your seat — we hold it.
           </p>
         </header>
 

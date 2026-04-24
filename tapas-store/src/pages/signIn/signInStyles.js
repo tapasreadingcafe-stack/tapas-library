@@ -1,5 +1,5 @@
 const SIGN_IN_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .si-root {
   --si-lime:   #caf27e;
@@ -11,7 +11,7 @@ const SIGN_IN_CSS = `
   --si-muted:  #6e6e6e;
   --si-rule:   #ececea;
   --si-bg:     #faf8f4;
-  --si-f-display: "Fraunces", Georgia, serif;
+  --si-f-display: "DM Serif Display", Georgia, serif;
   --si-f-ui:      "Inter", system-ui, sans-serif;
   --si-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -48,7 +48,7 @@ const SIGN_IN_CSS = `
 }
 .si-title {
   font-family: var(--si-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(40px, 5vw, 56px);
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -283,7 +283,7 @@ const SIGN_IN_CSS = `
 }
 .si-card-title {
   font-family: var(--si-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 24px;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -373,13 +373,13 @@ const SIGN_IN_CSS = `
   display: inline-grid;
   place-items: center;
   font-family: var(--si-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 14px;
   flex-shrink: 0;
 }
 .si-testimonial-name {
   font-family: var(--si-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 14px;
   color: var(--si-ink);
 }
@@ -403,7 +403,7 @@ const SIGN_IN_CSS = `
 .si-stub-inner { max-width: 480px; }
 .si-stub h1 {
   font-family: var(--si-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(32px, 4vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.02em;

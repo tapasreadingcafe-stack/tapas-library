@@ -5,7 +5,7 @@
 // every page has to import.
 
 const LIBRARY_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .library-root {
   --lib-lime:   #caf27e;
@@ -19,7 +19,7 @@ const LIBRARY_CSS = `
   --lib-rule:   #ececea;
   --lib-bg:     #faf8f4;
   --lib-card:   #ffffff;
-  --lib-f-display: "Fraunces", Georgia, serif;
+  --lib-f-display: "DM Serif Display", Georgia, serif;
   --lib-f-ui:      "Inter", system-ui, sans-serif;
   --lib-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -46,14 +46,15 @@ const LIBRARY_CSS = `
   overflow: hidden;
 }
 .library-hero-inner {
-  max-width: 1320px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 64px;
+  padding: 0 32px;
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 64px;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px;
   align-items: end;
 }
+.library-hero-inner > div:first-child { grid-column: 1 / span 7; }
 .library-hero-kicker {
   font-family: var(--lib-f-mono);
   font-size: 12px;
@@ -63,7 +64,7 @@ const LIBRARY_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 .library-hero-dot {
   display: inline-block;
@@ -73,10 +74,10 @@ const LIBRARY_CSS = `
 }
 .library-hero-title {
   font-family: var(--lib-f-display);
-  font-weight: 800;
-  font-size: clamp(36px, 5.2vw, 76px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  font-size: clamp(48px, 6vw, 80px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   color: var(--lib-ink);
   margin: 0;
 }
@@ -90,7 +91,9 @@ const LIBRARY_CSS = `
   line-height: 1.6;
   color: var(--lib-ink-2);
   margin: 0;
-  max-width: 44ch;
+  max-width: 42ch;
+  grid-column: 8 / span 5;
+  padding-bottom: 12px;
 }
 .library-hero-curve {
   position: absolute;
@@ -123,7 +126,7 @@ const LIBRARY_CSS = `
 }
 .library-stat-value {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 48px;
   line-height: 1;
   letter-spacing: -0.01em;
@@ -207,7 +210,7 @@ const LIBRARY_CSS = `
 }
 .library-featured-title {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(30px, 3.6vw, 46px);
   line-height: 1.08;
   letter-spacing: -0.015em;
@@ -301,12 +304,12 @@ const LIBRARY_CSS = `
   gap: 16px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--lib-rule);
-  margin-bottom: 22px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 .library-shelf-title {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 24px;
   color: var(--lib-ink);
   margin: 0;
@@ -364,7 +367,7 @@ const LIBRARY_CSS = `
 }
 .library-cover-title {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 19px;
   line-height: 1.08;
   letter-spacing: -0.01em;
@@ -418,7 +421,7 @@ const LIBRARY_CSS = `
 .library-empty-emoji { font-size: 40px; margin-bottom: 10px; }
 .library-empty h3 {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   color: var(--lib-ink);
   margin: 0 0 8px;
@@ -426,7 +429,7 @@ const LIBRARY_CSS = `
 .library-empty p { margin: 0; font-size: 14px; }
 
 /* ---- House rules ---- */
-.library-rules {
+.library-rules { margin-bottom: 0 !important;
   background: var(--lib-lime);
   border-radius: 28px;
   padding: 56px;
@@ -434,7 +437,7 @@ const LIBRARY_CSS = `
   grid-template-columns: 1fr 1.1fr;
   gap: 48px;
   align-items: start;
-  margin-bottom: 80px;
+  margin-bottom: 0;
 }
 .library-rules-kicker {
   font-family: var(--lib-f-mono);
@@ -446,7 +449,7 @@ const LIBRARY_CSS = `
 }
 .library-rules-title {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(28px, 3.4vw, 40px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -476,15 +479,15 @@ const LIBRARY_CSS = `
 .library-rules-item:first-child { border-top: 0; padding-top: 0; }
 .library-rules-num {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 28px;
   color: var(--lib-ink);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   line-height: 1;
 }
 .library-rules-item-title {
   font-family: var(--lib-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   color: var(--lib-ink);
   margin: 0 0 4px;
@@ -501,12 +504,12 @@ const LIBRARY_CSS = `
 @media (max-width: 1200px) {
   .library-hero-inner { padding: 0 40px; gap: 40px; }
   .library-wrap { padding: 0 40px; }
-  .library-featured, .library-rules { padding: 44px; }
+  .library-featured, .library-rules { margin-bottom: 0 !important; padding: 44px; }
 }
 @media (max-width: 1023px) {
   .library-stats { grid-template-columns: repeat(2, 1fr); }
   .library-shelf-grid { grid-template-columns: repeat(3, 1fr); }
-  .library-featured, .library-rules {
+  .library-featured, .library-rules { margin-bottom: 0 !important;
     grid-template-columns: 1fr;
     gap: 32px;
   }
@@ -518,7 +521,7 @@ const LIBRARY_CSS = `
   .library-wrap { padding: 0 20px; }
   .library-stats { grid-template-columns: 1fr; }
   .library-shelf-grid { grid-template-columns: repeat(2, 1fr); }
-  .library-featured, .library-rules {
+  .library-featured, .library-rules { margin-bottom: 0 !important;
     padding: 28px;
     border-radius: 22px;
   }
@@ -543,6 +546,16 @@ const LIBRARY_CSS = `
     gap: 12px;
   }
   .library-rules-num { font-size: 24px; }
+}
+
+@media (max-width: 1023px) {
+  .library-hero-inner { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .library-hero-inner > div:first-child { grid-column: auto !important; }
+  .library-hero-lede { grid-column: auto !important; padding-bottom: 0 !important; max-width: 100% !important; }
+}
+@media (max-width: 767px) {
+  .library-hero { padding: 48px 0 64px !important; }
+  .library-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
 }
 `;
 

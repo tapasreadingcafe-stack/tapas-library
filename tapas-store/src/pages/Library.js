@@ -42,7 +42,7 @@ export default function Library() {
   // reservation flow is designed.
   const onReserve = (book) => {
     // eslint-disable-next-line no-alert
-    window.alert(`Reserved \u201C${book.title}\u201D â pick up at the cafe within 48 hours.`);
+    window.alert(`Reserved \u201C${book.title}\u201D — pick up at the cafe within 48 hours.`);
   };
 
   // If the URL came in with a #shelf-xxx hash, scroll there once the

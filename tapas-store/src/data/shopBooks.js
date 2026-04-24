@@ -62,9 +62,9 @@ export const SHOP_BOOKS = [
   },
   {
     id: 'a-room-of-ones-own',
-    title: 'A Room of Oneâs Own',
+    title: 'A Room of One’s Own',
     author: 'Virginia Woolf',
-    coverLabel: 'A Room of Oneâs Own',
+    coverLabel: 'A Room of One’s Own',
     coverVariant: 'lime',
     price: 499,
     categories: ['Essays'],
@@ -118,7 +118,7 @@ export const SHOP_BOOKS = [
   },
   {
     id: 'the-thiefs-journal',
-    title: 'The Thiefâs Journal',
+    title: 'The Thief’s Journal',
     author: 'Jean Genet',
     // The spec asks the cover to display "Nightboat" (the imprint)
     // while the card below keeps the real title and author.
@@ -199,5 +199,5 @@ export const FEATURED_BOOK_ID = 'solenoid';
 // Human-readable INR.
 export function formatInr(n) {
   const v = Math.round(Number(n) || 0);
-  return `â¹${v.toLocaleString('en-IN')}`;
+  return `₹${v.toLocaleString('en-IN')}`;
 }

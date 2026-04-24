@@ -47,7 +47,7 @@ export default function SiteFooter() {
     <>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       />
       <style>{`
         .site-footer {
@@ -75,7 +75,7 @@ export default function SiteFooter() {
           margin-bottom: 18px;
         }
         .site-footer-brand-headline {
-          font-family: 'Fraunces', Georgia, serif;
+          font-family: 'DM Serif Display', Georgia, serif;
           font-weight: 500;
           font-style: italic;
           font-size: 16px;
@@ -196,7 +196,7 @@ export default function SiteFooter() {
               <ul>
                 <li>14 Haven Street</li>
                 <li>Reading, MA 01867</li>
-                <li>TueâSun Â· 10aâ11p</li>
+                <li>Tue–Sun · 10a–11p</li>
               </ul>
             </div>
 
@@ -221,7 +221,7 @@ export default function SiteFooter() {
 
           <div className="site-footer-bottom">
             <div className="site-footer-copy">
-              \u00a9 {year} Tapas Reading Cafe Â· Reading, MA
+              \u00a9 {year} Tapas Reading Cafe · Reading, MA
             </div>
             <div className="site-footer-socials" aria-label="Social links">
               {SOCIALS.map((s) => (

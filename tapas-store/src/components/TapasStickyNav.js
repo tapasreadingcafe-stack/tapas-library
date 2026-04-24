@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
@@ -61,19 +61,55 @@ export default function TapasStickyNav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { itemCount } = useCart();
 
+  // Transparent at the top, lime + soft shadow once the user has
+  // scrolled past a short threshold. 50px mirrors the usual "leave
+  // the hero" distance so the transition kicks in when the nav
+  // starts covering page content instead of the hero photo.
+  const [isScrolled, setIsScrolled] = useState(() =>
+    typeof window !== 'undefined' && window.scrollY > 50,
+  );
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 50);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
     <>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap"
       />
       <style>{`
         .tapas-snav {
           position: sticky; top: 0; z-index: 50;
-          background: ${LIME};
+          background: transparent;
           font-family: 'Poppins', system-ui, sans-serif;
           color: ${INK};
-          border-bottom: 1px solid rgba(0,0,0,0.04);
+          transition: background-color 300ms ease;
+        }
+        .tapas-snav.is-scrolled {
+          background: ${LIME};
+        }
+        /* When the nav is transparent at the top, only the right-side
+           items (search, cart, Sign In) sit over the library photo
+           and need to be white. The center links (About Us \u2192
+           Contact Us) sit over the lime curve / lime bg and stay
+           dark ink. Logo is also on lime and stays dark. Sign Up
+           keeps its pink pill either way. */
+        .tapas-snav.is-top .tapas-snav-signin,
+        .tapas-snav.is-top .tapas-snav-icon {
+          color: #fff;
+        }
+        .tapas-snav.is-top .tapas-snav-signin {
+          text-decoration-color: rgba(255,255,255,0.6);
+        }
+        .tapas-snav.is-top .tapas-snav-icon:hover {
+          background: rgba(255,255,255,0.15);
+        }
+        .tapas-snav.is-top .tapas-snav-badge {
+          border-color: rgba(255,255,255,0.9);
         }
         .tapas-snav-inner {
           max-width: 1320px; margin: 0 auto;
@@ -187,7 +223,18 @@ export default function TapasStickyNav() {
           .tapas-snav-logo-img { height: 48px; }
         }
       `}</style>
-      <nav className="tapas-snav" aria-label="Primary">
+      <nav
+        className={(() => {
+          // Transparent-at-top behavior is a home-page thing only —
+          // other routes don't have a hero photo under the nav, so
+          // the lime bg should stay put. On non-home pages we force
+          // is-scrolled regardless of actual scroll position.
+          const isHome = pathname === '/';
+          const state = !isHome || isScrolled ? 'is-scrolled' : 'is-top';
+          return `tapas-snav ${state}`;
+        })()}
+        aria-label="Primary"
+      >
         <div className="tapas-snav-inner">
           <Link to="/" className="tapas-snav-logo" aria-label="Tapas Reading Cafe — home">
             <img

@@ -1,5 +1,5 @@
 const SIGN_UP_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .su-root {
   --su-lime:   #caf27e;
@@ -12,7 +12,7 @@ const SIGN_UP_CSS = `
   --su-rule:   #ececea;
   --su-bg:     #faf8f4;
   --su-card:   #ffffff;
-  --su-f-display: "Fraunces", Georgia, serif;
+  --su-f-display: "DM Serif Display", Georgia, serif;
   --su-f-ui:      "Inter", system-ui, sans-serif;
   --su-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -48,7 +48,7 @@ const SIGN_UP_CSS = `
 }
 .su-title {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(40px, 5.2vw, 64px);
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -104,7 +104,7 @@ const SIGN_UP_CSS = `
 }
 .su-tier-name {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 20px;
   letter-spacing: -0.01em;
   color: var(--su-ink);
@@ -117,7 +117,7 @@ const SIGN_UP_CSS = `
 }
 .su-tier-price-num {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 36px;
   letter-spacing: -0.02em;
   color: var(--su-ink);
@@ -202,7 +202,7 @@ const SIGN_UP_CSS = `
 /* ---- Step content ---- */
 .su-step-title {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(26px, 3vw, 36px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -432,7 +432,7 @@ const SIGN_UP_CSS = `
 }
 .su-week-title {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -477,7 +477,7 @@ const SIGN_UP_CSS = `
 }
 .su-info h3 {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -504,7 +504,7 @@ const SIGN_UP_CSS = `
 .su-stub-inner { max-width: 520px; }
 .su-stub-inner h1 {
   font-family: var(--su-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(32px, 4vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.02em;

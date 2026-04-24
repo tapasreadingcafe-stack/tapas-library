@@ -1,5 +1,5 @@
 const CART_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .ct-root {
   --ct-lime:   #caf27e;
@@ -11,7 +11,7 @@ const CART_CSS = `
   --ct-muted:  #6e6e6e;
   --ct-rule:   #ececea;
   --ct-bg:     #faf8f4;
-  --ct-f-display: "Fraunces", Georgia, serif;
+  --ct-f-display: "DM Serif Display", Georgia, serif;
   --ct-f-ui:      "Inter", system-ui, sans-serif;
   --ct-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -34,14 +34,15 @@ const CART_CSS = `
   overflow: hidden;
 }
 .ct-hero-inner {
-  max-width: 1320px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 64px;
+  padding: 0 32px;
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 64px;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px;
   align-items: end;
 }
+.ct-hero-inner > div:first-child { grid-column: 1 / span 7; }
 .ct-hero-kicker {
   font-family: var(--ct-f-mono);
   font-size: 12px;
@@ -51,7 +52,7 @@ const CART_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 .ct-hero-dot {
   display: inline-block;
@@ -61,10 +62,10 @@ const CART_CSS = `
 }
 .ct-hero-title {
   font-family: var(--ct-f-display);
-  font-weight: 800;
-  font-size: clamp(40px, 5.4vw, 80px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  font-size: clamp(48px, 6vw, 80px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   color: var(--ct-ink);
   margin: 0;
 }
@@ -94,7 +95,7 @@ const CART_CSS = `
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 48px;
-  margin: 56px 0 80px;
+  margin: 40px 0 0;
   align-items: start;
 }
 
@@ -159,7 +160,7 @@ const CART_CSS = `
 .ct-item-cover.is-cream { color: var(--ct-ink); }
 .ct-item-cover-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 13px;
   line-height: 1.1;
   letter-spacing: -0.005em;
@@ -177,7 +178,7 @@ const CART_CSS = `
 .ct-item-meta { min-width: 0; }
 .ct-item-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   line-height: 1.15;
   color: var(--ct-ink);
@@ -235,7 +236,7 @@ const CART_CSS = `
   min-width: 40px;
   text-align: center;
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   color: var(--ct-ink);
   font-variant-numeric: tabular-nums;
@@ -254,7 +255,7 @@ const CART_CSS = `
 }
 .ct-price-now {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 20px;
   color: var(--ct-ink);
   letter-spacing: -0.01em;
@@ -294,7 +295,7 @@ const CART_CSS = `
 }
 .ct-empty h3 {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 28px;
   letter-spacing: -0.01em;
   margin: 0 0 8px;
@@ -335,7 +336,7 @@ const CART_CSS = `
 .ct-paired { margin-top: 44px; }
 .ct-paired-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   letter-spacing: -0.005em;
   color: var(--ct-ink);
@@ -370,7 +371,7 @@ const CART_CSS = `
 .ct-paired-cover.is-cream { color: var(--ct-ink); }
 .ct-paired-cover-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 14px;
   line-height: 1.1;
 }
@@ -384,7 +385,7 @@ const CART_CSS = `
 .ct-paired-meta b {
   display: block;
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 14px;
   color: var(--ct-ink);
 }
@@ -397,7 +398,7 @@ const CART_CSS = `
 }
 .ct-paired-price {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 15px;
   color: var(--ct-ink);
 }
@@ -436,7 +437,7 @@ const CART_CSS = `
 }
 .ct-summary-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -461,7 +462,7 @@ const CART_CSS = `
 }
 .ct-line-value {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 15px;
   color: var(--ct-ink);
   font-variant-numeric: tabular-nums;
@@ -484,7 +485,7 @@ const CART_CSS = `
 }
 .ct-line-total .ct-line-value {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 24px;
   color: var(--ct-ink);
 }
@@ -619,7 +620,7 @@ const CART_CSS = `
 .ct-side-card.is-lime { background: var(--ct-lime); border-color: transparent; }
 .ct-side-card-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   letter-spacing: -0.005em;
   margin: 0 0 6px;
@@ -651,7 +652,7 @@ const CART_CSS = `
 }
 .ct-gw-label b {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 16px;
   color: var(--ct-ink);
   display: block;
@@ -770,7 +771,7 @@ const CART_CSS = `
 }
 .ct-modal h3 {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   margin: 0 0 8px;
   color: var(--ct-ink);
@@ -833,10 +834,10 @@ const CART_CSS = `
 }
 .ct-checkout-stub h1 {
   font-family: var(--ct-f-display);
-  font-weight: 700;
-  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 400;
+  font-size: clamp(48px, 6vw, 80px);
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   margin: 0 0 12px;
 }
 .ct-checkout-stub h1 em { color: var(--ct-purple); font-style: italic; font-weight: 500; }
@@ -863,7 +864,7 @@ const CART_CSS = `
   margin-top: 8px;
   border-top: 1px dashed var(--ct-rule);
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 20px;
 }
 .ct-checkout-stub-back {
@@ -920,6 +921,16 @@ const CART_CSS = `
   .ct-summary { padding: 24px 22px; }
   .ct-mobile-bar { display: block; }
   .ct-wrap { padding-bottom: 80px; }
+}
+
+@media (max-width: 1023px) {
+  .ct-hero-inner { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .ct-hero-inner > div:first-child { grid-column: auto !important; }
+  .ct-hero-lede { grid-column: auto !important; padding-bottom: 0 !important; max-width: 100% !important; }
+}
+@media (max-width: 767px) {
+  .ct-hero { padding: 48px 0 64px !important; }
+  .ct-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
 }
 `;
 

@@ -57,7 +57,7 @@ export default function OrderSummary({
       )}
       {promoDiscount > 0 && (
         <div className="ct-line">
-          <span className="ct-line-label">Promo Â· {promoCode?.code}</span>
+          <span className="ct-line-label">Promo · {promoCode?.code}</span>
           <span className="ct-line-value is-discount">\u2212{rupees(promoDiscount)}</span>
         </div>
       )}
@@ -87,7 +87,7 @@ export default function OrderSummary({
       <div className="ct-promo">
         {promoCode ? (
           <div className="ct-promo-applied">
-            <span>Promo <b>{promoCode.code}</b> â \u2212{rupees(promoCode.amount)}</span>
+            <span>Promo <b>{promoCode.code}</b> — \u2212{rupees(promoCode.amount)}</span>
             <button type="button" onClick={() => { clearPromoCode(); setMsg(null); }}>
               Remove
             </button>
@@ -120,7 +120,7 @@ export default function OrderSummary({
         onClick={onCheckout}
         disabled={itemCount === 0}
       >
-        Checkout Â· {rupees(total)}
+        Checkout · {rupees(total)}
         <span className="ct-checkout-arrow" aria-hidden="true">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12" />
@@ -129,12 +129,12 @@ export default function OrderSummary({
         </span>
       </button>
 
-      <div className="ct-secure">Secure checkout Â· Razorpay / UPI / Cards</div>
+      <div className="ct-secure">Secure checkout · Razorpay / UPI / Cards</div>
       <div className="ct-trust">
         <span>Hand-wrapped</span>
-        <span>Â·</span>
+        <span>·</span>
         <span>Ships from the cafe</span>
-        <span>Â·</span>
+        <span>·</span>
         <span>30-day returns</span>
       </div>
     </section>

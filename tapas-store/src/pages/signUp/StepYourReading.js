@@ -82,7 +82,7 @@ export default function StepYourReading({ state, dispatch }) {
         </div>
 
         <div className="su-field">
-          <label>Which of these spoils your week if itâs bad</label>
+          <label>Which of these spoils your week if it’s bad</label>
           <div className="su-chip-row">
             {SPOILER_CHIPS.map((s) => {
               const on = r.spoilers.includes(s);

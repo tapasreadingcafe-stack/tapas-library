@@ -20,7 +20,7 @@ function ClubCard({ club }) {
             <span className="ev-club-seats-n">{club.seats}</span> seats
           </span>
         ) : (
-          <span className="ev-club-seats">â</span>
+          <span className="ev-club-seats">—</span>
         )}
         <span className="ev-club-status">{club.status}</span>
       </div>

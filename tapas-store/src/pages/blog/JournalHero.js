@@ -14,9 +14,8 @@ export default function JournalHero() {
           </h1>
         </div>
         <p className="blog-hero-lede">
-          Essays, marginalia, and conversations with writers,
-          translators, and cooks. Posted slowly, always from somewhere
-          inside the cafe.
+          Essays, marginalia, and conversations. Posted slowly,
+          always from inside the cafe.
         </p>
       </div>
       <svg

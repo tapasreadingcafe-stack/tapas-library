@@ -9,17 +9,17 @@ export default function Privacy() {
       <div className="su-stub-page">
         <div className="su-stub-inner">
           <div className="su-kicker" style={{ marginBottom: 16 }}>Privacy note</div>
-          <h1>The <em>privacy note</em> â coming soon.</h1>
+          <h1>The <em>privacy note</em> — coming soon.</h1>
           <p>
             A plain-language summary of what we store, why, and how
             to delete it is on its way. Email{' '}
             <a href="mailto:hello@tapasreadingcafe.com" style={{ color: '#E0004F' }}>
               hello@tapasreadingcafe.com
             </a>
-            {' '}if youâd like anything removed sooner.
+            {' '}if you’d like anything removed sooner.
           </p>
           <Link to="/sign-up" className="su-stub-back">
-            â Back to the sign-up
+            ← Back to the sign-up
           </Link>
         </div>
       </div>

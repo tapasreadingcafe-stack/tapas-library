@@ -2,7 +2,7 @@
 // don't leak. Design tokens mirror the other pages for visual parity.
 
 const CONTACT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .contact-root {
   --ct-lime:   #caf27e;
@@ -14,7 +14,7 @@ const CONTACT_CSS = `
   --ct-muted:  #6e6e6e;
   --ct-rule:   #ececea;
   --ct-bg:     #faf8f4;
-  --ct-f-display: "Fraunces", Georgia, serif;
+  --ct-f-display: "DM Serif Display", Georgia, serif;
   --ct-f-ui:      "Inter", system-ui, sans-serif;
   --ct-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -41,14 +41,15 @@ const CONTACT_CSS = `
   overflow: hidden;
 }
 .contact-hero-inner {
-  max-width: 1320px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 64px;
+  padding: 0 32px;
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 64px;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px;
   align-items: end;
 }
+.contact-hero-inner > div:first-child { grid-column: 1 / span 7; }
 .contact-hero-kicker {
   font-family: var(--ct-f-mono);
   font-size: 12px;
@@ -58,7 +59,7 @@ const CONTACT_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 .contact-hero-dot {
   display: inline-block;
@@ -68,10 +69,10 @@ const CONTACT_CSS = `
 }
 .contact-hero-title {
   font-family: var(--ct-f-display);
-  font-weight: 800;
-  font-size: clamp(40px, 5.4vw, 80px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  font-size: clamp(48px, 6vw, 80px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   color: var(--ct-ink);
   margin: 0;
 }
@@ -103,7 +104,7 @@ const CONTACT_CSS = `
   border: 1px solid var(--ct-rule);
   border-radius: 18px;
   overflow: hidden;
-  margin: 60px 0;
+  margin: 40px 0;
   background: #fff;
 }
 .contact-hours-day {
@@ -123,7 +124,7 @@ const CONTACT_CSS = `
 .contact-hours-day.is-today .contact-hours-name { color: var(--ct-ink); }
 .contact-hours-value {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   margin-top: 6px;
   color: var(--ct-ink);
@@ -230,7 +231,7 @@ const CONTACT_CSS = `
 }
 .contact-info-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -297,7 +298,7 @@ const CONTACT_CSS = `
 }
 .contact-form-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -429,7 +430,7 @@ const CONTACT_CSS = `
 }
 .contact-faq-title {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -452,7 +453,7 @@ const CONTACT_CSS = `
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
-  margin-bottom: 80px;
+  margin-bottom: 0;
 }
 .contact-faq {
   background: #fff;
@@ -462,7 +463,7 @@ const CONTACT_CSS = `
 }
 .contact-faq summary {
   font-family: var(--ct-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 18px;
   color: var(--ct-ink);
   cursor: pointer;
@@ -519,6 +520,16 @@ const CONTACT_CSS = `
   .contact-info, .contact-form { padding: 26px; }
   .contact-form-row2 { grid-template-columns: 1fr; }
   .contact-info-row { grid-template-columns: 96px 1fr; gap: 12px; }
+}
+
+@media (max-width: 1023px) {
+  .contact-hero-inner { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .contact-hero-inner > div:first-child { grid-column: auto !important; }
+  .contact-hero-lede { grid-column: auto !important; padding-bottom: 0 !important; max-width: 100% !important; }
+}
+@media (max-width: 767px) {
+  .contact-hero { padding: 48px 0 64px !important; }
+  .contact-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
 }
 `;
 

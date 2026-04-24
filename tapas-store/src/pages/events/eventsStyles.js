@@ -1,5 +1,5 @@
 const EVENTS_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .ev-root {
   --ev-lime:   #caf27e;
@@ -19,7 +19,7 @@ const EVENTS_CSS = `
   --chip-peach:     #FFE4CC;
   --chip-softPink:  #FCCEE0;
 
-  --ev-f-display: "Fraunces", Georgia, serif;
+  --ev-f-display: "DM Serif Display", Georgia, serif;
   --ev-f-ui:      "Inter", system-ui, sans-serif;
   --ev-f-mono:    "JetBrains Mono", ui-monospace, monospace;
 
@@ -46,14 +46,15 @@ const EVENTS_CSS = `
   overflow: hidden;
 }
 .ev-hero-inner {
-  max-width: 1320px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 64px;
+  padding: 0 32px;
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 64px;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px;
   align-items: end;
 }
+.ev-hero-inner > div:first-child { grid-column: 1 / span 7; }
 .ev-hero-kicker {
   font-family: var(--ev-f-mono);
   font-size: 12px;
@@ -63,7 +64,7 @@ const EVENTS_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 .ev-hero-dot {
   display: inline-block;
@@ -73,10 +74,10 @@ const EVENTS_CSS = `
 }
 .ev-hero-title {
   font-family: var(--ev-f-display);
-  font-weight: 800;
-  font-size: clamp(40px, 6vw, 96px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  font-size: clamp(48px, 6vw, 80px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   color: var(--ev-ink);
   margin: 0;
 }
@@ -91,7 +92,9 @@ const EVENTS_CSS = `
   line-height: 1.6;
   color: var(--ev-ink-2);
   margin: 0;
-  max-width: 44ch;
+  max-width: 42ch;
+  grid-column: 8 / span 5;
+  padding-bottom: 12px;
 }
 .ev-hero-curve {
   position: absolute;
@@ -175,7 +178,7 @@ const EVENTS_CSS = `
 }
 .ev-cal-title {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 20px;
   color: var(--ev-ink);
   letter-spacing: -0.01em;
@@ -229,7 +232,7 @@ const EVENTS_CSS = `
 .ev-cal-cell.has-events:hover { background: #fdfcf6; }
 .ev-cal-num {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 16px;
   color: var(--ev-ink);
   letter-spacing: -0.01em;
@@ -294,7 +297,7 @@ const EVENTS_CSS = `
 }
 .ev-head-title {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -351,10 +354,10 @@ const EVENTS_CSS = `
 }
 .ev-card-date-day {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 54px;
   line-height: 0.95;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   color: var(--ev-ink);
 }
 .ev-card-cta {
@@ -382,7 +385,7 @@ const EVENTS_CSS = `
 }
 .ev-card-title {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 26px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -454,7 +457,7 @@ const EVENTS_CSS = `
 }
 .ev-club-title {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 24px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -492,7 +495,7 @@ const EVENTS_CSS = `
 }
 .ev-club-seats-n {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 20px;
   color: var(--ev-ink);
   letter-spacing: -0.01em;
@@ -517,7 +520,7 @@ const EVENTS_CSS = `
   grid-template-columns: 1fr 1fr;
   gap: 48px;
   align-items: center;
-  margin: 60px 0;
+  margin: 60px 0 0 0;
 }
 .ev-supper-kicker {
   font-family: var(--ev-f-mono);
@@ -529,10 +532,10 @@ const EVENTS_CSS = `
 }
 .ev-supper-title {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(32px, 3.8vw, 52px);
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   margin: 0 0 20px;
   color: #fff;
 }
@@ -590,7 +593,7 @@ const EVENTS_CSS = `
 }
 .ev-menu-title {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   line-height: 1.2;
   margin: 0 0 16px;
@@ -612,7 +615,7 @@ const EVENTS_CSS = `
 .ev-menu-row:first-child { border-top: 0; padding-top: 0; }
 .ev-menu-n {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   color: var(--ev-purple);
   letter-spacing: -0.01em;
@@ -648,7 +651,7 @@ const EVENTS_CSS = `
 }
 .ev-empty h3 {
   font-family: var(--ev-f-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 22px;
   color: var(--ev-ink);
   margin: 0 0 8px;
@@ -722,6 +725,16 @@ const EVENTS_CSS = `
 }
 @media (min-width: 768px) {
   .ev-cal-hint { display: none; }
+}
+
+@media (max-width: 1023px) {
+  .ev-hero-inner { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .ev-hero-inner > div:first-child { grid-column: auto !important; }
+  .ev-hero-lede { grid-column: auto !important; padding-bottom: 0 !important; max-width: 100% !important; }
+}
+@media (max-width: 767px) {
+  .ev-hero { padding: 48px 0 64px !important; }
+  .ev-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
 }
 `;
 

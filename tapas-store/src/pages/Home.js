@@ -384,7 +384,7 @@ function Newsletter() {
 // Compose
 // ---------------------------------------------------------------------
 function LegacyHome() {
-  // LegacyHome no longer owns a hero â the split-layout
+  // LegacyHome no longer owns a hero — the split-layout
   // LandingHero sits above whatever branch Home() picks, so having
   // the old Hero() here too would double-stack.
   return (
@@ -424,10 +424,19 @@ export default function Home() {
     }
   }
 
+  // Whole-page lime background. The v2 tree paints `.tapas-landing`
+  // cream via `background: var(--landing-bg)` where the var is set
+  // to #faf8f4 inside the tree's own <style> node. Overriding the
+  // var here flips every inheriting surface (the landing root, its
+  // direct section backdrops) to lime while leaving card-level
+  // white/dark backgrounds intact.
   return (
-    <>
+    <div style={{ background: '#caf27e', minHeight: '100vh' }}>
+      <style>{`
+        .tapas-landing { --landing-bg: #caf27e !important; background: #caf27e !important; }
+      `}</style>
       <LandingHero />
       {body}
-    </>
+    </div>
   );
 }

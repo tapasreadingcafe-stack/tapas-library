@@ -14,8 +14,8 @@ import { findPageByPath, NotFound } from '../utils/findPage';
 
 const GENRES = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Children', 'Business', 'Travel', 'Arts', 'Biography', 'Mystery', 'Romance', 'Fantasy', 'Self-Help'];
 const SORT_OPTIONS = [
-  { value: 'title_asc',  label: 'Title AâZ' },
-  { value: 'title_desc', label: 'Title ZâA' },
+  { value: 'title_asc',  label: 'Title A–Z' },
+  { value: 'title_desc', label: 'Title Z–A' },
   { value: 'newest',     label: 'Recently added' },
   { value: 'available',  label: 'In stock first' },
 ];
@@ -233,7 +233,7 @@ function LegacyCatalog() {
           fontSize: '17px', maxWidth: '560px', margin: '0 auto', lineHeight: 1.7,
           color: 'var(--text-muted)', fontFamily: 'var(--font-body)',
         }}>
-          {loading ? 'Loadingâ¦' : `${total} ${catalog.header_subtitle_suffix || 'titles curated by the Tapas team. Browse by genre or search for something specific.'}`}
+          {loading ? 'Loading…' : `${total} ${catalog.header_subtitle_suffix || 'titles curated by the Tapas team. Browse by genre or search for something specific.'}`}
         </p>
       </header>
 
@@ -261,7 +261,7 @@ function LegacyCatalog() {
               defaultValue={search}
               onKeyDown={e => { if (e.key === 'Enter') setParam('search', e.target.value); }}
               onBlur={e => setParam('search', e.target.value)}
-              placeholder="Search title, author, or genreâ¦"
+              placeholder="Search title, author, or genre…"
               className="tps-input"
               style={{ paddingLeft: '32px', fontFamily: 'var(--font-body)' }}
             />
@@ -384,7 +384,7 @@ function LegacyCatalog() {
                 className="tps-btn tps-btn-ghost"
                 style={{ fontFamily: 'var(--font-body)', fontSize: '14px' }}
               >
-                â Prev
+                ← Prev
               </button>
               <span style={{
                 fontSize: '15px', fontFamily: 'var(--font-display)',
@@ -398,7 +398,7 @@ function LegacyCatalog() {
                 className="tps-btn tps-btn-ghost"
                 style={{ fontFamily: 'var(--font-body)', fontSize: '14px' }}
               >
-                Next â
+                Next →
               </button>
             </div>
           )}
