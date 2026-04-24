@@ -23,7 +23,6 @@ const ORANGE = '#FF934A';
 const ORANGE_DARK = '#de7628';
 const INK = '#1a1a1a';
 const INK_2 = '#3a3a3a';
-const CREAM = '#faf8f4';
 const NAV_H = 87; // Keep in sync with TapasStickyNav's measured height.
 
 export default function LandingHero() {
