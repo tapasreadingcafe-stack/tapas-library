@@ -1,14 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-// Split-layout landing hero that replaces the v2 tree's "big books /
-// small plates" band. The right-hand photo already ships with an
-// organic white cut-out on its top-left and bottom-left edges, so
-// the photo itself forms the cream-to-photo boundary. A lime SVG
-// shape peeks through the photo's bottom-right + sits behind its
-// left edge, matching the spec's "curve sweeps from top-left, dips
-// down through the middle, continues along the bottom of the right
-// side" requirement.
+// Split-layout landing hero.
+//
+// Layout from bottom to top:
+//   1. Section background: cream (#faf8f4) \u2014 the page's natural bg.
+//   2. Photo: absolute rectangle pinned to the right ~55%, object-fit
+//      cover. Clean rectangle; no masking.
+//   3. Lime S-curve SVG: absolute over the whole section, fills the
+//      left region with a smooth wavy right edge that overlaps the
+//      photo's left edge \u2014 that overlap is the organic divider.
+//   4. Copy + CTAs: absolute on the left, sits on top of the lime
+//      region.
+// The sticky nav above the hero is its own lime band (TapasStickyNav)
+// and spans full width without any gap over the photo.
 
 const LIME = '#caf27e';
 const PINK = '#E0004F';
@@ -32,6 +37,29 @@ export default function LandingHero() {
           min-height: 560px;
           isolation: isolate;
         }
+
+        /* Clean rectangle for the photo, right 55%. */
+        .lh-photo-wrap {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 55%;
+          height: 100%;
+          z-index: 1;
+          overflow: hidden;
+          background: ${CREAM};
+        }
+        .lh-photo {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center;
+          display: block;
+        }
+
+        /* The single lime S-curve: fills the left region with a wavy
+           right edge that sweeps across the middle of the hero and
+           overlaps the photo\u2019s left edge. One <path>, one fill. */
         .lh-lime {
           position: absolute;
           inset: 0;
@@ -39,29 +67,26 @@ export default function LandingHero() {
           height: 100%;
           display: block;
           pointer-events: none;
-          z-index: 0;
-        }
-        .lh-grid {
-          position: relative;
           z-index: 2;
-          display: grid;
-          grid-template-columns: 45% 55%;
-          min-height: 560px;
-          max-width: 1440px;
-          margin: 0 auto;
         }
+
+        /* Text column, on top of the lime region. */
         .lh-copy {
+          position: absolute;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: 50%;
+          z-index: 3;
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: 72px 40px 72px 64px;
-          position: relative;
-          z-index: 3;
+          padding: 72px 56px 72px 64px;
         }
         .lh-title {
           font-family: "Fraunces", Georgia, serif;
           font-weight: 700;
-          font-size: clamp(40px, 4.6vw, 64px);
+          font-size: clamp(40px, 4.6vw, 66px);
           line-height: 1.05;
           letter-spacing: -0.02em;
           color: ${INK};
@@ -99,12 +124,16 @@ export default function LandingHero() {
           transition: background 150ms, transform 150ms, box-shadow 150ms;
           color: #fff;
         }
-        .lh-btn.is-pink   { background: ${PINK};   box-shadow: 0 8px 18px -10px rgba(224,0,79,0.7); }
+        .lh-btn.is-pink {
+          background: ${PINK};
+          box-shadow: 0 8px 18px -10px rgba(224,0,79,0.7);
+        }
         .lh-btn.is-orange {
           background: ${ORANGE};
           box-shadow: 0 8px 18px -10px rgba(255,147,74,0.6);
-          /* Subtle text-shadow to hold the white above WCAG AA on the
-             light-orange field without changing the brand tone. */
+          /* Subtle text-shadow holds the white above WCAG AA on the
+             light-orange field. Dropped on hover when we darken the
+             background anyway. */
           text-shadow: 0 1px 1px rgba(0,0,0,0.28);
         }
         .lh-btn:hover { transform: translateY(-1px); }
@@ -115,50 +144,24 @@ export default function LandingHero() {
           outline-offset: 3px;
         }
 
-        .lh-photo-wrap {
-          position: relative;
-          overflow: hidden;
-        }
-        .lh-photo {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center;
-          display: block;
-        }
-        /* Soft white-to-transparent wash along the top of the photo
-           so the sticky nav's right-side items (Sign In / Sign Up /
-           icons) stay legible when they happen to sit over darker
-           parts of the library. Kept subtle so it doesn't flatten
-           the image. */
-        .lh-photo-scrim {
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 120px;
-          background: linear-gradient(
-            to bottom,
-            rgba(202, 242, 126, 0.6) 0%,
-            rgba(202, 242, 126, 0) 100%
-          );
-          pointer-events: none;
-          z-index: 1;
-        }
-
         @media (max-width: 1023px) {
-          .lh-grid { grid-template-columns: 50% 50%; }
-          .lh-copy { padding: 56px 32px 56px 48px; }
+          .lh-photo-wrap { width: 50%; }
+          .lh-copy {
+            width: 55%;
+            padding: 56px 32px 56px 48px;
+          }
           .lh-title { font-size: clamp(36px, 4.6vw, 48px); }
         }
         @media (max-width: 767px) {
           .lh-root { min-height: auto; }
-          .lh-grid {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto auto;
-            min-height: auto;
+          .lh-photo-wrap {
+            position: relative;
+            width: 100%;
+            height: 320px;
           }
           .lh-copy {
+            position: relative;
+            width: 100%;
             padding: 48px 28px 36px;
             text-align: center;
             align-items: center;
@@ -166,66 +169,55 @@ export default function LandingHero() {
           .lh-title { font-size: 34px; max-width: none; }
           .lh-lede { max-width: none; }
           .lh-ctas { justify-content: center; }
-          .lh-photo-wrap { height: 360px; }
-          .lh-photo-scrim {
-            /* Mobile: curve flows along the photo's TOP edge, so we
-               tint that band with a lime wash for a visual echo. */
-            background: linear-gradient(
-              to bottom,
-              ${LIME} 0%,
-              rgba(202, 242, 126, 0.35) 30%,
-              rgba(202, 242, 126, 0) 70%
-            );
-            height: 80px;
-          }
+          /* On mobile the curve flows along the photo's TOP edge. */
+          .lh-lime { height: 80px; top: auto; bottom: 320px; }
         }
       `}</style>
 
       <section className="lh-root" aria-label="Welcome to Tapas Reading Cafe">
-        {/* Lime curve. One <path> fills the bottom+right half of the
-            section with a soft S-wave across the top. The photo's
-            built-in white cut-out overlays the left edge of this
-            shape so the lime "peeks out" where the photo ends. */}
+        {/* 1. Photo rectangle, right 55%. */}
+        <div className="lh-photo-wrap">
+          <img
+            src={photoSrc}
+            alt=""
+            role="presentation"
+            className="lh-photo"
+          />
+        </div>
+
+        {/* 2. Single lime S-curve over the whole hero. Starts
+             top-left, sweeps across the middle, exits bottom-left \u2014
+             its right edge overlaps the photo. */}
         <svg
           className="lh-lime"
-          viewBox="0 0 1440 560"
+          viewBox="0 0 1440 700"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
           <path
-            d="M 0,130
-               C 320,40 600,220 820,170
-               C 1040,120 1220,260 1440,180
-               L 1440,560
-               L 0,560 Z"
+            d="M 0,0
+               L 760,0
+               C 860,180 620,360 820,540
+               C 900,620 780,660 720,700
+               L 0,700 Z"
             fill={LIME}
           />
         </svg>
 
-        <div className="lh-grid">
-          <div className="lh-copy">
-            <h1 className="lh-title">
-              Where Stories Begin &amp;<br />Families Connect
-            </h1>
-            <p className="lh-lede">
-              A cozy reading space for kids and parents \u2014 discover
-              books, enjoy simple treats, and build a love for reading
-              together.
-            </p>
-            <div className="lh-ctas">
-              <Link to="/sign-up" className="lh-btn is-pink">Join now!</Link>
-              <Link to="/shop"    className="lh-btn is-orange">Explore books</Link>
-            </div>
-          </div>
-
-          <div className="lh-photo-wrap">
-            <div className="lh-photo-scrim" aria-hidden="true" />
-            <img
-              src={photoSrc}
-              alt=""
-              role="presentation"
-              className="lh-photo"
-            />
+        {/* 3. Copy + CTAs. Em dash is a real character so it renders
+             as \u2014 in the output (JSX text doesn\u2019t interpret
+             \\u escape sequences). */}
+        <div className="lh-copy">
+          <h1 className="lh-title">
+            Where Stories Begin &amp;<br />Families Connect
+          </h1>
+          <p className="lh-lede">
+            A cozy reading space for kids and parents — discover books,
+            enjoy simple treats, and build a love for reading together.
+          </p>
+          <div className="lh-ctas">
+            <Link to="/sign-up" className="lh-btn is-pink">Join now!</Link>
+            <Link to="/shop"    className="lh-btn is-orange">Explore books</Link>
           </div>
         </div>
       </section>

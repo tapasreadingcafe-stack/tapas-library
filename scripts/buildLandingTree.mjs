@@ -500,7 +500,8 @@ const root = () => node('body', {
   classes: ['tapas-landing'],
   children: [
     styleNode(RAW_CSS),
-    marquee(),
+    // No marquee here \u2014 the "READING ROOM \u00b7 BOOK CLUB \u00b7 SMALL PLATES"
+    // dotted black band broke the visual flow under the new LandingHero.
     services(),
     arrivals(),
     membership(),
