@@ -21,7 +21,7 @@ export default function CategoryFilter({ category, onCategory, query, onQuery })
       <input
         type="search"
         className="library-filter-search"
-        placeholder="Title, author, shelf\u2026"
+        placeholder="Title, author, shelfâ¦"
         value={query}
         onChange={(e) => onQuery(e.target.value)}
         aria-label="Search the library"

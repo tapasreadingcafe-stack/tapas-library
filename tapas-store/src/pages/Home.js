@@ -384,7 +384,7 @@ function Newsletter() {
 // Compose
 // ---------------------------------------------------------------------
 function LegacyHome() {
-  // LegacyHome no longer owns a hero \u2014 the split-layout
+  // LegacyHome no longer owns a hero â the split-layout
   // LandingHero sits above whatever branch Home() picks, so having
   // the old Hero() here too would double-stack.
   return (

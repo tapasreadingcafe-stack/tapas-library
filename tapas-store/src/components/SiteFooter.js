@@ -196,7 +196,7 @@ export default function SiteFooter() {
               <ul>
                 <li>14 Haven Street</li>
                 <li>Reading, MA 01867</li>
-                <li>Tue\u2013Sun \u00b7 10a\u201311p</li>
+                <li>TueâSun Â· 10aâ11p</li>
               </ul>
             </div>
 
@@ -221,7 +221,7 @@ export default function SiteFooter() {
 
           <div className="site-footer-bottom">
             <div className="site-footer-copy">
-              \u00a9 {year} Tapas Reading Cafe \u00b7 Reading, MA
+              \u00a9 {year} Tapas Reading Cafe Â· Reading, MA
             </div>
             <div className="site-footer-socials" aria-label="Social links">
               {SOCIALS.map((s) => (

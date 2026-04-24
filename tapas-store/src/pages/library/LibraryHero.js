@@ -15,7 +15,7 @@ export default function LibraryHero() {
         </div>
         <p className="library-hero-lede">
           Take two home at a time. Keep them for three weeks. Return
-          them to the drop-box by the door. No late fees \u2014 we
+          them to the drop-box by the door. No late fees â we
           trust you. Donations always welcome on the orange shelf.
         </p>
       </div>

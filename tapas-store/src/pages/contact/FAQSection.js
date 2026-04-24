@@ -15,7 +15,7 @@ export default function FAQSection() {
           </h2>
         </div>
         <p className="contact-faq-lede">
-          If you can\u2019t find it here, just ask us at the counter.
+          If you canât find it here, just ask us at the counter.
         </p>
       </div>
 

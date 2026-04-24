@@ -45,9 +45,9 @@ export default function BlogPost() {
           </>
         )}
         <p className="blog-detail-note">
-          Coming soon \u2014 full post detail page in the next spec.
+          Coming soon â full post detail page in the next spec.
         </p>
-        <Link to="/blog" className="blog-detail-back">\u2190 Back to the journal</Link>
+        <Link to="/blog" className="blog-detail-back">â Back to the journal</Link>
       </article>
     </div>
   );

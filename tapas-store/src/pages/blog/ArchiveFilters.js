@@ -21,7 +21,7 @@ export default function ArchiveFilters({ category, onCategory, query, onQuery })
       <input
         type="search"
         className="blog-search"
-        placeholder="Search the journal\u2026"
+        placeholder="Search the journalâ¦"
         value={query}
         onChange={(e) => onQuery(e.target.value)}
         aria-label="Search the journal"

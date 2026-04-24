@@ -3,7 +3,7 @@ import React from 'react';
 export default function LibraryBookCard({ book, onReserve }) {
   const isOut = book.status?.kind === 'out';
   const statusLabel = isOut
-    ? `Out \u00b7 back ${book.status.returnDate}`
+    ? `Out Â· back ${book.status.returnDate}`
     : 'Available';
 
   return (

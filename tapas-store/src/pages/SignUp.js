@@ -58,7 +58,7 @@ export default function SignUp() {
   const currentTier = tierByKey(state.tier);
   const ctaLabel = state.step < 3
     ? 'Continue'
-    : `Start membership \u00b7 ${currentTier.paymentLabel}`;
+    : `Start membership Â· ${currentTier.paymentLabel}`;
 
   const canContinue = !state.consent ? false : true;
 
@@ -106,7 +106,7 @@ export default function SignUp() {
                     }
                   />
                   <span>
-                    I\u2019ve read the{' '}
+                    Iâve read the{' '}
                     <Link to="/code-of-the-room">code of the room</Link>{' '}
                     and the{' '}
                     <Link to="/privacy">privacy note</Link>.
@@ -115,7 +115,7 @@ export default function SignUp() {
                 <div style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
                   {state.step > 1 && (
                     <button type="button" className="su-back" onClick={onBack}>
-                      \u2190 Back
+                      â Back
                     </button>
                   )}
                   <button
@@ -124,7 +124,7 @@ export default function SignUp() {
                     disabled={!canContinue}
                   >
                     {ctaLabel}
-                    <span className="su-next-arrow" aria-hidden="true">\u2192</span>
+                    <span className="su-next-arrow" aria-hidden="true">â</span>
                   </button>
                 </div>
               </div>
@@ -137,7 +137,7 @@ export default function SignUp() {
 
             <p className="su-below-form">
               Already a member?
-              <Link to="/sign-in">Sign in \u2192</Link>
+              <Link to="/sign-in">Sign in â</Link>
             </p>
           </div>
 

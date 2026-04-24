@@ -4,12 +4,12 @@ import { Link } from 'react-router-dom';
 // Split-layout landing hero.
 //
 // Layout from bottom to top:
-//   1. Section background: cream (#faf8f4) \u2014 the page's natural bg.
+//   1. Section background: cream (#faf8f4) â the page's natural bg.
 //   2. Photo: absolute rectangle pinned to the right ~55%, object-fit
 //      cover. Clean rectangle; no masking.
 //   3. Lime S-curve SVG: absolute over the whole section, fills the
 //      left region with a smooth wavy right edge that overlaps the
-//      photo's left edge \u2014 that overlap is the organic divider.
+//      photo's left edge â that overlap is the organic divider.
 //   4. Copy + CTAs: absolute on the left, sits on top of the lime
 //      region.
 // The sticky nav above the hero is its own lime band (TapasStickyNav)
@@ -59,7 +59,7 @@ export default function LandingHero() {
 
         /* The single lime S-curve: fills the left region with a wavy
            right edge that sweeps across the middle of the hero and
-           overlaps the photo\u2019s left edge. One <path>, one fill. */
+           overlaps the photoâs left edge. One <path>, one fill. */
         .lh-lime {
           position: absolute;
           inset: 0;
@@ -186,7 +186,7 @@ export default function LandingHero() {
         </div>
 
         {/* 2. Single lime S-curve over the whole hero. Starts
-             top-left, sweeps across the middle, exits bottom-left \u2014
+             top-left, sweeps across the middle, exits bottom-left â
              its right edge overlaps the photo. */}
         <svg
           className="lh-lime"
@@ -205,7 +205,7 @@ export default function LandingHero() {
         </svg>
 
         {/* 3. Copy + CTAs. Em dash is a real character so it renders
-             as \u2014 in the output (JSX text doesn\u2019t interpret
+             as â in the output (JSX text doesnât interpret
              \\u escape sequences). */}
         <div className="lh-copy">
           <h1 className="lh-title">

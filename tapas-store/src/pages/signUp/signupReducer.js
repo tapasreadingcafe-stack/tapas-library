@@ -66,7 +66,7 @@ export function validateStep3(s) {
   const exp = digitsOnly(s.payment.expiry);
   if (exp.length < 4) errs.expiry = 'MM / YY.';
   const cv = digitsOnly(s.payment.cvc);
-  if (cv.length < 3 || cv.length > 4) errs.cvc = '3\u20134 digits.';
+  if (cv.length < 3 || cv.length > 4) errs.cvc = '3â4 digits.';
   if (!s.payment.authorized) errs.authorized = 'Needed to charge your card.';
   if (!s.consent) errs.consent = 'Required.';
   return errs;

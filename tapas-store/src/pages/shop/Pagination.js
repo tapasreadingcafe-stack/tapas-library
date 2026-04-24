@@ -29,7 +29,7 @@ export default function Pagination({ page, totalPages, onChange }) {
       >\u2039</button>
       {window.map((p, idx) => {
         if (p === 'gap-l' || p === 'gap-r') {
-          return <span key={`${p}-${idx}`} className="shop-pag-gap" aria-hidden="true">\u2026</span>;
+          return <span key={`${p}-${idx}`} className="shop-pag-gap" aria-hidden="true">â¦</span>;
         }
         return (
           <button

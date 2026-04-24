@@ -8,7 +8,7 @@ export default function FeaturedSupper() {
     // eslint-disable-next-line no-console
     console.log('[events] action', { slug: s.slug, action: s.cta.action });
     // eslint-disable-next-line no-alert
-    window.alert(actionMessage(s.cta.action, { time: 'Fri \u00b7 8:00p' }));
+    window.alert(actionMessage(s.cta.action, { time: 'Fri Â· 8:00p' }));
   };
   return (
     <section className="ev-supper" aria-labelledby="ev-supper-h">

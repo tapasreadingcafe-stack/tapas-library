@@ -27,7 +27,7 @@ export default function FilterSidebar({ filters, setFilters }) {
         <input
           type="search"
           className="shop-filter-search"
-          placeholder="Title, author, ISBN\u2026"
+          placeholder="Title, author, ISBNâ¦"
           value={filters.search}
           onChange={(e) => patch({ search: e.target.value })}
         />

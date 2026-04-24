@@ -5,7 +5,7 @@ import React from 'react';
 export default function StylizedMap() {
   return (
     <div className="contact-map" role="img" aria-label="Illustrated map of Haven Street and the square in Reading, Massachusetts">
-      <div className="contact-map-label">Haven St \u00b7 Reading, MA</div>
+      <div className="contact-map-label">Haven St Â· Reading, MA</div>
       <svg
         className="contact-map-roads"
         viewBox="0 0 800 380"

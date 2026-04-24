@@ -16,7 +16,7 @@ export const PRICING_TIERS = [
     name: 'Pass',
     price: 250,
     suffix: '/ visit',
-    paymentLabel: '\u20B9250 / visit',
+    paymentLabel: 'â¹250 / visit',
   },
   {
     key: 'monthly',
@@ -24,26 +24,26 @@ export const PRICING_TIERS = [
     name: 'Monthly',
     price: 467,
     suffix: '/ month',
-    paymentLabel: '\u20B9467 / month',
+    paymentLabel: 'â¹467 / month',
     highlight: true,
   },
   {
     key: 'annual',
-    kicker: 'Best value \u00b7 save \u20B92,000',
+    kicker: 'Best value Â· save â¹2,000',
     name: 'Annual',
     price: 3600,
     suffix: '/ year',
-    paymentLabel: '\u20B93,600 / year',
+    paymentLabel: 'â¹3,600 / year',
   },
 ];
 
 export const PREFERRED_CLUBS = [
-  'Saturday Silent Reading \u00b7 drop-in',
-  'Slow Fiction Club \u00b7 Thursdays 7p',
-  'Translators in Translation \u00b7 Mondays 7:30p',
-  'Poetry & Small Plates \u00b7 2nd Fridays 8p',
-  'First-Draft Friday \u00b7 3rd Fridays 7p',
-  'The Novella Supper \u00b7 Monthly Thursdays',
+  'Saturday Silent Reading Â· drop-in',
+  'Slow Fiction Club Â· Thursdays 7p',
+  'Translators in Translation Â· Mondays 7:30p',
+  'Poetry & Small Plates Â· 2nd Fridays 8p',
+  'First-Draft Friday Â· 3rd Fridays 7p',
+  'The Novella Supper Â· Monthly Thursdays',
   'Not sure yet',
 ];
 
@@ -59,7 +59,7 @@ export const READING_CHIPS = [
   'Nothing in particular',
 ];
 
-export const PACE_OPTIONS = ['Slow', 'Medium', "Fast (can\u2019t help it)"];
+export const PACE_OPTIONS = ['Slow', 'Medium', "Fast (canât help it)"];
 export const ATTENTION_OPTIONS = ['One book at a time', 'Two at a time', 'Several always open'];
 export const FORMAT_OPTIONS = ['Paperback', 'Hardcover', 'Either', 'E-reader sometimes'];
 export const REREAD_OPTIONS = ['I re-read a lot', 'I re-read rarely', 'I never re-read'];
@@ -77,17 +77,17 @@ export const SPOILER_CHIPS = [
 // member. Keep in sync with Events page seed data.
 export const THIS_WEEK = [
   {
-    when: 'Thu Apr 23 \u00b7 7:00p',
+    when: 'Thu Apr 23 Â· 7:00p',
     titleItalic: 'The Magic Mountain',
-    tail: ' \u2014 Slow Fiction Club opens',
+    tail: ' â Slow Fiction Club opens',
   },
   {
-    when: 'Sat Apr 25 \u00b7 10:00a',
+    when: 'Sat Apr 25 Â· 10:00a',
     titleItalic: 'Saturday Silent Reading',
     tail: ', drop in',
   },
   {
-    when: 'Mon Apr 27 \u00b7 7:30p',
+    when: 'Mon Apr 27 Â· 7:30p',
     titleItalic: 'Margaret Jull Costa',
     tail: ' in conversation',
   },

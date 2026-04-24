@@ -10,7 +10,7 @@ import { MEMBERSHIP_PERKS } from '../data/signUpConfig';
 //   /sign-in  uses variant="compact" with a price line.
 //   /sign-up  uses variant="stacked" with Starts today / No contract.
 
-const DEFAULT_PRICE_LINE = '\u20B9467 / month \u00b7 cancel anytime';
+const DEFAULT_PRICE_LINE = 'â¹467 / month Â· cancel anytime';
 
 export default function MemberCard({
   className = '',
@@ -41,7 +41,7 @@ export default function MemberCard({
       )}
 
       <header className="mc-head">
-        <span>Member card \u00b7 2026</span>
+        <span>Member card Â· 2026</span>
         {variant === 'stacked' ? (
           <img
             src={`${process.env.PUBLIC_URL || ''}/logo.png`}

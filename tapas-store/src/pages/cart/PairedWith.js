@@ -30,7 +30,7 @@ export default function PairedWith() {
   return (
     <section className="ct-paired" aria-labelledby="ct-paired-h">
       <h3 id="ct-paired-h" className="ct-paired-title">
-        Paired well with what\u2019s in your basket.
+        Paired well with whatâs in your basket.
       </h3>
       <div className="ct-paired-grid">
         {paired.map((b) => (

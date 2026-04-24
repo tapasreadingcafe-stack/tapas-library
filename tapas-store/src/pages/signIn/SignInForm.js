@@ -30,7 +30,7 @@ export default function SignInForm() {
   const onSubmit = (e) => {
     e.preventDefault();
     if (!isValidEmail(email)) {
-      setError('That email doesn\u2019t look right.');
+      setError('That email doesnât look right.');
       return;
     }
     if (!password || password.length < 6) {
@@ -49,7 +49,7 @@ export default function SignInForm() {
       // eslint-disable-next-line no-console
       console.log('[sign-in] submit', { email, keep });
       // eslint-disable-next-line no-alert
-      window.alert('Sign-in not wired yet \u2014 Supabase auth integration pending.');
+      window.alert('Sign-in not wired yet â Supabase auth integration pending.');
       setProcessing(false);
     }, 800);
   };
@@ -59,12 +59,12 @@ export default function SignInForm() {
     // eslint-disable-next-line no-console
     console.log('[sign-in] oauth', { provider });
     // eslint-disable-next-line no-alert
-    window.alert('OAuth not wired yet \u2014 coming soon.');
+    window.alert('OAuth not wired yet â coming soon.');
   };
 
   return (
     <div className="si-form-wrap">
-      <div className="si-kicker">Members \u00b7 Sign in</div>
+      <div className="si-kicker">Members Â· Sign in</div>
       <h1 className="si-title">Welcome <em>back.</em></h1>
       <p className="si-lede">
         Access your borrowings, book club seats, supper reservations,
@@ -120,7 +120,7 @@ export default function SignInForm() {
 
         <button type="submit" className="si-submit" disabled={processing}>
           {processing ? (
-            <>Signing in\u2026</>
+            <>Signing inâ¦</>
           ) : (
             <>
               Sign in
@@ -149,8 +149,8 @@ export default function SignInForm() {
       </div>
 
       <p className="si-foot">
-        Don\u2019t have an account?
-        <Link to="/sign-up">Become a member \u2192</Link>
+        Donât have an account?
+        <Link to="/sign-up">Become a member â</Link>
       </p>
     </div>
   );

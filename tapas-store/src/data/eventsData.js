@@ -37,20 +37,20 @@ export const EVENT_FILTERS = [
 // category }. Anchored to April 2026 to match the seeded
 // "Upcoming events" card list below.
 export const CALENDAR_EVENTS = [
-  { date: '2026-04-03', label: 'Slow Fiction \u00b7 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
-  { date: '2026-04-05', label: 'Silent Reading \u00b7 10a', chip: 'sage',     category: 'silent-reading', targetSlug: null },
-  { date: '2026-04-07', label: 'Translators \u00b7 7:30p',  chip: 'peach',    category: 'guest-night',    targetSlug: null },
-  { date: '2026-04-10', label: 'Slow Fiction \u00b7 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
-  { date: '2026-04-11', label: 'Poetry Supper \u00b7 8p',   chip: 'pink',     category: 'poetry-supper',  targetSlug: null },
-  { date: '2026-04-12', label: 'Silent Reading \u00b7 10a', chip: 'sage',     category: 'silent-reading', targetSlug: null },
-  { date: '2026-04-17', label: 'Slow Fiction \u00b7 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
-  { date: '2026-04-18', label: 'First Draft \u00b7 7p',     chip: 'softPink', category: 'members-only',   targetSlug: null },
-  { date: '2026-04-19', label: 'Silent Reading \u00b7 10a', chip: 'sage',     category: 'silent-reading', targetSlug: null },
-  { date: '2026-04-23', label: 'Slow Fiction \u00b7 7p',    chip: 'lavender', category: 'book-club',      targetSlug: 'slow-fiction-apr-23' },
-  { date: '2026-04-24', label: 'Novella Supper \u00b7 4p',  chip: 'lavender', category: 'book-club',      targetSlug: 'novella-supper-apr-24' },
-  { date: '2026-04-26', label: 'Silent Reading \u00b7 10a', chip: 'sage',     category: 'silent-reading', targetSlug: 'silent-reading-apr-26' },
-  { date: '2026-04-27', label: 'Translators \u00b7 7:30p',  chip: 'peach',    category: 'guest-night',    targetSlug: 'translators-apr-30' },
-  { date: '2026-05-01', label: 'Slow Fiction \u00b7 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
+  { date: '2026-04-03', label: 'Slow Fiction Â· 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
+  { date: '2026-04-05', label: 'Silent Reading Â· 10a', chip: 'sage',     category: 'silent-reading', targetSlug: null },
+  { date: '2026-04-07', label: 'Translators Â· 7:30p',  chip: 'peach',    category: 'guest-night',    targetSlug: null },
+  { date: '2026-04-10', label: 'Slow Fiction Â· 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
+  { date: '2026-04-11', label: 'Poetry Supper Â· 8p',   chip: 'pink',     category: 'poetry-supper',  targetSlug: null },
+  { date: '2026-04-12', label: 'Silent Reading Â· 10a', chip: 'sage',     category: 'silent-reading', targetSlug: null },
+  { date: '2026-04-17', label: 'Slow Fiction Â· 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
+  { date: '2026-04-18', label: 'First Draft Â· 7p',     chip: 'softPink', category: 'members-only',   targetSlug: null },
+  { date: '2026-04-19', label: 'Silent Reading Â· 10a', chip: 'sage',     category: 'silent-reading', targetSlug: null },
+  { date: '2026-04-23', label: 'Slow Fiction Â· 7p',    chip: 'lavender', category: 'book-club',      targetSlug: 'slow-fiction-apr-23' },
+  { date: '2026-04-24', label: 'Novella Supper Â· 4p',  chip: 'lavender', category: 'book-club',      targetSlug: 'novella-supper-apr-24' },
+  { date: '2026-04-26', label: 'Silent Reading Â· 10a', chip: 'sage',     category: 'silent-reading', targetSlug: 'silent-reading-apr-26' },
+  { date: '2026-04-27', label: 'Translators Â· 7:30p',  chip: 'peach',    category: 'guest-night',    targetSlug: 'translators-apr-30' },
+  { date: '2026-05-01', label: 'Slow Fiction Â· 7p',    chip: 'lavender', category: 'book-club',      targetSlug: null },
 ];
 
 // Upcoming events — the stacked cards under the calendar.
@@ -61,7 +61,7 @@ export const UPCOMING_EVENTS = [
     title: 'Slow Fiction',
     italic: 'Club',
     description: 'Opening pages of The Magic Mountain. Sherry, olives, long table.',
-    time: 'Thu \u00b7 7:00p',
+    time: 'Thu Â· 7:00p',
     seats: '22 of 24 seats',
     badge: 'weekly',
     cta: { label: 'RSVP', action: 'rsvp' },
@@ -73,7 +73,7 @@ export const UPCOMING_EVENTS = [
     title: 'Novella',
     italic: 'Supper',
     description: 'Read a short novel over the afternoon, then dinner and discussion.',
-    time: 'Fri \u00b7 4:00p',
+    time: 'Fri Â· 4:00p',
     seats: '6 of 12 seats',
     badge: 'prixFixe',
     cta: { label: 'RSVP', action: 'rsvp' },
@@ -85,8 +85,8 @@ export const UPCOMING_EVENTS = [
     title: 'Saturday',
     italic: 'Silent Reading',
     description: 'Two hours of quiet. Coffee, toast, no phones, no introductions.',
-    time: 'Sat \u00b7 10:00a',
-    seats: 'Drop-in \u00b7 no RSVP',
+    time: 'Sat Â· 10:00a',
+    seats: 'Drop-in Â· no RSVP',
     badge: 'weekly',
     cta: { label: 'Drop in', action: 'drop-in' },
     category: 'silent-reading',
@@ -97,7 +97,7 @@ export const UPCOMING_EVENTS = [
     title: 'Translators',
     italic: 'in Conversation',
     description: 'Sophie Hughes and Sean Cotter on what gets lost, what gets found.',
-    time: 'Wed \u00b7 7:30p',
+    time: 'Wed Â· 7:30p',
     seats: '14 of 18 seats',
     badge: 'guestNight',
     cta: { label: 'RSVP', action: 'rsvp' },
@@ -108,9 +108,9 @@ export const UPCOMING_EVENTS = [
     dateMonth: 'MAY', dateDay: 8, iso: '2026-05-08',
     title: 'Poetry on',
     italic: 'Small Plates',
-    description: "A six-course menu paired to six poems \u2014 Lorca, Szymborska, Berry.",
-    time: 'Fri \u00b7 8:00p',
-    seats: '\u20B94,080 / \u20B93,060 members',
+    description: "A six-course menu paired to six poems â Lorca, Szymborska, Berry.",
+    time: 'Fri Â· 8:00p',
+    seats: 'â¹4,080 / â¹3,060 members',
     badge: 'prixFixe',
     cta: { label: 'Reserve', action: 'reserve' },
     category: 'poetry-supper',
@@ -121,7 +121,7 @@ export const UPCOMING_EVENTS = [
 export const CLUBS = [
   {
     id: 'slow-fiction',
-    schedule: 'Thursdays \u00b7 7:00p',
+    schedule: 'Thursdays Â· 7:00p',
     title: 'Slow',
     titleItalic: 'Fiction',
     titleTail: ' Club',
@@ -132,47 +132,47 @@ export const CLUBS = [
   },
   {
     id: 'translators',
-    schedule: 'Mondays \u00b7 7:30p',
+    schedule: 'Mondays Â· 7:30p',
     title: 'Translators in ',
     titleItalic: 'Translation',
-    body: "One book a month, read alongside its original where possible. Bring a dictionary \u2014 or don\u2019t.",
+    body: "One book a month, read alongside its original where possible. Bring a dictionary â or donât.",
     seats: 18,
     status: '3 open',
     category: 'guest-night',
   },
   {
     id: 'poetry-small-plates',
-    schedule: 'Second Fridays \u00b7 8:00p',
+    schedule: 'Second Fridays Â· 8:00p',
     title: 'Poetry & ',
     titleItalic: 'Small Plates',
-    body: "A tasting menu built around one poet\u2019s body of work. Ends with wine and a recitation.",
+    body: "A tasting menu built around one poetâs body of work. Ends with wine and a recitation.",
     seats: 16,
     status: 'Prix fixe',
     category: 'poetry-supper',
   },
   {
     id: 'first-draft',
-    schedule: 'Third Fridays \u00b7 7:00p',
+    schedule: 'Third Fridays Â· 7:00p',
     title: 'First-Draft ',
     titleItalic: 'Friday',
     body: 'A low-stakes workshop for work-in-progress. Two minutes on the floor, kind notes from the room.',
     seats: null,
-    status: 'Members \u00b7 open seat',
+    status: 'Members Â· open seat',
     category: 'members-only',
   },
   {
     id: 'silent-reading',
-    schedule: 'Saturdays \u00b7 10:00a',
+    schedule: 'Saturdays Â· 10:00a',
     title: 'Saturday ',
     titleItalic: 'Silent Reading',
-    body: 'Two hours of pure, uninterrupted reading. No discussion, no phones \u2014 just a pot of coffee.',
+    body: 'Two hours of pure, uninterrupted reading. No discussion, no phones â just a pot of coffee.',
     seats: null,
-    status: 'All welcome \u00b7 drop in',
+    status: 'All welcome Â· drop in',
     category: 'silent-reading',
   },
   {
     id: 'novella-supper',
-    schedule: 'Monthly \u00b7 Thursdays',
+    schedule: 'Monthly Â· Thursdays',
     title: 'The ',
     titleItalic: 'Novella',
     titleTail: ' Supper',
@@ -185,10 +185,10 @@ export const CLUBS = [
 
 // Featured supper — the big dark card near the bottom.
 export const FEATURED_SUPPER = {
-  kicker: 'May 8 \u00b7 Prix fixe',
+  kicker: 'May 8 Â· Prix fixe',
   titleLead: 'Poetry on ',
   titleItalic: 'Small Plates.',
-  body: "A six-course tasting menu paired to six poems. The kitchen cooks what we\u2019ve been reading; the room reads what we\u2019re eating. \u20B94,080, \u20B93,060 for members, wine pairing \u20B92,050.",
+  body: "A six-course tasting menu paired to six poems. The kitchen cooks what weâve been reading; the room reads what weâre eating. â¹4,080, â¹3,060 for members, wine pairing â¹2,050.",
   cta: { label: 'Reserve a seat', action: 'reserve' },
   slug: 'poetry-small-plates-may-8',
   menu: [
@@ -218,12 +218,12 @@ export function isSameDay(a, b) {
 export function actionMessage(action, event) {
   switch (action) {
     case 'rsvp':
-      return `Reserved \u2014 we\u2019ll email you confirmation. See you ${event.time}.`;
+      return `Reserved â weâll email you confirmation. See you ${event.time}.`;
     case 'reserve':
-      return 'Reserved \u2014 confirmation will arrive within 10 minutes.';
+      return 'Reserved â confirmation will arrive within 10 minutes.';
     case 'drop-in':
-      return 'No RSVP needed \u2014 just come. Saturdays, 10a, front door.';
+      return 'No RSVP needed â just come. Saturdays, 10a, front door.';
     default:
-      return 'Saved. We\u2019ll be in touch.';
+      return 'Saved. Weâll be in touch.';
   }
 }

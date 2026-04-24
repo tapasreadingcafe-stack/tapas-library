@@ -4,12 +4,12 @@
 export const CONTACT_HOURS = [
   // dayIndex matches JS's getDay() (0 = Sun, 1 = Mon, ...).
   { key: 'mon', dayIndex: 1, short: 'Mon', hours: 'Closed', closed: true  },
-  { key: 'tue', dayIndex: 2, short: 'Tue', hours: '10a\u201311p' },
-  { key: 'wed', dayIndex: 3, short: 'Wed', hours: '10a\u201311p' },
-  { key: 'thu', dayIndex: 4, short: 'Thu', hours: '10a\u201311p' },
-  { key: 'fri', dayIndex: 5, short: 'Fri', hours: '10a\u201312a' },
-  { key: 'sat', dayIndex: 6, short: 'Sat', hours: '9a\u201312a' },
-  { key: 'sun', dayIndex: 0, short: 'Sun', hours: '9a\u20139p' },
+  { key: 'tue', dayIndex: 2, short: 'Tue', hours: '10aâ11p' },
+  { key: 'wed', dayIndex: 3, short: 'Wed', hours: '10aâ11p' },
+  { key: 'thu', dayIndex: 4, short: 'Thu', hours: '10aâ11p' },
+  { key: 'fri', dayIndex: 5, short: 'Fri', hours: '10aâ12a' },
+  { key: 'sat', dayIndex: 6, short: 'Sat', hours: '9aâ12a' },
+  { key: 'sun', dayIndex: 0, short: 'Sun', hours: '9aâ9p' },
 ];
 
 export const CONTACT_INFO = {
@@ -19,7 +19,7 @@ export const CONTACT_INFO = {
   events: 'events@tapasreadingcafe.com',
   press:  'press@tapasreadingcafe.com',
   parking: 'Free on-street after 6p; garage on Sanborn St, 2 min walk',
-  transit: 'Reading Depot \u00b7 MBTA Commuter Rail, 4 min walk',
+  transit: 'Reading Depot Â· MBTA Commuter Rail, 4 min walk',
   accessibility: 'Step-free entrance via Haven; accessible restroom on ground floor',
 };
 
@@ -34,15 +34,15 @@ export const CONTACT_SUBJECTS = [
 export const CONTACT_FAQS = [
   {
     q: 'Do I need to be a member to come in?',
-    a: 'Not at all. Walk in any time we\u2019re open \u2014 read, borrow a book, order a plate. Membership just unlocks the book clubs, supper priority, and a quarterly book on us.',
+    a: 'Not at all. Walk in any time weâre open â read, borrow a book, order a plate. Membership just unlocks the book clubs, supper priority, and a quarterly book on us.',
   },
   {
     q: 'Can I work here on my laptop?',
-    a: 'Before 5pm, absolutely \u2014 Wi-Fi is free, outlets at every other table. After 5, we dim the lights and ask laptops to close so the room can breathe.',
+    a: 'Before 5pm, absolutely â Wi-Fi is free, outlets at every other table. After 5, we dim the lights and ask laptops to close so the room can breathe.',
   },
   {
     q: 'Do you host private events?',
-    a: 'Yes \u2014 we buy out the room for book launches, small weddings, birthday suppers, and translation parties. Email events@ and we\u2019ll send a one-pager.',
+    a: 'Yes â we buy out the room for book launches, small weddings, birthday suppers, and translation parties. Email events@ and weâll send a one-pager.',
   },
   {
     q: 'Is the menu vegetarian-friendly?',
@@ -50,11 +50,11 @@ export const CONTACT_FAQS = [
   },
   {
     q: 'Can I bring kids?',
-    a: 'Of course \u2014 we have a small children\u2019s shelf and crayons by the window. After 8pm the room tilts a little quieter, so that\u2019s more of an adult hour.',
+    a: 'Of course â we have a small childrenâs shelf and crayons by the window. After 8pm the room tilts a little quieter, so thatâs more of an adult hour.',
   },
   {
     q: 'How do I donate a book?',
-    a: 'Leave it on the orange shelf by the door, or hand it to whoever\u2019s at the counter. We keep everything worth keeping and pass the rest to the Reading Public Library.',
+    a: 'Leave it on the orange shelf by the door, or hand it to whoeverâs at the counter. We keep everything worth keeping and pass the rest to the Reading Public Library.',
   },
 ];
 

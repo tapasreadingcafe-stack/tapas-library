@@ -8,10 +8,10 @@ export default function Shelf({ shelf, books, onReserve }) {
     <section className="library-shelf" id={shelf.id} aria-labelledby={`${shelf.id}-title`}>
       <header className="library-shelf-head">
         <h3 id={`${shelf.id}-title`} className="library-shelf-title">
-          Shelf {number} \u00b7 <em>{name}</em>
+          Shelf {number} Â· <em>{name}</em>
         </h3>
         <span className="library-shelf-meta">
-          {totals.titles} titles \u00b7 {totals.outOnLoan} out on loan
+          {totals.titles} titles Â· {totals.outOnLoan} out on loan
         </span>
       </header>
       <div className="library-shelf-grid">

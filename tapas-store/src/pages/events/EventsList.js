@@ -24,7 +24,7 @@ function EventCard({ event, focus, cardRef }) {
         <span className="ev-card-date-month">{event.dateMonth}</span>
         <span className="ev-card-date-day">{event.dateDay}</span>
         <button type="button" className="ev-card-cta" onClick={onClick}>
-          {event.cta.label} \u2192
+          {event.cta.label} â
         </button>
       </div>
 

@@ -20,7 +20,7 @@ export default function FeaturedArticle() {
     <Link to={`/blog/${a.slug}`} className="blog-featured">
       <div className="blog-featured-blob" aria-hidden="true" />
       <div className="blog-featured-kicker">
-        {a.kicker.toUpperCase()} \u00b7 {dateLabel}
+        {a.kicker.toUpperCase()} Â· {dateLabel}
       </div>
       <h2 className="blog-featured-title">{renderTitle(a.title)}</h2>
       <div className="blog-featured-author">
@@ -28,7 +28,7 @@ export default function FeaturedArticle() {
         <div className="blog-featured-author-name">
           {a.author.name}{' '}
           <span className="dim">
-            \u00b7 {a.author.role} \u00b7 {a.readMinutes} min read
+            Â· {a.author.role} Â· {a.readMinutes} min read
           </span>
         </div>
       </div>

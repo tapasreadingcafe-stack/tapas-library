@@ -36,7 +36,7 @@ export default function HoursStrip() {
             className={`contact-hours-day${isToday ? ' is-today' : ''}`}
           >
             <div className="contact-hours-name">
-              {d.short}{isToday ? ' \u00b7 Today' : ''}
+              {d.short}{isToday ? ' Â· Today' : ''}
             </div>
             <div className={`contact-hours-value${d.closed ? ' is-closed' : ''}`}>
               {d.hours}
