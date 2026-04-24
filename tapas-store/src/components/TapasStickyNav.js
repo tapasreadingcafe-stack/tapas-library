@@ -83,7 +83,7 @@ export default function TapasStickyNav() {
       />
       <style>{`
         .tapas-snav {
-          position: sticky; top: 0; z-index: 50;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 50;
           background: transparent;
           font-family: 'Poppins', system-ui, sans-serif;
           color: ${INK};

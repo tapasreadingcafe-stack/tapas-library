@@ -108,6 +108,7 @@ function PageLoader() {
 
 function AppShell() {
   const v2 = useV2Content();
+  const { pathname } = useLocation();
   // Hold the first paint until we know whether v2 is enabled. Without
   // this, the shell renders the global HeaderTemplate + LegacyHome for
   // ~300ms before v2 arrives and swaps them out — the user sees a flash
@@ -133,7 +134,7 @@ function AppShell() {
         body, html { font-family: 'Poppins', system-ui, sans-serif; }
       `}</style>
       <StoreEditorSync />
-      <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', transition:'background 200ms, color 200ms' }}>
+      <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 87, transition:'background 200ms, color 200ms' }}>
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
