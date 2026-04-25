@@ -34,10 +34,10 @@ jobs:
       - name: Start storefront
         working-directory: tapas-store
         env:
-          # Ensure a green app_settings — the workflow assumes the
-          # repo's Supabase project is reachable via the deployed
-          # preview URL rather than needing secrets here. Swap to
-          # `npm run build && npx serve` once preview URLs are stable.
+          # CRA defaults to port 3000; pin 3001 to match the local dev
+          # convention and the harness's TAPAS_STORE_URL below.
+          PORT: 3001
+          BROWSER: none
           REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
         run: |
