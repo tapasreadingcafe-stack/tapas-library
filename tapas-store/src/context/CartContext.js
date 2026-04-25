@@ -14,6 +14,17 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 const CartContext = createContext(null);
 
 const STORAGE_KEY = 'tapas_cart_v1';
+// Cart "extras" (gift-wrap / pickup / note / promo) live in a
+// separate key so legacy carts that persisted a bare items-array
+// under STORAGE_KEY still load cleanly.
+const EXTRAS_KEY = 'tapas_cart_extras_v1';
+
+const DEFAULT_EXTRAS = {
+  note: '',
+  giftWrap: false,
+  pickup: false,
+  promoCode: null, // { code, amount } | null
+};
 
 const readInitial = () => {
   try {
@@ -26,8 +37,20 @@ const readInitial = () => {
   }
 };
 
+const readExtras = () => {
+  try {
+    const raw = localStorage.getItem(EXTRAS_KEY);
+    if (!raw) return { ...DEFAULT_EXTRAS };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_EXTRAS, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+  } catch {
+    return { ...DEFAULT_EXTRAS };
+  }
+};
+
 export function CartProvider({ children }) {
   const [items, setItems] = useState(readInitial);
+  const [extras, setExtras] = useState(readExtras);
 
   // Persist on every change.
   useEffect(() => {
@@ -37,6 +60,14 @@ export function CartProvider({ children }) {
       console.warn('[Cart] persist failed', err);
     }
   }, [items]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(EXTRAS_KEY, JSON.stringify(extras));
+    } catch (err) {
+      console.warn('[Cart] persist extras failed', err);
+    }
+  }, [extras]);
 
   const addBook = useCallback((book, qty = 1) => {
     const key = `book:${book.id}`;
@@ -86,7 +117,42 @@ export function CartProvider({ children }) {
     setItems(prev => prev.filter(i => i.key !== key));
   }, []);
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => {
+    setItems([]);
+    setExtras({ ...DEFAULT_EXTRAS });
+  }, []);
+
+  // Insert an item at a specific index — used by the remove-with-
+  // undo flow so the restored book lands where it was.
+  const insertItemAt = useCallback((item, index) => {
+    setItems((prev) => {
+      const next = prev.slice();
+      const at = Math.max(0, Math.min(index, next.length));
+      next.splice(at, 0, item);
+      return next;
+    });
+  }, []);
+
+  const updateNote = useCallback(
+    (note) => setExtras((p) => ({ ...p, note: String(note || '').slice(0, 140) })),
+    [],
+  );
+  const setGiftWrap = useCallback(
+    (giftWrap) => setExtras((p) => ({ ...p, giftWrap: !!giftWrap })),
+    [],
+  );
+  const setPickup = useCallback(
+    (pickup) => setExtras((p) => ({ ...p, pickup: !!pickup })),
+    [],
+  );
+  const applyPromoCode = useCallback(
+    (code, amount) => setExtras((p) => ({ ...p, promoCode: { code, amount } })),
+    [],
+  );
+  const clearPromoCode = useCallback(
+    () => setExtras((p) => ({ ...p, promoCode: null })),
+    [],
+  );
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal  = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
@@ -100,7 +166,17 @@ export function CartProvider({ children }) {
       addMembership,
       updateQty,
       removeItem,
+      insertItemAt,
       clear,
+      note: extras.note,
+      giftWrap: extras.giftWrap,
+      pickup: extras.pickup,
+      promoCode: extras.promoCode,
+      updateNote,
+      setGiftWrap,
+      setPickup,
+      applyPromoCode,
+      clearPromoCode,
     }}>
       {children}
     </CartContext.Provider>

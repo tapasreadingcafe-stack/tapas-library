@@ -28,7 +28,7 @@ function StarRating({ rating, interactive, onRate, size = 18 }) {
           onMouseEnter={() => interactive && setHover(i)}
           onMouseLeave={() => interactive && setHover(0)}
           onClick={() => interactive && onRate && onRate(i)}
-        >\u2605</span>
+        >★</span>
       ))}
     </span>
   );
@@ -179,7 +179,7 @@ export default function BookDetail() {
         background: 'var(--bg)', fontFamily: 'var(--font-body)',
       }}>
         <div className="tps-skeleton" style={{ width: '240px', height: '320px', borderRadius: 'var(--radius-xl)' }} />
-        <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontStyle: 'italic' }}>Loading book\u2026</p>
+        <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontStyle: 'italic' }}>Loading book…</p>
       </div>
     );
   }
@@ -254,7 +254,7 @@ export default function BookDetail() {
                 fontFamily: 'var(--font-body)',
                 ...(!inStock ? { background: '#d44', color: '#fff' } : {}),
               }}>
-                {inStock ? `In stock \u00b7 ${book.quantity_available} available` : 'Currently sold out'}
+                {inStock ? `In stock · ${book.quantity_available} available` : 'Currently sold out'}
               </span>
             </div>
 
@@ -271,14 +271,14 @@ export default function BookDetail() {
                 <button onClick={handleReserve} disabled={reserving} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block" style={{
                   fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: '700',
                 }}>
-                  {reserving ? 'Reserving\u2026' : 'Reserve to Borrow'}
+                  {reserving ? 'Reserving…' : 'Reserve to Borrow'}
                 </button>
               )}
               <button onClick={handleWishlist} disabled={wishlisting} className="tps-btn tps-btn-ghost tps-btn-block" style={{
                 fontFamily: 'var(--font-body)', fontSize: '14px',
                 color: inWishlist ? '#c44' : 'var(--text-muted)',
               }}>
-                {wishlisting ? '\u2026' : inWishlist ? 'Remove from Wishlist' : 'Save to Wishlist'}
+                {wishlisting ? '…' : inWishlist ? 'Remove from Wishlist' : 'Save to Wishlist'}
               </button>
             </div>
 
@@ -333,7 +333,7 @@ export default function BookDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
                 <StarRating rating={Math.round(parseFloat(avgRating))} />
                 <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
-                  {avgRating} \u00b7 {reviews.length} review{reviews.length === 1 ? '' : 's'}
+                  {avgRating} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
                 </span>
               </div>
             )}
@@ -345,7 +345,7 @@ export default function BookDetail() {
                   fontSize: '48px', fontWeight: '700', color: 'var(--accent)',
                   fontFamily: 'var(--font-display)',
                 }}>
-                  \u20b9{book.sales_price}
+                  ₹{book.sales_price}
                 </span>
                 {book.mrp && Number(book.mrp) > Number(book.sales_price) && (
                   <>
@@ -353,10 +353,10 @@ export default function BookDetail() {
                       fontSize: '18px', marginLeft: '14px', textDecoration: 'line-through',
                       color: 'var(--text-subtle)',
                     }}>
-                      \u20b9{book.mrp}
+                      ₹{book.mrp}
                     </span>
                     <span className="tps-chip tps-chip-teal" style={{ marginLeft: '12px', fontSize: '11px' }}>
-                      Save \u20b9{Number(book.mrp) - Number(book.sales_price)}
+                      Save ₹{Number(book.mrp) - Number(book.sales_price)}
                     </span>
                   </>
                 )}
@@ -364,7 +364,7 @@ export default function BookDetail() {
                   fontSize: '13px', marginTop: '10px', color: 'var(--text-subtle)',
                   fontFamily: 'var(--font-body)',
                 }}>
-                  Purchase price \u00b7 In-store pickup
+                  Purchase price · In-store pickup
                 </div>
               </div>
             )}
@@ -420,11 +420,11 @@ export default function BookDetail() {
               padding: '28px 24px',
             }}>
               {[
-                { label: 'ISBN',       value: book.isbn || '\u2014' },
-                { label: 'Publisher',   value: book.publisher || '\u2014' },
-                { label: 'Year',        value: book.publication_year || '\u2014' },
+                { label: 'ISBN',       value: book.isbn || '—' },
+                { label: 'Publisher',   value: book.publisher || '—' },
+                { label: 'Year',        value: book.publication_year || '—' },
                 { label: 'Language',    value: book.language || 'English' },
-                { label: 'Condition',   value: book.condition || '\u2014' },
+                { label: 'Condition',   value: book.condition || '—' },
                 { label: 'Total copies', value: book.quantity_total || 1 },
               ].map(d => (
                 <div key={d.label}>
@@ -531,7 +531,7 @@ export default function BookDetail() {
                     fontFamily: 'var(--font-body)',
                   }}>
                     <span style={{ fontWeight: '700', color: 'var(--text)' }}>
-                      \u2014 {review.members?.name || 'Anonymous'}
+                      — {review.members?.name || 'Anonymous'}
                     </span>
                     <span>{review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
                   </div>

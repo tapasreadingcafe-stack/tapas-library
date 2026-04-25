@@ -37,7 +37,7 @@ const RAW_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .tapas-landing {
-  --lime: #C9F27F; --lime-2: #DCF59A;
+  --lime: #caf27e; --lime-2: #DCF59A;
   --orange: #FF934A; --purple: #8F4FD6; --pink: #E0004F;
   --ink: #1a1a1a; --ink-2: #3a3a3a; --muted: #6e6e6e;
   --rule: #ececea; --landing-bg: #faf8f4; --card: #ffffff;
@@ -61,18 +61,6 @@ const RAW_CSS = `
 }
 .tapas-landing h1 em, .tapas-landing h2 em, .tapas-landing h3 em { font-style: italic; font-weight: 500; }
 .tapas-landing p { line-height: 1.6; margin: 0; }
-
-.tapas-landing .nav-band { background: var(--lime); }
-.tapas-landing .nav { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 20px 0; gap: 40px; }
-.tapas-landing .nav .links { display: flex; gap: 36px; align-items: center; font-size: 14.5px; font-weight: 500; }
-.tapas-landing .nav .links a:hover { color: var(--pink); }
-.tapas-landing .nav .brand { font-family: var(--f-display); font-weight: 700; font-size: 22px; line-height: 1.05; text-align: center; letter-spacing: -0.01em; white-space: nowrap; }
-.tapas-landing .nav .brand .row1 { font-style: italic; font-weight: 500; font-size: 17px; display: block; }
-.tapas-landing .nav .brand .row2 { display: block; }
-.tapas-landing .nav .right { display: flex; gap: 16px; justify-content: flex-end; align-items: center; font-size: 14.5px; font-weight: 500; }
-.tapas-landing .nav .pill { background: var(--pink); color: #fff; padding: 10px 22px; border-radius: 999px; font-weight: 600; font-size: 14px; }
-.tapas-landing .nav .pill:hover { background: var(--ink); }
-.tapas-landing .nav .cart { width: 38px; height: 38px; border-radius: 999px; background: #fff; display: inline-grid; place-items: center; border: 1px solid rgba(0,0,0,0.08); }
 
 .tapas-landing .hero-band { background: var(--lime); position: relative; overflow: hidden; }
 .tapas-landing .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; padding: 40px 0 80px; }
@@ -254,27 +242,10 @@ const SHELF = [
 ];
 
 // ---- Section builders ----------------------------------------------
-const nav = () => node('nav', {
-  classes: ['nav'],
-  children: [
-    node('div', { classes: ['links'], children: [
-      node('a', { attributes: { href: '/' },       textContent: 'Home' }),
-      node('a', { attributes: { href: '#services'}, textContent: 'Services' }),
-      node('a', { attributes: { href: '/books' },   textContent: 'Library' }),
-      node('a', { attributes: { href: '#events' },  textContent: 'Events' }),
-      node('a', { attributes: { href: '#blog' },    textContent: 'Journal' }),
-    ]}),
-    node('div', { classes: ['brand'], children: [
-      node('span', { classes: ['row1'], textContent: 'Tapas reading' }),
-      node('span', { classes: ['row2'], textContent: 'cafe' }),
-    ]}),
-    node('div', { classes: ['right'], children: [
-      node('a', { classes: ['sign'], attributes: { href: '/login' }, textContent: 'Sign in' }),
-      node('a', { classes: ['pill'], attributes: { href: '#join' },  textContent: 'Sign up' }),
-      node('a', { classes: ['cart'], attributes: { href: '/cart', 'aria-label': 'Cart' }, textContent: '🛒' }),
-    ]}),
-  ],
-});
+// No nav here — the primary navbar now lives outside the v2 tree in
+// tapas-store/src/components/TapasStickyNav.js so it can react to the
+// current route (active-state coloring, responsive hamburger menu).
+// The tree still owns the hero band and everything below.
 
 const hero = () => node('section', {
   classes: ['hero'],
@@ -515,69 +486,28 @@ const newsletter = () => node('section', {
   ],
 });
 
-const footer = () => node('footer', {
-  classes: ['wrap', 'site-foot'], children: [
-    node('div', { classes: ['foot-grid'], children: [
-      node('div', { classes: ['foot-brand'], children: [
-        node('div', { classes: ['name'], children: [
-          { text: 'Tapas reading cafe', marks: [] },
-          node('i', { textContent: 'a small room for big books' }),
-        ]}),
-        node('p', { textContent: 'A neighborhood library-cafe serving small plates, natural wine, and six weekly book clubs.' }),
-      ]}),
-      node('div', { classes: ['foot-col'], children: [
-        node('h5', { textContent: 'Visit' }),
-        node('ul', { children: [
-          node('li', { textContent: '14 Haven Street' }),
-          node('li', { textContent: 'Reading, MA 01867' }),
-          node('li', { textContent: 'Tue–Sun · 10a–11p' }),
-        ]}),
-      ]}),
-      node('div', { classes: ['foot-col'], children: [
-        node('h5', { textContent: 'Read' }),
-        node('ul', { children: [
-          node('li', { children: [node('a', { attributes: { href: '/books' },  textContent: 'Library' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#events' }, textContent: 'Book Clubs' })] }),
-          node('li', { children: [node('a', { attributes: { href: '/blog' },   textContent: 'The Journal' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#archive' }, textContent: 'Archive' })] }),
-        ]}),
-      ]}),
-      node('div', { classes: ['foot-col'], children: [
-        node('h5', { textContent: 'More' }),
-        node('ul', { children: [
-          node('li', { children: [node('a', { attributes: { href: '#events' },  textContent: 'Private Events' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#gift' },    textContent: 'Gift Cards' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#careers' }, textContent: 'Careers' })] }),
-          node('li', { children: [node('a', { attributes: { href: '#contact' }, textContent: 'Contact' })] }),
-        ]}),
-      ]}),
-    ]}),
-    node('div', { classes: ['foot-bottom'], children: [
-      node('span', { textContent: `© ${new Date().getFullYear()} Tapas Reading Cafe · Reading, MA` }),
-      node('div', { classes: ['socials'], children: [
-        node('a', { attributes: { href: '#ig' }, textContent: 'IG' }),
-        node('a', { attributes: { href: '#fb' }, textContent: 'FB' }),
-        node('a', { attributes: { href: '#sp' }, textContent: 'SP' }),
-      ]}),
-    ]}),
-  ],
-});
+// No footer here — the global React SiteFooter
+// (tapas-store/src/components/SiteFooter.js) renders on every route,
+// so baking a `<footer>` into the landing tree would just stack two
+// footers on the home page.
+
+// No hero here \u2014 the /cart-style split-layout LandingHero React
+// component (tapas-store/src/components/LandingHero.js) renders
+// above whatever the tree emits, so baking a hero-band into the
+// tree would stack two heroes on the home page.
 
 const root = () => node('body', {
   classes: ['tapas-landing'],
   children: [
     styleNode(RAW_CSS),
-    node('div', { classes: ['nav-band', 'hero-band'], children: [
-      node('div', { classes: ['wrap'], children: [nav(), hero()] }),
-    ]}),
-    marquee(),
+    // No marquee here \u2014 the "READING ROOM \u00b7 BOOK CLUB \u00b7 SMALL PLATES"
+    // dotted black band broke the visual flow under the new LandingHero.
     services(),
     arrivals(),
     membership(),
     events(),
     testimonial(),
     newsletter(),
-    footer(),
   ],
 });
 

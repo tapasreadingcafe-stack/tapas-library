@@ -2,97 +2,30 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { SiteContentProvider, useSiteContent, useV2Content } from './context/SiteContent';
-import { findV2PageByPath } from './utils/findPage';
+import { SiteContentProvider } from './context/SiteContent';
 import { ThemeProvider } from './context/ThemeContext';
 import StoreEditorSync from './components/StoreEditorSync';
-import HeaderTemplate from './components/HeaderTemplates';
-import FooterTemplate from './components/FooterTemplates';
+import TapasStickyNav from './components/TapasStickyNav';
+import SiteFooter from './components/SiteFooter';
 import InstallPrompt from './components/InstallPrompt';
-import { findPageByPath } from './utils/findPage';
 import './App.css';
 
-// When the current page has a Navbar/Footer block in its block tree,
-// the global app-chrome Header/Footer should get out of the way — we'd
-// otherwise render two navbars or two footers, one from the app shell
-// and one from the block. These helpers check the current URL against
-// content.pages and hide the global chrome if a block version exists.
-function currentPageBlocks(content, pathname) {
-  const matchKey = findPageByPath(content?.pages, pathname);
-  if (!matchKey) return [];
-  const blocks = content.pages[matchKey]?.blocks;
-  return Array.isArray(blocks) ? blocks : [];
-}
-
-// v2 equivalent: walk the Node tree for the current page and look for
-// any node whose semantic tag (or authored class) indicates a navbar
-// or footer. Without this check, every page authored in the v2 editor
-// would double-stack chrome against the global HeaderTemplate /
-// FooterTemplate app shell.
-function v2TreeHas(tree, predicate) {
-  if (!tree) return false;
-  const stack = [tree];
-  while (stack.length) {
-    const n = stack.pop();
-    if (!n) continue;
-    if (predicate(n)) return true;
-    if (Array.isArray(n.children)) stack.push(...n.children);
-  }
-  return false;
-}
-
-function hasNavbarNode(n) {
-  if (n?.tag === 'nav') return true;
-  const cls = n?.classes;
-  if (!Array.isArray(cls)) return false;
-  return cls.some(c => /(^|-)navbar(-|$)|(^|-)header(-|$)/i.test(c || ''));
-}
-
-function hasFooterNode(n) {
-  if (n?.tag === 'footer') return true;
-  const cls = n?.classes;
-  if (!Array.isArray(cls)) return false;
-  return cls.some(c => /(^|-)footer(-|$)/i.test(c || ''));
-}
-
-function currentV2PageTree(v2, pathname) {
-  if (!v2?.enabled || !v2?.content?.pages) return null;
-  const key = findV2PageByPath(v2.content.pages, pathname);
-  if (!key) return null;
-  return v2.content.pages[key]?.tree || null;
-}
-
-// Routes whose page component renders its own navbar + footer, so the
-// global app shell must step aside. Empty now that the landing page is
-// owned by the editor — keep the hook here for future bespoke pages.
-const FULL_BLEED_ROUTES = new Set();
+// Auth flows get a dedicated split-screen layout; stacking the
+// sticky navbar on top would compete with the focused form. Add any
+// new auth routes to this set to hide the nav there.
+const HIDE_NAV_ROUTES = new Set(['/sign-in', '/sign-up', '/forgot-password']);
 
 function GlobalHeader() {
-  const location = useLocation();
-  const content = useSiteContent();
-  const v2 = useV2Content();
-  if (FULL_BLEED_ROUTES.has(location.pathname)) return null;
-  const v2Tree = currentV2PageTree(v2, location.pathname);
-  if (v2Tree && v2TreeHas(v2Tree, hasNavbarNode)) return null;
-  if (!v2Tree) {
-    const blocks = currentPageBlocks(content, location.pathname);
-    if (blocks.some(b => b?.type === 'navbar' && !b?.props?.hidden)) return null;
-  }
-  return <HeaderTemplate />;
+  const { pathname } = useLocation();
+  if (HIDE_NAV_ROUTES.has(pathname)) return null;
+  return <TapasStickyNav />;
 }
 
 function GlobalFooter() {
-  const location = useLocation();
-  const content = useSiteContent();
-  const v2 = useV2Content();
-  if (FULL_BLEED_ROUTES.has(location.pathname)) return null;
-  const v2Tree = currentV2PageTree(v2, location.pathname);
-  if (v2Tree && v2TreeHas(v2Tree, hasFooterNode)) return null;
-  if (!v2Tree) {
-    const blocks = currentPageBlocks(content, location.pathname);
-    if (blocks.some(b => b?.type === 'footer' && !b?.props?.hidden)) return null;
-  }
-  return <FooterTemplate />;
+  // SiteFooter owns the footer for the entire site. The landing tree
+  // no longer carries its own footer node, so nothing else renders
+  // below; SiteFooter always takes over.
+  return <SiteFooter />;
 }
 
 // Recover from ChunkLoadError by forcing one hard reload. Prevents a
@@ -135,6 +68,16 @@ const Blog            = lazyWithRetry(() => import('./pages/Blog'));
 const BlogPost        = lazyWithRetry(() => import('./pages/BlogPost'));
 const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
 const SearchPage      = lazyWithRetry(() => import('./pages/Search'));
+const Shop            = lazyWithRetry(() => import('./pages/Shop'));
+const Library         = lazyWithRetry(() => import('./pages/Library'));
+const Contact         = lazyWithRetry(() => import('./pages/Contact'));
+const Events          = lazyWithRetry(() => import('./pages/Events'));
+const SignIn          = lazyWithRetry(() => import('./pages/SignIn'));
+const SignUp          = lazyWithRetry(() => import('./pages/SignUp'));
+const ForgotPassword  = lazyWithRetry(() => import('./pages/ForgotPassword'));
+const Welcome         = lazyWithRetry(() => import('./pages/Welcome'));
+const CodeOfTheRoom   = lazyWithRetry(() => import('./pages/CodeOfTheRoom'));
+const Privacy         = lazyWithRetry(() => import('./pages/Privacy'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -164,21 +107,7 @@ function PageLoader() {
 }
 
 function AppShell() {
-  const v2 = useV2Content();
-  // Hold the first paint until we know whether v2 is enabled. Without
-  // this, the shell renders the global HeaderTemplate + LegacyHome for
-  // ~300ms before v2 arrives and swaps them out — the user sees a flash
-  // of the old UI on every reload. A blank frame against --bg is
-  // kinder than that flash; once v2.loaded flips we render normally.
-  if (!v2?.loaded) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'var(--bg, #faf8f4)',
-        transition: 'background 200ms',
-      }} />
-    );
-  }
+  const { pathname } = useLocation();
   return (
     <>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" />
@@ -190,7 +119,7 @@ function AppShell() {
         body, html { font-family: 'Poppins', system-ui, sans-serif; }
       `}</style>
       <StoreEditorSync />
-      <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', transition:'background 200ms, color 200ms' }}>
+      <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 87, transition:'background 200ms, color 200ms' }}>
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -210,6 +139,16 @@ function AppShell() {
             <Route path="/order/:id"     element={<OrderSuccess />} />
             <Route path="/order/:id/track" element={<OrderTracking />} />
             <Route path="/search"        element={<SearchPage />} />
+            <Route path="/shop"          element={<Shop />} />
+            <Route path="/library"       element={<Library />} />
+            <Route path="/contact"       element={<Contact />} />
+            <Route path="/events"        element={<Events />} />
+            <Route path="/sign-in"       element={<SignIn />} />
+            <Route path="/sign-up"       element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/welcome"       element={<Welcome />} />
+            <Route path="/code-of-the-room" element={<CodeOfTheRoom />} />
+            <Route path="/privacy"       element={<Privacy />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
             <Route path="*"              element={<CustomPage />} />

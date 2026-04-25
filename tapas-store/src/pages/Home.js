@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useSiteContent, useV2Content } from '../context/SiteContent';
+import { useSiteContent } from '../context/SiteContent';
 import PageRenderer from '../blocks/PageRenderer';
-import { findPageByPath, findV2PageByPath } from '../utils/findPage';
+import LandingHero from '../components/LandingHero';
+import { findPageByPath } from '../utils/findPage';
 
 // =====================================================================
 // Home — Tapas reading cafe landing page (Figma conversion).
@@ -10,7 +11,7 @@ import { findPageByPath, findV2PageByPath } from '../utils/findPage';
 // New Arrivals (4 product cards), Room inspiration, Testimonials.
 // =====================================================================
 
-const LIME = '#CFF389';
+const LIME = '#caf27e';
 const PINK = '#EF3D7B';
 const PINK_DARK = '#D02A65';
 const INK = '#1F2937';
@@ -53,94 +54,9 @@ function ImageOrPlaceholder({ src, ratio, label, bg }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// 1. Hero
-// ---------------------------------------------------------------------
-function Hero() {
-  return (
-    <section style={{
-      position: 'relative', overflow: 'hidden', background: LIME,
-      marginTop: '-64px',
-    }}>
-      <style>{`
-        @keyframes tapas-fade-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-        .tapas-hero-wrap { display: grid; grid-template-columns: 0.9fr 1.3fr; min-height: 720px; }
-        .tapas-hero-photo { position: relative; }
-        @media (max-width: 900px) {
-          .tapas-hero-wrap { grid-template-columns: 1fr; min-height: auto; }
-          .tapas-hero-photo { aspect-ratio: 4 / 3; }
-        }
-      `}</style>
-      <div className="tapas-hero-wrap">
-        {/* Left: lime block + copy */}
-        <div style={{
-          background: LIME, position: 'relative',
-          padding: 'clamp(40px, 6vw, 96px) clamp(20px, 6vw, 80px)',
-          display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          animation: 'tapas-fade-up 600ms ease-out',
-        }}>
-          <h1 style={{
-            margin: 0, fontFamily: 'var(--tapas-heading-font, Newsreader, serif)',
-            fontSize: 'clamp(34px, 4.5vw, 58px)', lineHeight: 1.05,
-            color: INK, fontWeight: 700, letterSpacing: '-0.01em',
-          }}>
-            Discover Our<br />New Collection
-          </h1>
-          <p style={{
-            marginTop: '18px', maxWidth: '440px',
-            color: INK_DIM, fontSize: '15px', lineHeight: 1.65,
-          }}>
-            Curated reads from our shelves — fresh fiction, deep non-fiction,
-            and the year's most-talked-about titles, all under one roof.
-          </p>
-          <div style={{ marginTop: '28px' }}>
-            <Link
-              to="/books"
-              style={{
-                display: 'inline-block',
-                padding: '14px 30px', borderRadius: '999px',
-                background: PINK, color: '#fff',
-                fontWeight: 700, fontSize: '14px', letterSpacing: '0.5px',
-                textDecoration: 'none', textTransform: 'uppercase',
-                boxShadow: '0 8px 20px rgba(239,61,123,0.35)',
-                transition: 'transform 200ms, box-shadow 200ms',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = PINK_DARK; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = PINK; e.currentTarget.style.transform = 'none'; }}
-            >
-              Join now!
-            </Link>
-          </div>
-        </div>
-
-        {/* Right: library photo — lime bleeds through the PNG's transparent
-            wave so the curve reads as one continuous shape. */}
-        <div className="tapas-hero-photo" style={{ background: LIME }}>
-          <ImageOrPlaceholder
-            src={asset('HERO-LIBRARY.png')}
-            ratio="auto"
-            label="Hero photo (HERO-LIBRARY.png)"
-            bg="transparent"
-          />
-        </div>
-      </div>
-
-      {/* Decorative wave — only on desktop, sits right on the column boundary */}
-      <svg
-        viewBox="0 0 160 600" preserveAspectRatio="none" aria-hidden="true"
-        className="tapas-hero-wave"
-        style={{
-          position: 'absolute', top: 0, left: '50%', height: '100%',
-          width: '120px', transform: 'translateX(-60px)', display: 'block',
-          pointerEvents: 'none',
-        }}
-      >
-        <path d="M 0,0 L 40,0 C 80,150 20,300 90,450 C 120,540 60,580 40,600 L 0,600 Z" fill={LIME} />
-      </svg>
-      <style>{`@media (max-width: 900px) { .tapas-hero-wave { display: none !important; } }`}</style>
-    </section>
-  );
-}
+// The legacy lime "Discover Our / New Collection" Hero component was
+// removed when the split-layout LandingHero took over. Keeping this
+// comment so future greps for "hero" land somewhere meaningful.
 
 // ---------------------------------------------------------------------
 // 2. Services
@@ -468,9 +384,11 @@ function Newsletter() {
 // Compose
 // ---------------------------------------------------------------------
 function LegacyHome() {
+  // LegacyHome no longer owns a hero — the split-layout
+  // LandingHero sits above whatever branch Home() picks, so having
+  // the old Hero() here too would double-stack.
   return (
     <>
-      <Hero />
       <Services />
       <NewArrivals />
       <RoomInspiration />
@@ -480,25 +398,36 @@ function LegacyHome() {
   );
 }
 
-// Public Home — defer to draft block tree if the user customised the page
-// in the editor; otherwise render the LegacyHome layout above.
+// Public Home — always open with the split-layout LandingHero, then
+// render the legacy React sections (or a custom block tree if the
+// dashboard editor has stored one for the home page).
 export default function Home() {
   const content = useSiteContent();
-  const v2 = useV2Content();
-  // v2 takes over as soon as it resolves — its own PageRenderer branch
-  // handles the blank-during-loading case so there's no flash of v1.
-  if (v2?.enabled && v2.loaded) {
-    const v2Key = findV2PageByPath(v2?.content?.pages, '/');
-    if (v2Key) return <PageRenderer pageKey={v2Key} />;
-  }
+
+  let body = <LegacyHome />;
   const matchKey = findPageByPath(content?.pages, '/');
   if (matchKey) {
     const blocks = content.pages[matchKey].blocks;
     if (Array.isArray(blocks) && blocks.length > 0) {
-      return <PageRenderer pageKey={matchKey} />;
+      body = <PageRenderer pageKey={matchKey} />;
+    } else if (matchKey !== 'home') {
+      body = null;
     }
-    if (matchKey === 'home') return <LegacyHome />;
-    return null;
   }
-  return <LegacyHome />;
+
+  // Whole-page lime background. The v2 tree paints `.tapas-landing`
+  // cream via `background: var(--landing-bg)` where the var is set
+  // to #faf8f4 inside the tree's own <style> node. Overriding the
+  // var here flips every inheriting surface (the landing root, its
+  // direct section backdrops) to lime while leaving card-level
+  // white/dark backgrounds intact.
+  return (
+    <div style={{ background: '#caf27e', minHeight: '100vh' }}>
+      <style>{`
+        .tapas-landing { --landing-bg: #caf27e !important; background: #caf27e !important; }
+      `}</style>
+      <LandingHero />
+      {body}
+    </div>
+  );
 }
