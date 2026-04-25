@@ -6,7 +6,9 @@ import FeaturedShelf from './library/FeaturedShelf';
 import Shelf from './library/Shelf';
 import HouseRules from './library/HouseRules';
 import LIBRARY_CSS from './library/libraryStyles';
-import { LIBRARY_SHELVES, matchesBook } from '../data/libraryBooks';
+import { matchesBook } from '../data/libraryBooks';
+import { useLibraryShelves } from '../cms/hooks';
+import { adaptLibraryShelves } from '../cms/adapters';
 
 // Search input debounce — 200ms per spec so typing doesn't thrash
 // the filter pipeline.
@@ -24,14 +26,17 @@ export default function Library() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounced(query, 200);
 
+  const { data: rows, loading } = useLibraryShelves();
+  const shelves = useMemo(() => adaptLibraryShelves(rows), [rows]);
+
   const filteredShelves = useMemo(() => {
-    return LIBRARY_SHELVES.map((shelf) => ({
+    return shelves.map((shelf) => ({
       ...shelf,
       visibleBooks: shelf.books.filter((b) =>
         matchesBook(b, { category, query: debouncedQuery }),
       ),
     }));
-  }, [category, debouncedQuery]);
+  }, [shelves, category, debouncedQuery]);
 
   const totalVisible = filteredShelves.reduce(
     (sum, s) => sum + s.visibleBooks.length,
@@ -79,9 +84,13 @@ export default function Library() {
         <FeaturedShelf />
 
         <div className="library-shelves">
-          {totalVisible === 0 ? (
+          {loading && shelves.length === 0 ? (
+            <div className="library-empty" aria-busy="true">
+              <p>Loading shelves…</p>
+            </div>
+          ) : totalVisible === 0 ? (
             <div className="library-empty">
-              <div className="library-empty-emoji" aria-hidden="true">\ud83d\udcda</div>
+              <div className="library-empty-emoji" aria-hidden="true">📚</div>
               <h3>No books match your filters</h3>
               <p>Try a different category or clear the search.</p>
             </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import { ABOUT_PRESS } from '../../data/aboutContent';
+import { useAbout } from '../../cms/hooks';
+import { adaptAbout } from '../../cms/adapters';
 
 function renderTitle(parts) {
   return parts.map((p, i) => p.em
@@ -9,7 +11,9 @@ function renderTitle(parts) {
 }
 
 export default function PressQuotes() {
-  const p = ABOUT_PRESS;
+  const { data } = useAbout();
+  const adapted = adaptAbout(data);
+  const p = adapted?.press || ABOUT_PRESS;
   return (
     <section aria-labelledby="ab-press-h">
       <header className="ab-head-row">

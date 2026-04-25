@@ -1,5 +1,7 @@
 import React from 'react';
 import { CONTACT_INFO } from '../../data/contactConfig';
+import { useContactInfo } from '../../cms/hooks';
+import { adaptContactInfo } from '../../cms/adapters';
 
 function Row({ label, children }) {
   return (
@@ -11,7 +13,8 @@ function Row({ label, children }) {
 }
 
 export default function FindUsCard() {
-  const i = CONTACT_INFO;
+  const { data: row } = useContactInfo();
+  const i = adaptContactInfo(row) || CONTACT_INFO;
   return (
     <section className="contact-info" aria-labelledby="contact-info-h">
       <div className="contact-info-kicker">Find us</div>

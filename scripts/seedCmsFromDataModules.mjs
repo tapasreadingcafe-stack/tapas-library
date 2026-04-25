@@ -320,11 +320,11 @@ function parseReturnDate(md) {
   const pageSeeds = [
     { slug: 'home',    title: 'Home',         hero_kicker: 'Welcome to Tapas',     hero_heading_html: 'Where Stories Begin &amp; Families Connect', hero_lede: 'A cozy reading space for kids and parents — discover books, enjoy simple treats, and build a love for reading together.' },
     { slug: 'shop',    title: 'Shop',         hero_kicker: 'The Shop',             hero_heading_html: 'Books we keep <em>pressing</em> into people’s hands.', hero_lede: 'A considered shelf of new releases, small presses, and staff favorites. Free shipping over ₹999.' },
-    { slug: 'library', title: 'Library',      hero_kicker: 'The Library',          hero_heading_html: 'A working <em>library</em> on Haven Street.', hero_lede: 'Three shelves curated by translators, novelists, and the people who shelve them.' },
+    { slug: 'library', title: 'Library',      hero_kicker: 'The Lending Library',          hero_heading_html: 'Over <em>2,400 books</em>,<br />free to borrow.', hero_lede: 'Take two home at a time. Three weeks to return. No late fees, no paperwork.' },
     { slug: 'blog',    title: 'The Journal',  hero_kicker: 'The Journal',          hero_heading_html: 'Notes from the <em>reading room.</em>', hero_lede: 'Essays, marginalia, and conversations. Posted slowly, always from inside the cafe.' },
     { slug: 'events',  title: 'Events',       hero_kicker: 'Events &amp; Book Clubs', hero_heading_html: 'Six clubs, one room,<br /><em>all welcome.</em>', hero_lede: 'Weekly clubs, poetry suppers, and silent reading Saturdays. Drop in once as a guest.' },
-    { slug: 'contact', title: 'Contact',      hero_kicker: 'Contact',              hero_heading_html: 'Find us at <em>14 Haven.</em>', hero_lede: 'Email, walk in, or fill the form. We answer within a working day.' },
-    { slug: 'about',   title: 'About',        hero_kicker: 'About',                hero_heading_html: 'A small room for <em>big books.</em>', hero_lede: 'Three years in, fourteen hundred titles, six clubs, one stove.' },
+    { slug: 'contact', title: 'Contact',      hero_kicker: 'Visit & Contact',              hero_heading_html: 'Come <em>read with us.</em>', hero_lede: '14 Haven Street, right off the square. Walk in anytime.' },
+    { slug: 'about',   title: 'About',        hero_kicker: 'About Us',                hero_heading_html: 'A small room<br /><em>for big books.</em>', hero_lede: 'A library-cafe on Haven Street since 2021. Six clubs, 2,400 books, one long table.' },
     { slug: 'cart',    title: 'Cart',         hero_kicker: 'Your basket',          hero_heading_html: 'Books waiting <em>to be read.</em>', hero_lede: 'Free shipping over ₹999, or pick up at the cafe.' },
   ];
   for (const p of pageSeeds) {

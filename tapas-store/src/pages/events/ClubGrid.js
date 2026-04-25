@@ -1,5 +1,7 @@
 import React from 'react';
 import { CLUBS } from '../../data/eventsData';
+import { useClubs } from '../../cms/hooks';
+import { adaptClubs } from '../../cms/adapters';
 
 function ClubCard({ club }) {
   return (
@@ -29,9 +31,15 @@ function ClubCard({ club }) {
 }
 
 export default function ClubGrid({ category }) {
-  const visible = CLUBS.filter((c) =>
-    category === 'all' ? true : c.category === category,
-  );
+  const { data: rows } = useClubs();
+  const adapted = adaptClubs(rows || []);
+  const list = adapted.length > 0 ? adapted : CLUBS;
+  // The CMS schema doesn't carry per-club category; show all clubs
+  // when 'all', and keep the legacy filter behaviour against fallback
+  // hardcoded data for back-compat.
+  const visible = adapted.length > 0
+    ? list
+    : list.filter((c) => category === 'all' ? true : c.category === category);
   if (visible.length === 0) {
     return (
       <div className="ev-empty">

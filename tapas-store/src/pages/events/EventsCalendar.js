@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import {
   CALENDAR_EVENTS, CHIP, ymd, isSameDay,
 } from '../../data/eventsData';
+import { useEvents } from '../../cms/hooks';
+import { splitEvents } from '../../cms/adapters';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -34,16 +36,22 @@ export default function EventsCalendar({ category, onJumpToEvent }) {
   const month = cursor.getMonth();
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month]);
 
+  const { data: rows } = useEvents();
+  const calendarEvents = useMemo(() => {
+    const all = splitEvents(rows || []).calendar;
+    return all.length > 0 ? all : CALENDAR_EVENTS;
+  }, [rows]);
+
   // Bucket events by yyyy-mm-dd for O(1) cell lookups.
   const byDate = useMemo(() => {
     const map = new Map();
-    for (const e of CALENDAR_EVENTS) {
+    for (const e of calendarEvents) {
       if (category !== 'all' && e.category !== category) continue;
       if (!map.has(e.date)) map.set(e.date, []);
       map.get(e.date).push(e);
     }
     return map;
-  }, [category]);
+  }, [calendarEvents, category]);
 
   const shift = (delta) => {
     setCursor(new Date(year, month + delta, 1));

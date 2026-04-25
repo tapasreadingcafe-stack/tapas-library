@@ -1,5 +1,7 @@
 import React from 'react';
 import { ABOUT_COMPROMISES } from '../../data/aboutContent';
+import { useAbout } from '../../cms/hooks';
+import { adaptAbout } from '../../cms/adapters';
 
 function renderTitle(parts) {
   return parts.map((p, i) => {
@@ -16,7 +18,9 @@ function renderCardTitle(parts) {
 }
 
 export default function Compromises() {
-  const c = ABOUT_COMPROMISES;
+  const { data } = useAbout();
+  const adapted = adaptAbout(data);
+  const c = adapted?.compromises || ABOUT_COMPROMISES;
   return (
     <section aria-labelledby="ab-compromises-h">
       <header className="ab-head-row">

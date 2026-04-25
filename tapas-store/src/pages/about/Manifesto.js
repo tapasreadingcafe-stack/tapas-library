@@ -1,5 +1,7 @@
 import React from 'react';
 import { ABOUT_MANIFESTO } from '../../data/aboutContent';
+import { useAbout } from '../../cms/hooks';
+import { adaptAbout } from '../../cms/adapters';
 
 function renderTitle(parts) {
   return parts.map((p, i) => p.em
@@ -9,7 +11,9 @@ function renderTitle(parts) {
 }
 
 export default function Manifesto() {
-  const m = ABOUT_MANIFESTO;
+  const { data } = useAbout();
+  const adapted = adaptAbout(data);
+  const m = adapted?.manifesto || ABOUT_MANIFESTO;
   return (
     <section className="ab-manifesto" aria-labelledby="ab-manifesto-h">
       <div>

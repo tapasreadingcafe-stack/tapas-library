@@ -1,5 +1,7 @@
 import React from 'react';
 import { ABOUT_HISTORY } from '../../data/aboutContent';
+import { useAbout } from '../../cms/hooks';
+import { adaptAbout } from '../../cms/adapters';
 
 function renderTitle(parts) {
   return parts.map((p, i) => p.em
@@ -9,7 +11,9 @@ function renderTitle(parts) {
 }
 
 export default function BriefHistory() {
-  const h = ABOUT_HISTORY;
+  const { data } = useAbout();
+  const adapted = adaptAbout(data);
+  const h = adapted?.history || ABOUT_HISTORY;
   return (
     <section className="ab-history" aria-labelledby="ab-history-h">
       <div className="ab-history-kicker">{h.kicker}</div>

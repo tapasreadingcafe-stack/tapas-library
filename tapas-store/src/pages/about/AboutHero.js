@@ -1,23 +1,26 @@
 import React from 'react';
+import { usePage } from '../../cms/hooks';
 
 export default function AboutHero() {
+  const { data: page } = usePage('about');
+  const kicker = page?.hero_kicker || 'About Us';
+  const headingHtml = page?.hero_heading_html || 'A small room<br /><em>for big books.</em>';
+  const lede = page?.hero_lede || 'A library-cafe on Haven Street since 2021. Six clubs, 2,400 books, one long table.';
   return (
     <section className="ab-hero" aria-labelledby="ab-hero-h1">
       <div className="ab-hero-inner">
         <div>
           <div className="ab-hero-kicker" aria-hidden="true">
             <span className="ab-hero-dot" />
-            About Us
+            {kicker}
           </div>
-          <h1 id="ab-hero-h1" className="ab-hero-title">
-            A small room<br />
-            <em>for big books.</em>
-          </h1>
+          <h1
+            id="ab-hero-h1"
+            className="ab-hero-title"
+            dangerouslySetInnerHTML={{ __html: headingHtml }}
+          />
         </div>
-        <p className="ab-hero-lede">
-          A library-cafe on Haven Street since 2021. Six clubs,
-          2,400 books, one long table.
-        </p>
+        <p className="ab-hero-lede">{lede}</p>
       </div>
       <svg
         className="ab-hero-curve"

@@ -7,7 +7,9 @@ import Toolbar from './shop/Toolbar';
 import BookGrid from './shop/BookGrid';
 import Pagination from './shop/Pagination';
 import SHOP_CSS from './shop/shopStyles';
-import { SHOP_BOOKS, SHOP_PRICE_MAX } from '../data/shopBooks';
+import { SHOP_PRICE_MAX } from '../data/shopBooks';
+import { useShopBooks } from '../cms/hooks';
+import { adaptShopBooks } from '../cms/adapters';
 
 const PAGE_SIZE = 12;
 
@@ -104,11 +106,14 @@ export default function Shop() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const gridRef = useRef(null);
 
+  const { data: rows, loading } = useShopBooks();
+  const books = useMemo(() => adaptShopBooks(rows), [rows]);
+
   const debouncedSearch = useDebounced(filters.search, 200);
 
   const filtered = useMemo(
-    () => applyFilters(SHOP_BOOKS, filters, debouncedSearch),
-    [filters, debouncedSearch]
+    () => applyFilters(books, filters, debouncedSearch),
+    [books, filters, debouncedSearch]
   );
   const sorted = useMemo(() => applySort(filtered, sort), [filtered, sort]);
 
@@ -155,11 +160,19 @@ export default function Shop() {
               onSortChange={setSort}
               onOpenFilters={() => setDrawerOpen(true)}
             />
-            <BookGrid
-              books={pageBooks}
-              memberDiscount={filters.memberDiscount}
-              gridRef={gridRef}
-            />
+            {loading && books.length === 0 ? (
+              <div className="shop-grid" ref={gridRef} aria-busy="true" />
+            ) : sorted.length === 0 ? (
+              <div ref={gridRef} style={{ padding: '64px 24px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
+                No books match these filters.
+              </div>
+            ) : (
+              <BookGrid
+                books={pageBooks}
+                memberDiscount={filters.memberDiscount}
+                gridRef={gridRef}
+              />
+            )}
             <Pagination
               page={page}
               totalPages={Math.max(totalPages, showSpecBadges ? 21 : totalPages)}

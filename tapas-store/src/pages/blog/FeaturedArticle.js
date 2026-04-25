@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { JOURNAL_FEATURED, formatPublished } from '../../data/journalPosts';
+import { useJournalPosts } from '../../cms/hooks';
+import { adaptJournalPosts } from '../../cms/adapters';
 
 function renderTitle(parts) {
   return parts.map((p, i) => {
@@ -14,21 +16,25 @@ function renderTitle(parts) {
 }
 
 export default function FeaturedArticle() {
-  const a = JOURNAL_FEATURED;
+  const { data: rows } = useJournalPosts();
+  const adapted = adaptJournalPosts(rows || []);
+  const a = adapted.featured || JOURNAL_FEATURED;
+  if (!a) return null;
   const dateLabel = formatPublished(a.publishedAt).toUpperCase();
+  const role = a.author?.role;
   return (
     <Link to={`/blog/${a.slug}`} className="blog-featured">
       <div className="blog-featured-blob" aria-hidden="true" />
       <div className="blog-featured-kicker">
-        {a.kicker.toUpperCase()} · {dateLabel}
+        {(a.kicker || 'FEATURED').toUpperCase()}{dateLabel ? ` · ${dateLabel}` : ''}
       </div>
       <h2 className="blog-featured-title">{renderTitle(a.title)}</h2>
       <div className="blog-featured-author">
-        <span className="blog-avatar" aria-hidden="true">{a.author.initial}</span>
+        <span className="blog-avatar" aria-hidden="true">{a.author?.initial}</span>
         <div className="blog-featured-author-name">
-          {a.author.name}{' '}
+          {a.author?.name}{' '}
           <span className="dim">
-            · {a.author.role} · {a.readMinutes} min read
+            {role ? `· ${role} ` : ''}· {a.readMinutes} min read
           </span>
         </div>
       </div>

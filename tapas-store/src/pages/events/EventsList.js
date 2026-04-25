@@ -1,5 +1,7 @@
 import React from 'react';
 import { UPCOMING_EVENTS, BADGE, actionMessage } from '../../data/eventsData';
+import { useEvents } from '../../cms/hooks';
+import { splitEvents } from '../../cms/adapters';
 
 function EventCard({ event, focus, cardRef }) {
   const badge = BADGE[event.badge] || BADGE.weekly;
@@ -57,7 +59,10 @@ function EventCard({ event, focus, cardRef }) {
 export default function EventsList({
   category, focusSlug, listRef, cardRefs,
 }) {
-  const visible = UPCOMING_EVENTS.filter((e) =>
+  const { data: rows } = useEvents();
+  const upcoming = splitEvents(rows || []).upcoming;
+  const list = upcoming.length > 0 ? upcoming : UPCOMING_EVENTS;
+  const visible = list.filter((e) =>
     category === 'all' ? true : e.category === category,
   );
 

@@ -1,10 +1,14 @@
 import React from 'react';
 import { useCart } from '../../context/CartContext';
-import { SHOP_BOOKS, FEATURED_BOOK_ID, formatInr, MEMBER_DISCOUNT_RATE } from '../../data/shopBooks';
+import { formatInr, MEMBER_DISCOUNT_RATE } from '../../data/shopBooks';
+import { useShopBooks } from '../../cms/hooks';
+import { adaptShopBooks } from '../../cms/adapters';
 
 export default function FeaturedBook({ memberDiscount }) {
   const { addBook } = useCart();
-  const book = SHOP_BOOKS.find((b) => b.id === FEATURED_BOOK_ID);
+  const { data: rows } = useShopBooks();
+  const books = adaptShopBooks(rows);
+  const book = books.find((b) => b.isFeatured) || books[0];
   if (!book) return null;
 
   const effective = memberDiscount
@@ -28,9 +32,8 @@ export default function FeaturedBook({ memberDiscount }) {
           {book.title} <em>· {book.author}</em>
         </h2>
         <p className="shop-featured-body">
-          A diary-novel the size of a cathedral. Translator Sean Cotter
-          pulls off a small miracle. Our Slow Fiction Club is reading it
-          through June.
+          {book.description ||
+            'A diary-novel the size of a cathedral. Translator Sean Cotter pulls off a small miracle. Our Slow Fiction Club is reading it through June.'}
         </p>
         <button type="button" className="shop-featured-cta" onClick={onAdd}>
           <span className="shop-featured-cta-label">

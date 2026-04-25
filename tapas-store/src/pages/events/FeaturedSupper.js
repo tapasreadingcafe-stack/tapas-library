@@ -1,8 +1,11 @@
 import React from 'react';
 import { FEATURED_SUPPER, actionMessage } from '../../data/eventsData';
+import { useFeaturedSupper } from '../../cms/hooks';
+import { adaptFeaturedSupper } from '../../cms/adapters';
 
 export default function FeaturedSupper() {
-  const s = FEATURED_SUPPER;
+  const { data: row } = useFeaturedSupper();
+  const s = adaptFeaturedSupper(row) || FEATURED_SUPPER;
   const onReserve = () => {
     // TODO: wire to a real booking endpoint.
     // eslint-disable-next-line no-console
