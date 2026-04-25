@@ -23,7 +23,7 @@ import {
   useHomeTestimonials,
 } from '../cms/hooks';
 import { adaptShopBooks, splitEvents } from '../cms/adapters';
-import { formatInr, MEMBER_DISCOUNT_RATE } from '../data/shopBooks';
+import { MEMBER_DISCOUNT_RATE } from '../data/shopBooks';
 import DispatchNewsletter from '../pages/blog/DispatchNewsletter';
 
 // --- styles -----------------------------------------------------------
