@@ -184,6 +184,20 @@ export async function fetchJournalPosts() {
 }
 
 // ---------------------------------------------------------------------
+// home_testimonials (single-quote pull on the home page)
+// ---------------------------------------------------------------------
+export async function fetchHomeTestimonials() {
+  return cached('home_testimonials', async () => {
+    const { data, error } = await supabase
+      .from('home_testimonials')
+      .select('*')
+      .order('sort_order');
+    if (error) throw error;
+    return data || [];
+  });
+}
+
+// ---------------------------------------------------------------------
 // about_*  —  one round-trip via Promise.all
 // ---------------------------------------------------------------------
 export async function fetchAbout() {

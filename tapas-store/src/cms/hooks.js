@@ -38,3 +38,4 @@ export function useHours()           { return useFetch(() => cms.fetchHours()); 
 export function useFaqs()            { return useFetch(() => cms.fetchFaqs()); }
 export function useJournalPosts()    { return useFetch(() => cms.fetchJournalPosts()); }
 export function useAbout()           { return useFetch(() => cms.fetchAbout()); }
+export function useHomeTestimonials(){ return useFetch(() => cms.fetchHomeTestimonials()); }

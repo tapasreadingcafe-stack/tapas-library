@@ -318,7 +318,7 @@ function parseReturnDate(md) {
   // (Above block already populated pendingStats.library)
   sql.push('-- pages');
   const pageSeeds = [
-    { slug: 'home',    title: 'Home',         hero_kicker: 'Welcome to Tapas',     hero_heading_html: 'Where Stories Begin &amp; Families Connect', hero_lede: 'A cozy reading space for kids and parents — discover books, enjoy simple treats, and build a love for reading together.' },
+    { slug: 'home',    title: 'Home',         hero_kicker: 'WELCOME TO TAPAS',     hero_heading_html: 'Where Stories Begin & Families Connect',    hero_lede: 'A cozy reading space for kids and parents — discover books, enjoy simple treats, and build a love for reading together.' },
     { slug: 'shop',    title: 'Shop',         hero_kicker: 'The Shop',             hero_heading_html: 'Books we keep <em>pressing</em> into people’s hands.', hero_lede: 'A considered shelf of new releases, small presses, and staff favorites. Free shipping over ₹999.' },
     { slug: 'library', title: 'Library',      hero_kicker: 'The Lending Library',          hero_heading_html: 'Over <em>2,400 books</em>,<br />free to borrow.', hero_lede: 'Take two home at a time. Three weeks to return. No late fees, no paperwork.' },
     { slug: 'blog',    title: 'The Journal',  hero_kicker: 'The Journal',          hero_heading_html: 'Notes from the <em>reading room.</em>', hero_lede: 'Essays, marginalia, and conversations. Posted slowly, always from inside the cafe.' },
