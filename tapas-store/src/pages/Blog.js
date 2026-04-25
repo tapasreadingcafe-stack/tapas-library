@@ -46,7 +46,7 @@ export default function Blog() {
 
   const { data: rows } = useJournalPosts();
   const adapted = useMemo(() => adaptJournalPosts(rows || []), [rows]);
-  const archive = adapted?.archive || [];
+  const archive = useMemo(() => adapted?.archive || [], [adapted]);
 
   const filtered = useMemo(
     () => filterArticles(archive, category, debouncedQuery),
