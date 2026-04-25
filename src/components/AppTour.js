@@ -48,7 +48,6 @@ const TOUR_SECTIONS = [
   ]},
   { section: 'Online Store', icon: '🛒', steps: [
     { path: '/store/orders', target: null, title: 'Online Orders', desc: 'View and manage orders placed through your online store. Track order status and fulfillment.' },
-    { path: '/store/content', target: null, title: 'Website Editor', desc: 'Design your public-facing website content. Control what visitors see on your library site.' },
   ]},
   { section: 'Marketing', icon: '📣', steps: [
     { path: '/marketing-dashboard', target: null, title: 'Marketing Overview', desc: 'Dashboard showing campaign performance, member engagement, promo code usage, and growth metrics.' },

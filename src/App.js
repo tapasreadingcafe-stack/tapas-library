@@ -104,7 +104,39 @@ const KioskMode             = lazyWithRetry(() => import('./pages/KioskMode'));
 
 // ── Lazy-loaded pages (New - Phase 5: Online Store) ─────────────────────────
 const CustomerOrders        = lazyWithRetry(() => import('./pages/CustomerOrders'));
-const WebsiteEditor         = lazyWithRetry(() => import('./pages/WebsiteEditor'));
+// WebsiteEditor (v2 block-tree, lives at src/pages/WebsiteEditor.js)
+// is no longer reachable from the UI — the entry point is blocked
+// while the CMS migration replaces it. Source kept intact so the
+// migration can lift fragments out as needed.
+// Inline placeholder shown at /store/content-v2 while the v2 block-tree
+// editor is being replaced by the new CMS.
+function WebsiteEditorRebuilding() {
+  return (
+    <div style={{
+      maxWidth: 640, margin: '120px auto', padding: '40px 32px',
+      background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+      borderRadius: 14, boxShadow: '0 8px 24px rgba(0,0,0,0.05)',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+    }}>
+      <div style={{ fontSize: 32, marginBottom: 16 }}>🏗️</div>
+      <h1 style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 600 }}>
+        Website Editor is being rebuilt
+      </h1>
+      <p style={{ margin: '0 0 16px', lineHeight: 1.55, color: '#444' }}>
+        The block-tree editor that used to live here is being replaced as
+        part of the CMS migration. Anything you edit on this screen will
+        <strong> not </strong>appear on the live site.
+      </p>
+      <p style={{ margin: 0, lineHeight: 1.55, color: '#444' }}>
+        For now, edit copy via{' '}
+        <a href="/site-content" style={{ color: '#006a6a', fontWeight: 500 }}>
+          Site Content
+        </a>
+        . The new editor will land alongside the typed content tables.
+      </p>
+    </div>
+  );
+}
 const ContactInbox          = lazyWithRetry(() => import('./pages/ContactInbox'));
 const NewsletterInbox       = lazyWithRetry(() => import('./pages/NewsletterInbox'));
 const StoreAnalytics        = lazyWithRetry(() => import('./pages/StoreAnalytics'));
@@ -271,7 +303,10 @@ const NAV_CONFIG = [
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
       { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
       { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
-      { to: '/store/content-v2', icon: '🎨', label: 'Website Editor' },
+      // Website Editor (v2 block-tree) is being rebuilt as part of the
+      // CMS migration. Hidden from the sidebar so staff don't reach a
+      // dead editor; the route still resolves so existing bookmarks
+      // open the rebuilt-banner page.
     ],
   },
   {
@@ -768,7 +803,7 @@ function DashboardShell() {
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/commerce-insights"                  element={<CommerceInsights />} />
             <Route path="/store/content"                      element={<Navigate to="/store/content-v2" replace />} />
-            <Route path="/store/content-v2"                   element={<WebsiteEditor />} />
+            <Route path="/store/content-v2"                   element={<WebsiteEditorRebuilding />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
             {/* Marketing */}

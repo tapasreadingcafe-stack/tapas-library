@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useSiteContent, useV2Content } from '../context/SiteContent';
+import { useSiteContent } from '../context/SiteContent';
 import PageRenderer from '../blocks/PageRenderer';
 import LandingHero from '../components/LandingHero';
-import { findPageByPath, findV2PageByPath } from '../utils/findPage';
+import { findPageByPath } from '../utils/findPage';
 
 // =====================================================================
 // Home — Tapas reading cafe landing page (Figma conversion).
@@ -399,28 +399,19 @@ function LegacyHome() {
 }
 
 // Public Home — always open with the split-layout LandingHero, then
-// delegate the rest of the page to the v2 tree (or the legacy React
-// sections when v2 is off).
+// render the legacy React sections (or a custom block tree if the
+// dashboard editor has stored one for the home page).
 export default function Home() {
   const content = useSiteContent();
-  const v2 = useV2Content();
 
-  let body = null;
-  if (v2?.enabled && v2.loaded) {
-    const v2Key = findV2PageByPath(v2?.content?.pages, '/');
-    if (v2Key) body = <PageRenderer pageKey={v2Key} />;
-  }
-  if (!body) {
-    const matchKey = findPageByPath(content?.pages, '/');
-    if (matchKey) {
-      const blocks = content.pages[matchKey].blocks;
-      if (Array.isArray(blocks) && blocks.length > 0) {
-        body = <PageRenderer pageKey={matchKey} />;
-      } else if (matchKey === 'home') {
-        body = <LegacyHome />;
-      }
-    } else {
-      body = <LegacyHome />;
+  let body = <LegacyHome />;
+  const matchKey = findPageByPath(content?.pages, '/');
+  if (matchKey) {
+    const blocks = content.pages[matchKey].blocks;
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      body = <PageRenderer pageKey={matchKey} />;
+    } else if (matchKey !== 'home') {
+      body = null;
     }
   }
 

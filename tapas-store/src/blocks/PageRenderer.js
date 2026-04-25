@@ -14,11 +14,9 @@
 // =====================================================================
 
 import React from 'react';
-import { useSiteContent, useV2Content } from '../context/SiteContent';
+import { useSiteContent } from '../context/SiteContent';
 import { supabase } from '../utils/supabase';
 import { BLOCK_REGISTRY } from './index';
-import { Node as V2Node } from './Node';
-import { compileClassesToCSS } from './compileClassesToCSS';
 
 // ---------------------------------------------------------------------
 // Phase 7: A/B testing. Blocks with an `ab_variant` prop (values 'A' or
@@ -489,7 +487,6 @@ function EmptyPageState({ pageKey, allHidden }) {
 
 export default function PageRenderer({ pageKey, fallback = null }) {
   const content = useSiteContent();
-  const v2 = useV2Content();
   const page = content?.pages?.[pageKey];
   const blocks = Array.isArray(page?.blocks) ? page.blocks : [];
   const editorMode = isEditorMode();
@@ -499,34 +496,7 @@ export default function PageRenderer({ pageKey, fallback = null }) {
     clearAbImpressions();
   }, [pageKey]);
 
-  // ----- Phase 10: v2 cutover branch -------------------------------
-  // If the flag is enabled AND the v2 blob has a tree for this page,
-  // render via primitive Node renderer instead of the block registry.
-  // While v2 is still loading (loaded === false) we render nothing so
-  // there's no flash of the v1 path right before swapping.
-  const v2Page = v2?.content?.pages?.[pageKey];
-  const v2Tree = v2Page?.tree;
-  const v2Meta = v2Page?.meta;
-  // v2 takes over only when there's real content for this page. An
-  // empty <body> in the migrated blob (e.g. pages never touched in v2)
-  // falls through to v1 so nothing goes dark during incremental cutover.
-  const v2HasContent = !!(v2Tree && Array.isArray(v2Tree.children) && v2Tree.children.length > 0);
-  usePageMeta(v2?.enabled && v2HasContent && v2Meta ? v2Meta : page?.meta);
-  if (v2?.enabled && v2.loaded && v2HasContent) {
-    const css = compileClassesToCSS(v2?.content?.classes || {});
-    return (
-      <>
-        <style>{css}</style>
-        <V2Node node={v2Tree} />
-      </>
-    );
-  }
-  if (v2?.enabled && !v2.loaded) {
-    // Flag says v2 but blob not here yet — avoid painting v1 then
-    // snapping to v2. One frame of blank is kinder than a flash.
-    return null;
-  }
-  // ----- v1 path (unchanged) --------------------------------------
+  usePageMeta(page?.meta);
   // Apply SEO meta even when the page falls back to legacy JSX — the
   // meta fields should take effect regardless of whether blocks are
   // rendered.
