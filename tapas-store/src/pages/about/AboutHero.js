@@ -10,8 +10,32 @@ export default function AboutHero() {
     <section className="ab-hero" aria-labelledby="ab-hero-h1">
       <div className="ab-hero-inner">
         <div>
-          <div className="ab-hero-kicker" aria-hidden="true">
-            <span className="ab-hero-dot" />
+          <div
+            className="ab-hero-kicker"
+            aria-hidden="true"
+            style={{
+              fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+              fontSize: '12px',
+              fontWeight: 400,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: '#3a3a3a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginBottom: '14px',
+            }}
+          >
+            <span
+              className="ab-hero-dot"
+              style={{
+                display: 'inline-block',
+                width: '8px',
+                height: '8px',
+                borderRadius: '999px',
+                background: '#E0004F',
+              }}
+            />
             {kicker}
           </div>
           <h1
