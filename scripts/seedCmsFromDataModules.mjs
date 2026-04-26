@@ -348,7 +348,7 @@ function parseReturnDate(md) {
   sql.push('');
 }
 
-// ---------- tapas_events + clubs + featured_supper ----------
+// ---------- events (unified table — see 20260426_unify_events.sql) ----------
 {
   const m = loadDataModule('eventsData.js');
   const upcoming = m.UPCOMING_EVENTS || [];
@@ -360,9 +360,9 @@ function parseReturnDate(md) {
   // that point at an upcoming card (targetSlug match).
   const upcomingSlugs = new Set(upcoming.map((u) => u.slug));
 
-  sql.push('-- tapas_events: full upcoming cards (5 of these in seed)');
+  sql.push('-- events: full upcoming cards (5 of these in seed)');
   upcoming.forEach((e, i) => {
-    sql.push(`insert into public.tapas_events (slug, title, italic_accent, description, event_date, category, badge, cta_type, chip_color, sort_order, status) values (`
+    sql.push(`insert into public.events (slug, title, italic_accent, description, start_date, category, badge, cta_type, chip_color, sort_order, status) values (`
       + [
         sqlString(e.slug),
         sqlString(e.title),
@@ -374,20 +374,20 @@ function parseReturnDate(md) {
         sqlString(normalizeCta(e.cta?.action)),
         sqlString(normalizeChipColor(chipColorForCategory(e.category))),
         sqlInt(i),
-        `'published'`,
+        `'upcoming'`,
       ].join(', ')
       + `) on conflict (slug) do update set `
       + `title=excluded.title, italic_accent=excluded.italic_accent, description=excluded.description, `
-      + `event_date=excluded.event_date, category=excluded.category, badge=excluded.badge, `
+      + `start_date=excluded.start_date, category=excluded.category, badge=excluded.badge, `
       + `cta_type=excluded.cta_type, chip_color=excluded.chip_color, sort_order=excluded.sort_order;`);
   });
 
-  sql.push('-- tapas_events: calendar-only stubs (no description)');
+  sql.push('-- events: calendar-only stubs (no description)');
   let stubCount = 0;
   calendar.forEach((c, i) => {
     if (c.targetSlug && upcomingSlugs.has(c.targetSlug)) return; // skip duplicates
     const slug = c.targetSlug || `cal-${c.date}-${slugify(c.label)}`;
-    sql.push(`insert into public.tapas_events (slug, title, event_date, category, chip_color, sort_order, status) values (`
+    sql.push(`insert into public.events (slug, title, start_date, category, chip_color, sort_order, status) values (`
       + [
         sqlString(slug),
         sqlString(c.label),
@@ -395,14 +395,14 @@ function parseReturnDate(md) {
         sqlString(c.category),
         sqlString(normalizeChipColor(c.chip)),
         sqlInt(100 + i),
-        `'published'`,
+        `'upcoming'`,
       ].join(', ')
       + `) on conflict (slug) do update set `
-      + `title=excluded.title, event_date=excluded.event_date, category=excluded.category, `
+      + `title=excluded.title, start_date=excluded.start_date, category=excluded.category, `
       + `chip_color=excluded.chip_color, sort_order=excluded.sort_order;`);
     stubCount++;
   });
-  track('tapas_events', upcoming.length + stubCount);
+  track('events', upcoming.length + stubCount);
   sql.push('');
 
   sql.push('-- clubs');

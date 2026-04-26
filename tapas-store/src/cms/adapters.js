@@ -84,10 +84,11 @@ export function adaptLibraryShelf(shelf, idx = 0) {
 }
 export function adaptLibraryShelves(rows) { return (rows || []).map(adaptLibraryShelf); }
 
-// tapas_events → events page component shape.
+// events → events page component shape.
 // "Full" cards (those with a description) become UPCOMING_EVENTS-shaped;
 // minimal calendar stubs become CALENDAR_EVENTS-shaped. Both come back
-// from the same DB table.
+// from the same DB table — the dashboard's `events` table after the
+// 20260426_unify_events migration folded tapas_events into it.
 const BADGE_LABEL = {
   weekly:        'WEEKLY',
   monthly:       'MONTHLY',
@@ -123,11 +124,14 @@ export function splitEvents(rows) {
   const upcoming = [];
   const calendar = [];
   (rows || []).forEach((e) => {
+    // events.start_date is the canonical date column; legacy seed/data
+    // may still carry event_date — accept either.
+    const date = e.start_date || e.event_date;
     if (e.description) {
-      const { month, day } = isoToMonthDay(e.event_date);
+      const { month, day } = isoToMonthDay(date);
       upcoming.push({
         slug: e.slug,
-        dateMonth: month, dateDay: day, iso: e.event_date,
+        dateMonth: month, dateDay: day, iso: date,
         title: e.title,
         italic: e.italic_accent || '',
         description: e.description,
@@ -142,11 +146,11 @@ export function splitEvents(rows) {
       });
     } else {
       calendar.push({
-        date: e.event_date,
+        date,
         label: e.title,
         chip: CHIP_TO_DISPLAY[e.chip_color] || e.chip_color,
         category: e.category,
-        targetSlug: e.slug.startsWith('cal-') ? null : e.slug,
+        targetSlug: e.slug && e.slug.startsWith('cal-') ? null : e.slug,
       });
     }
   });

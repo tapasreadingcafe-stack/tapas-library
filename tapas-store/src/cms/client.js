@@ -98,17 +98,21 @@ export async function fetchLibraryShelves() {
 }
 
 // ---------------------------------------------------------------------
-// tapas_events  +  clubs  +  featured_supper  (events page)
+// events  +  clubs  +  featured_supper  (events page)
+//
+// Note: events deliberately bypasses the `cached()` wrapper so that
+// dashboard edits show on the very next page load with no 60s lag —
+// the customer site treats the dashboard as the source of truth.
 // ---------------------------------------------------------------------
 export async function fetchEvents() {
-  return cached('tapas_events', async () => {
-    const { data, error } = await supabase
-      .from('tapas_events')
-      .select('*')
-      .order('event_date');
-    if (error) throw error;
-    return data || [];
-  });
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('status', 'upcoming')
+    .order('start_date', { ascending: true })
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
 export async function fetchClubs() {
