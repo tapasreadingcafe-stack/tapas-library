@@ -10,9 +10,33 @@ export default function HeroBand() {
     <section className="shop-hero-band" aria-labelledby="shop-hero-h1">
       <div className="shop-hero-wrap">
         <div className="shop-hero-left">
-          <div className="shop-hero-kicker" aria-hidden="true">
-            <span className="shop-hero-dot" />
-            {kicker}
+          <div
+            className="shop-hero-kicker"
+            aria-hidden="true"
+            style={{
+              fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+              fontSize: '12px',
+              fontWeight: 400,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: '#3a3a3a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginBottom: '14px',
+            }}
+          >
+            <span
+              className="shop-hero-dot"
+              style={{
+                display: 'inline-block',
+                width: '8px',
+                height: '8px',
+                borderRadius: '999px',
+                background: '#E0004F',
+              }}
+            />
+            {String(kicker).toUpperCase()}
           </div>
           <h1
             id="shop-hero-h1"
