@@ -21,10 +21,16 @@ const PAGE_SIZE = 12;
 // count (books flagged newThisWeek) otherwise.
 const DEFAULT_FILTERS = {
   search: '',
-  categories: ['Fiction', 'Translation'],
-  format: 'Paperback',
+  // Open defaults: show every book by default. The previous defaults
+  // pre-checked specific categories/format/clubs that matched the
+  // hardcoded seed data — after the dashboard-driven unify_books
+  // migration, those filters silently hid everything because dashboard
+  // books carry only a single free-form category and no format/clubs
+  // metadata. Visitors filter from "everything" instead.
+  categories: [],
+  format: '',
   priceMax: SHOP_PRICE_MAX,
-  club: 'Slow Fiction',
+  club: '',
   inStockOnly: false,
   signedOnly: false,
   memberDiscount: true,
