@@ -36,10 +36,16 @@ export default function BookCard({ book, memberDiscount }) {
         {fav ? '\u2665' : '\u2661'}
       </button>
 
-      <div className={`shop-cover c-${book.coverVariant}`} aria-hidden="true">
-        <div className="shop-cover-title">{book.coverLabel}</div>
-        <div className="shop-cover-author">{book.author}</div>
-      </div>
+      {book.coverUrl ? (
+        <div className="shop-cover shop-cover-photo" aria-hidden="true">
+          <img src={book.coverUrl} alt="" loading="lazy" />
+        </div>
+      ) : (
+        <div className={`shop-cover c-${book.coverVariant}`} aria-hidden="true">
+          <div className="shop-cover-title">{book.coverLabel}</div>
+          <div className="shop-cover-author">{book.author}</div>
+        </div>
+      )}
 
       <div className="shop-card-meta">
         <div className="shop-card-title">{book.title}</div>

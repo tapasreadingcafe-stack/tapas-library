@@ -26,7 +26,7 @@ export default function Pagination({ page, totalPages, onChange }) {
         disabled={page === 1}
         onClick={() => onChange(Math.max(1, page - 1))}
         aria-label="Previous page"
-      >\u2039</button>
+      >‹</button>
       {window.map((p, idx) => {
         if (p === 'gap-l' || p === 'gap-r') {
           return <span key={`${p}-${idx}`} className="shop-pag-gap" aria-hidden="true">…</span>;
@@ -48,7 +48,7 @@ export default function Pagination({ page, totalPages, onChange }) {
         disabled={page === totalPages}
         onClick={() => onChange(Math.min(totalPages, page + 1))}
         aria-label="Next page"
-      >\u203A</button>
+      >›</button>
     </nav>
   );
 }

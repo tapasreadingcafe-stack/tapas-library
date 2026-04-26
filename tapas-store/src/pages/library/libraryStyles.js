@@ -365,6 +365,17 @@ const LIBRARY_CSS = `
   color: #fff;
   box-shadow: 0 10px 30px -18px rgba(0,0,0,0.4);
 }
+/* Photo cover (uploaded book_image from dashboard). */
+.library-cover-photo {
+  padding: 0;
+  background: #f0ebe1;
+}
+.library-cover-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .library-cover-title {
   font-family: var(--lib-f-display);
   font-weight: 400;

@@ -49,10 +49,16 @@ export default function FeaturedBook({ memberDiscount }) {
       </div>
 
       <div className="shop-featured-cover-wrap">
-        <div className={`shop-featured-cover c-${book.coverVariant}`} aria-hidden="true">
-          <div className="shop-featured-cover-title">{book.coverLabel}</div>
-          <div className="shop-featured-cover-author">{book.author}</div>
-        </div>
+        {book.coverUrl ? (
+          <div className="shop-featured-cover shop-cover-photo" aria-hidden="true">
+            <img src={book.coverUrl} alt="" loading="lazy" />
+          </div>
+        ) : (
+          <div className={`shop-featured-cover c-${book.coverVariant}`} aria-hidden="true">
+            <div className="shop-featured-cover-title">{book.coverLabel}</div>
+            <div className="shop-featured-cover-author">{book.author}</div>
+          </div>
+        )}
       </div>
     </section>
   );

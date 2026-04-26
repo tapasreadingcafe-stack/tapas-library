@@ -13,10 +13,16 @@ export default function LibraryBookCard({ book, onReserve }) {
       onClick={() => onReserve(book)}
       aria-label={`Reserve ${book.title} by ${book.author}, ${statusLabel}`}
     >
-      <div className={`library-cover c-${book.cover}`} aria-hidden="true">
-        <div className="library-cover-title">{book.title}</div>
-        <div className="library-cover-author">{book.author.toUpperCase()}</div>
-      </div>
+      {book.coverUrl ? (
+        <div className="library-cover library-cover-photo" aria-hidden="true">
+          <img src={book.coverUrl} alt="" loading="lazy" />
+        </div>
+      ) : (
+        <div className={`library-cover c-${book.cover}`} aria-hidden="true">
+          <div className="library-cover-title">{book.title}</div>
+          <div className="library-cover-author">{book.author.toUpperCase()}</div>
+        </div>
+      )}
       <div className={`library-status ${isOut ? 'is-out' : 'is-available'}`}>
         <span className="library-status-dot" />
         {statusLabel}

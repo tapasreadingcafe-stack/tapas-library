@@ -134,6 +134,9 @@ const HOME_SECTIONS_CSS = `
   .hs-cover.c-taupe  { background: linear-gradient(155deg, #5b4d3d 0%, #2e251c 100%); }
   .hs-cover.c-cream  { background: linear-gradient(155deg, #e8dfcb 0%, #c5b89c 100%); }
   .hs-cover.c-cream .title-line, .hs-cover.c-cream .author-line { color: var(--hs-ink); }
+  /* Photo cover (uploaded book_image from dashboard). */
+  .hs-cover.hs-cover-photo { background: #f0ebe1; padding: 0; }
+  .hs-cover-photo img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 12px; }
 
   .hs-book-card .name { font-family: var(--hs-display); font-weight: 700; font-size: 18px; line-height: 1.15; }
   .hs-book-card .author { font-size: 13px; color: var(--hs-muted); margin-top: 2px; }
@@ -440,10 +443,16 @@ function NewArrivalsSection() {
         <div className="hs-arrivals">
           {books.map((b) => (
             <Link to="/shop" key={b.id} className="hs-book-card">
-              <div className={`hs-cover c-${b.coverVariant}`}>
-                <div className="title-line">{b.title}</div>
-                <div className="author-line">{b.author}</div>
-              </div>
+              {b.coverUrl ? (
+                <div className="hs-cover hs-cover-photo">
+                  <img src={b.coverUrl} alt="" loading="lazy" />
+                </div>
+              ) : (
+                <div className={`hs-cover c-${b.coverVariant}`}>
+                  <div className="title-line">{b.title}</div>
+                  <div className="author-line">{b.author}</div>
+                </div>
+              )}
               <div>
                 <div className="name">{b.title}</div>
                 <div className="author">{b.author}</div>
