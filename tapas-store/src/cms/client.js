@@ -63,38 +63,45 @@ export async function fetchPage(slug) {
 }
 
 // ---------------------------------------------------------------------
-// shop_books
+// shop  —  reads from the unified `books` table (post 20260427_unify_books)
+// where store_visible=true. Bypasses cache so dashboard edits show on
+// the next page load (mirrors events).
 // ---------------------------------------------------------------------
 export async function fetchShopBooks() {
-  return cached('shop_books', async () => {
-    const { data, error } = await supabase
-      .from('shop_books')
-      .select('*')
-      .order('sort_order');
-    if (error) throw error;
-    return data || [];
-  });
+  const { data, error } = await supabase
+    .from('books')
+    .select('*')
+    .eq('status', 'published')
+    .eq('store_visible', true)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
 // ---------------------------------------------------------------------
-// library_shelves with their books nested. One round-trip for the
-// whole page.
+// library_shelves with their borrowable books nested. Books come from
+// the unified `books` table where is_borrowable=true and shelf_id is
+// set. Bypasses cache so dashboard edits show immediately.
 // ---------------------------------------------------------------------
 export async function fetchLibraryShelves() {
-  return cached('library_shelves+books', async () => {
-    const [{ data: shelves, error: e1 }, { data: books, error: e2 }] = await Promise.all([
-      supabase.from('library_shelves').select('*').order('sort_order'),
-      supabase.from('library_books').select('*').order('sort_order'),
-    ]);
-    if (e1) throw e1;
-    if (e2) throw e2;
-    const byShelf = new Map();
-    (books || []).forEach((b) => {
-      if (!byShelf.has(b.shelf_id)) byShelf.set(b.shelf_id, []);
-      byShelf.get(b.shelf_id).push(b);
-    });
-    return (shelves || []).map((s) => ({ ...s, books: byShelf.get(s.id) || [] }));
+  const [{ data: shelves, error: e1 }, { data: books, error: e2 }] = await Promise.all([
+    supabase.from('library_shelves').select('*').order('sort_order'),
+    supabase
+      .from('books')
+      .select('*')
+      .eq('status', 'published')
+      .eq('is_borrowable', true)
+      .not('shelf_id', 'is', null)
+      .order('sort_order', { ascending: true }),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  const byShelf = new Map();
+  (books || []).forEach((b) => {
+    if (!byShelf.has(b.shelf_id)) byShelf.set(b.shelf_id, []);
+    byShelf.get(b.shelf_id).push(b);
   });
+  return (shelves || []).map((s) => ({ ...s, books: byShelf.get(s.id) || [] }));
 }
 
 // ---------------------------------------------------------------------

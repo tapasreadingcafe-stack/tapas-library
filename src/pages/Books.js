@@ -75,9 +75,19 @@ export default function Books() {
     is_borrowable: true,
     is_staff_pick: false,
     staff_pick_blurb: '',
+    // Storefront display
+    slug: '',
+    shelf_id: '',  // empty string = unset; required when is_borrowable=true
   };
 
   const [formData, setFormData] = useState(emptyForm);
+  const [shelves, setShelves] = useState([]);
+
+  useEffect(() => {
+    supabase.from('library_shelves').select('id, name, slug').order('sort_order').then(({ data }) => {
+      setShelves(data || []);
+    });
+  }, []);
 
   // Run probe + categories only once on mount
   useEffect(() => {
@@ -100,7 +110,7 @@ export default function Books() {
     try {
       let query = supabase
         .from('books')
-        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb')
+        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -273,6 +283,13 @@ export default function Books() {
 
   const handleAddBook = async (e) => {
     e.preventDefault();
+
+    // Library books need a shelf so the storefront can group them.
+    if (formData.is_borrowable && !formData.shelf_id) {
+      toast.warning('Pick a library shelf for borrowable books, or uncheck "Part of lending library".');
+      return;
+    }
+
     try {
       const payload = { ...formData };
       if (!hasCondition) delete payload.condition;
@@ -285,6 +302,15 @@ export default function Books() {
       payload.sales_price = parseFloat(payload.sales_price) || 0;
       payload.mrp = parseFloat(payload.mrp) || 0;
       payload.discount_percent = parseFloat(payload.discount_percent) || 0;
+
+      // Storefront fields: slug must be unique; null shelf_id when not borrowable.
+      const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+      if (!payload.slug) {
+        payload.slug = `${slugify(payload.title || 'book')}-${Date.now().toString(36)}`;
+      }
+      if (!payload.shelf_id) payload.shelf_id = null;
+      // Mirror book_image into cover_url so the storefront can render it directly.
+      if (payload.book_image && !payload.cover_url) payload.cover_url = payload.book_image;
 
       const copyCount = parseInt(payload.quantity_total) || 1;
 
@@ -751,6 +777,28 @@ export default function Books() {
                   />
                   <span><strong>Part of lending library</strong> — members can borrow this book (uncheck for bookstore-only stock)</span>
                 </label>
+
+                {formData.is_borrowable !== false && (
+                  <div style={{ marginLeft: '28px', marginBottom: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#5a67d8', marginBottom: '4px' }}>
+                      📚 Library shelf <span style={{ color: '#c0392b' }}>*</span>
+                    </label>
+                    <select
+                      value={formData.shelf_id || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, shelf_id: e.target.value }))}
+                      style={{ width: '100%', maxWidth: '320px', padding: '8px 10px', border: '1px solid #c0c8f5', borderRadius: '4px', fontSize: '14px', background: 'white' }}
+                      disabled={isReadOnly}
+                    >
+                      <option value="">— pick a shelf —</option>
+                      {shelves.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                      Required so the book appears under the right group on the website /library page.
+                    </div>
+                  </div>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', cursor: 'pointer', fontSize: '14px' }}>
                   <input
                     type="checkbox"

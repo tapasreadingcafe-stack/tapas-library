@@ -194,36 +194,35 @@ function track(table, n) {
   counts[table] = (counts[table] || 0) + n;
 }
 
-// ---------- shop_books ----------
+// ---------- books (sale-only seed — see 20260427_unify_books.sql) ----------
 {
   const m = loadDataModule('shopBooks.js');
   const books = m.SHOP_BOOKS || [];
   const featuredId = m.FEATURED_BOOK_ID;
-  sql.push('-- shop_books');
+  sql.push('-- books (sale-side: store_visible=true)');
   books.forEach((b, i) => {
-    sql.push(`insert into public.shop_books (slug, title, author, cover_color, price_inr, categories, clubs, format, in_stock, signed, is_featured, sort_order, status) values (`
+    sql.push(`insert into public.books (slug, title, author, cover_color, price, sales_price, store_visible, is_borrowable, is_staff_pick, sort_order, status, quantity_total, quantity_available) values (`
       + [
         sqlString(b.id),
         sqlString(b.title),
         sqlString(b.author),
-        sqlString(b.coverVariant),
+        sqlString(b.coverVariant || 'taupe'),
         sqlInt(b.price),
-        sqlTextArray(b.categories || []),
-        sqlTextArray(b.clubs || []),
-        sqlString(b.format),
-        sqlBool(b.inStock),
-        sqlBool(b.signed),
+        sqlInt(b.price),
+        `true`,
+        `false`,
         sqlBool(b.id === featuredId),
         sqlInt(i),
         `'published'`,
+        b.inStock ? '1' : '0',
+        b.inStock ? '1' : '0',
       ].join(', ')
       + `) on conflict (slug) do update set `
       + `title=excluded.title, author=excluded.author, cover_color=excluded.cover_color, `
-      + `price_inr=excluded.price_inr, categories=excluded.categories, clubs=excluded.clubs, `
-      + `format=excluded.format, in_stock=excluded.in_stock, signed=excluded.signed, `
-      + `is_featured=excluded.is_featured, sort_order=excluded.sort_order;`);
+      + `price=excluded.price, sales_price=excluded.sales_price, store_visible=true, `
+      + `is_staff_pick=excluded.is_staff_pick, sort_order=excluded.sort_order;`);
   });
-  track('shop_books', books.length);
+  track('books (sale)', books.length);
   sql.push('');
 }
 
@@ -256,36 +255,35 @@ function track(table, n) {
   track('library_shelves', shelves.length);
   sql.push('');
 
-  sql.push('-- library_books');
+  sql.push('-- books (borrow-side: is_borrowable=true, shelf_id set)');
   let bookSort = 0;
   let totalBooks = 0;
   shelves.forEach((shelf) => {
     const books = shelf.books || [];
-    books.forEach((book, idx) => {
-      const av = book.status?.kind === 'out' ? 'out' : 'available';
-      const returnDate = book.status?.kind === 'out' && book.status.returnDate
-        ? parseReturnDate(book.status.returnDate) : null;
-      sql.push(`insert into public.library_books (shelf_id, slug, title, author, cover_color, availability_status, return_date, categories, sort_order, status) values (`
+    books.forEach((book) => {
+      const isOut = book.status?.kind === 'out';
+      sql.push(`insert into public.books (slug, title, author, cover_color, shelf_id, store_visible, is_borrowable, quantity_total, quantity_available, sort_order, status) values (`
         + [
-          `(select id from public.library_shelves where slug=${sqlString(shelf.id)})`,
           sqlString(book.id || slugify(book.title)),
           sqlString(book.title),
           sqlString(book.author),
-          sqlString(book.coverVariant || 'cream'),
-          sqlString(av),
-          sqlDate(returnDate),
-          sqlTextArray(book.categories || []),
+          sqlString(book.coverVariant || 'taupe'),
+          `(select id from public.library_shelves where slug=${sqlString(shelf.id)})`,
+          `false`,
+          `true`,
+          `1`,
+          isOut ? '0' : '1',
           sqlInt(bookSort++),
           `'published'`,
         ].join(', ')
-        + `) on conflict (shelf_id, slug) do update set `
+        + `) on conflict (slug) do update set `
         + `title=excluded.title, author=excluded.author, cover_color=excluded.cover_color, `
-        + `availability_status=excluded.availability_status, return_date=excluded.return_date, `
-        + `categories=excluded.categories, sort_order=excluded.sort_order;`);
+        + `shelf_id=excluded.shelf_id, is_borrowable=true, `
+        + `quantity_available=excluded.quantity_available, sort_order=excluded.sort_order;`);
       totalBooks++;
     });
   });
-  track('library_books', totalBooks);
+  track('books (borrow)', totalBooks);
   sql.push('');
 
   // pages.library.stats_jsonb — page-level numbers (titles/onLoan/etc).
