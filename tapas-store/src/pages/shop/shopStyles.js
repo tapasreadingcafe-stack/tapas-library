@@ -50,14 +50,14 @@ const SHOP_CSS = `
 .shop-hero-_placeholder
 
 .shop-hero-kicker {
-  font-family: var(--shop-f-mono);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--shop-f-mono) !important;
+  font-size: 12px !important;
+  letter-spacing: 0.32em !important;
+  text-transform: uppercase !important;
   color: var(--shop-ink-2);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 14px;
 }
 .shop-hero-dot {
