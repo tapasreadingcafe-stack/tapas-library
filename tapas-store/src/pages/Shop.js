@@ -36,22 +36,6 @@ const DEFAULT_FILTERS = {
   memberDiscount: true,
 };
 
-const SPEC_BADGES = { total: 242, newThisWeek: 32 };
-
-function filtersAreDefault(f) {
-  return (
-    f.search === DEFAULT_FILTERS.search
-    && f.format === DEFAULT_FILTERS.format
-    && f.priceMax === DEFAULT_FILTERS.priceMax
-    && f.club === DEFAULT_FILTERS.club
-    && f.inStockOnly === DEFAULT_FILTERS.inStockOnly
-    && f.signedOnly === DEFAULT_FILTERS.signedOnly
-    && f.memberDiscount === DEFAULT_FILTERS.memberDiscount
-    && JSON.stringify([...f.categories].sort())
-       === JSON.stringify([...DEFAULT_FILTERS.categories].sort())
-  );
-}
-
 // Debounce the search term so every keystroke doesn't thrash the
 // filter pipeline (200ms per spec).
 function useDebounced(value, delay) {
@@ -115,6 +99,15 @@ export default function Shop() {
   const { data: rows, loading } = useShopBooks();
   const books = useMemo(() => adaptShopBooks(rows), [rows]);
 
+  // Real category counts (sidebar badges) derived from actual books
+  // — replaces the hardcoded SHOP_CATEGORIES.count values that lied
+  // about catalogue size.
+  const categoryCounts = useMemo(() => {
+    const m = {};
+    books.forEach((b) => (b.categories || []).forEach((c) => { m[c] = (m[c] || 0) + 1; }));
+    return m;
+  }, [books]);
+
   const debouncedSearch = useDebounced(filters.search, 200);
 
   const filtered = useMemo(
@@ -137,16 +130,13 @@ export default function Shop() {
     });
   };
 
-  // Toolbar lies intentionally when filters are untouched — the spec
-  // quotes inflated catalogue totals ("242 titles · 32 new this
-  // week") that only make sense as a header stat for the full
-  // catalogue. Once the visitor engages a filter, switch to the real
-  // count of the 12 seed books so the number tracks the grid below.
-  const showSpecBadges = filtersAreDefault(filters) && debouncedSearch === '' && sort === 'recommended';
-  const totalForToolbar = showSpecBadges ? SPEC_BADGES.total : filtered.length;
-  const newForToolbar = showSpecBadges
-    ? SPEC_BADGES.newThisWeek
-    : filtered.filter((b) => b.newThisWeek).length;
+  // Real counts straight from the data — toolbar shows the actual
+  // catalogue size (length of all books) and current "new this week"
+  // count (books created within the last 7 days).
+  const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - NEW_WINDOW_MS;
+  const totalForToolbar = books.length;
+  const newForToolbar = books.filter((b) => b.createdAt && new Date(b.createdAt).getTime() > cutoff).length;
 
   return (
     <div className="shop-root">
@@ -156,7 +146,7 @@ export default function Shop() {
         <FeaturedBook memberDiscount={filters.memberDiscount} />
         <div className="shop-layout">
           <aside className="shop-filters-aside">
-            <FilterSidebar filters={filters} setFilters={setFilters} />
+            <FilterSidebar filters={filters} setFilters={setFilters} categoryCounts={categoryCounts} />
           </aside>
           <div>
             <Toolbar
@@ -181,7 +171,7 @@ export default function Shop() {
             )}
             <Pagination
               page={page}
-              totalPages={Math.max(totalPages, showSpecBadges ? 21 : totalPages)}
+              totalPages={totalPages}
               onChange={onPageChange}
             />
           </div>
@@ -192,6 +182,7 @@ export default function Shop() {
         onClose={() => setDrawerOpen(false)}
         filters={filters}
         setFilters={setFilters}
+        categoryCounts={categoryCounts}
       />
     </div>
   );

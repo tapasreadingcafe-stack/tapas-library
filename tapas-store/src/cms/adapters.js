@@ -46,6 +46,7 @@ export function adaptShopBook(row) {
     newThisWeek: false,
     description: row.staff_pick_blurb || null,
     isFeatured: !!row.is_staff_pick,
+    createdAt: row.created_at || null,
   };
 }
 export function adaptShopBooks(rows) { return (rows || []).map(adaptShopBook); }
