@@ -4,7 +4,7 @@ import FilterSidebar from './FilterSidebar';
 // Slide-in drawer used at tablet/mobile widths where the sidebar is
 // hidden. Shares the actual control markup with FilterSidebar so the
 // two can't drift.
-export default function FilterDrawer({ open, onClose, filters, setFilters }) {
+export default function FilterDrawer({ open, onClose, filters, setFilters, categoryCounts }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -42,11 +42,11 @@ export default function FilterDrawer({ open, onClose, filters, setFilters }) {
             onClick={onClose}
             aria-label="Close filters"
           >
-            \u2715
+            ✕
           </button>
         </div>
         <div className="shop-drawer-body">
-          <FilterSidebar filters={filters} setFilters={setFilters} />
+          <FilterSidebar filters={filters} setFilters={setFilters} categoryCounts={categoryCounts} />
         </div>
         <div className="shop-drawer-foot">
           <button type="button" className="shop-drawer-apply" onClick={onClose}>

@@ -11,7 +11,7 @@ import {
 // One shared shape for the sidebar and the slide-in drawer; the
 // drawer just wraps this same body in an overlay. Keeping the markup
 // in one place means there's a single set of controls to maintain.
-export default function FilterSidebar({ filters, setFilters }) {
+export default function FilterSidebar({ filters, setFilters, categoryCounts = {} }) {
   const patch = (next) => setFilters((prev) => ({ ...prev, ...next }));
 
   const toggleCategory = (key) => {
@@ -43,7 +43,7 @@ export default function FilterSidebar({ filters, setFilters }) {
               onChange={() => toggleCategory(c.key)}
             />
             <span className="shop-filter-check-label">{c.label}</span>
-            <span className="shop-filter-check-count">{c.count}</span>
+            <span className="shop-filter-check-count">{categoryCounts[c.key] || 0}</span>
           </label>
         ))}
       </div>
