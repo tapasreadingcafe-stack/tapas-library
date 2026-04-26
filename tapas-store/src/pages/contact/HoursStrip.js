@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CONTACT_HOURS } from '../../data/contactConfig';
+import { useHours } from '../../cms/hooks';
+import { adaptHours } from '../../cms/adapters';
 
 // Read the local weekday as 0-6 (Sun-Sat). Kept in state so the
 // server-rendered shell (if any) matches the client on mount — SSR
@@ -25,9 +27,12 @@ function useTodayIndex() {
 
 export default function HoursStrip() {
   const todayIdx = useTodayIndex();
+  const { data: rows } = useHours();
+  const adapted = adaptHours(rows || []);
+  const list = adapted.length > 0 ? adapted : CONTACT_HOURS;
   return (
     <div className="contact-hours" role="list" aria-label="Weekly hours">
-      {CONTACT_HOURS.map((d) => {
+      {list.map((d) => {
         const isToday = d.dayIndex === todayIdx;
         return (
           <div

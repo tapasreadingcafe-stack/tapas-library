@@ -1,5 +1,7 @@
 import React from 'react';
 import { ABOUT_TEAM } from '../../data/aboutContent';
+import { useAbout } from '../../cms/hooks';
+import { adaptAbout } from '../../cms/adapters';
 
 function renderTitle(parts) {
   return parts.map((p, i) => p.em
@@ -9,7 +11,9 @@ function renderTitle(parts) {
 }
 
 export default function TeamGrid() {
-  const t = ABOUT_TEAM;
+  const { data } = useAbout();
+  const adapted = adaptAbout(data);
+  const t = adapted?.team || ABOUT_TEAM;
   return (
     <section aria-labelledby="ab-team-h">
       <header className="ab-head-row">

@@ -18,6 +18,9 @@ export default function EventCreate() {
     start_date: '', end_date: '', start_time: '', end_time: '',
     location: 'Tapas Reading Cafe', is_paid: false, ticket_price: 0,
     capacity: '', waitlist_enabled: false, image_url: '', status: 'upcoming',
+    // CMS display fields — drive how the event appears on the customer site.
+    slug: '', italic_accent: '',
+    category: 'book-club', badge: '', cta_type: 'rsvp', chip_color: 'lavender',
   });
 
   React.useEffect(() => {
@@ -30,6 +33,9 @@ export default function EventCreate() {
           location: data.location || '', is_paid: data.is_paid || false, ticket_price: data.ticket_price || 0,
           capacity: data.capacity || '', waitlist_enabled: data.waitlist_enabled || false,
           image_url: data.image_url || '', status: data.status || 'upcoming',
+          slug: data.slug || '', italic_accent: data.italic_accent || '',
+          category: data.category || 'book-club', badge: data.badge || '',
+          cta_type: data.cta_type || 'rsvp', chip_color: data.chip_color || 'lavender',
         });
         setLoaded(true);
       });
@@ -38,13 +44,25 @@ export default function EventCreate() {
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
+  const slugify = (s) =>
+    s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.start_date) return toast.warning('Title and start date are required');
     setSaving(true);
     try {
+      // Auto-generate a unique-ish slug from the title for new events when
+      // staff didn't provide one. Slug must be unique across the events
+      // table — we suffix the start_date to keep collisions rare without
+      // pulling a uuid library into the dashboard bundle.
+      const finalSlug = form.slug.trim() || `${slugify(form.title)}-${form.start_date}`;
       const payload = {
         ...form,
+        slug: finalSlug,
+        // Empty string from the optional badge select means "no badge".
+        badge: form.badge || null,
+        italic_accent: form.italic_accent || null,
         ticket_price: parseFloat(form.ticket_price) || 0,
         capacity: form.capacity ? parseInt(form.capacity) : null,
         updated_at: new Date().toISOString(),
@@ -179,6 +197,65 @@ export default function EventCreate() {
           <label>Image URL (optional)</label>
           <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://..." disabled={isReadOnly} />
         </div>
+
+        <details style={{ marginTop: 24, marginBottom: 8, border: '1px solid #e0e0e0', borderRadius: 8, padding: '12px 16px' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#555', fontSize: 14 }}>
+            Customer site display options
+          </summary>
+          <div style={{ marginTop: 16 }}>
+            <div className="event-form-row">
+              <div className="event-form-group">
+                <label>Category</label>
+                <select value={form.category} onChange={e => set('category', e.target.value)} disabled={isReadOnly}>
+                  <option value="book-club">Book club</option>
+                  <option value="poetry-supper">Poetry supper</option>
+                  <option value="silent-reading">Silent reading</option>
+                  <option value="guest-night">Guest night</option>
+                  <option value="members-only">Members only</option>
+                </select>
+              </div>
+              <div className="event-form-group">
+                <label>Chip color</label>
+                <select value={form.chip_color} onChange={e => set('chip_color', e.target.value)} disabled={isReadOnly}>
+                  <option value="lavender">Lavender</option>
+                  <option value="sage">Sage</option>
+                  <option value="pink">Pink</option>
+                  <option value="peach">Peach</option>
+                  <option value="soft-pink">Soft pink</option>
+                </select>
+              </div>
+            </div>
+            <div className="event-form-row">
+              <div className="event-form-group">
+                <label>Badge (optional)</label>
+                <select value={form.badge} onChange={e => set('badge', e.target.value)} disabled={isReadOnly}>
+                  <option value="">— none —</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="prix-fixe">Prix fixe</option>
+                  <option value="drop-in">Drop in</option>
+                  <option value="guest-night">Guest night</option>
+                </select>
+              </div>
+              <div className="event-form-group">
+                <label>CTA</label>
+                <select value={form.cta_type} onChange={e => set('cta_type', e.target.value)} disabled={isReadOnly}>
+                  <option value="rsvp">RSVP</option>
+                  <option value="reserve">Reserve</option>
+                  <option value="dropin">Drop in</option>
+                </select>
+              </div>
+            </div>
+            <div className="event-form-group">
+              <label>Italic accent (optional — short word like "Club" or "Supper")</label>
+              <input value={form.italic_accent} onChange={e => set('italic_accent', e.target.value)} placeholder="Supper" disabled={isReadOnly} />
+            </div>
+            <div className="event-form-group">
+              <label>Slug (optional — auto-generated from title if blank)</label>
+              <input value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="poetry-night-may-12" disabled={isReadOnly} />
+            </div>
+          </div>
+        </details>
 
         <div className="event-form-actions">
           <button type="submit" disabled={saving || isReadOnly || !canManageEvents} style={{ background: (isReadOnly || !canManageEvents) ? '#ccc' : '#667eea', color: 'white', cursor: (isReadOnly || !canManageEvents) ? 'not-allowed' : 'pointer' }}>

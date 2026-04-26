@@ -7,10 +7,11 @@ import ArchiveGrid from './blog/ArchiveGrid';
 import DispatchNewsletter from './blog/DispatchNewsletter';
 import BLOG_CSS from './blog/blogStyles';
 import {
-  JOURNAL_ARCHIVE,
   FILTER_TO_CATEGORY,
   titleText,
 } from '../data/journalPosts';
+import { useJournalPosts } from '../cms/hooks';
+import { adaptJournalPosts } from '../cms/adapters';
 
 function useDebounced(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -43,9 +44,13 @@ export default function Blog() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounced(query, 200);
 
+  const { data: rows } = useJournalPosts();
+  const adapted = useMemo(() => adaptJournalPosts(rows || []), [rows]);
+  const archive = useMemo(() => adapted?.archive || [], [adapted]);
+
   const filtered = useMemo(
-    () => filterArticles(JOURNAL_ARCHIVE, category, debouncedQuery),
-    [category, debouncedQuery],
+    () => filterArticles(archive, category, debouncedQuery),
+    [archive, category, debouncedQuery],
   );
 
   const filterEngaged = category !== 'All' || debouncedQuery.trim() !== '';

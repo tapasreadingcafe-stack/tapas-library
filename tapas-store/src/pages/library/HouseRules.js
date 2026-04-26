@@ -1,7 +1,10 @@
 import React from 'react';
 import { LIBRARY_HOUSE_RULES } from '../../data/libraryBooks';
+import { usePage } from '../../cms/hooks';
 
 export default function HouseRules() {
+  const { data: page } = usePage('library');
+  const rules = page?.stats_jsonb?.houseRules || LIBRARY_HOUSE_RULES;
   return (
     <section className="library-rules" aria-labelledby="library-rules-h">
       <div>
@@ -15,7 +18,7 @@ export default function HouseRules() {
         </p>
       </div>
       <ol className="library-rules-list">
-        {LIBRARY_HOUSE_RULES.map((r) => (
+        {rules.map((r) => (
           <li key={r.n} className="library-rules-item">
             <span className="library-rules-num">{r.n}</span>
             <div>

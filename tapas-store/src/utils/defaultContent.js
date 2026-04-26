@@ -284,14 +284,10 @@ export const DEFAULT_CONTENT = {
   pages: {
     home: {
       meta: { title: 'Home', description: '' },
-      blocks: [
-        { id: 'tapas_home_hero',         type: 'tapas_hero',         props: {} },
-        { id: 'tapas_home_services',     type: 'tapas_services',     props: {} },
-        { id: 'tapas_home_new_arrivals', type: 'tapas_new_arrivals', props: {} },
-        { id: 'tapas_home_inspiration',  type: 'tapas_inspiration',  props: {} },
-        { id: 'tapas_home_testimonials', type: 'tapas_testimonials', props: {} },
-        { id: 'tapas_home_newsletter',   type: 'tapas_newsletter',   props: {} },
-      ],
+      // The home page is rendered as LandingHero + global SiteFooter.
+      // No block tree, no template sections. Hero copy comes from the
+      // pages table (Phase 3 CMS migration).
+      blocks: [],
     },
     about:   { meta: { title: 'About',   description: '' }, blocks: [] },
     catalog: { meta: { title: 'Shop',    description: '' }, blocks: [] },

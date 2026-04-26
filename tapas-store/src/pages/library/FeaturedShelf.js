@@ -1,5 +1,6 @@
 import React from 'react';
 import { LIBRARY_FEATURED } from '../../data/libraryBooks';
+import { usePage } from '../../cms/hooks';
 
 const SPINE_COLOR = {
   purple: '#8F4FD6',
@@ -11,7 +12,14 @@ const SPINE_COLOR = {
 };
 
 export default function FeaturedShelf() {
-  const f = LIBRARY_FEATURED;
+  const { data: page } = usePage('library');
+  // Editable copy from pages.library.stats_jsonb.featured; fall back to
+  // the hardcoded fixture for spines/CTA which are visual-only.
+  const fromDb = page?.stats_jsonb?.featured;
+  const f = {
+    ...LIBRARY_FEATURED,
+    ...(fromDb || {}),
+  };
   const onBrowse = (e) => {
     e.preventDefault();
     const target = document.getElementById(f.ctaTarget);

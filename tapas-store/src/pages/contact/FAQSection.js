@@ -1,7 +1,12 @@
 import React from 'react';
 import { CONTACT_FAQS } from '../../data/contactConfig';
+import { useFaqs } from '../../cms/hooks';
+import { adaptFaqs } from '../../cms/adapters';
 
 export default function FAQSection() {
+  const { data: rows } = useFaqs();
+  const adapted = adaptFaqs(rows || []);
+  const list = adapted.length > 0 ? adapted : CONTACT_FAQS;
   return (
     <section aria-labelledby="contact-faq-h">
       <div className="contact-faq-head">
@@ -20,7 +25,7 @@ export default function FAQSection() {
       </div>
 
       <div className="contact-faq-grid">
-        {CONTACT_FAQS.map((f, idx) => (
+        {list.map((f, idx) => (
           <details
             key={f.q}
             className="contact-faq"
