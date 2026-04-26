@@ -69,7 +69,7 @@ const SHOP_CSS = `
 .shop-hero-title {
   font-family: var(--shop-f-display);
   font-weight: 400;
-  font-size: clamp(48px, 6vw, 80px);
+  font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
   color: var(--shop-ink);
@@ -107,13 +107,13 @@ const SHOP_CSS = `
 /* ---- Featured ---- */
 .shop-featured {
   background: var(--shop-orange);
-  border-radius: 28px;
-  padding: 56px;
+  border-radius: 24px;
+  padding: 28px 36px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 32px;
   align-items: center;
-  margin: 20px 0 80px;
+  margin: 16px 0 56px;
 }
 .shop-featured-kicker {
   font-family: var(--shop-f-mono);
@@ -126,8 +126,8 @@ const SHOP_CSS = `
 .shop-featured-title {
   font-family: var(--shop-f-display);
   font-weight: 400;
-  font-size: 44px;
-  line-height: 1.05;
+  font-size: 38px;
+  line-height: 1.08;
   letter-spacing: -0.015em;
   margin: 0;
   color: var(--shop-ink);
@@ -138,11 +138,11 @@ const SHOP_CSS = `
   color: var(--shop-ink);
 }
 .shop-featured-body {
-  margin: 16px 0 28px;
+  margin: 14px 0 22px;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--shop-ink);
-  max-width: 40ch;
+  max-width: 46ch;
 }
 .shop-featured-cta {
   display: inline-flex;
@@ -179,14 +179,26 @@ const SHOP_CSS = `
 .shop-featured-cover {
   aspect-ratio: 3 / 4;
   width: 100%;
-  max-width: 360px;
-  border-radius: 16px;
-  box-shadow: 0 30px 60px -30px rgba(0,0,0,0.4);
-  padding: 32px 26px;
+  max-width: 220px;
+  border-radius: 14px;
+  box-shadow: 0 24px 48px -18px rgba(0,0,0,0.45),
+              0 4px 10px -4px rgba(0,0,0,0.25);
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   color: #fff;
+}
+/* Photo cover gets a white "picture frame" around the artwork. */
+.shop-featured-cover.shop-cover-photo {
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 24px 48px -18px rgba(0,0,0,0.45),
+              0 4px 10px -4px rgba(0,0,0,0.25),
+              inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.shop-featured-cover.shop-cover-photo img {
+  border-radius: 8px;
 }
 .shop-featured-cover-title {
   font-family: var(--shop-f-display);
@@ -660,7 +672,7 @@ const SHOP_CSS = `
 }
 @media (max-width: 767px) {
   .shop-hero-band { padding: 48px 0 64px !important; }
-  .shop-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
+  .shop-hero-title { font-size: clamp(22px, 4.2vw, 26px) !important; line-height: 1.08 !important; }
 }
 `;
 
