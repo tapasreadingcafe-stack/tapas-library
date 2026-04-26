@@ -417,6 +417,19 @@ const SHOP_CSS = `
   overflow: hidden;
   color: #fff;
 }
+/* Photo cover (uploaded book_image from dashboard) — fills the same
+   3:4 frame as the gradient covers, no padding so the image edges
+   meet the rounded corners. */
+.shop-cover-photo, .shop-featured-cover.shop-cover-photo {
+  padding: 0;
+  background: #f0ebe1;
+}
+.shop-cover-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .shop-cover-title {
   font-family: var(--shop-f-display);
   font-weight: 400;
