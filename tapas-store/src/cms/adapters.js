@@ -17,68 +17,69 @@ const TEAM_HEX = {
   lavender: '#E8D9FF',
 };
 
-// shop_books: DB → Shop component shape
-//   id ← slug              (so favorites/cart keep using stable slugs)
-//   price ← price_inr
-//   coverVariant ← cover_color
-//   coverLabel  ← title    (hardcoded data sometimes set this to a
-//                           different string for design hints; default
-//                           to title now — Phase 4 dashboard could add
-//                           a separate cover_label column if needed)
-//   inStock ← in_stock
-//   newThisWeek ← false    (column not in DB; Phase 4 may add it)
+// books → Shop component shape (post 20260427_unify_books).
+// The dashboard `books` table is the single source of truth; the
+// previous separate `shop_books` table is gone.
+//   id           ← slug
+//   price        ← sales_price (preferred, the on-sale number) or price
+//   coverVariant ← cover_color (defaults 'taupe')
+//   inStock      ← quantity_available > 0
+//   categories   ← single `category` string wrapped into an array (the
+//                  dashboard form keeps category as a single value)
 export function adaptShopBook(row) {
   if (!row) return null;
+  const sales = Number(row.sales_price) || 0;
+  const list  = Number(row.price) || 0;
   return {
     id: row.slug,
     title: row.title,
     author: row.author,
     coverLabel: row.title,
+    coverUrl: row.cover_url || row.book_image || null,
     coverVariant: row.cover_color || 'taupe',
-    price: row.price_inr,
-    categories: row.categories || [],
-    format: row.format,
-    clubs: row.clubs || [],
-    inStock: row.in_stock,
-    signed: row.signed,
+    price: sales > 0 ? sales : list,
+    categories: row.category ? [row.category] : [],
+    format: 'paperback',
+    clubs: [],
+    inStock: (row.quantity_available || 0) > 0,
+    signed: false,
     newThisWeek: false,
-    description: row.description || null,
-    isFeatured: row.is_featured,
+    description: row.staff_pick_blurb || null,
+    isFeatured: !!row.is_staff_pick,
   };
 }
 export function adaptShopBooks(rows) { return (rows || []).map(adaptShopBook); }
 
-// library_shelves+books: DB → Library component shape.
+// library_shelves + books → Library component shape (post unify_books).
 // The component expects each book to have { id, title, author, status }
-// where status = { kind: 'available' } or { kind: 'out', returnDate: 'M/D' }.
-function formatReturnDate(iso) {
-  if (!iso) return '';
-  const m = String(iso).match(/^\d{4}-(\d{2})-(\d{2})/);
-  if (!m) return iso;
-  return `${parseInt(m[1], 10)}/${parseInt(m[2], 10)}`;
-}
+// where status = { kind: 'available' } or { kind: 'out' }.
+// We derive availability from the dashboard's quantity_available count
+// (>0 = available, 0 = out). Per-copy return dates aren't tracked at
+// the books-row level, so we only surface kind.
 export function adaptLibraryShelf(shelf, idx = 0) {
   if (!shelf) return null;
+  const books = shelf.books || [];
   return {
     id: shelf.slug,
     number: String(idx + 1).padStart(2, '0'),
     name: shelf.name,
     italic: shelf.italic_accent || null,
     totals: {
-      titles: shelf.title_count || 0,
-      outOnLoan: shelf.out_on_loan || 0,
+      titles: shelf.title_count || books.length,
+      outOnLoan: books.filter((b) => (b.quantity_available || 0) === 0).length,
     },
     isFeatured: shelf.is_featured,
-    books: (shelf.books || []).map((b) => ({
+    books: books.map((b) => ({
       id: b.slug,
       title: b.title,
       author: b.author,
       cover: b.cover_color || 'cream',
       coverVariant: b.cover_color || 'cream',
-      categories: b.categories || [],
-      status: b.availability_status === 'out'
-        ? { kind: 'out', returnDate: formatReturnDate(b.return_date) }
-        : { kind: 'available' },
+      coverUrl: b.cover_url || b.book_image || null,
+      categories: b.category ? [b.category] : [],
+      status: (b.quantity_available || 0) > 0
+        ? { kind: 'available' }
+        : { kind: 'out' },
     })),
   };
 }
