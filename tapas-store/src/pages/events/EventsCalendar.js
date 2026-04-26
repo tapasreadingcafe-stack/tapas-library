@@ -64,8 +64,8 @@ export default function EventsCalendar({ category, onJumpToEvent }) {
           {MONTH_NAMES[month]} {year}
         </div>
         <div className="ev-cal-nav">
-          <button type="button" aria-label="Previous month" onClick={() => shift(-1)}>\u2039</button>
-          <button type="button" aria-label="Next month" onClick={() => shift(1)}>\u203A</button>
+          <button type="button" aria-label="Previous month" onClick={() => shift(-1)}>‹</button>
+          <button type="button" aria-label="Next month" onClick={() => shift(1)}>›</button>
         </div>
       </div>
 
