@@ -15,13 +15,13 @@ export default function Contact() {
       <ContactHero />
 
       <div className="contact-wrap">
-        <HoursStrip />
-        <StylizedMap />
-
         <div className="contact-layout">
           <FindUsCard />
           <ContactForm />
         </div>
+
+        <HoursStrip />
+        <StylizedMap />
 
         <FAQSection />
       </div>

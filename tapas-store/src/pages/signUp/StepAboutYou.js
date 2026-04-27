@@ -1,9 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  PREFERRED_CLUBS, READING_CHIPS,
-} from '../../data/signUpConfig';
-
-const DEFAULT_CHIPS = new Set(['Literary fiction', 'In translation']);
 
 export default function StepAboutYou({ state, dispatch, errors }) {
   const firstRef = useRef(null);
@@ -99,52 +94,6 @@ export default function StepAboutYou({ state, dispatch, errors }) {
           </div>
         </div>
 
-        <div className="su-field">
-          <label htmlFor="su-preferredClub">Preferred club to try first</label>
-          <select
-            id="su-preferredClub"
-            className="su-select"
-            value={a.preferredClub}
-            onChange={(e) => patch({ preferredClub: e.target.value })}
-          >
-            {PREFERRED_CLUBS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="su-field">
-          <label>What do you read lately?</label>
-          <div className="su-chip-row">
-            {READING_CHIPS.map((chip) => {
-              const on = a.readingTags.includes(chip);
-              const isDefault = DEFAULT_CHIPS.has(chip);
-              return (
-                <button
-                  key={chip}
-                  type="button"
-                  aria-pressed={on}
-                  className={`su-chip${on ? ' is-on' : ''}${isDefault && on ? ' is-default' : ''}`}
-                  onClick={() => dispatch({ type: 'TOGGLE_READING_TAG', tag: chip })}
-                >
-                  {chip}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="su-field">
-          <label htmlFor="su-reading">One sentence — what are you reading right now? (optional)</label>
-          <textarea
-            id="su-reading"
-            className="su-textarea"
-            rows={4}
-            placeholder="Middlemarch, slowly, on the train."
-            value={a.currentlyReading}
-            onChange={(e) => patch({ currentlyReading: e.target.value })}
-          />
-        </div>
       </div>
     </>
   );

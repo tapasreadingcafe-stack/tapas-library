@@ -4,12 +4,12 @@
 export const CONTACT_HOURS = [
   // dayIndex matches JS's getDay() (0 = Sun, 1 = Mon, ...).
   { key: 'mon', dayIndex: 1, short: 'Mon', hours: 'Closed', closed: true  },
-  { key: 'tue', dayIndex: 2, short: 'Tue', hours: '10a–11p' },
-  { key: 'wed', dayIndex: 3, short: 'Wed', hours: '10a–11p' },
-  { key: 'thu', dayIndex: 4, short: 'Thu', hours: '10a–11p' },
-  { key: 'fri', dayIndex: 5, short: 'Fri', hours: '10a–12a' },
-  { key: 'sat', dayIndex: 6, short: 'Sat', hours: '9a–12a' },
-  { key: 'sun', dayIndex: 0, short: 'Sun', hours: '9a–9p' },
+  { key: 'tue', dayIndex: 2, short: 'Tue', hours: '10am–11pm' },
+  { key: 'wed', dayIndex: 3, short: 'Wed', hours: '10am–11pm' },
+  { key: 'thu', dayIndex: 4, short: 'Thu', hours: '10am–11pm' },
+  { key: 'fri', dayIndex: 5, short: 'Fri', hours: '10am–12am' },
+  { key: 'sat', dayIndex: 6, short: 'Sat', hours: '9am–12am' },
+  { key: 'sun', dayIndex: 0, short: 'Sun', hours: '9am–9pm' },
 ];
 
 export const CONTACT_INFO = {

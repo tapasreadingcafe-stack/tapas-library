@@ -36,11 +36,12 @@ export default function EventsCalendar({ category, onJumpToEvent }) {
   const month = cursor.getMonth();
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month]);
 
-  const { data: rows } = useEvents();
+  const { data: rows, loading } = useEvents();
   const calendarEvents = useMemo(() => {
+    if (loading) return [];
     const all = splitEvents(rows || []).calendar;
     return all.length > 0 ? all : CALENDAR_EVENTS;
-  }, [rows]);
+  }, [rows, loading]);
 
   // Bucket events by yyyy-mm-dd for O(1) cell lookups.
   const byDate = useMemo(() => {

@@ -231,7 +231,7 @@ function timeToDisplay(t) {
   if (Number.isNaN(h)) return '';
   const isMidnight = h === 0;
   const hour12 = isMidnight ? 12 : (h > 12 ? h - 12 : h);
-  const suffix = h < 12 ? 'a' : (isMidnight ? 'a' : 'p');
+  const suffix = h < 12 ? 'am' : (isMidnight ? 'am' : 'pm');
   if (m && m !== 0) return `${hour12}:${String(m).padStart(2, '0')}${suffix}`;
   return `${hour12}${suffix}`;
 }

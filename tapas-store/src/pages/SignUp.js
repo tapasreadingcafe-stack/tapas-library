@@ -4,7 +4,6 @@ import SignUpHeading from './signUp/SignUpHeading';
 import PricingTiers from './signUp/PricingTiers';
 import SignUpStepper from './signUp/SignUpStepper';
 import StepAboutYou from './signUp/StepAboutYou';
-import StepYourReading from './signUp/StepYourReading';
 import StepPayment from './signUp/StepPayment';
 import ThisWeekCard from './signUp/ThisWeekCard';
 import InfoCards from './signUp/InfoCards';
@@ -14,11 +13,13 @@ import {
   signupReducer, DEFAULT_SIGNUP_STATE,
   validateStep1, validateStep3,
 } from './signUp/signupReducer';
-import { tierByKey } from '../data/signUpConfig';
+import { tierByKey, PAID_TIER_KEYS } from '../data/signUpConfig';
 
 export default function SignUp() {
   const [state, dispatch] = useReducer(signupReducer, DEFAULT_SIGNUP_STATE);
   const navigate = useNavigate();
+
+  const isPaidTier = PAID_TIER_KEYS.has(state.tier);
 
   const onContinue = () => {
     if (state.step === 1) {
@@ -28,20 +29,22 @@ export default function SignUp() {
         return;
       }
       dispatch({ type: 'SET_ERRORS', errors: {} });
+      // Free shopper accounts skip the payment step.
+      if (!isPaidTier) {
+        // eslint-disable-next-line no-console
+        console.log('[sign-up] submit (free)', state);
+        navigate('/welcome');
+        return;
+      }
       dispatch({ type: 'GOTO_STEP', step: 2 });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (state.step === 2) {
-      dispatch({ type: 'GOTO_STEP', step: 3 });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (state.step === 3) {
       const errs = validateStep3(state);
       if (Object.keys(errs).length > 0) {
         dispatch({ type: 'SET_ERRORS', errors: errs });
         return;
       }
-      // TODO: wire to Supabase user creation + Razorpay/Stripe
-      // subscription + Kit/Mailchimp tag assignment (use
-      // preferredClub + readingTags as tag inputs).
+      // TODO: wire to Supabase user creation + Razorpay/Stripe.
       // eslint-disable-next-line no-console
       console.log('[sign-up] submit', state);
       navigate('/welcome');
@@ -56,9 +59,12 @@ export default function SignUp() {
   };
 
   const currentTier = tierByKey(state.tier);
-  const ctaLabel = state.step < 3
-    ? 'Continue'
-    : `Start membership · ${currentTier.paymentLabel}`;
+  let ctaLabel;
+  if (state.step === 1) {
+    ctaLabel = isPaidTier ? 'Continue to payment' : 'Create free account';
+  } else {
+    ctaLabel = `Start membership · ${currentTier.paymentLabel}`;
+  }
 
   const canContinue = !state.consent ? false : true;
 
@@ -90,9 +96,6 @@ export default function SignUp() {
                 <StepAboutYou state={state} dispatch={dispatch} errors={state.errors} />
               )}
               {state.step === 2 && (
-                <StepYourReading state={state} dispatch={dispatch} />
-              )}
-              {state.step === 3 && (
                 <StepPayment state={state} dispatch={dispatch} errors={state.errors} />
               )}
 
@@ -120,7 +123,7 @@ export default function SignUp() {
                   )}
                   <button
                     type="submit"
-                    className={`su-next${state.step === 3 ? ' is-final' : ''}`}
+                    className={`su-next${state.step === 2 ? ' is-final' : ''}`}
                     disabled={!canContinue}
                   >
                     {ctaLabel}

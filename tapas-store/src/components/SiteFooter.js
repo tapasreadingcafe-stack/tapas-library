@@ -182,10 +182,7 @@ export default function SiteFooter() {
                 alt="Tapas Reading Cafe"
                 className="site-footer-logo"
               />
-              <p id="site-footer-brand" className="site-footer-brand-headline">
-                a small room for big books
-              </p>
-              <p className="site-footer-brand-body">
+              <p className="site-footer-brand-body" id="site-footer-brand">
                 A neighborhood library-cafe serving small plates,
                 natural wine, and six weekly book clubs.
               </p>

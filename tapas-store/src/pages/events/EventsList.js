@@ -59,7 +59,7 @@ function EventCard({ event, focus, cardRef }) {
 export default function EventsList({
   category, focusSlug, listRef, cardRefs,
 }) {
-  const { data: rows } = useEvents();
+  const { data: rows, loading } = useEvents();
   const upcoming = splitEvents(rows || []).upcoming;
   const list = upcoming.length > 0 ? upcoming : UPCOMING_EVENTS;
   const visible = list.filter((e) =>
@@ -67,7 +67,11 @@ export default function EventsList({
   );
 
   return (
-    <div className="ev-list" ref={listRef}>
+    <div
+      className="ev-list"
+      ref={listRef}
+      style={{ opacity: loading ? 0 : 1, transition: 'opacity 180ms ease-out' }}
+    >
       {visible.length === 0 ? (
         <div className="ev-empty">
           <h3>Nothing on the books in that category.</h3>
