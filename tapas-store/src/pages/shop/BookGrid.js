@@ -13,8 +13,8 @@ export default function BookGrid({ books, memberDiscount, gridRef }) {
   }
   return (
     <div className="shop-grid" ref={gridRef}>
-      {books.map((b) => (
-        <BookCard key={b.id} book={b} memberDiscount={memberDiscount} />
+      {books.map((b, i) => (
+        <BookCard key={b.id} book={b} memberDiscount={memberDiscount} eager={i < 4} />
       ))}
     </div>
   );

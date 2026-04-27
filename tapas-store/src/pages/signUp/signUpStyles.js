@@ -37,6 +37,48 @@ const SIGN_UP_CSS = `
   align-items: start;
 }
 
+.su-oauth {
+  margin-top: 0;
+}
+.su-oauth-btn {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--su-rule);
+  border-radius: 999px;
+  padding: 12px 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--su-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 150ms, background 150ms;
+}
+.su-oauth-btn:hover {
+  border-color: var(--su-ink);
+  background: #fafaf5;
+}
+.su-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 28px 0;
+  font-family: var(--su-f-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--su-muted);
+}
+.su-divider::before,
+.su-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--su-rule);
+}
+
 /* ---- Heading ---- */
 .su-kicker {
   font-family: var(--su-f-mono);
@@ -382,7 +424,14 @@ const SIGN_UP_CSS = `
   cursor: pointer;
   transition: background 150ms, transform 150ms, opacity 150ms;
 }
-.su-next.is-final { background: var(--su-lime); color: var(--su-ink); }
+.su-next.is-final {
+  background: var(--su-ink);
+  color: #fff;
+  width: 100%;
+  justify-content: center;
+  padding: 16px 24px;
+  font-size: 16px;
+}
 .su-next:hover:not(:disabled) { transform: translateY(-1px); }
 .su-next:disabled { opacity: 0.5; cursor: not-allowed; }
 .su-next-arrow {
@@ -392,6 +441,10 @@ const SIGN_UP_CSS = `
   color: #fff;
   display: inline-grid;
   place-items: center;
+}
+.su-next.is-final .su-next-arrow {
+  background: var(--su-lime);
+  color: var(--su-ink);
 }
 .su-back {
   background: transparent;

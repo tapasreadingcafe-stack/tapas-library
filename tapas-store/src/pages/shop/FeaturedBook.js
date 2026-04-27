@@ -51,7 +51,7 @@ export default function FeaturedBook({ memberDiscount }) {
       <div className="shop-featured-cover-wrap">
         {book.coverUrl ? (
           <div className="shop-featured-cover shop-cover-photo" aria-hidden="true">
-            <img src={book.coverUrl} alt="" loading="lazy" />
+            <img src={book.coverUrl} alt="" loading="eager" fetchpriority="high" />
           </div>
         ) : (
           <div className={`shop-featured-cover c-${book.coverVariant}`} aria-hidden="true">

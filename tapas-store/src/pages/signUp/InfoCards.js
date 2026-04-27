@@ -14,8 +14,8 @@ export default function InfoCards() {
         <h3>Rather not <em>decide online?</em></h3>
         <p>
           Come in any Saturday between 10a and noon. Ask for Marisol,
-          say the word \u201Cmembership,\u201D and a cup of coffee is
-          on us while we fill it out together.
+          say the word “membership,” and a cup of coffee is on us
+          while we fill it out together.
         </p>
       </section>
     </>

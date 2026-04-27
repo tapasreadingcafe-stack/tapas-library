@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import LibraryHero from './library/LibraryHero';
-import StatsRow from './library/StatsRow';
 import CategoryFilter from './library/CategoryFilter';
 import FeaturedShelf from './library/FeaturedShelf';
 import Shelf from './library/Shelf';
@@ -72,8 +71,6 @@ export default function Library() {
       <LibraryHero />
 
       <div className="library-wrap">
-        <StatsRow />
-
         <CategoryFilter
           category={category}
           onCategory={setCategory}

@@ -47,7 +47,7 @@ export default function FeaturedSupper() {
                 {c.dish}
                 <i>{c.poem}</i>
               </span>
-              <span className="ev-menu-bullet" aria-hidden="true">\u2022</span>
+              <span className="ev-menu-bullet" aria-hidden="true">•</span>
             </li>
           ))}
         </ol>

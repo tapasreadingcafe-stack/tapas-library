@@ -187,7 +187,7 @@ const SIGN_IN_CSS = `
 
 .si-oauth {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 .si-oauth button {
