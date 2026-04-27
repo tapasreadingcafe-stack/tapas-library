@@ -13,7 +13,7 @@ import './App.css';
 // Auth flows get a dedicated split-screen layout; stacking the
 // sticky navbar on top would compete with the focused form. Add any
 // new auth routes to this set to hide the nav there.
-const HIDE_NAV_ROUTES = new Set(['/sign-in', '/sign-up', '/forgot-password']);
+const HIDE_NAV_ROUTES = new Set(['/forgot-password']);
 
 function GlobalHeader() {
   const { pathname } = useLocation();

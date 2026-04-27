@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../../utils/supabase';
 
 function isValidEmail(s) {
   return typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
@@ -11,12 +12,6 @@ const GoogleIcon = () => (
     <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8A12 12 0 0 1 24 16c3 0 5.8 1.1 7.9 3l5.7-5.7A20 20 0 0 0 6.3 14.7z"/>
     <path fill="#4CAF50" d="M24 44c5.3 0 10-2 13.6-5.3L31.3 33A12 12 0 0 1 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.4 40 16.1 44 24 44z"/>
     <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4 5.4l6.3 5.3c-.4.4 6.4-4.7 6.4-14.7 0-1.2-.1-2.4-.4-3.5z"/>
-  </svg>
-);
-
-const AppleIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.2-2.9 .9-3.7.9-.8 0-1.9-.9-3.1-.9-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.5.8 1.2 1.7 2.4 2.9 2.4 1.2 0 1.6-.8 3.1-.8 1.4 0 1.8.8 3.1.8 1.3 0 2.1-1.2 2.9-2.4 .9-1.4 1.3-2.7 1.3-2.8-.1 0-2.4-.9-2.4-3.8zM14 5.7c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1 .1 2.2-.6 2.8-1.4z"/>
   </svg>
 );
 
@@ -54,12 +49,13 @@ export default function SignInForm() {
     }, 800);
   };
 
-  const onOAuth = (provider) => {
-    // TODO: supabase.auth.signInWithOAuth({ provider })
-    // eslint-disable-next-line no-console
-    console.log('[sign-in] oauth', { provider });
-    // eslint-disable-next-line no-alert
-    window.alert('OAuth not wired yet — coming soon.');
+  const onOAuth = async (provider) => {
+    setError(null);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (oauthError) setError(oauthError.message);
   };
 
   return (
@@ -140,11 +136,7 @@ export default function SignInForm() {
       <div className="si-oauth">
         <button type="button" onClick={() => onOAuth('google')}>
           <GoogleIcon />
-          Google
-        </button>
-        <button type="button" onClick={() => onOAuth('apple')}>
-          <AppleIcon />
-          Apple
+          Continue with Google
         </button>
       </div>
 

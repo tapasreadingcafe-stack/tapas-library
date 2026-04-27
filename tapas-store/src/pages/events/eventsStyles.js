@@ -697,6 +697,8 @@ const EVENTS_CSS = `
     margin: 0 -20px;
     padding: 4px 20px 8px;
     scrollbar-width: none;
+    min-width: 0;
+    max-width: calc(100% + 40px);
   }
   .ev-pills::-webkit-scrollbar { display: none; }
   .ev-toggle { align-self: flex-end; }

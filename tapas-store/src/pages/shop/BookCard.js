@@ -3,7 +3,7 @@ import { useCart } from '../../context/CartContext';
 import { useFavorites } from '../../hooks/useFavorites';
 import { formatInr, MEMBER_DISCOUNT_RATE } from '../../data/shopBooks';
 
-export default function BookCard({ book, memberDiscount }) {
+export default function BookCard({ book, memberDiscount, eager }) {
   const { addBook } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
   const fav = isFavorite(book.id);
@@ -38,7 +38,7 @@ export default function BookCard({ book, memberDiscount }) {
 
       {book.coverUrl ? (
         <div className="shop-cover shop-cover-photo" aria-hidden="true">
-          <img src={book.coverUrl} alt="" loading="lazy" />
+          <img src={book.coverUrl} alt="" loading={eager ? 'eager' : 'lazy'} />
         </div>
       ) : (
         <div className={`shop-cover c-${book.coverVariant}`} aria-hidden="true">
