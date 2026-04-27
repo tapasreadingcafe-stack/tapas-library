@@ -70,7 +70,7 @@ const CONTACT_CSS = `
 .contact-hero-title {
   font-family: var(--ct-f-display);
   font-weight: 400;
-  font-size: clamp(48px, 6vw, 80px);
+  font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
   color: var(--ct-ink);
@@ -86,7 +86,9 @@ const CONTACT_CSS = `
   line-height: 1.6;
   color: var(--ct-ink-2);
   margin: 0;
-  max-width: 48ch;
+  max-width: 42ch;
+  grid-column: 8 / span 5;
+  padding-bottom: 12px;
 }
 .contact-hero-curve {
   position: absolute;
@@ -101,36 +103,56 @@ const CONTACT_CSS = `
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 0;
-  border: 1px solid var(--ct-rule);
-  border-radius: 18px;
+  border-radius: 22px;
   overflow: hidden;
   margin: 40px 0;
   background: #fff;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.02),
+    0 18px 40px -22px rgba(0, 0, 0, 0.12);
 }
 .contact-hours-day {
-  padding: 18px 14px;
+  position: relative;
+  padding: 26px 14px 22px;
   text-align: center;
-  border-left: 1px solid var(--ct-rule);
 }
-.contact-hours-day:first-child { border-left: 0; }
-.contact-hours-day.is-today { background: var(--ct-lime); }
+.contact-hours-day + .contact-hours-day::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.contact-hours-day.is-today {
+  background: var(--ct-lime);
+}
+.contact-hours-day.is-today + .contact-hours-day::before,
+.contact-hours-day.is-today::before { display: none; }
 .contact-hours-name {
   font-family: var(--ct-f-mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ct-muted);
 }
-.contact-hours-day.is-today .contact-hours-name { color: var(--ct-ink); }
+.contact-hours-day.is-today .contact-hours-name {
+  color: var(--ct-ink);
+  font-weight: 600;
+}
 .contact-hours-value {
   font-family: var(--ct-f-display);
   font-weight: 400;
-  font-size: 18px;
-  margin-top: 6px;
+  font-size: 19px;
+  margin-top: 8px;
   color: var(--ct-ink);
   letter-spacing: -0.01em;
 }
-.contact-hours-value.is-closed { color: var(--ct-pink); }
+.contact-hours-value.is-closed {
+  color: var(--ct-muted);
+  font-style: italic;
+}
 
 /* ---- Map ---- */
 .contact-map {
@@ -529,7 +551,7 @@ const CONTACT_CSS = `
 }
 @media (max-width: 767px) {
   .contact-hero { padding: 48px 0 64px !important; }
-  .contact-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
+  .contact-hero-title { font-size: clamp(22px, 4.2vw, 26px) !important; line-height: 1.08 !important; }
 }
 `;
 

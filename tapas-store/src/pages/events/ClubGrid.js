@@ -31,7 +31,7 @@ function ClubCard({ club }) {
 }
 
 export default function ClubGrid({ category }) {
-  const { data: rows } = useClubs();
+  const { data: rows, loading } = useClubs();
   const adapted = adaptClubs(rows || []);
   const list = adapted.length > 0 ? adapted : CLUBS;
   // The CMS schema doesn't carry per-club category; show all clubs
@@ -40,16 +40,17 @@ export default function ClubGrid({ category }) {
   const visible = adapted.length > 0
     ? list
     : list.filter((c) => category === 'all' ? true : c.category === category);
+  const fadeStyle = { opacity: loading ? 0 : 1, transition: 'opacity 180ms ease-out' };
   if (visible.length === 0) {
     return (
-      <div className="ev-empty">
+      <div className="ev-empty" style={fadeStyle}>
         <h3>No clubs matching that filter.</h3>
         <p>Try another category.</p>
       </div>
     );
   }
   return (
-    <div className="ev-clubs">
+    <div className="ev-clubs" style={fadeStyle}>
       {visible.map((c) => <ClubCard key={c.id} club={c} />)}
     </div>
   );

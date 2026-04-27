@@ -41,9 +41,6 @@ export default function FindUsCard() {
       <Row label="Press">
         <a href={`mailto:${i.press}`}>{i.press}</a>
       </Row>
-      <Row label="Parking">{i.parking}</Row>
-      <Row label="Transit">{i.transit}</Row>
-      <Row label="Accessibility">{i.accessibility}</Row>
     </section>
   );
 }

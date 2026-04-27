@@ -11,13 +11,17 @@ const decodeEntities = (s) =>
     .replace(/&apos;/g, "'");
 
 export default function EventsHero() {
-  const { data: page } = usePage('events');
+  const { data: page, loading } = usePage('events');
+  const ready = !loading && !!page;
   const kicker = decodeEntities(page?.hero_kicker || 'Events & Book Clubs');
   const headingHtml = page?.hero_heading_html || 'Six clubs, one room,<br /><em>all welcome.</em>';
   const lede = page?.hero_lede || 'Weekly clubs, poetry suppers, and silent reading Saturdays. Drop in once as a guest.';
   return (
     <section className="ev-hero" aria-labelledby="ev-hero-h1">
-      <div className="ev-hero-inner">
+      <div
+        className="ev-hero-inner"
+        style={{ opacity: ready ? 1 : 0, transition: 'opacity 180ms ease-out' }}
+      >
         <div>
           <div
             className="ev-hero-kicker"

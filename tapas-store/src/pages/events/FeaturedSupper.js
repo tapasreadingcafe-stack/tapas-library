@@ -4,7 +4,7 @@ import { useFeaturedSupper } from '../../cms/hooks';
 import { adaptFeaturedSupper } from '../../cms/adapters';
 
 export default function FeaturedSupper() {
-  const { data: row } = useFeaturedSupper();
+  const { data: row, loading } = useFeaturedSupper();
   const s = adaptFeaturedSupper(row) || FEATURED_SUPPER;
   const onReserve = () => {
     // TODO: wire to a real booking endpoint.
@@ -14,7 +14,11 @@ export default function FeaturedSupper() {
     window.alert(actionMessage(s.cta.action, { time: 'Fri · 8:00p' }));
   };
   return (
-    <section className="ev-supper" aria-labelledby="ev-supper-h">
+    <section
+      className="ev-supper"
+      aria-labelledby="ev-supper-h"
+      style={{ opacity: loading ? 0 : 1, transition: 'opacity 180ms ease-out' }}
+    >
       <div>
         <div className="ev-supper-kicker">{s.kicker.toUpperCase()}</div>
         <h2 id="ev-supper-h" className="ev-supper-title">

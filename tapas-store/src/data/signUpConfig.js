@@ -11,12 +11,12 @@ export const MEMBERSHIP_PERKS = [
 
 export const PRICING_TIERS = [
   {
-    key: 'pass',
-    kicker: 'Occasional',
-    name: 'Pass',
-    price: 250,
-    suffix: '/ visit',
-    paymentLabel: '₹250 / visit',
+    key: 'shopper',
+    kicker: 'Free',
+    name: 'Shopper',
+    price: 0,
+    suffix: 'just shop',
+    paymentLabel: 'Free',
   },
   {
     key: 'monthly',
@@ -36,6 +36,10 @@ export const PRICING_TIERS = [
     paymentLabel: '₹3,600 / year',
   },
 ];
+
+// Membership tiers that actually require payment. Keys not in this set
+// (e.g. "shopper") skip the Payment step on signup.
+export const PAID_TIER_KEYS = new Set(['monthly', 'annual']);
 
 export const PREFERRED_CLUBS = [
   'Saturday Silent Reading · drop-in',
@@ -94,7 +98,7 @@ export const THIS_WEEK = [
 ];
 
 export const DEFAULT_SIGNUP_STATE = {
-  tier: 'monthly',
+  tier: 'shopper',
   step: 1,
   aboutYou: {
     firstName: '',
@@ -127,7 +131,7 @@ export const DEFAULT_SIGNUP_STATE = {
   errors: {},
 };
 
-export const STEP_LABELS = ['About you', 'Your reading', 'Payment'];
+export const STEP_LABELS = ['About you', 'Payment'];
 
 export function isValidEmail(s) {
   return typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());

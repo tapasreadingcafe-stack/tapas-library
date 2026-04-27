@@ -75,7 +75,7 @@ const EVENTS_CSS = `
 .ev-hero-title {
   font-family: var(--ev-f-display);
   font-weight: 400;
-  font-size: clamp(48px, 6vw, 80px);
+  font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
   color: var(--ev-ink);
@@ -734,7 +734,7 @@ const EVENTS_CSS = `
 }
 @media (max-width: 767px) {
   .ev-hero { padding: 48px 0 64px !important; }
-  .ev-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
+  .ev-hero-title { font-size: clamp(22px, 4.2vw, 26px) !important; line-height: 1.08 !important; }
 }
 `;
 

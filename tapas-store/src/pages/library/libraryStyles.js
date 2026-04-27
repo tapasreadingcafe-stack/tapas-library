@@ -75,7 +75,7 @@ const LIBRARY_CSS = `
 .library-hero-title {
   font-family: var(--lib-f-display);
   font-weight: 400;
-  font-size: clamp(48px, 6vw, 80px);
+  font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
   color: var(--lib-ink);
@@ -566,7 +566,7 @@ const LIBRARY_CSS = `
 }
 @media (max-width: 767px) {
   .library-hero { padding: 48px 0 64px !important; }
-  .library-hero-title { font-size: clamp(36px, 7vw, 44px) !important; line-height: 1.08 !important; }
+  .library-hero-title { font-size: clamp(22px, 4.2vw, 26px) !important; line-height: 1.08 !important; }
 }
 `;
 
