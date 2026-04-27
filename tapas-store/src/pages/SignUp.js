@@ -4,7 +4,6 @@ import SignUpHeading from './signUp/SignUpHeading';
 import StepAboutYou from './signUp/StepAboutYou';
 import ThisWeekCard from './signUp/ThisWeekCard';
 import InfoCards from './signUp/InfoCards';
-import MemberCard, { MEMBER_CARD_CSS } from '../components/MemberCard';
 import SIGN_UP_CSS from './signUp/signUpStyles';
 import {
   signupReducer, DEFAULT_SIGNUP_STATE, validateStep1,
@@ -33,7 +32,6 @@ export default function SignUp() {
   return (
     <div className="su-root">
       <style>{SIGN_UP_CSS}</style>
-      <style>{MEMBER_CARD_CSS}</style>
 
       <div className="su-wrap">
         <div className="su-grid">
@@ -82,11 +80,6 @@ export default function SignUp() {
           </div>
 
           <aside className="su-side">
-            <MemberCard
-              variant="stacked"
-              showPerforations
-              cardNumber="No. 0318"
-            />
             <ThisWeekCard />
             <InfoCards />
           </aside>
