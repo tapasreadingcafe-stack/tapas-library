@@ -3,7 +3,7 @@ import React from 'react';
 export default function SignUpHeading() {
   return (
     <header>
-      <div className="su-kicker">Membership · opens a door</div>
+      <div className="su-kicker">Opens a door</div>
       <h1 className="su-title">
         Join the <em>long table.</em>
       </h1>
