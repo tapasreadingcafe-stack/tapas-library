@@ -1429,39 +1429,117 @@ function CanvasSelectionShell({
 // Style tab is live in Phase 3. Settings + Interactions still stubbed.
 // =====================================================================
 function ElementInspector({ selector, onClear, onSetStyle, getValue, W }) {
+  const [openSection, setOpenSection] = useState('typography');
   const tag = (() => {
     const last = String(selector || '').split('>').pop().trim();
     return last.split(':')[0].split('.')[0].toLowerCase() || 'element';
   })();
-  const Field = ({ label, prop, type = 'text', placeholder = '' }) => (
-    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: W.textDim, marginBottom: 12, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+
+  const inputBase = {
+    marginTop: 4, width: '100%', boxSizing: 'border-box',
+    height: 26, padding: '0 8px',
+    background: W.inputBg || '#1a1a1a',
+    color: W.text || '#eee',
+    border: `1px solid ${W.panelBorder}`,
+    borderRadius: 3,
+    fontSize: 12, fontFamily: 'inherit',
+    textTransform: 'none', letterSpacing: 'normal',
+  };
+  const labelStyle = {
+    display: 'block', fontSize: 10, fontWeight: 600,
+    color: W.textDim, marginBottom: 10,
+    letterSpacing: '0.06em', textTransform: 'uppercase',
+  };
+
+  const Field = ({ label, prop, placeholder = '', type = 'text' }) => (
+    <label style={labelStyle}>
       {label}
       <input
         type={type}
         value={getValue(prop)}
         placeholder={placeholder}
         onChange={(e) => onSetStyle(prop, e.target.value)}
-        style={{
-          marginTop: 4, width: '100%', boxSizing: 'border-box',
-          height: 26, padding: '0 8px',
-          background: W.inputBg || '#1a1a1a',
-          color: W.text || '#eee',
-          border: `1px solid ${W.panelBorder}`,
-          borderRadius: 3,
-          fontSize: 12, fontFamily: 'inherit',
-          textTransform: 'none', letterSpacing: 'normal',
-        }}
+        style={inputBase}
       />
     </label>
   );
+
+  // Side-by-side: e.g. color + alpha or two related fields.
+  const FieldRow = ({ children }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>{children}</div>
+  );
+
+  const SelectField = ({ label, prop, options }) => (
+    <label style={labelStyle}>
+      {label}
+      <select
+        value={getValue(prop)}
+        onChange={(e) => onSetStyle(prop, e.target.value)}
+        style={{ ...inputBase, padding: '0 6px' }}
+      >
+        <option value="">—</option>
+        {options.map(o => typeof o === 'string'
+          ? <option key={o} value={o}>{o}</option>
+          : <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    </label>
+  );
+
+  const ColorField = ({ label, prop, placeholder = '' }) => {
+    const v = String(getValue(prop) || '');
+    const isHex = /^#([0-9a-f]{3}){1,2}$/i.test(v);
+    return (
+      <label style={labelStyle}>
+        {label}
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <input
+            type="color"
+            value={isHex ? v : '#000000'}
+            onChange={(e) => onSetStyle(prop, e.target.value)}
+            style={{ width: 26, height: 26, padding: 0, border: `1px solid ${W.panelBorder}`, borderRadius: 3, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
+          />
+          <input
+            type="text"
+            value={v}
+            placeholder={placeholder || '#000 / red / rgba(...)'}
+            onChange={(e) => onSetStyle(prop, e.target.value)}
+            style={{ ...inputBase, marginTop: 0 }}
+          />
+        </div>
+      </label>
+    );
+  };
+
+  const Section = ({ id, title, children }) => {
+    const open = openSection === id;
+    return (
+      <div style={{ borderBottom: `1px solid ${W.panelBorder}` }}>
+        <button
+          type="button"
+          onClick={() => setOpenSection(open ? null : id)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
+            color: W.text || '#eee', fontSize: 11, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}
+        >
+          <span>{title}</span>
+          <span style={{ color: W.textDim, fontSize: 10 }}>{open ? '▾' : '▸'}</span>
+        </button>
+        {open && <div style={{ padding: '4px 14px 14px' }}>{children}</div>}
+      </div>
+    );
+  };
+
   return (
     <div style={{
       flexShrink: 0,
       borderBottom: `1px solid ${W.panelBorder}`,
       background: 'rgba(249, 115, 22, 0.06)',
-      padding: '12px 14px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
@@ -1484,11 +1562,56 @@ function ElementInspector({ selector, onClear, onSetStyle, getValue, W }) {
           }}
         >×</button>
       </div>
-      <Field label="Text color" prop="color" placeholder="#1F1B16 / red / rgba(...)" />
-      <Field label="Font size" prop="fontSize" placeholder="18px / 1.2rem / clamp(...)" />
-      <Field label="Padding" prop="padding" placeholder="12px 16px" />
-      <div style={{ fontSize: 10, color: W.textDim, marginTop: 2, lineHeight: 1.4 }}>
-        Saves to <code style={{ fontFamily: 'ui-monospace, monospace' }}>element_styles</code> and shows on the storefront on next reload.
+
+      <Section id="typography" title="Typography">
+        <ColorField label="Text color" prop="color" />
+        <FieldRow>
+          <Field label="Size" prop="fontSize" placeholder="18px" />
+          <SelectField label="Weight" prop="fontWeight" options={['300','400','500','600','700','800','900']} />
+        </FieldRow>
+        <FieldRow>
+          <Field label="Line height" prop="lineHeight" placeholder="1.4" />
+          <Field label="Letter spacing" prop="letterSpacing" placeholder="0" />
+        </FieldRow>
+        <FieldRow>
+          <SelectField label="Align" prop="textAlign" options={['left','center','right','justify']} />
+          <SelectField label="Transform" prop="textTransform" options={['none','uppercase','lowercase','capitalize']} />
+        </FieldRow>
+        <SelectField label="Style" prop="fontStyle" options={['normal','italic']} />
+      </Section>
+
+      <Section id="spacing" title="Spacing">
+        <Field label="Padding" prop="padding" placeholder="12px 16px" />
+        <Field label="Margin"  prop="margin"  placeholder="0 0 16px" />
+      </Section>
+
+      <Section id="background" title="Background">
+        <ColorField label="Background color" prop="backgroundColor" />
+        <Field label="Background image" prop="backgroundImage" placeholder="url(/cover.png)" />
+        <FieldRow>
+          <SelectField label="Size" prop="backgroundSize" options={['cover','contain','auto','100% 100%']} />
+          <SelectField label="Position" prop="backgroundPosition" options={['center','top','bottom','left','right']} />
+        </FieldRow>
+      </Section>
+
+      <Section id="border" title="Border">
+        <Field label="Radius" prop="borderRadius" placeholder="8px / 50%" />
+        <FieldRow>
+          <Field label="Width" prop="borderWidth" placeholder="1px" />
+          <SelectField label="Style" prop="borderStyle" options={['none','solid','dashed','dotted']} />
+        </FieldRow>
+        <ColorField label="Border color" prop="borderColor" />
+      </Section>
+
+      <Section id="effects" title="Effects">
+        <Field label="Opacity" prop="opacity" placeholder="0.0–1.0" />
+        <Field label="Box shadow" prop="boxShadow" placeholder="0 4px 12px rgba(0,0,0,0.1)" />
+        <Field label="Transform" prop="transform" placeholder="rotate(2deg) scale(1.05)" />
+        <Field label="Cursor" prop="cursor" placeholder="pointer" />
+      </Section>
+
+      <div style={{ fontSize: 10, color: W.textDim, padding: '8px 14px 12px', lineHeight: 1.45 }}>
+        Saves to <code style={{ fontFamily: 'ui-monospace, monospace' }}>element_styles</code>. Reload the storefront to see changes.
       </div>
     </div>
   );
