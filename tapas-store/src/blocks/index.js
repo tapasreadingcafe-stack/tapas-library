@@ -40,6 +40,7 @@ import {
   TapasCompromises, TapasTeamGrid, TapasPressQuotes,
   TapasBlogFeatured, TapasBlogSidebar, TapasBlogArchive,
   TapasLibraryStats, TapasLibraryShelves, TapasLibraryHouseRules,
+  TapasShopFeatured, TapasShopBrowser,
 } from './TapasFigmaBlocks';
 import { TapasGroup, ComponentRef } from './PageRenderer';
 
@@ -1128,6 +1129,27 @@ export const BLOCK_REGISTRY = {
       { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
       { key: 'heading', label: 'Heading', type: 'text' },
       { key: 'body',    label: 'Body',    type: 'textarea' },
+    ],
+  },
+
+  tapas_shop_featured: {
+    label: 'Tapas Shop — Featured Book (live)',
+    category: 'Content',
+    Renderer: TapasShopFeatured,
+    defaultProps: { eyebrow: 'Book of the Month', member_discount: true },
+    schema: [
+      { key: 'eyebrow',         label: 'Eyebrow',                    type: 'text' },
+      { key: 'member_discount', label: 'Show 10% member discount',   type: 'boolean' },
+    ],
+  },
+  tapas_shop_browser: {
+    label: 'Tapas Shop — Browser (live)',
+    category: 'Content',
+    Renderer: TapasShopBrowser,
+    defaultProps: { page_size: 12, member_discount_default: true },
+    schema: [
+      { key: 'page_size',                label: 'Books per page',                  type: 'number' },
+      { key: 'member_discount_default',  label: 'Member discount on by default',  type: 'boolean' },
     ],
   },
 

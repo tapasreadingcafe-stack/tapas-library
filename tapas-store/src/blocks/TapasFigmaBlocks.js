@@ -1731,3 +1731,286 @@ export function TapasLibraryHouseRules({ props = {} }) {
     </section>
   );
 }
+
+// =====================================================================
+// Phase 2 (Shop page) blocks — featured book spotlight + full
+// browser (filter sidebar + toolbar + grid + pagination, all inside
+// one self-contained block).
+// =====================================================================
+
+const _SHOP_PAGE_SIZE = 12;
+
+export function TapasShopFeatured({ props = {} }) {
+  const { eyebrow = 'Book of the Month', member_discount = true } = props;
+  const { useShopBooks } = require('../cms/hooks');
+  const { adaptShopBooks } = require('../cms/adapters');
+  const { formatInr, MEMBER_DISCOUNT_RATE } = require('../data/shopBooks');
+  const { useCart } = require('../context/CartContext');
+  const { data: rows } = useShopBooks();
+  const { addBook } = useCart();
+  const books = adaptShopBooks(rows);
+  const book = books.find((b) => b.isFeatured) || books[0];
+  if (!book) return null;
+
+  const effective = member_discount
+    ? Math.round(Number(book.price || 0) * (1 - MEMBER_DISCOUNT_RATE))
+    : Number(book.price || 0);
+
+  const onAdd = () => addBook({ id: book.id, title: book.title, author: book.author, sales_price: effective });
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 48, background: HS_LIME, borderRadius: 28, padding: 'clamp(28px, 4vw, 56px)', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{eyebrow}</div>
+          <h2 style={{ margin: '12px 0 14px', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(30px, 3.6vw, 48px)', lineHeight: 1.05, color: HS_INK }}>
+            {book.title} <em style={{ fontStyle: 'italic', color: HS_PURPLE }}>· {book.author}</em>
+          </h2>
+          <p style={{ margin: '0 0 22px', fontSize: 16, lineHeight: 1.6, color: 'rgba(31,27,22,0.78)', maxWidth: 560 }}>
+            {book.description || 'A diary-novel the size of a cathedral.'}
+          </p>
+          <button type="button" onClick={onAdd} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            background: HS_INK, color: '#fff', border: 0,
+            padding: '14px 24px', borderRadius: 999,
+            fontFamily: 'inherit', fontWeight: 600, fontSize: 14.5, cursor: 'pointer',
+          }}>
+            Add to cart · {formatInr(effective)} <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <div style={{ aspectRatio: '3 / 4', borderRadius: 18, overflow: 'hidden', background: '#fff', boxShadow: '0 18px 40px rgba(31,27,22,0.18)' }}>
+          {book.coverUrl ? (
+            <img src={book.coverUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{
+              width: '100%', height: '100%', padding: 18, color: '#fff',
+              background: '#5b4d3d', display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{ fontFamily: 'serif', fontWeight: 700, fontSize: 18, lineHeight: 1.2 }}>{book.title}</div>
+              <div style={{ marginTop: 'auto', fontSize: 12, opacity: 0.85, letterSpacing: '0.08em' }}>{(book.author || '').toUpperCase()}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Big self-contained shop browser. Owns filter / sort / pagination state.
+export function TapasShopBrowser({ props = {} }) {
+  const { page_size = _SHOP_PAGE_SIZE, member_discount_default = true } = props;
+  const { useShopBooks } = require('../cms/hooks');
+  const { adaptShopBooks } = require('../cms/adapters');
+  const { SHOP_PRICE_MAX, formatInr, MEMBER_DISCOUNT_RATE } = require('../data/shopBooks');
+  const { useCart } = require('../context/CartContext');
+
+  const { data: rows, loading } = useShopBooks();
+  const books = React.useMemo(() => adaptShopBooks(rows), [rows, adaptShopBooks]);
+  const { addBook } = useCart();
+
+  const [filters, setFilters] = React.useState({
+    search: '',
+    categories: new Set(),
+    format: '',
+    priceMax: SHOP_PRICE_MAX,
+    inStockOnly: false,
+    signedOnly: false,
+    memberDiscount: !!member_discount_default,
+  });
+  const [sort, setSort] = React.useState('recommended');
+  const [page, setPage] = React.useState(1);
+  const gridRef = React.useRef(null);
+
+  // Debounced search
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(filters.search), 200);
+    return () => clearTimeout(t);
+  }, [filters.search]);
+
+  const categoryCounts = React.useMemo(() => {
+    const m = {};
+    books.forEach((b) => (b.categories || []).forEach((c) => { m[c] = (m[c] || 0) + 1; }));
+    return m;
+  }, [books]);
+
+  const filtered = React.useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    return books.filter((b) => {
+      if (q && !(b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q))) return false;
+      if (filters.categories.size > 0) {
+        const hit = (b.categories || []).some((c) => filters.categories.has(c));
+        if (!hit) return false;
+      }
+      if (filters.format && b.format !== filters.format) return false;
+      if (b.price > filters.priceMax) return false;
+      if (filters.inStockOnly && !b.inStock) return false;
+      if (filters.signedOnly && !b.signed) return false;
+      return true;
+    });
+  }, [books, filters, debouncedSearch]);
+
+  const sorted = React.useMemo(() => {
+    const arr = filtered.slice();
+    if (sort === 'price-asc') return arr.sort((a, b) => a.price - b.price);
+    if (sort === 'author-az') return arr.sort((a, b) => {
+      const la = (a.author || '').split(' ').slice(-1)[0].toLowerCase();
+      const lb = (b.author || '').split(' ').slice(-1)[0].toLowerCase();
+      return la.localeCompare(lb);
+    });
+    if (sort === 'new-arrivals') return arr.reverse();
+    return arr;
+  }, [filtered, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / page_size));
+  React.useEffect(() => { if (page > totalPages) setPage(1); }, [page, totalPages]);
+  React.useEffect(() => { setPage(1); }, [filters, debouncedSearch, sort]);
+  const pageBooks = sorted.slice((page - 1) * page_size, page * page_size);
+
+  const toggleCategory = (c) => setFilters((f) => {
+    const next = new Set(f.categories);
+    if (next.has(c)) next.delete(c); else next.add(c);
+    return { ...f, categories: next };
+  });
+
+  const onAdd = (book) => {
+    const eff = filters.memberDiscount
+      ? Math.round(Number(book.price || 0) * (1 - MEMBER_DISCOUNT_RATE))
+      : Number(book.price || 0);
+    addBook({ id: book.id, title: book.title, author: book.author, sales_price: eff });
+  };
+
+  const allCats = Object.keys(categoryCounts).sort();
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 32, alignItems: 'start' }}>
+        {/* Sidebar */}
+        <aside style={{ background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 18, padding: 22, position: 'sticky', top: 88 }}>
+          <div style={{ marginBottom: 18 }}>
+            <input
+              type="search" value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              placeholder="Search"
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 999, border: `1px solid ${HS_RULE}`, background: '#fff', fontSize: 14, fontFamily: 'inherit', color: HS_INK, outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: HS_PURPLE, marginBottom: 8 }}>Categories</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+              {allCats.length === 0 && <span style={{ fontSize: 12, color: 'rgba(31,27,22,0.5)' }}>None yet</span>}
+              {allCats.map((c) => (
+                <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: HS_INK, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={filters.categories.has(c)} onChange={() => toggleCategory(c)} />
+                  <span style={{ flex: 1 }}>{c}</span>
+                  <span style={{ fontSize: 11, color: 'rgba(31,27,22,0.55)' }}>{categoryCounts[c]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: HS_PURPLE, marginBottom: 8 }}>Max price</div>
+            <input type="range" min="0" max={SHOP_PRICE_MAX} step="50" value={filters.priceMax}
+              onChange={(e) => setFilters((f) => ({ ...f, priceMax: Number(e.target.value) }))} style={{ width: '100%' }} />
+            <div style={{ fontSize: 13, color: HS_INK, marginTop: 4 }}>{formatInr(filters.priceMax)}</div>
+          </div>
+          <div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: HS_INK, cursor: 'pointer', marginBottom: 8 }}>
+              <input type="checkbox" checked={filters.inStockOnly} onChange={(e) => setFilters((f) => ({ ...f, inStockOnly: e.target.checked }))} />
+              In stock only
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: HS_INK, cursor: 'pointer', marginBottom: 8 }}>
+              <input type="checkbox" checked={filters.signedOnly} onChange={(e) => setFilters((f) => ({ ...f, signedOnly: e.target.checked }))} />
+              Signed copies only
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: HS_INK, cursor: 'pointer' }}>
+              <input type="checkbox" checked={filters.memberDiscount} onChange={(e) => setFilters((f) => ({ ...f, memberDiscount: e.target.checked }))} />
+              Apply member discount
+            </label>
+          </div>
+        </aside>
+
+        {/* Right column */}
+        <div ref={gridRef}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, gap: 16, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: 'rgba(31,27,22,0.65)', fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+              {sorted.length} of {books.length} titles
+            </span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)} style={{
+              padding: '8px 14px', borderRadius: 999, border: `1px solid ${HS_RULE}`, background: '#fff',
+              fontFamily: 'inherit', fontSize: 13, color: HS_INK, cursor: 'pointer',
+            }}>
+              <option value="recommended">Recommended</option>
+              <option value="new-arrivals">New arrivals</option>
+              <option value="price-asc">Price · low to high</option>
+              <option value="author-az">Author · A → Z</option>
+            </select>
+          </div>
+
+          {loading && books.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'rgba(31,27,22,0.55)' }}>Loading shop…</div>
+          ) : sorted.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', background: HS_CARD, border: `1px dashed ${HS_RULE}`, borderRadius: 16, color: 'rgba(31,27,22,0.7)' }}>
+              No books match these filters.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                {pageBooks.map((b) => {
+                  const eff = filters.memberDiscount
+                    ? Math.round(Number(b.price || 0) * (1 - MEMBER_DISCOUNT_RATE))
+                    : Number(b.price || 0);
+                  return (
+                    <article key={b.id} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 14px rgba(31,27,22,0.06)', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ aspectRatio: '3 / 4', background: '#5b4d3d', position: 'relative' }}>
+                        {b.coverUrl
+                          ? <img src={b.coverUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <div style={{ padding: 14, color: '#fff', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+                              <div style={{ fontFamily: 'serif', fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{b.title}</div>
+                              <div style={{ marginTop: 'auto', fontSize: 11, opacity: 0.85, letterSpacing: '0.08em' }}>{(b.author || '').toUpperCase()}</div>
+                            </div>}
+                      </div>
+                      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                        <div style={{ fontFamily: 'serif', fontWeight: 600, fontSize: 16, color: HS_INK, lineHeight: 1.2 }}>{b.title}</div>
+                        <div style={{ fontSize: 12, color: 'rgba(31,27,22,0.6)' }}>{b.author}</div>
+                        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                          <div>
+                            <span style={{ fontWeight: 700, color: HS_INK }}>{formatInr(eff)}</span>
+                            {filters.memberDiscount && eff < b.price && (
+                              <span style={{ marginLeft: 6, fontSize: 12, color: 'rgba(31,27,22,0.5)', textDecoration: 'line-through' }}>{formatInr(b.price)}</span>
+                            )}
+                          </div>
+                          <button onClick={() => onAdd(b)} aria-label={`Add ${b.title} to cart`} style={{
+                            width: 32, height: 32, borderRadius: '50%',
+                            background: HS_PINK, color: '#fff', border: 'none', cursor: 'pointer',
+                            fontSize: 18, lineHeight: 1, fontWeight: 700,
+                          }}>+</button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 28 }}>
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '8px 14px', borderRadius: 999, border: `1px solid ${HS_RULE}`, background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1 }}>← Prev</button>
+                  {Array.from({ length: totalPages }).map((_, i) => (
+                    <button key={i} onClick={() => setPage(i + 1)} style={{
+                      padding: '8px 14px', borderRadius: 999,
+                      border: `1px solid ${page === i + 1 ? HS_INK : HS_RULE}`,
+                      background: page === i + 1 ? HS_INK : '#fff',
+                      color: page === i + 1 ? '#fff' : HS_INK,
+                      cursor: 'pointer',
+                    }}>{i + 1}</button>
+                  ))}
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '8px 14px', borderRadius: 999, border: `1px solid ${HS_RULE}`, background: '#fff', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1 }}>Next →</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
