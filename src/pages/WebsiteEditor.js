@@ -1581,6 +1581,175 @@ function CanvasSelectionShell({
 // Right panel  —  spec § 1: 280 px, Style / Settings / Interactions tabs
 // Style tab is live in Phase 3. Settings + Interactions still stubbed.
 // =====================================================================
+// =====================================================================
+// BlockPropsInspector — auto-generated form for editing the content
+// (text, image URLs, colors, toggles, lists) of a type-keyed block
+// like tapas_hero / tapas_pricing_split. No schema lookup — every key
+// on `block.props` becomes an input, with the input shape inferred
+// from the existing value's type:
+//   * boolean → checkbox
+//   * number  → number input
+//   * string  → input or textarea (textarea over 60 chars)
+//   * array   → JSON textarea (round-tripped through JSON.parse on
+//               commit; invalid JSON keeps the existing value so a
+//               half-typed entry doesn't blow up the prop)
+//   * object  → JSON textarea (same shape)
+// Image / color shape detection is heuristic: keys ending in
+// "_url" / "image" / "photo" / "src" get a paired text input + URL
+// hint; keys ending in "_color" / "color" get a native color picker.
+// =====================================================================
+function BlockPropsInspector({ block, onSetProp, W }) {
+  const props = block?.props || {};
+  const keys = Object.keys(props).filter((k) => !k.startsWith('_'));
+  const labelStyle = {
+    display: 'block', fontSize: 10, fontWeight: 600,
+    color: W.textDim, marginBottom: 10,
+    letterSpacing: '0.06em', textTransform: 'uppercase',
+  };
+  const inputBase = {
+    marginTop: 4, width: '100%', boxSizing: 'border-box',
+    height: 26, padding: '0 8px',
+    background: W.inputBg || '#1a1a1a',
+    color: W.text || '#eee',
+    border: `1px solid ${W.panelBorder}`,
+    borderRadius: 3,
+    fontSize: 12, fontFamily: 'inherit',
+    textTransform: 'none', letterSpacing: 'normal',
+  };
+  const titleCase = (s) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const renderField = (key, value) => {
+    const lk = key.toLowerCase();
+    const isColor   = lk.endsWith('color') || lk.endsWith('_color');
+    const isImage   = lk.endsWith('_url') || lk.endsWith('image') || lk.endsWith('photo') || lk.endsWith('src');
+    const isHtml    = lk.endsWith('_html') || key === 'quote_html' || key === 'title_html' || key === 'heading_html';
+    if (typeof value === 'boolean') {
+      return (
+        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12, color: W.text || '#eee' }}>
+          <input type="checkbox" checked={value} onChange={(e) => onSetProp(key, e.target.checked)} />
+          <span>{titleCase(key)}</span>
+        </label>
+      );
+    }
+    if (typeof value === 'number') {
+      return (
+        <label key={key} style={labelStyle}>
+          {titleCase(key)}
+          <input type="number" value={value}
+            onChange={(e) => onSetProp(key, e.target.value === '' ? 0 : Number(e.target.value))}
+            style={inputBase} />
+        </label>
+      );
+    }
+    if (Array.isArray(value) || (value && typeof value === 'object')) {
+      const json = JSON.stringify(value, null, 2);
+      return (
+        <label key={key} style={labelStyle}>
+          {titleCase(key)} <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(JSON)</span>
+          <textarea
+            defaultValue={json}
+            onBlur={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                onSetProp(key, parsed);
+              } catch {
+                // Keep current value on invalid JSON — no spam toasts.
+              }
+            }}
+            style={{ ...inputBase, height: 'auto', minHeight: 80, padding: 8, fontFamily: 'ui-monospace, monospace', fontSize: 11 }}
+          />
+        </label>
+      );
+    }
+    // String-ish (covers null/undefined → '')
+    const str = value == null ? '' : String(value);
+    if (isColor) {
+      const isHex = /^#([0-9a-f]{3}){1,2}$/i.test(str);
+      return (
+        <label key={key} style={labelStyle}>
+          {titleCase(key)}
+          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+            <input
+              type="color"
+              value={isHex ? str : '#000000'}
+              onChange={(e) => onSetProp(key, e.target.value)}
+              style={{ width: 26, height: 26, padding: 0, border: `1px solid ${W.panelBorder}`, borderRadius: 3, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
+            />
+            <input
+              type="text"
+              value={str}
+              onChange={(e) => onSetProp(key, e.target.value)}
+              placeholder="#000 / red / rgba(...)"
+              style={{ ...inputBase, marginTop: 0 }}
+            />
+          </div>
+        </label>
+      );
+    }
+    if (isImage) {
+      return (
+        <label key={key} style={labelStyle}>
+          {titleCase(key)}
+          <input
+            type="text" value={str}
+            onChange={(e) => onSetProp(key, e.target.value)}
+            placeholder="https://… or /assets/photo.jpg"
+            style={inputBase}
+          />
+          {str && (
+            <img
+              src={str.startsWith('http') || str.startsWith('/') ? str : `/${str}`}
+              alt=""
+              style={{ marginTop: 6, maxWidth: '100%', maxHeight: 80, objectFit: 'cover', borderRadius: 4, border: `1px solid ${W.panelBorder}` }}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          )}
+        </label>
+      );
+    }
+    if (isHtml || str.length > 60) {
+      return (
+        <label key={key} style={labelStyle}>
+          {titleCase(key)}{isHtml && <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}> (HTML)</span>}
+          <textarea
+            value={str}
+            onChange={(e) => onSetProp(key, e.target.value)}
+            rows={Math.max(2, Math.min(6, Math.ceil(str.length / 50)))}
+            style={{ ...inputBase, height: 'auto', minHeight: 60, padding: 8, fontFamily: 'inherit' }}
+          />
+        </label>
+      );
+    }
+    return (
+      <label key={key} style={labelStyle}>
+        {titleCase(key)}
+        <input type="text" value={str} onChange={(e) => onSetProp(key, e.target.value)} style={inputBase} />
+      </label>
+    );
+  };
+
+  return (
+    <div style={{
+      flexShrink: 0,
+      borderBottom: `1px solid ${W.panelBorder}`,
+      background: 'rgba(20, 110, 245, 0.07)',
+      padding: '14px',
+    }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: W.text || '#eee', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Block · {block.type}
+        </div>
+        <div style={{ fontSize: 10, color: W.textDim, fontFamily: 'ui-monospace, monospace' }} title={block.id}>
+          id: {block.id}
+        </div>
+      </div>
+      {keys.length === 0 ? (
+        <div style={{ fontSize: 11, color: W.textDim }}>This block has no editable props.</div>
+      ) : keys.map((k) => renderField(k, props[k]))}
+    </div>
+  );
+}
+
 function ElementInspector({ selector, onClear, onSetStyle, getValue, W }) {
   const [openSection, setOpenSection] = useState('typography');
   const tag = (() => {
@@ -1782,6 +1951,7 @@ function RightPanel({
   onPlayTimeline,
   tree, onSetTextContent,
   selectedElementSel, onClearElementSel, onSetElementStyle, elementStyleValue,
+  selectedBlock, onSetBlockProp,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -1816,6 +1986,20 @@ function RightPanel({
           >{t.label}</button>
         ))}
       </div>
+      {/* Block props inspector — edits the actual content of a
+          type-keyed block (text fields, image URLs, colors, toggles).
+          Auto-generates inputs from whatever keys exist on
+          block.props — no schema needed; staff see exactly what's
+          editable on the selected block. Writes flow through
+          onSetBlockProp → applyEdit → IframeCanvas re-broadcasts
+          to the storefront iframe → live re-render. */}
+      {selectedBlock && onSetBlockProp && (
+        <BlockPropsInspector
+          block={selectedBlock}
+          onSetProp={(k, v) => onSetBlockProp(selectedBlock.id, k, v)}
+          W={W}
+        />
+      )}
       {/* Element-level inspector — Webflow features 2 + 3.
           Shown only when staff have drilled into a sub-element of the
           currently-selected block (orange outline on canvas). Three
@@ -2467,6 +2651,39 @@ export default function WebsiteEditor() {
       return setClassBreakpointStyle(withClass, className, device, prop, value);
     });
   }, [selectedId, activePageKey, styleState, device, applyEdit]);
+
+  // Block prop write — edits the actual content of a type-keyed block
+  // (text, image URL, color, etc.) by mutating
+  // content.pages[pageKey].blocks[i].props[propKey]. The IframeCanvas
+  // re-broadcasts the updated content to the storefront iframe via
+  // tapas:apply-content, so changes appear in the canvas immediately.
+  // For boolean / number values, callers should pre-coerce.
+  const handleSetBlockProp = useCallback((blockId, propKey, value) => {
+    if (!blockId || !propKey || !pageKey) return;
+    applyEdit((c) => {
+      const pages = { ...(c?.pages || {}) };
+      const page = { ...(pages[pageKey] || {}) };
+      const blocks = Array.isArray(page.blocks) ? page.blocks.slice() : [];
+      const idx = blocks.findIndex((b) => b?.id === blockId);
+      if (idx === -1) return c;
+      const block = { ...blocks[idx] };
+      block.props = { ...(block.props || {}), [propKey]: value };
+      blocks[idx] = block;
+      page.blocks = blocks;
+      pages[pageKey] = page;
+      return { ...c, pages };
+    });
+  }, [pageKey, applyEdit]);
+
+  // Resolves the currently-selected block from
+  // content.pages[pageKey].blocks (the type-keyed schema used by seeded
+  // pages). Returns null when the selection is from the legacy tag-tree
+  // instead, so the new BlockPropsInspector knows when to bail.
+  const selectedBlock = useMemo(() => {
+    const blocks = content?.pages?.[pageKey]?.blocks;
+    if (!Array.isArray(blocks) || !selectedId) return null;
+    return blocks.find((b) => b?.id === selectedId) || null;
+  }, [content, pageKey, selectedId]);
 
   // Element-level style write — Webflow feature 2/3. Writes a CSS
   // override at content.element_styles[BLOCK_PATH]["::"+selector][prop]
@@ -3315,6 +3532,8 @@ export default function WebsiteEditor() {
           onClearElementSel={() => setSelectedElementSel(null)}
           onSetElementStyle={handleSetElementStyle}
           elementStyleValue={elementStyleValue}
+          selectedBlock={selectedBlock}
+          onSetBlockProp={handleSetBlockProp}
         />
       </div>
       <CommandPalette
