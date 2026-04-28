@@ -124,16 +124,18 @@ function WebsiteEditorRebuilding() {
       </h1>
       <p style={{ margin: '0 0 16px', lineHeight: 1.55, color: '#444' }}>
         The block-tree editor that used to live here is being replaced as
-        part of the CMS migration. Anything you edit on this screen will
-        <strong> not </strong>appear on the live site.
+        part of the CMS migration. Anything you edit on this screen would
+        <strong> not </strong>appear on the live site, so it's blocked.
       </p>
       <p style={{ margin: 0, lineHeight: 1.55, color: '#444' }}>
-        For now, edit copy via{' '}
-        <a href="/site-content" style={{ color: '#006a6a', fontWeight: 500 }}>
-          Site Content
-        </a>
-        . The new editor will land alongside the typed content tables.
+        Use these instead — they write to the same tables the live site reads from:
       </p>
+      <ul style={{ margin: '12px 0 0', paddingLeft: 18, lineHeight: 1.7, color: '#444' }}>
+        <li><a href="/store/cms" style={{ color: '#006a6a', fontWeight: 500 }}>Store Content</a> — Hours, Contact, FAQs, Journal, Clubs, Team, Press</li>
+        <li><a href="/books" style={{ color: '#006a6a', fontWeight: 500 }}>Books</a> — Shop catalogue + Library shelves</li>
+        <li><a href="/store/promo-codes" style={{ color: '#006a6a', fontWeight: 500 }}>Promo Codes</a> — Storefront discount codes</li>
+        <li><a href="/events" style={{ color: '#006a6a', fontWeight: 500 }}>Events</a> — Calendar entries</li>
+      </ul>
     </div>
   );
 }
@@ -151,7 +153,6 @@ const MarketingTools        = lazyWithRetry(() => import('./pages/MarketingTools
 const PromoCodes            = lazyWithRetry(() => import('./pages/PromoCodes'));
 const StorePromoCodes       = lazyWithRetry(() => import('./pages/StorePromoCodes'));
 const StoreCMS              = lazyWithRetry(() => import('./pages/StoreCMS'));
-const WebsiteEditor         = lazyWithRetry(() => import('./pages/WebsiteEditor'));
 const MarketingHub          = lazyWithRetry(() => import('./pages/MarketingHub'));
 const LoyaltySystem         = lazyWithRetry(() => import('./pages/LoyaltySystem'));
 const GrowthTools           = lazyWithRetry(() => import('./pages/GrowthTools'));
@@ -810,7 +811,7 @@ function DashboardShell() {
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/commerce-insights"                  element={<CommerceInsights />} />
             <Route path="/store/content"                      element={<Navigate to="/store/content-v2" replace />} />
-            <Route path="/store/content-v2"                   element={<WebsiteEditor />} />
+            <Route path="/store/content-v2"                   element={<WebsiteEditorRebuilding />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
             {/* Marketing */}
