@@ -36,6 +36,8 @@ import {
   TapasEventsCalendar, TapasPricingSplit, TapasFeaturedTestimonial,
   TapasClubsGrid, TapasFeaturedSupper,
   TapasFindUs, TapasHoursStrip, TapasFaqAccordion,
+  TapasManifesto, TapasStatsStrip, TapasTimeline,
+  TapasCompromises, TapasTeamGrid, TapasPressQuotes,
 } from './TapasFigmaBlocks';
 import { TapasGroup, ComponentRef } from './PageRenderer';
 
@@ -1019,6 +1021,49 @@ export const BLOCK_REGISTRY = {
       { key: 'heading_html', label: 'Heading (HTML, <em> allowed)',  type: 'text' },
       { key: 'lede',         label: 'Lede',                          type: 'textarea' },
     ],
+  },
+
+  tapas_manifesto: {
+    label: 'Tapas Manifesto (live)',
+    category: 'Content',
+    Renderer: TapasManifesto,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_stats_strip: {
+    label: 'Tapas Stats Strip (live)',
+    category: 'Content',
+    Renderer: TapasStatsStrip,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_timeline: {
+    label: 'Tapas Timeline (live)',
+    category: 'Content',
+    Renderer: TapasTimeline,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_compromises: {
+    label: 'Tapas Compromises (live)',
+    category: 'Content',
+    Renderer: TapasCompromises,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_team_grid: {
+    label: 'Tapas Team Grid (live)',
+    category: 'Content',
+    Renderer: TapasTeamGrid,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_press_quotes: {
+    label: 'Tapas Press Quotes (live)',
+    category: 'Content',
+    Renderer: TapasPressQuotes,
+    defaultProps: {},
+    schema: [],
   },
 
   tapas_featured_testimonial: {
