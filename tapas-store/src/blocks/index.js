@@ -39,6 +39,7 @@ import {
   TapasManifesto, TapasStatsStrip, TapasTimeline,
   TapasCompromises, TapasTeamGrid, TapasPressQuotes,
   TapasBlogFeatured, TapasBlogSidebar, TapasBlogArchive,
+  TapasLibraryStats, TapasLibraryShelves, TapasLibraryHouseRules,
 } from './TapasFigmaBlocks';
 import { TapasGroup, ComponentRef } from './PageRenderer';
 
@@ -1094,6 +1095,39 @@ export const BLOCK_REGISTRY = {
       { key: 'eyebrow',      label: 'Eyebrow',                       type: 'text' },
       { key: 'heading_html', label: 'Heading (HTML, <em> allowed)',  type: 'text' },
       { key: 'lede',         label: 'Lede',                          type: 'textarea' },
+    ],
+  },
+
+  tapas_library_stats: {
+    label: 'Tapas Library — Stats Row (live)',
+    category: 'Content',
+    Renderer: TapasLibraryStats,
+    defaultProps: { fallback: [] },
+    schema: [],
+  },
+  tapas_library_shelves: {
+    label: 'Tapas Library — Shelves Browser (live)',
+    category: 'Content',
+    Renderer: TapasLibraryShelves,
+    defaultProps: { show_featured: true, show_filter: true },
+    schema: [
+      { key: 'show_filter',   label: 'Show category + search filter', type: 'boolean' },
+      { key: 'show_featured', label: 'Show featured shelf banner',   type: 'boolean' },
+    ],
+  },
+  tapas_library_house_rules: {
+    label: 'Tapas Library — House Rules (live)',
+    category: 'Content',
+    Renderer: TapasLibraryHouseRules,
+    defaultProps: {
+      eyebrow: 'House Rules',
+      heading: 'How the lending works.',
+      body:    'No library card, no paperwork. Just a signature in the ledger by the door and a promise to bring them back.',
+    },
+    schema: [
+      { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
+      { key: 'heading', label: 'Heading', type: 'text' },
+      { key: 'body',    label: 'Body',    type: 'textarea' },
     ],
   },
 

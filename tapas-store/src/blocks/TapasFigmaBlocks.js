@@ -1521,3 +1521,213 @@ export function TapasBlogArchive({ props = {} }) {
     </section>
   );
 }
+
+// =====================================================================
+// Phase 2 (Library page) blocks — stats row, full filterable shelf
+// browser (self-contained state), house-rules ordered list.
+// =====================================================================
+
+export function TapasLibraryStats({ props = {} }) {
+  const { fallback = [] } = props;
+  const { usePage } = require('../cms/hooks');
+  const { data: page } = usePage('library');
+  const stats = page?.stats_jsonb?.stats || fallback;
+  if (!Array.isArray(stats) || stats.length === 0) return null;
+  return (
+    <section style={{ padding: 'clamp(24px, 4vw, 48px) 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`, gap: 24, background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 18, padding: 28 }} role="list">
+        {stats.map((s, i) => (
+          <div key={i} role="listitem" style={{ borderLeft: i === 0 ? 0 : `1px solid ${HS_RULE}`, paddingLeft: i === 0 ? 0 : 24 }}>
+            <div style={{ fontFamily: 'serif', fontWeight: 700, fontSize: 36, color: s.accent ? HS_PURPLE : HS_INK, lineHeight: 1, letterSpacing: '-0.02em' }}>{s.value}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(31,27,22,0.7)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Full library browser — filter + featured + shelves + reserve.
+// Self-contained: owns its category + search state internally so a
+// staff-placed instance behaves the same anywhere it's dropped.
+export function TapasLibraryShelves({ props = {} }) {
+  const {
+    show_featured = true,
+    show_filter   = true,
+  } = props;
+  const { useLibraryShelves, usePage } = require('../cms/hooks');
+  const { adaptLibraryShelves } = require('../cms/adapters');
+  const { matchesBook, LIBRARY_CATEGORIES, LIBRARY_FEATURED } = require('../data/libraryBooks');
+  const { data: rows, loading } = useLibraryShelves();
+  const { data: page } = usePage('library');
+  const shelves = React.useMemo(() => adaptLibraryShelves(rows), [rows, adaptLibraryShelves]);
+
+  const [category, setCategory] = React.useState('All');
+  const [query, setQuery] = React.useState('');
+
+  const filtered = React.useMemo(() => shelves.map((shelf) => ({
+    ...shelf,
+    visibleBooks: shelf.books.filter((b) => matchesBook(b, { category, query })),
+  })), [shelves, category, query, matchesBook]);
+
+  const totalVisible = filtered.reduce((sum, s) => sum + s.visibleBooks.length, 0);
+
+  const onReserve = (book) => {
+    // eslint-disable-next-line no-alert
+    window.alert(`Reserved "${book.title}" — pick up at the cafe within 48 hours.`);
+  };
+
+  const fromDb = page?.stats_jsonb?.featured;
+  const f = { ...LIBRARY_FEATURED, ...(fromDb || {}) };
+
+  const cats = ['All', ...(LIBRARY_CATEGORIES || [])];
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <style>{`
+        .tpx-lib-cover { aspect-ratio: 3 / 4; border-radius: 8px;
+          display: flex; flex-direction: column; align-items: flex-start;
+          padding: 12px; color: #fff; font-family: serif; font-weight: 600;
+          overflow: hidden; }
+        .tpx-lib-cover.c-purple { background: #8F4FD6; }
+        .tpx-lib-cover.c-ink    { background: #1a1a1a; }
+        .tpx-lib-cover.c-orange { background: #FF934A; }
+        .tpx-lib-cover.c-pink   { background: #E0004F; }
+        .tpx-lib-cover.c-taupe  { background: #5b4d3d; }
+        .tpx-lib-cover.c-lime   { background: #C9F27F; color: ${HS_INK}; }
+        .tpx-lib-cover.has-photo { padding: 0; }
+        .tpx-lib-cover img { width: 100%; height: 100%; object-fit: cover; }
+        .tpx-lib-book { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 8px;
+          background: #fff; border: 1px solid ${HS_RULE}; border-radius: 12px; padding: 12px; transition: box-shadow .2s; }
+        .tpx-lib-book:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+        .tpx-lib-book .stat { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; }
+        .tpx-lib-book .stat.is-out { color: #c0392b; }
+        .tpx-lib-book .stat.is-available { color: #2BB673; }
+      `}</style>
+
+      {show_filter && (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {cats.map((c) => (
+              <button key={c} onClick={() => setCategory(c)} style={{
+                padding: '8px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600,
+                border: `1px solid ${category === c ? HS_INK : HS_RULE}`,
+                background: category === c ? HS_INK : '#fff',
+                color: category === c ? '#fff' : HS_INK,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>{c}</button>
+            ))}
+          </div>
+          <input
+            type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by title or author"
+            style={{
+              marginLeft: 'auto', minWidth: 260, padding: '10px 16px',
+              borderRadius: 999, border: `1px solid ${HS_RULE}`, background: '#fff',
+              fontSize: 14, fontFamily: 'inherit', color: HS_INK, outline: 'none',
+            }}
+          />
+        </div>
+      )}
+
+      {show_featured && f && (
+        <section style={{ background: HS_LIME, borderRadius: 24, padding: 'clamp(28px, 4vw, 56px)', marginBottom: 36 }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{f.kicker}</div>
+          <h2 style={{ margin: '12px 0 10px', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(28px, 3.4vw, 44px)', lineHeight: 1.05, color: HS_INK }}>
+            {f.headline} {f.accent && <em style={{ fontStyle: 'italic', color: HS_PURPLE }}>{f.accent}</em>}
+          </h2>
+          {f.body && <p style={{ margin: '0 0 18px', fontSize: 15.5, color: 'rgba(31,27,22,0.78)', maxWidth: 640 }}>{f.body}</p>}
+          {f.ctaLabel && (
+            <button type="button" onClick={() => {
+              const t = document.getElementById(f.ctaTarget);
+              if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.history.replaceState(null, '', `#${f.ctaTarget}`); }
+            }} style={{
+              background: HS_INK, color: '#fff', border: 0, padding: '12px 22px',
+              borderRadius: 999, fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+            }}>
+              {f.ctaLabel} →
+            </button>
+          )}
+        </section>
+      )}
+
+      {loading && shelves.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'rgba(31,27,22,0.55)' }}>Loading shelves…</div>
+      ) : totalVisible === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', background: HS_CARD, border: `1px dashed ${HS_RULE}`, borderRadius: 16, color: 'rgba(31,27,22,0.7)' }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }} aria-hidden="true">📚</div>
+          <h3 style={{ margin: '0 0 6px', fontFamily: 'serif' }}>No books match your filters</h3>
+          <p style={{ margin: 0, fontSize: 14 }}>Try a different category or clear the search.</p>
+        </div>
+      ) : filtered.map((shelf) => shelf.visibleBooks.length === 0 ? null : (
+        <section key={shelf.id} id={shelf.id} style={{ marginBottom: 36 }}>
+          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+            <h3 style={{ margin: 0, fontFamily: 'serif', fontWeight: 600, fontSize: 22, color: HS_INK }}>
+              Shelf {shelf.number} · <em style={{ fontStyle: 'italic', color: HS_PURPLE }}>{shelf.name}</em>
+            </h3>
+            {shelf.totals && (
+              <span style={{ fontSize: 12, color: 'rgba(31,27,22,0.6)', fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                {shelf.totals.titles} titles · {shelf.totals.outOnLoan} out on loan
+              </span>
+            )}
+          </header>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
+            {shelf.visibleBooks.map((b) => {
+              const isOut = b.status?.kind === 'out';
+              const statusLabel = isOut ? `Out · back ${b.status.returnDate}` : 'Available';
+              return (
+                <button key={b.id} type="button" className="tpx-lib-book" onClick={() => onReserve(b)} aria-label={`Reserve ${b.title} by ${b.author}, ${statusLabel}`}>
+                  {b.coverUrl ? (
+                    <div className="tpx-lib-cover has-photo" aria-hidden="true"><img src={b.coverUrl} alt="" loading="lazy" /></div>
+                  ) : (
+                    <div className={`tpx-lib-cover c-${b.cover || 'taupe'}`} aria-hidden="true">
+                      <div style={{ fontSize: 12, lineHeight: 1.2, fontWeight: 700 }}>{b.title}</div>
+                      <div style={{ marginTop: 'auto', fontSize: 10, opacity: 0.85, letterSpacing: '0.08em' }}>{(b.author || '').toUpperCase()}</div>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: HS_INK, fontWeight: 600, lineHeight: 1.2, textAlign: 'left' }}>{b.title}</span>
+                  </div>
+                  <div className={`stat ${isOut ? 'is-out' : 'is-available'}`}>● {statusLabel}</div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </section>
+  );
+}
+
+export function TapasLibraryHouseRules({ props = {} }) {
+  const {
+    eyebrow = 'House Rules',
+    heading = 'How the lending works.',
+    body    = 'No library card, no paperwork. Just a signature in the ledger by the door and a promise to bring them back.',
+  } = props;
+  const { usePage } = require('../cms/hooks');
+  const { data: page } = usePage('library');
+  const { LIBRARY_HOUSE_RULES } = require('../data/libraryBooks');
+  const rules = page?.stats_jsonb?.houseRules || LIBRARY_HOUSE_RULES;
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0', display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48, alignItems: 'start' }}>
+      <div>
+        <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{eyebrow}</div>
+        <h2 style={{ margin: '8px 0 12px', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(28px, 3.4vw, 44px)', lineHeight: 1.05, color: HS_INK }}>{heading}</h2>
+        <p style={{ margin: 0, fontSize: 15.5, color: 'rgba(31,27,22,0.7)', lineHeight: 1.55 }}>{body}</p>
+      </div>
+      <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {(rules || []).map((r, i) => (
+          <li key={r.n || i} style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: 16, padding: '16px 18px', background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 14 }}>
+            <span style={{ fontFamily: 'serif', fontWeight: 700, fontSize: 24, color: HS_PURPLE }}>{r.n}</span>
+            <div>
+              <h4 style={{ margin: 0, fontFamily: 'serif', fontWeight: 600, fontSize: 17, color: HS_INK }}>{r.title}</h4>
+              {r.body && <p style={{ margin: '4px 0 0', fontSize: 14, color: 'rgba(31,27,22,0.7)', lineHeight: 1.55 }}>{r.body}</p>}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
