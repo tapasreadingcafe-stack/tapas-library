@@ -1428,6 +1428,72 @@ function CanvasSelectionShell({
 // Right panel  —  spec § 1: 280 px, Style / Settings / Interactions tabs
 // Style tab is live in Phase 3. Settings + Interactions still stubbed.
 // =====================================================================
+function ElementInspector({ selector, onClear, onSetStyle, getValue, W }) {
+  const tag = (() => {
+    const last = String(selector || '').split('>').pop().trim();
+    return last.split(':')[0].split('.')[0].toLowerCase() || 'element';
+  })();
+  const Field = ({ label, prop, type = 'text', placeholder = '' }) => (
+    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: W.textDim, marginBottom: 12, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+      {label}
+      <input
+        type={type}
+        value={getValue(prop)}
+        placeholder={placeholder}
+        onChange={(e) => onSetStyle(prop, e.target.value)}
+        style={{
+          marginTop: 4, width: '100%', boxSizing: 'border-box',
+          height: 26, padding: '0 8px',
+          background: W.inputBg || '#1a1a1a',
+          color: W.text || '#eee',
+          border: `1px solid ${W.panelBorder}`,
+          borderRadius: 3,
+          fontSize: 12, fontFamily: 'inherit',
+          textTransform: 'none', letterSpacing: 'normal',
+        }}
+      />
+    </label>
+  );
+  return (
+    <div style={{
+      flexShrink: 0,
+      borderBottom: `1px solid ${W.panelBorder}`,
+      background: 'rgba(249, 115, 22, 0.06)',
+      padding: '12px 14px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: W.text || '#eee', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Element &lt;{tag}&gt;</div>
+            <div style={{
+              fontSize: 10, color: W.textDim, fontFamily: 'ui-monospace, monospace',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }} title={selector}>{selector}</div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          title="Clear element selection (ESC)"
+          style={{
+            width: 20, height: 20, lineHeight: '20px',
+            border: 'none', background: 'transparent',
+            color: W.textDim, cursor: 'pointer', fontSize: 14,
+            padding: 0, flexShrink: 0,
+          }}
+        >×</button>
+      </div>
+      <Field label="Text color" prop="color" placeholder="#1F1B16 / red / rgba(...)" />
+      <Field label="Font size" prop="fontSize" placeholder="18px / 1.2rem / clamp(...)" />
+      <Field label="Padding" prop="padding" placeholder="12px 16px" />
+      <div style={{ fontSize: 10, color: W.textDim, marginTop: 2, lineHeight: 1.4 }}>
+        Saves to <code style={{ fontFamily: 'ui-monospace, monospace' }}>element_styles</code> and shows on the storefront on next reload.
+      </div>
+    </div>
+  );
+}
+
 function RightPanel({
   selectedNode, className, classDef,
   state, onStateChange,
@@ -1439,6 +1505,7 @@ function RightPanel({
   previewSliderId, onTogglePreviewSlider,
   onPlayTimeline,
   tree, onSetTextContent,
+  selectedElementSel, onClearElementSel, onSetElementStyle, elementStyleValue,
 }) {
   const [tab, setTab] = useState('style');
   const tabs = [
@@ -1473,6 +1540,21 @@ function RightPanel({
           >{t.label}</button>
         ))}
       </div>
+      {/* Element-level inspector — Webflow features 2 + 3.
+          Shown only when staff have drilled into a sub-element of the
+          currently-selected block (orange outline on canvas). Three
+          minimal CSS controls: text color, font size, padding. Writes
+          land in content.element_styles[blockPath]["::"+selector] and
+          flow to the storefront via SiteContent.applyElementStyles. */}
+      {selectedElementSel && onSetElementStyle && (
+        <ElementInspector
+          selector={selectedElementSel}
+          onClear={onClearElementSel}
+          onSetStyle={onSetElementStyle}
+          getValue={elementStyleValue}
+          W={W}
+        />
+      )}
       {/* Selection strip */}
       <div style={{
         padding: '10px 12px',
@@ -2081,6 +2163,46 @@ export default function WebsiteEditor() {
       return setClassBreakpointStyle(withClass, className, device, prop, value);
     });
   }, [selectedId, activePageKey, styleState, device, applyEdit]);
+
+  // Element-level style write — Webflow feature 2/3. Writes a CSS
+  // override at content.element_styles[BLOCK_PATH]["::"+selector][prop]
+  // where BLOCK_PATH matches the data-editable attribute on the block
+  // root. Storefront SiteContent.applyElementStyles emits a CSS rule of
+  // the form `[data-editable="${BLOCK_PATH}"] ${selector} { … }`.
+  // Empty / null value clears the property; if the override object
+  // becomes empty, the parent ::selector key is removed too.
+  const handleSetElementStyle = useCallback((prop, value) => {
+    if (!selectedId || !selectedElementSel || !pageKey) return;
+    const blockPath = `pages.${pageKey}.blocks.${selectedId}`;
+    const subKey = `::${selectedElementSel}`;
+    applyEdit((c) => {
+      const styles = { ...(c?.element_styles || {}) };
+      const blockBucket = { ...(styles[blockPath] || {}) };
+      const subBucket = { ...(blockBucket[subKey] || {}) };
+      if (value === '' || value == null) delete subBucket[prop];
+      else subBucket[prop] = value;
+      if (Object.keys(subBucket).length === 0) {
+        delete blockBucket[subKey];
+      } else {
+        blockBucket[subKey] = subBucket;
+      }
+      if (Object.keys(blockBucket).length === 0) {
+        delete styles[blockPath];
+      } else {
+        styles[blockPath] = blockBucket;
+      }
+      return { ...c, element_styles: styles };
+    });
+  }, [selectedId, selectedElementSel, pageKey, applyEdit]);
+
+  // Read the current value of an element-style prop so the inspector
+  // controls can show what's already saved.
+  const elementStyleValue = useCallback((prop) => {
+    if (!selectedId || !selectedElementSel || !pageKey) return '';
+    const blockPath = `pages.${pageKey}.blocks.${selectedId}`;
+    const subKey = `::${selectedElementSel}`;
+    return content?.element_styles?.[blockPath]?.[subKey]?.[prop] ?? '';
+  }, [selectedId, selectedElementSel, pageKey, content]);
 
   const handleSetTag = useCallback((tag) => {
     if (!selectedId) return;
@@ -2867,6 +2989,10 @@ export default function WebsiteEditor() {
           onPlayTimeline={handlePlayTimeline}
           tree={tree}
           onSetTextContent={handleSetLeafText}
+          selectedElementSel={selectedElementSel}
+          onClearElementSel={() => setSelectedElementSel(null)}
+          onSetElementStyle={handleSetElementStyle}
+          elementStyleValue={elementStyleValue}
         />
       </div>
       <CommandPalette

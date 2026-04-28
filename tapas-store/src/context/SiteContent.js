@@ -134,7 +134,10 @@ function applyElementStyles(elementStyles, classes, elementClasses) {
   if (existing) existing.remove();
 
   const buildDecls = (props) => Object.entries(props)
-    .filter(([k, v]) => !k.startsWith('_') && v !== undefined && v !== null && v !== '')
+    // Reserved sub-keys: `_hover` / `_active` / `_anim_*` (handled
+    // elsewhere) and `::selector` (emitted as a nested rule below).
+    // Filter them out so they don't leak into the property declarations.
+    .filter(([k, v]) => !k.startsWith('_') && !k.startsWith('::') && v !== undefined && v !== null && v !== '')
     .map(([k, v]) => {
       const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
       return `${cssProp}: ${v} !important`;
@@ -170,6 +173,21 @@ function applyElementStyles(elementStyles, classes, elementClasses) {
     if (Object.keys(activeMerged).length) {
       const activeDecls = buildDecls(activeMerged);
       if (activeDecls) rules.push(`[data-editable="${safePath}"]:active { ${activeDecls}; }`);
+    }
+
+    // Per-element sub-overrides — any subkey under ownStyle that starts
+    // with "::" is a CSS selector relative to the block root. Emits one
+    // rule per subkey: `[data-editable="…"] {selector} { … }`. The
+    // editor's element-level inspector writes here when the user
+    // tweaks color / font-size / padding on a sub-element.
+    for (const subKey of Object.keys(ownStyle)) {
+      if (!subKey.startsWith('::')) continue;
+      const subStyles = ownStyle[subKey];
+      if (!subStyles || typeof subStyles !== 'object') continue;
+      const subDecls = buildDecls(subStyles);
+      if (!subDecls) continue;
+      const childSel = subKey.slice(2); // strip "::"
+      rules.push(`[data-editable="${safePath}"] ${childSel} { ${subDecls}; }`);
     }
   }
 
