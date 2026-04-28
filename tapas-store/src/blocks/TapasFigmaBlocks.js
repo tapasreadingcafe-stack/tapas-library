@@ -1185,7 +1185,7 @@ function _renderTitleParts(parts) {
     : <React.Fragment key={i}>{p.t}</React.Fragment>);
 }
 
-const _AboutHeader = ({ kicker, title, lede }) => (
+const AboutSectionHeader = ({ kicker, title, lede }) => (
   <header style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, alignItems: 'end', marginBottom: 28 }}>
     <div>
       <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>
@@ -1250,7 +1250,7 @@ export function TapasTimeline() {
   const h = a.history;
   return (
     <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
-      <_AboutHeader kicker={h.kicker} title={h.title} lede={h.lede} />
+      <AboutSectionHeader kicker={h.kicker} title={h.title} lede={h.lede} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18 }}>
         {(h.items || []).map((it, i) => (
           <div key={i} style={{ background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 16, padding: 22 }}>
@@ -1271,7 +1271,7 @@ export function TapasCompromises() {
   const bg = (variant) => variant === 'lime' ? HS_LIME : variant === 'orange' ? HS_ORANGE : '#fff';
   return (
     <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
-      <_AboutHeader kicker={c.kicker} title={c.title} lede={c.lede} />
+      <AboutSectionHeader kicker={c.kicker} title={c.title} lede={c.lede} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
         {(c.cards || []).map((card, i) => (
           <article key={i} style={{ background: bg(card.variant), border: `1px solid ${HS_RULE}`, borderRadius: 18, padding: '28px 24px' }}>
@@ -1293,7 +1293,7 @@ export function TapasTeamGrid() {
   const t = a.team;
   return (
     <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
-      <_AboutHeader kicker={t.kicker} title={t.title} lede={t.lede} />
+      <AboutSectionHeader kicker={t.kicker} title={t.title} lede={t.lede} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18 }}>
         {(t.members || []).map((m, i) => (
           <div key={i} style={{ background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 16, padding: 18, display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -1316,7 +1316,7 @@ export function TapasPressQuotes() {
   const p = a.press;
   return (
     <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
-      <_AboutHeader kicker={p.kicker} title={p.title} lede={p.lede} />
+      <AboutSectionHeader kicker={p.kicker} title={p.title} lede={p.lede} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
         {(p.quotes || []).map((q, i) => (
           <blockquote key={i} style={{ margin: 0, background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 16, padding: 22, fontFamily: 'serif' }}>
@@ -1437,12 +1437,12 @@ export function TapasBlogArchive({ props = {} }) {
     lede = 'Essays and interviews, sorted however’s useful.',
   } = props;
   const j = _useJournal();
-  const archive = j?.archive || [];
   const { FILTER_TO_CATEGORY, titleText } = require('../data/journalPosts');
 
   const [category, setCategory] = React.useState('All');
   const [query, setQuery] = React.useState('');
   const filtered = React.useMemo(() => {
+    const archive = j?.archive || [];
     const mapped = FILTER_TO_CATEGORY[category];
     const q = query.trim().toLowerCase();
     return archive.filter((a) => {
@@ -1453,7 +1453,7 @@ export function TapasBlogArchive({ props = {} }) {
       }
       return true;
     });
-  }, [archive, category, query, FILTER_TO_CATEGORY, titleText]);
+  }, [j, category, query, FILTER_TO_CATEGORY, titleText]);
 
   const cats = ['All', ...Object.keys(FILTER_TO_CATEGORY).filter(k => k !== 'All')];
 
