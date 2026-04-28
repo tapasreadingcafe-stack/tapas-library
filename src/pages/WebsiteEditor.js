@@ -42,6 +42,7 @@ import {
   driveTimeline,
 } from './WebsiteEditor.timeline';
 import { ensureSiteDefaults } from '../editor/compileBlocksToTree';
+import { uploadAsset } from '../utils/assetLibrary';
 import { BLOCK_CATALOGUE } from './WebsiteEditor.library';
 import { ANIM_CSS } from './WebsiteEditor.anim';
 import StylePanel from './WebsiteEditor.style';
@@ -1584,6 +1585,96 @@ function CanvasSelectionShell({
 // Style tab is live in Phase 3. Settings + Interactions still stubbed.
 // =====================================================================
 // =====================================================================
+// ImageField — text input + thumbnail + Upload button. Click Upload
+// → native file picker → uploadAsset() pushes the file into the
+// editor-assets Supabase bucket → public URL is written into the
+// prop. Drop-zone (drag a file from desktop into the field box) is
+// the same code path. Shows progress while uploading.
+// =====================================================================
+function ImageField({ label, value, onChange, inputBase, labelStyle, W }) {
+  const inputRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [err, setErr] = useState('');
+  const upload = async (file) => {
+    if (!file) return;
+    setBusy(true); setErr(''); setProgress(0);
+    try {
+      const result = await uploadAsset(file, { pageId: 'editor', onProgress: setProgress });
+      if (result?.url) onChange(result.url);
+    } catch (e) {
+      setErr(e?.message || 'Upload failed.');
+    } finally {
+      setBusy(false);
+      setProgress(0);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+  const onPick = (e) => upload(e.target.files?.[0]);
+  const onDrop = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    upload(e.dataTransfer.files?.[0]);
+  };
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+  const src = value && (value.startsWith('http') || value.startsWith('/')) ? value : (value ? `/${value}` : '');
+
+  return (
+    <label style={labelStyle}>
+      {label}
+      <div onDragOver={stop} onDragEnter={stop} onDrop={onDrop} style={{ marginTop: 4 }}>
+        <input
+          type="text" value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://… or /assets/photo.jpg"
+          style={inputBase}
+        />
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+          <button
+            type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+            style={{
+              flex: 1, height: 26, padding: '0 10px',
+              background: busy ? '#444' : '#2a2a2a', color: W.text || '#eee',
+              border: `1px solid ${W.panelBorder}`, borderRadius: 3,
+              fontSize: 11, fontWeight: 600, cursor: busy ? 'wait' : 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {busy ? `Uploading… ${Math.round(progress * 100)}%` : '⬆ Upload (or drop file)'}
+          </button>
+          {value && (
+            <button
+              type="button" onClick={() => onChange('')}
+              style={{
+                height: 26, padding: '0 10px',
+                background: 'transparent', color: W.textDim,
+                border: `1px solid ${W.panelBorder}`, borderRadius: 3,
+                fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >Clear</button>
+          )}
+        </div>
+        <input
+          ref={inputRef} type="file" accept="image/*"
+          onChange={onPick}
+          style={{ display: 'none' }}
+        />
+        {err && (
+          <div style={{ marginTop: 6, fontSize: 11, color: '#f87171' }}>{err}</div>
+        )}
+        {src && (
+          <img
+            src={src} alt=""
+            style={{ marginTop: 6, maxWidth: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 4, border: `1px solid ${W.panelBorder}`, display: 'block' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        )}
+      </div>
+    </label>
+  );
+}
+
+// =====================================================================
 // BlockPropsInspector — auto-generated form for editing the content
 // (text, image URLs, colors, toggles, lists) of a type-keyed block
 // like tapas_hero / tapas_pricing_split. No schema lookup — every key
@@ -1690,23 +1781,15 @@ function BlockPropsInspector({ block, onSetProp, W }) {
     }
     if (isImage) {
       return (
-        <label key={key} style={labelStyle}>
-          {titleCase(key)}
-          <input
-            type="text" value={str}
-            onChange={(e) => onSetProp(key, e.target.value)}
-            placeholder="https://… or /assets/photo.jpg"
-            style={inputBase}
-          />
-          {str && (
-            <img
-              src={str.startsWith('http') || str.startsWith('/') ? str : `/${str}`}
-              alt=""
-              style={{ marginTop: 6, maxWidth: '100%', maxHeight: 80, objectFit: 'cover', borderRadius: 4, border: `1px solid ${W.panelBorder}` }}
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          )}
-        </label>
+        <ImageField
+          key={key}
+          label={titleCase(key)}
+          value={str}
+          onChange={(v) => onSetProp(key, v)}
+          inputBase={inputBase}
+          labelStyle={labelStyle}
+          W={W}
+        />
       );
     }
     if (isHtml || str.length > 60) {
