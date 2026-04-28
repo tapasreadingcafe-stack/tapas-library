@@ -1164,3 +1164,168 @@ export function TapasFaqAccordion({ props = {} }) {
     </section>
   );
 }
+
+// =====================================================================
+// Phase 2 (About page) blocks — six small renderers, one shared CSS
+// block. All pull from useAbout()/adaptAbout() which already aggregates
+// the about_* tables.
+// =====================================================================
+
+function _useAboutData() {
+  const { useAbout } = require('../cms/hooks');
+  const { adaptAbout } = require('../cms/adapters');
+  const { data } = useAbout();
+  return adaptAbout(data) || null;
+}
+
+function _renderTitleParts(parts) {
+  if (!Array.isArray(parts)) return null;
+  return parts.map((p, i) => p.em
+    ? <em key={i} style={{ fontStyle: 'italic', color: '#7E22CE' }}>{p.t}</em>
+    : <React.Fragment key={i}>{p.t}</React.Fragment>);
+}
+
+const _AboutHeader = ({ kicker, title, lede }) => (
+  <header style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, alignItems: 'end', marginBottom: 28 }}>
+    <div>
+      <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>
+        <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: HS_PURPLE, marginRight: 8 }} />
+        {kicker}
+      </div>
+      <h2 style={{ margin: '8px 0 0', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(30px, 3.6vw, 48px)', lineHeight: 1.05, color: HS_INK }}>
+        {_renderTitleParts(title)}
+      </h2>
+    </div>
+    {lede && <p style={{ margin: 0, fontSize: 15.5, color: 'rgba(31,27,22,0.7)', lineHeight: 1.55 }}>{lede}</p>}
+  </header>
+);
+
+export function TapasManifesto() {
+  const a = _useAboutData();
+  if (!a?.manifesto) return null;
+  const m = a.manifesto;
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0', display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48 }}>
+      <div>
+        <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{m.kicker}</div>
+        <h2 style={{ margin: '8px 0 0', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(34px, 4vw, 56px)', lineHeight: 1.05, color: HS_INK }}>
+          {_renderTitleParts(m.title)}
+        </h2>
+      </div>
+      <div>
+        {(m.paragraphs || []).map((p, i) => (
+          <p key={i} style={{ marginTop: i === 0 ? 0 : 18, fontFamily: 'serif', fontSize: 18, lineHeight: 1.55, color: HS_INK }}>
+            {p.dropCap && <span style={{ float: 'left', fontFamily: 'serif', fontSize: 64, lineHeight: 1, marginRight: 12, color: HS_PURPLE }}>{p.dropCap}</span>}
+            {p.body}
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function TapasStatsStrip() {
+  const a = _useAboutData();
+  if (!a?.stats) return null;
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <h2 style={{ margin: '0 0 24px', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(28px, 3.4vw, 44px)', lineHeight: 1.05, color: HS_INK }}>
+        {_renderTitleParts(a.stats.title)}
+      </h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 24 }}>
+        {(a.stats.items || []).map((s, i) => (
+          <div key={i} style={{ borderTop: `1px solid ${HS_RULE}`, paddingTop: 18 }}>
+            <div style={{ fontFamily: 'serif', fontSize: 48, fontWeight: 700, color: s.highlighted ? HS_PURPLE : HS_INK, lineHeight: 1, letterSpacing: '-0.02em' }}>{s.value}</div>
+            <div style={{ marginTop: 8, fontSize: 13, color: 'rgba(31,27,22,0.7)' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function TapasTimeline() {
+  const a = _useAboutData();
+  if (!a?.history) return null;
+  const h = a.history;
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <_AboutHeader kicker={h.kicker} title={h.title} lede={h.lede} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18 }}>
+        {(h.items || []).map((it, i) => (
+          <div key={i} style={{ background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 16, padding: 22 }}>
+            <div style={{ fontFamily: 'serif', fontWeight: 700, fontSize: 22, color: HS_PURPLE }}>{it.year}</div>
+            <h3 style={{ margin: '8px 0 8px', fontFamily: 'serif', fontWeight: 600, fontSize: 18, color: HS_INK }}>{it.heading}</h3>
+            {it.body && <p style={{ margin: 0, fontSize: 14, color: 'rgba(31,27,22,0.7)', lineHeight: 1.55 }}>{it.body}</p>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function TapasCompromises() {
+  const a = _useAboutData();
+  if (!a?.compromises) return null;
+  const c = a.compromises;
+  const bg = (variant) => variant === 'lime' ? HS_LIME : variant === 'orange' ? HS_ORANGE : '#fff';
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <_AboutHeader kicker={c.kicker} title={c.title} lede={c.lede} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
+        {(c.cards || []).map((card, i) => (
+          <article key={i} style={{ background: bg(card.variant), border: `1px solid ${HS_RULE}`, borderRadius: 18, padding: '28px 24px' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: HS_INK, opacity: 0.5 }}>{card.n}</div>
+            <h3 style={{ margin: '10px 0 12px', fontFamily: 'serif', fontWeight: 600, fontSize: 24, lineHeight: 1.15, color: HS_INK }}>
+              {_renderTitleParts(card.title)}
+            </h3>
+            <p style={{ margin: 0, fontSize: 14.5, color: HS_INK, opacity: 0.78, lineHeight: 1.6 }}>{card.body}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function TapasTeamGrid() {
+  const a = _useAboutData();
+  if (!a?.team) return null;
+  const t = a.team;
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <_AboutHeader kicker={t.kicker} title={t.title} lede={t.lede} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18 }}>
+        {(t.members || []).map((m, i) => (
+          <div key={i} style={{ background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 16, padding: 18, display: 'flex', gap: 14, alignItems: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 12, background: m.color, display: 'grid', placeItems: 'center', fontFamily: 'serif', fontWeight: 700, fontSize: 20, color: HS_INK, flexShrink: 0 }}>{m.initials}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, color: HS_INK }}>{m.name}</div>
+              {m.role && <div style={{ fontSize: 12, color: 'rgba(31,27,22,0.6)' }}>{m.role}</div>}
+              {m.reading && <div style={{ fontSize: 12, color: HS_PURPLE, fontStyle: 'italic', marginTop: 4 }}>Reading: {m.reading}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function TapasPressQuotes() {
+  const a = _useAboutData();
+  if (!a?.press) return null;
+  const p = a.press;
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <_AboutHeader kicker={p.kicker} title={p.title} lede={p.lede} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
+        {(p.quotes || []).map((q, i) => (
+          <blockquote key={i} style={{ margin: 0, background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 16, padding: 22, fontFamily: 'serif' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: HS_PURPLE, marginBottom: 10 }}>{q.source}</div>
+            <p style={{ margin: 0, fontStyle: 'italic', fontSize: 16, lineHeight: 1.55, color: HS_INK }}>“{q.body}”</p>
+            {q.footer && <footer style={{ marginTop: 10, fontSize: 12, color: 'rgba(31,27,22,0.6)', fontFamily: 'sans-serif' }}>{q.footer}</footer>}
+          </blockquote>
+        ))}
+      </div>
+    </section>
+  );
+}
