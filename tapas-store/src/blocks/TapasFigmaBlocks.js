@@ -873,3 +873,134 @@ export function TapasFeaturedTestimonial({ props = {} }) {
     </section>
   );
 }
+
+// =====================================================================
+// Phase 2 (Events page) blocks
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// TapasClubsGrid — recurring clubs grid matching the live Events page
+// ClubGrid. Pulls from `clubs` table via useClubs() + adaptClubs().
+// ---------------------------------------------------------------------
+export function TapasClubsGrid({ props = {} }) {
+  const {
+    eyebrow = 'Weekly clubs',
+    heading_html = 'Find a chair <em>that fits.</em>',
+    lede = 'Six ongoing groups. Come once as a guest to find your people, then keep your seat — we hold it.',
+  } = props;
+  const { useClubs } = require('../cms/hooks');
+  const { adaptClubs } = require('../cms/adapters');
+  const { data: rows, loading } = useClubs();
+  const list = adaptClubs(rows || []);
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 20px' }}>
+      <style>{`
+        .tpx-clubs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; max-width: 1180px; margin: 0 auto; }
+        .tpx-club { border: 1px solid ${HS_RULE}; border-radius: 18px; padding: 24px; background: ${HS_CARD}; display: flex; flex-direction: column; gap: 12px; }
+        .tpx-club-head { font-family: monospace; font-size: 11px; letter-spacing: 0.18em; color: ${HS_PURPLE}; text-transform: uppercase; }
+        .tpx-club-title { margin: 0; font-family: serif; font-size: 22px; line-height: 1.15; color: ${HS_INK}; font-weight: 600; }
+        .tpx-club-title em { font-style: italic; color: ${HS_PURPLE}; font-weight: 400; }
+        .tpx-club-body { margin: 0; font-size: 14.5px; color: rgba(31,27,22,0.7); line-height: 1.55; flex: 1; }
+        .tpx-club-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px dashed ${HS_RULE}; font-size: 12px; color: rgba(31,27,22,0.65); }
+      `}</style>
+      <div style={{ maxWidth: '1180px', margin: '0 auto 28px' }}>
+        <div style={{ color: HS_PURPLE, fontWeight: 700, fontSize: 12, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{eyebrow}</div>
+        <h2 style={{ margin: '8px 0 10px', fontSize: 'clamp(30px, 3.6vw, 48px)', fontFamily: 'serif', lineHeight: 1.05, color: HS_INK }} dangerouslySetInnerHTML={{ __html: heading_html }} />
+        <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, color: 'rgba(31,27,22,0.7)', maxWidth: 640 }}>{lede}</p>
+      </div>
+      <div className="tpx-clubs" style={{ opacity: loading ? 0 : 1, transition: 'opacity 180ms ease-out' }}>
+        {list.length === 0 ? (
+          <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', color: 'rgba(31,27,22,0.6)' }}>No clubs configured yet.</div>
+        ) : list.map((c) => (
+          <article key={c.id} className="tpx-club">
+            <div className="tpx-club-head">
+              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: HS_PURPLE, marginRight: 8 }} />
+              {(c.schedule || '').toUpperCase()}
+            </div>
+            <h3 className="tpx-club-title">
+              {c.title}
+              {c.titleItalic && <em> {c.titleItalic}</em>}
+              {c.titleTail && ` ${c.titleTail}`}
+            </h3>
+            <p className="tpx-club-body">{c.body}</p>
+            <div className="tpx-club-foot">
+              {c.seats ? <span><strong style={{ color: HS_INK }}>{c.seats}</strong> seats</span> : <span>—</span>}
+              <span>{c.status}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TapasFeaturedSupper — large left/right split for the seasonal supper.
+// Pulls from `featured_supper` singleton via useFeaturedSupper().
+// ---------------------------------------------------------------------
+export function TapasFeaturedSupper({ props = {} }) {
+  const { menu_kicker = 'The menu', menu_title = 'Read & eaten.' } = props;
+  const { useFeaturedSupper } = require('../cms/hooks');
+  const { adaptFeaturedSupper } = require('../cms/adapters');
+  const { data: row, loading } = useFeaturedSupper();
+  const s = adaptFeaturedSupper(row);
+  if (loading || !s) return null;
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 20px' }}>
+      <style>{`
+        .tpx-supper { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px;
+          background: ${HS_CARD}; border: 1px solid ${HS_RULE}; border-radius: 28px;
+          padding: 56px 56px; max-width: 1180px; margin: 0 auto; align-items: start; }
+        .tpx-supper-k { font-family: monospace; font-size: 11px; letter-spacing: 0.18em;
+          text-transform: uppercase; color: ${HS_PURPLE}; }
+        .tpx-supper-h { margin: 10px 0 16px; font-family: serif; font-weight: 600;
+          font-size: clamp(36px, 4vw, 56px); line-height: 1.05; color: ${HS_INK}; }
+        .tpx-supper-h em { font-style: italic; color: ${HS_PURPLE}; font-weight: 400; }
+        .tpx-supper-b { margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: rgba(31,27,22,0.75); max-width: 48ch; }
+        .tpx-menu-k { font-family: monospace; font-size: 11px; letter-spacing: 0.18em;
+          text-transform: uppercase; color: ${HS_PURPLE}; margin-bottom: 6px; }
+        .tpx-menu-h { margin: 0 0 14px; font-family: serif; font-size: 22px; color: ${HS_INK}; font-weight: 600; }
+        .tpx-menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+        .tpx-menu-row { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed ${HS_RULE}; }
+        .tpx-menu-n { font-family: serif; font-weight: 700; color: ${HS_PURPLE}; }
+        .tpx-menu-dish i { font-style: italic; color: rgba(31,27,22,0.55); display: block; font-size: 13px; }
+        @media (max-width: 1023px) { .tpx-supper { grid-template-columns: 1fr; padding: 40px 32px; gap: 28px; } }
+      `}</style>
+      <div className="tpx-supper">
+        <div>
+          <div className="tpx-supper-k">{(s.kicker || '').toUpperCase()}</div>
+          <h2 className="tpx-supper-h">
+            {s.titleLead}{s.titleItalic && <em>{s.titleItalic}</em>}
+          </h2>
+          <p className="tpx-supper-b">{s.body}</p>
+          {s.cta?.label && (
+            <Link to={s.cta.href || '#'} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              background: HS_INK, color: '#fff', padding: '14px 24px',
+              borderRadius: 999, fontWeight: 600, fontSize: 14.5,
+              textDecoration: 'none',
+            }}>{s.cta.label} <span aria-hidden="true">→</span></Link>
+          )}
+        </div>
+        <aside>
+          <div className="tpx-menu-k">{menu_kicker}</div>
+          <h3 className="tpx-menu-h">{menu_title}</h3>
+          <ol className="tpx-menu-list">
+            {(s.menu || []).map((c, i) => (
+              <li key={c.n || i} className="tpx-menu-row">
+                <span className="tpx-menu-n">{c.n || (i + 1)}</span>
+                <span className="tpx-menu-dish">
+                  {c.dish}
+                  {c.poem && <i>{c.poem}</i>}
+                </span>
+                <span style={{ color: HS_PURPLE }}>·</span>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      </div>
+    </section>
+  );
+}

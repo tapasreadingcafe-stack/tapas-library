@@ -34,6 +34,7 @@ import {
   TapasHero, TapasServices, TapasNewArrivals, TapasInspiration,
   TapasTestimonials, TapasNewsletter, TapasSection,
   TapasEventsCalendar, TapasPricingSplit, TapasFeaturedTestimonial,
+  TapasClubsGrid, TapasFeaturedSupper,
 } from './TapasFigmaBlocks';
 import { TapasGroup, ComponentRef } from './PageRenderer';
 
@@ -946,6 +947,36 @@ export const BLOCK_REGISTRY = {
       { key: 'right_price_suffix', label: 'Right panel — price suffix',   type: 'text', hint: 'e.g. /month' },
       { key: 'right_cta_text',    label: 'Right panel — CTA text',        type: 'text' },
       { key: 'right_cta_href',    label: 'Right panel — CTA link',        type: 'text' },
+    ],
+  },
+
+  tapas_clubs_grid: {
+    label: 'Tapas Clubs Grid (live)',
+    category: 'Content',
+    Renderer: TapasClubsGrid,
+    defaultProps: {
+      eyebrow: 'Weekly clubs',
+      heading_html: 'Find a chair <em>that fits.</em>',
+      lede: 'Six ongoing groups. Come once as a guest to find your people, then keep your seat — we hold it.',
+    },
+    schema: [
+      { key: 'eyebrow',      label: 'Eyebrow',                       type: 'text' },
+      { key: 'heading_html', label: 'Heading (HTML, <em> allowed)',  type: 'text' },
+      { key: 'lede',         label: 'Lede paragraph',                type: 'textarea' },
+    ],
+  },
+
+  tapas_featured_supper: {
+    label: 'Tapas Featured Supper (live)',
+    category: 'Content',
+    Renderer: TapasFeaturedSupper,
+    defaultProps: {
+      menu_kicker: 'The menu',
+      menu_title: 'Read & eaten.',
+    },
+    schema: [
+      { key: 'menu_kicker', label: 'Menu — kicker', type: 'text' },
+      { key: 'menu_title',  label: 'Menu — title',  type: 'text' },
     ],
   },
 

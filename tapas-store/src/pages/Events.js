@@ -6,8 +6,22 @@ import EventsList from './events/EventsList';
 import ClubGrid from './events/ClubGrid';
 import FeaturedSupper from './events/FeaturedSupper';
 import EVENTS_CSS from './events/eventsStyles';
+import PageRenderer from '../blocks/PageRenderer';
+import { useSiteContent } from '../context/SiteContent';
 
 export default function Events() {
+  const content = useSiteContent();
+  if (content?.pages?.events?.use_blocks) {
+    return (
+      <div style={{ minHeight: '100vh' }}>
+        <PageRenderer pageKey="events" />
+      </div>
+    );
+  }
+  return <EventsLegacy />;
+}
+
+function EventsLegacy() {
   const [category, setCategory] = useState('all');
   const [view, setView] = useState('calendar');
   const [focusSlug, setFocusSlug] = useState(null);
