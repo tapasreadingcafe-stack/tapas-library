@@ -1,4 +1,4 @@
-import React, { useReducer } from 'react';
+import React, { useReducer, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SignUpHeading from './signUp/SignUpHeading';
 import StepAboutYou from './signUp/StepAboutYou';
@@ -9,26 +9,71 @@ import SIGN_UP_CSS from './signUp/signUpStyles';
 import {
   signupReducer, DEFAULT_SIGNUP_STATE, validateStep1,
 } from './signUp/signupReducer';
+import { supabase } from '../utils/supabase';
+
+function friendlySignupError(message) {
+  const m = (message || '').toLowerCase();
+  if (m.includes('already registered') || m.includes('user already')) {
+    return 'An account with that email already exists. Try signing in instead.';
+  }
+  if (m.includes('weak password') || m.includes('password should')) {
+    return 'Password is too weak — try a longer one with mixed characters.';
+  }
+  return message || 'Could not create your account. Please try again.';
+}
 
 export default function SignUp() {
   const [state, dispatch] = useReducer(signupReducer, DEFAULT_SIGNUP_STATE);
   const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     const errs = validateStep1(state);
     if (Object.keys(errs).length > 0) {
       dispatch({ type: 'SET_ERRORS', errors: errs });
       return;
     }
+    if (!state.consent) {
+      dispatch({ type: 'SET_ERRORS', errors: { consent: 'Required.' } });
+      return;
+    }
     dispatch({ type: 'SET_ERRORS', errors: {} });
-    // TODO: wire to Supabase user creation.
-    // eslint-disable-next-line no-console
-    console.log('[sign-up] submit', state);
-    navigate('/welcome');
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      const { firstName, lastName, email, phone, password } = state.aboutYou;
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const { error: err } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          // Stamped on auth.users.raw_user_meta_data so the
+          // handle_auth_user_insert trigger can populate the
+          // members row (see 20260411_ecommerce.sql).
+          data: {
+            name: fullName,
+            phone: phone || null,
+            preferred_club: state.aboutYou.preferredClub || null,
+            reading_tags: state.aboutYou.readingTags || [],
+          },
+          emailRedirectTo: `${window.location.origin}/welcome`,
+        },
+      });
+      if (err) throw err;
+      // If email confirmation is required, the session won't be live
+      // yet — surface that on the welcome page instead of silently
+      // bouncing to a logged-out homepage.
+      navigate('/welcome');
+    } catch (err) {
+      setSubmitError(friendlySignupError(err?.message));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const canContinue = !!state.consent;
+  const canContinue = !!state.consent && !submitting;
 
   return (
     <div className="su-root">
@@ -64,13 +109,18 @@ export default function SignUp() {
                   className="su-next is-final"
                   disabled={!canContinue}
                 >
-                  Create account
+                  {submitting ? 'Creating account…' : 'Create account'}
                   <span className="su-next-arrow" aria-hidden="true">→</span>
                 </button>
               </div>
               {state.errors.consent && (
                 <div className="su-error" style={{ marginTop: 12, textAlign: 'right' }}>
                   {state.errors.consent}
+                </div>
+              )}
+              {submitError && (
+                <div className="su-error" role="alert" style={{ marginTop: 12, textAlign: 'right' }}>
+                  {submitError}
                 </div>
               )}
             </form>

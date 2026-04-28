@@ -149,7 +149,10 @@ export async function applyCheckoutExtras(args: {
 
 /**
  * Post-insert hook: record a promo redemption, debit the member's point
- * balance, and mark the cart snapshot as completed.
+ * balance, and mark the cart snapshot as completed — atomically, via a
+ * single SECURITY DEFINER RPC. Falls back to the legacy three-call
+ * sequence on RPC error so a stale Postgres function (pre-migration
+ * 20260428_signup_inventory_and_finalize_rpc) still completes the order.
  */
 export async function finalizeExtrasForOrder(args: {
   svc: SupabaseLike;
@@ -158,13 +161,27 @@ export async function finalizeExtrasForOrder(args: {
   applied: AppliedExtras;
 }) {
   const { svc, orderId, memberId, applied } = args;
+  const promoDiscount = Math.max(0, applied.discount - applied.points_redeemed);
+
+  const { error: rpcErr } = await svc.rpc("finalize_order_extras", {
+    p_order_id: orderId,
+    p_member_id: memberId,
+    p_promo_code_id: applied.promo_code_id,
+    p_promo_discount: promoDiscount,
+    p_points_redeemed: applied.points_redeemed,
+    p_snapshot_id: applied.snapshot_id,
+  });
+
+  if (!rpcErr) return;
+
+  console.warn("finalize_order_extras RPC failed, falling back", rpcErr);
 
   if (applied.promo_code_id) {
     await svc.from("store_promo_redemptions").insert({
       promo_code_id: applied.promo_code_id,
       order_id: orderId,
       member_id: memberId,
-      discount_amount: applied.discount - applied.points_redeemed,
+      discount_amount: promoDiscount,
     });
   }
 

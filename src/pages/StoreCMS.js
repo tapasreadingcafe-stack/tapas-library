@@ -15,6 +15,9 @@ const TABS = [
   { key: 'contact_info',  label: '📞 Contact info' },
   { key: 'faqs',          label: '❓ FAQs' },
   { key: 'journal_posts', label: '📰 Journal' },
+  { key: 'clubs',         label: '👥 Clubs' },
+  { key: 'team_members',  label: '🧑‍💼 Team' },
+  { key: 'press_quotes',  label: '🗞 Press' },
 ];
 
 export default function StoreCMS() {
@@ -41,6 +44,9 @@ export default function StoreCMS() {
       {tab === 'contact_info' && <ContactInfoEditor />}
       {tab === 'faqs' && <FaqsEditor />}
       {tab === 'journal_posts' && <JournalEditor />}
+      {tab === 'clubs' && <ClubsEditor />}
+      {tab === 'team_members' && <TeamEditor />}
+      {tab === 'press_quotes' && <PressEditor />}
     </div>
   );
 }
@@ -506,6 +512,209 @@ function emptyJournalForm() {
     is_featured: false, is_sidebar: false, sidebar_kicker: '',
     sort_order: 0, published_at: '', status: 'published',
   };
+}
+
+// ── Clubs ──────────────────────────────────────────────────────────────
+function ClubsEditor() {
+  return (
+    <SimpleListEditor
+      table="clubs"
+      title="Clubs"
+      help="Recurring weekly clubs shown on the events page."
+      orderBy="sort_order"
+      empty={() => ({ slug: '', title_html: '', schedule: '', description: '', total_seats: '', status_label: '', sort_order: 0, status: 'published' })}
+      summary={(c) => ({
+        title: c.title_html,
+        meta: `${c.schedule}${c.status_label ? ' · ' + c.status_label : ''}${c.status !== 'published' ? ' · DRAFT' : ''}`,
+      })}
+      fields={[
+        { key: 'slug',         label: 'SLUG', required: true },
+        { key: 'title_html',   label: 'TITLE (HTML — <em> allowed)', required: true },
+        { key: 'schedule',     label: 'SCHEDULE', required: true, placeholder: 'THURSDAYS · 7:00P' },
+        { key: 'description',  label: 'DESCRIPTION', textarea: true },
+        { key: 'total_seats',  label: 'TOTAL SEATS', type: 'number' },
+        { key: 'status_label', label: 'STATUS LABEL', placeholder: '"3 open", "Waitlist"' },
+        { key: 'sort_order',   label: 'SORT', type: 'number' },
+        { key: 'status',       label: 'STATUS', select: ['published', 'draft'] },
+      ]}
+    />
+  );
+}
+
+// ── Team members ───────────────────────────────────────────────────────
+function TeamEditor() {
+  return (
+    <SimpleListEditor
+      table="team_members"
+      title="Team"
+      help="People shown on the About page team grid."
+      orderBy="sort_order"
+      empty={() => ({ initials: '', color: 'cream', name: '', role: '', currently_reading: '', photo_url: '', sort_order: 0, status: 'published' })}
+      summary={(t) => ({
+        title: t.name,
+        meta: `${t.role || '—'}${t.currently_reading ? ' · reading ' + t.currently_reading : ''}${t.status !== 'published' ? ' · DRAFT' : ''}`,
+      })}
+      fields={[
+        { key: 'name',              label: 'NAME', required: true },
+        { key: 'initials',          label: 'INITIALS (1–3 chars)', required: true, maxLength: 3 },
+        { key: 'role',              label: 'ROLE' },
+        { key: 'currently_reading', label: 'CURRENTLY READING' },
+        { key: 'photo_url',         label: 'PHOTO URL' },
+        { key: 'color',             label: 'CARD COLOR', select: ['cream', 'lime', 'orange', 'lavender'] },
+        { key: 'sort_order',        label: 'SORT', type: 'number' },
+        { key: 'status',            label: 'STATUS', select: ['published', 'draft'] },
+      ]}
+    />
+  );
+}
+
+// ── Press quotes ───────────────────────────────────────────────────────
+function PressEditor() {
+  return (
+    <SimpleListEditor
+      table="press_quotes"
+      title="Press"
+      help="Press quotes shown on the About page press strip."
+      orderBy="sort_order"
+      empty={() => ({ source: '', quote: '', context: '', sort_order: 0 })}
+      summary={(p) => ({
+        title: `“${p.quote}”`,
+        meta: `${p.source}${p.context ? ' · ' + p.context : ''}`,
+      })}
+      fields={[
+        { key: 'source',     label: 'SOURCE', required: true, placeholder: 'The Hindu' },
+        { key: 'quote',      label: 'QUOTE', required: true, textarea: true },
+        { key: 'context',    label: 'CONTEXT', placeholder: 'DINING · 2024' },
+        { key: 'sort_order', label: 'SORT', type: 'number' },
+      ]}
+    />
+  );
+}
+
+// ── Generic list editor — list/create/edit/delete for a flat table ────
+function SimpleListEditor({ table, help, orderBy, empty, summary, fields }) {
+  const [items, setItems] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(empty());
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from(table).select('*').order(orderBy || 'updated_at');
+    setItems(data || []);
+  }, [table, orderBy]);
+  useEffect(() => { load(); }, [load]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...empty(), sort_order: items.length });
+    setError(''); setShowForm(true);
+  };
+  const openEdit = (it) => {
+    const f = empty();
+    Object.keys(f).forEach((k) => { f[k] = it[k] ?? f[k]; });
+    setEditing(it);
+    setForm(f);
+    setError(''); setShowForm(true);
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    for (const f of fields) {
+      if (f.required && !String(form[f.key] ?? '').trim()) {
+        setError(`${f.label.replace(/\s\(.*\)$/, '')} is required.`);
+        return;
+      }
+    }
+    setSaving(true); setError('');
+    const payload = {};
+    fields.forEach((f) => {
+      const v = form[f.key];
+      if (f.type === 'number') {
+        payload[f.key] = v === '' || v == null ? null : Number(v);
+      } else if (typeof v === 'string') {
+        payload[f.key] = v.trim() || null;
+      } else {
+        payload[f.key] = v ?? null;
+      }
+    });
+    payload.updated_at = new Date().toISOString();
+    const { error: err } = editing
+      ? await supabase.from(table).update(payload).eq('id', editing.id)
+      : await supabase.from(table).insert(payload);
+    setSaving(false);
+    if (err) { setError(err.message); return; }
+    setShowForm(false);
+    load();
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm('Delete this row?')) return;
+    await supabase.from(table).delete().eq('id', id);
+    load();
+  };
+
+  return (
+    <section style={S.section}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <p style={{ ...S.help, margin: 0 }}>{help}</p>
+        <button onClick={openCreate} style={S.primaryBtn}>+ New</button>
+      </div>
+      {items.length === 0 ? (
+        <div style={S.empty}>Nothing here yet.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 10 }}>
+          {items.map(it => {
+            const s = summary(it);
+            return (
+              <li key={it.id} style={S.row}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }} dangerouslySetInnerHTML={{ __html: s.title }} />
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{s.meta}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => openEdit(it)} style={S.iconBtn}>✏️</button>
+                  <button onClick={() => remove(it.id)} style={S.iconBtn}>🗑</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {showForm && (
+        <Modal onClose={() => setShowForm(false)}>
+          <h2 style={S.modalH2}>{editing ? 'Edit' : 'New'}</h2>
+          {error && <div style={S.error}>{error}</div>}
+          <form onSubmit={save}>
+            {fields.map((f) => (
+              <div key={f.key} style={S.field}>
+                <label style={S.label}>{f.label}</label>
+                {f.select ? (
+                  <select value={form[f.key] ?? ''} onChange={e => setForm(s => ({ ...s, [f.key]: e.target.value }))} style={S.input}>
+                    {f.select.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                ) : f.textarea ? (
+                  <textarea value={form[f.key] ?? ''} onChange={e => setForm(s => ({ ...s, [f.key]: e.target.value }))}
+                    style={{ ...S.input, minHeight: 90, fontFamily: 'inherit' }}
+                    placeholder={f.placeholder} maxLength={f.maxLength} />
+                ) : (
+                  <input type={f.type || 'text'} value={form[f.key] ?? ''}
+                    onChange={e => setForm(s => ({ ...s, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder} maxLength={f.maxLength} style={S.input} />
+                )}
+              </div>
+            ))}
+            <div style={S.formActions}>
+              <button type="button" onClick={() => setShowForm(false)} style={S.cancelBtn}>Cancel</button>
+              <button type="submit" disabled={saving} style={S.primaryBtn}>{saving ? 'Saving…' : 'Save'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </section>
+  );
 }
 
 // ── Shared ─────────────────────────────────────────────────────────────
