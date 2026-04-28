@@ -589,7 +589,7 @@ const STOREFRONT_URL = (typeof process !== 'undefined' && process.env?.REACT_APP
       ? 'http://localhost:3001'
       : 'https://www.tapasreadingcafe.com');
 
-function IframeCanvas({ content, pageKey, device, onDeviceChange, onSelect }) {
+function IframeCanvas({ content, pageKey, device, onDeviceChange, onSelect, onTextEdit }) {
   const iframeRef = useRef(null);
   const [zoom, setZoom] = useState(100);
   const [hoverRect, setHoverRect] = useState(null);
@@ -632,11 +632,13 @@ function IframeCanvas({ content, pageKey, device, onDeviceChange, onSelect }) {
         setHoverRect(msg.rect || null);
       } else if (msg.type === 'tapas:hover-clear') {
         setHoverRect(null);
+      } else if (msg.type === 'tapas:text-edit') {
+        if (onTextEdit) onTextEdit(msg);
       }
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [onSelect]);
+  }, [onSelect, onTextEdit]);
 
   return (
     <div style={{
@@ -2652,6 +2654,42 @@ export default function WebsiteEditor() {
     });
   }, [selectedId, activePageKey, styleState, device, applyEdit]);
 
+  // Inline text-edit handler — invoked when the storefront iframe
+  // postMessages `tapas:text-edit` ({ editable, oldText, newText }).
+  // Resolves the block via `editable` ("pages.{slug}.blocks.{id}"),
+  // then finds which top-level prop holds `oldText` (string-equality
+  // lookup) and updates it to `newText`. Only handles top-level string
+  // props in this slice — inline-editing array items (e.g. service
+  // cards, menu rows) needs the path-aware variant which is a future
+  // slice. If no matching prop is found, surface a console warning so
+  // staff can fall back to the right-panel form.
+  const handleInlineTextEdit = useCallback((msg) => {
+    if (!msg || !msg.editable) return;
+    const blockId = msg.editable.split('.').pop();
+    if (!blockId) return;
+    applyEdit((c) => {
+      const pages = { ...(c?.pages || {}) };
+      const page = { ...(pages[pageKey] || {}) };
+      const blocks = Array.isArray(page.blocks) ? page.blocks.slice() : [];
+      const idx = blocks.findIndex((b) => b?.id === blockId);
+      if (idx === -1) return c;
+      const block = { ...blocks[idx] };
+      const props = { ...(block.props || {}) };
+      const matchKey = Object.keys(props).find((k) => props[k] === msg.oldText);
+      if (!matchKey) {
+        // eslint-disable-next-line no-console
+        console.warn('[inline-edit] no top-level prop matched', { blockId, oldText: msg.oldText });
+        return c;
+      }
+      props[matchKey] = msg.newText;
+      block.props = props;
+      blocks[idx] = block;
+      page.blocks = blocks;
+      pages[pageKey] = page;
+      return { ...c, pages };
+    });
+  }, [pageKey, applyEdit]);
+
   // Block prop write — edits the actual content of a type-keyed block
   // (text, image URL, color, etc.) by mutating
   // content.pages[pageKey].blocks[i].props[propKey]. The IframeCanvas
@@ -3478,6 +3516,7 @@ export default function WebsiteEditor() {
                 setSelectedElementSel(payload.selector || null);
               }
             }}
+            onTextEdit={handleInlineTextEdit}
           />
         ) : (
           <Canvas

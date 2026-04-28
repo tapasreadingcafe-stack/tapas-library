@@ -447,6 +447,12 @@ function describeClickedElement(target, doc) {
   }
   if (!blockEl || blockEl === doc.body) return null;
   const segs = [];
+  // Walk up from target to the block root, collecting tag:nth-of-type
+  // segments along the way. The .filter callback below references the
+  // loop-scoped `node`, which eslint's no-loop-func can't statically
+  // verify is safe (the loop body runs to completion before the next
+  // iteration so the closure capture is fine).
+  // eslint-disable-next-line no-loop-func
   for (let cur = target; cur && cur !== blockEl; cur = cur.parentElement) {
     const parent = cur.parentElement;
     if (!parent) break;
@@ -508,6 +514,120 @@ export function SiteContentProvider({ children }) {
     // capture-phase so we run before any inner handler stops propagation.
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
+  }, []);
+
+  // Inline text editing bridge — double-click any element with a single
+  // text-node child to make it contentEditable. On blur, postMessage
+  // the new text + the parent block's `data-editable` path UP. The
+  // editor matches the OLD text against the block's props (string-
+  // equality lookup) and writes the matching prop. Esc cancels.
+  // Skips elements with mixed/multiple children to avoid corrupting
+  // nested HTML (e.g. a heading that contains an <em>).
+  useEffect(() => {
+    if (!IS_DRAFT) return;
+    let activeEl = null;
+    let activeOriginal = '';
+    let activeBlockEditable = null;
+
+    const finish = (commit) => {
+      if (!activeEl) return;
+      activeEl.removeAttribute('contenteditable');
+      activeEl.style.removeProperty('outline');
+      activeEl.style.removeProperty('cursor');
+      activeEl.style.removeProperty('background');
+      const newText = activeEl.textContent || '';
+      const oldText = activeOriginal;
+      const editable = activeBlockEditable;
+      const elRef = activeEl;
+      activeEl = null;
+      activeOriginal = '';
+      activeBlockEditable = null;
+      if (!commit) {
+        // Restore on cancel.
+        elRef.textContent = oldText;
+        return;
+      }
+      if (newText === oldText) return;
+      try {
+        window.parent.postMessage({
+          type: 'tapas:text-edit',
+          editable,
+          oldText,
+          newText,
+        }, '*');
+      } catch {}
+    };
+
+    const onDblClick = (e) => {
+      // Walk up to find the [data-editable="pages.…"] block root.
+      let blockEl = e.target;
+      while (blockEl && blockEl !== document.body) {
+        const ed = blockEl.getAttribute?.('data-editable');
+        if (ed && ed.startsWith('pages.')) break;
+        blockEl = blockEl.parentElement;
+      }
+      if (!blockEl || blockEl === document.body) return;
+      // Only enable inline edit on elements whose ONLY child is a text
+      // node — avoids stomping nested <em>/<a>/<img> children.
+      const target = e.target;
+      if (target.children.length > 0) return;
+      if (!target.textContent || !target.textContent.trim()) return;
+      // Already editing this one? leave it.
+      if (activeEl === target) return;
+      // Commit any prior edit first.
+      finish(true);
+      e.preventDefault();
+      e.stopPropagation();
+      activeEl = target;
+      activeOriginal = target.textContent || '';
+      activeBlockEditable = blockEl.getAttribute('data-editable');
+      target.setAttribute('contenteditable', 'plaintext-only');
+      target.style.outline = '2px solid #f97316';
+      target.style.cursor = 'text';
+      target.style.background = 'rgba(249, 115, 22, 0.08)';
+      // Tell window editing started so SiteContent doesn't re-render
+      // while a contentEditable caret is active.
+      window.__tapasInlineEditing = true;
+      // Focus + select all on next frame so the user can just type.
+      requestAnimationFrame(() => {
+        target.focus();
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    };
+
+    const onBlur = (e) => {
+      if (e.target === activeEl) {
+        window.__tapasInlineEditing = false;
+        finish(true);
+      }
+    };
+
+    const onKey = (e) => {
+      if (!activeEl) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        window.__tapasInlineEditing = false;
+        finish(false);
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        window.__tapasInlineEditing = false;
+        finish(true);
+        if (activeEl) activeEl.blur();
+      }
+    };
+
+    document.addEventListener('dblclick', onDblClick, true);
+    document.addEventListener('blur', onBlur, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('dblclick', onDblClick, true);
+      document.removeEventListener('blur', onBlur, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
   }, []);
 
   // Hover bridge — same shape as click but throttled, so the editor can
