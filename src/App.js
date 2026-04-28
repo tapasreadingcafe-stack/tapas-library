@@ -151,6 +151,7 @@ const MarketingTools        = lazyWithRetry(() => import('./pages/MarketingTools
 const PromoCodes            = lazyWithRetry(() => import('./pages/PromoCodes'));
 const StorePromoCodes       = lazyWithRetry(() => import('./pages/StorePromoCodes'));
 const StoreCMS              = lazyWithRetry(() => import('./pages/StoreCMS'));
+const WebsiteEditor         = lazyWithRetry(() => import('./pages/WebsiteEditor'));
 const MarketingHub          = lazyWithRetry(() => import('./pages/MarketingHub'));
 const LoyaltySystem         = lazyWithRetry(() => import('./pages/LoyaltySystem'));
 const GrowthTools           = lazyWithRetry(() => import('./pages/GrowthTools'));
@@ -809,7 +810,7 @@ function DashboardShell() {
             <Route path="/store/analytics"                    element={<StoreAnalytics />} />
             <Route path="/commerce-insights"                  element={<CommerceInsights />} />
             <Route path="/store/content"                      element={<Navigate to="/store/content-v2" replace />} />
-            <Route path="/store/content-v2"                   element={<WebsiteEditorRebuilding />} />
+            <Route path="/store/content-v2"                   element={<WebsiteEditor />} />
             <Route path="/marketing/campaigns"                element={<EmailCampaigns />} />
 
             {/* Marketing */}
