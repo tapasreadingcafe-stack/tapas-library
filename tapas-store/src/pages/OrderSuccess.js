@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
+import { BlockSlot } from '../blocks/PageRenderer';
 
 // =====================================================================
 // /order/:id — Modern Heritage redesign
@@ -107,6 +108,7 @@ export default function OrderSuccess() {
       padding: '72px 20px',
       fontFamily: 'var(--font-body)',
     }}>
+      <BlockSlot pageKey="order_success" slot="above_blocks" />
       {/* Celebration card */}
       <div className="tps-card" style={{
         background: 'var(--bg-card, #ede8d0)',
@@ -252,6 +254,7 @@ export default function OrderSuccess() {
           </Link>
         </div>
       </div>
+      <BlockSlot pageKey="order_success" slot="below_blocks" />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import CART_CSS from './cart/cartStyles';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { rupees, pluralItems, pluralTitles } from './cart/cartFormat';
+import { BlockSlot } from '../blocks/PageRenderer';
 
 const UNDO_MS = 5000;
 
@@ -105,6 +106,7 @@ export default function Cart() {
   return (
     <div className="ct-root">
       <style>{CART_CSS}</style>
+      <BlockSlot pageKey="cart" slot="above_blocks" />
       <CartHero />
 
       <div className="ct-wrap">
@@ -213,6 +215,7 @@ export default function Cart() {
           </button>
         </div>
       )}
+      <BlockSlot pageKey="cart" slot="below_blocks" />
     </div>
   );
 }

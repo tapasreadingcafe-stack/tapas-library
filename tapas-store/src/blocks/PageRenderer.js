@@ -530,3 +530,28 @@ export default function PageRenderer({ pageKey, fallback = null }) {
     </>
   );
 }
+
+// ---------------------------------------------------------------------
+// BlockSlot — render an arbitrary block array stored at
+// `content.pages[pageKey][slot]`. Used by transactional pages
+// (BookDetail / Cart / OrderSuccess) to add optional staff-editable
+// "extras" sections (promo bands, related content, FAQs) without
+// replacing the working transactional UI. Renders nothing when the
+// slot is empty so it's zero-impact by default.
+// ---------------------------------------------------------------------
+export function BlockSlot({ pageKey, slot }) {
+  const content = useSiteContent();
+  const blocks = content?.pages?.[pageKey]?.[slot];
+  if (!Array.isArray(blocks) || blocks.length === 0) return null;
+  const editorMode = isEditorMode();
+  const visible = blocks.filter((b) => !b?.props?.hidden);
+  if (visible.length === 0) return null;
+  return (
+    <>
+      <style>{RESPONSIVE_CSS}</style>
+      {visible.map((b, idx) => (
+        <BlockView key={b.id || idx} block={b} pageKey={pageKey} blockIndex={idx} totalBlocks={visible.length} editorMode={editorMode} />
+      ))}
+    </>
+  );
+}
