@@ -689,11 +689,14 @@ export const BLOCK_REGISTRY = {
   },
 
   tapas_new_arrivals: {
-    label: 'Tapas New Arrivals (4 products)',
+    label: 'Tapas New Arrivals',
     category: 'Content',
     Renderer: TapasNewArrivals,
     defaultProps: {
       eyebrow: 'New Arrivals',
+      source: 'static',
+      limit: 8,
+      show_add_to_cart: true,
       items: [
         { title: 'Syltherine', sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: 'Rp 3.500.000', badge: '-30%', image_url: 'arrival-1.jpg' },
         { title: 'Leviosa',    sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: '',              badge: '',     image_url: 'arrival-2.jpg' },
@@ -704,7 +707,17 @@ export const BLOCK_REGISTRY = {
     schema: [
       { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
       {
-        key: 'items', label: 'Products', type: 'array',
+        key: 'source', label: 'Data source', type: 'select',
+        options: [
+          { value: 'static', label: 'Static (use the items below)' },
+          { value: 'live',   label: 'Live shop catalogue' },
+        ],
+        hint: '"Live" pulls from the Books table — items below are ignored.',
+      },
+      { key: 'limit', label: 'How many to show (live only)', type: 'number', hint: '1–48. Defaults to 8.' },
+      { key: 'show_add_to_cart', label: 'Show add-to-cart button (live only)', type: 'boolean' },
+      {
+        key: 'items', label: 'Products (static only)', type: 'array',
         itemDefaults: { title: '', sub: '', price: '', strike: '', badge: '', image_url: '' },
         itemFields: [
           { key: 'title',     label: 'Title',          type: 'text' },

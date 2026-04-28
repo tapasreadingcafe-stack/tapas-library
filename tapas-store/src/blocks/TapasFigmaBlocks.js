@@ -1,5 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useShopBooks } from '../cms/hooks';
+import { adaptShopBooks } from '../cms/adapters';
+import { useCart } from '../context/CartContext';
 
 // =====================================================================
 // TapasFigmaBlocks
@@ -254,9 +257,18 @@ function ServiceCard({ icon, title, body, cta_text, cta_href }) {
 // ---------------------------------------------------------------------
 // 3. New Arrivals — 4 product cards
 // ---------------------------------------------------------------------
+// Member discount mirrored from the live HomeSections — kept local so
+// this block doesn't reach into a sibling component file.
+const MEMBER_DISCOUNT_RATE = 0.10;
+
+const formatRupees = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+
 export function TapasNewArrivals({ props = {} }) {
   const {
     eyebrow = 'New Arrivals',
+    source = 'static',          // 'static' | 'live'
+    limit = 8,
+    show_add_to_cart = true,
     items = [
       { title: 'Syltherine', sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: 'Rp 3.500.000', badge: '-30%', image_url: 'arrival-1.jpg' },
       { title: 'Leviosa',    sub: 'Stylish café chair', price: 'Rp 2.500.000', strike: '',              badge: '',     image_url: 'arrival-2.jpg' },
@@ -264,6 +276,33 @@ export function TapasNewArrivals({ props = {} }) {
       { title: 'Respira',    sub: 'Outdoor bar table',  price: 'Rp 500.000',   strike: '',              badge: 'New',  image_url: 'arrival-4.jpg' },
     ],
   } = props;
+
+  // Always call hooks unconditionally (rules of hooks). The `source`
+  // toggle just decides which set of items the renderer maps over.
+  const { data: liveRows } = useShopBooks();
+  const { addBook } = useCart();
+
+  const liveItems = React.useMemo(() => {
+    if (source !== 'live') return [];
+    return adaptShopBooks(liveRows)
+      .slice(0, Math.max(1, Math.min(48, Number(limit) || 8)))
+      .map((b) => {
+        const effective = Math.round(Number(b.price || 0) * (1 - MEMBER_DISCOUNT_RATE));
+        return {
+          id: b.id,
+          title: b.title,
+          sub: b.author,
+          price: formatRupees(effective),
+          strike: b.price && effective < b.price ? formatRupees(b.price) : '',
+          badge: b.clubs?.[0] || b.categories?.[0] || '',
+          image_url: b.coverUrl || '',
+          _bookForCart: { id: b.id, title: b.title, author: b.author, sales_price: effective },
+        };
+      });
+  }, [source, liveRows, limit]);
+
+  const renderItems = source === 'live' ? liveItems : (items || []);
+
   return (
     <section style={{ background: LIME, padding: '0 20px clamp(60px, 8vw, 110px)' }}>
       <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
@@ -273,14 +312,20 @@ export function TapasNewArrivals({ props = {} }) {
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
-          {(items || []).map((a, i) => <ArrivalCard key={i} {...a} />)}
+          {renderItems.map((a, i) => (
+            <ArrivalCard
+              key={a.id || i}
+              {...a}
+              onAddToCart={show_add_to_cart && a._bookForCart ? () => addBook(a._bookForCart) : null}
+            />
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function ArrivalCard({ title, sub, price, strike, badge, image_url }) {
+function ArrivalCard({ title, sub, price, strike, badge, image_url, onAddToCart }) {
   const [hovered, setHovered] = React.useState(false);
   const badgeColor = badge === 'New' ? '#2BB673' : PINK;
   return (
@@ -312,6 +357,18 @@ function ArrivalCard({ title, sub, price, strike, badge, image_url }) {
         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'baseline', gap: '10px' }}>
           <span style={{ fontSize: '17px', fontWeight: 700, color: INK }}>{price}</span>
           {strike && <span style={{ fontSize: '12px', color: INK_FAINT, textDecoration: 'line-through' }}>{strike}</span>}
+          {onAddToCart && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(); }}
+              aria-label={`Add ${title} to cart`}
+              style={{
+                marginLeft: 'auto', width: 32, height: 32, borderRadius: '50%',
+                background: PINK, color: '#fff', border: 'none', cursor: 'pointer',
+                fontSize: 18, lineHeight: 1, fontWeight: 700,
+              }}
+            >+</button>
+          )}
         </div>
       </div>
     </article>
