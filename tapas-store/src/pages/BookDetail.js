@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { useApp } from '../App';
 import { useCart } from '../context/CartContext';
 import ReviewForm from '../components/ReviewForm';
+import { BlockSlot } from '../blocks/PageRenderer';
 
 // =====================================================================
 // BookDetail — Modern Heritage design system
@@ -195,6 +196,7 @@ export default function BookDetail() {
 
   return (
     <div style={{ background: 'var(--bg)', fontFamily: 'var(--font-body)', minHeight: '90vh' }}>
+      <BlockSlot pageKey="book_detail" slot="above_blocks" />
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px 96px' }}>
 
         {/* Breadcrumb */}
@@ -574,6 +576,7 @@ export default function BookDetail() {
           }
         }
       `}</style>
+      <BlockSlot pageKey="book_detail" slot="below_blocks" />
     </div>
   );
 }
