@@ -38,6 +38,7 @@ import {
   TapasFindUs, TapasHoursStrip, TapasFaqAccordion,
   TapasManifesto, TapasStatsStrip, TapasTimeline,
   TapasCompromises, TapasTeamGrid, TapasPressQuotes,
+  TapasBlogFeatured, TapasBlogSidebar, TapasBlogArchive,
 } from './TapasFigmaBlocks';
 import { TapasGroup, ComponentRef } from './PageRenderer';
 
@@ -1064,6 +1065,36 @@ export const BLOCK_REGISTRY = {
     Renderer: TapasPressQuotes,
     defaultProps: {},
     schema: [],
+  },
+
+  tapas_blog_featured: {
+    label: 'Tapas Blog — Featured Article (live)',
+    category: 'Content',
+    Renderer: TapasBlogFeatured,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_blog_sidebar: {
+    label: 'Tapas Blog — Sidebar Cards (live)',
+    category: 'Content',
+    Renderer: TapasBlogSidebar,
+    defaultProps: {},
+    schema: [],
+  },
+  tapas_blog_archive: {
+    label: 'Tapas Blog — Archive Grid (live)',
+    category: 'Content',
+    Renderer: TapasBlogArchive,
+    defaultProps: {
+      eyebrow: 'The Archive',
+      heading_html: 'More from <em>the room.</em>',
+      lede: 'Essays and interviews, sorted however’s useful.',
+    },
+    schema: [
+      { key: 'eyebrow',      label: 'Eyebrow',                       type: 'text' },
+      { key: 'heading_html', label: 'Heading (HTML, <em> allowed)',  type: 'text' },
+      { key: 'lede',         label: 'Lede',                          type: 'textarea' },
+    ],
   },
 
   tapas_featured_testimonial: {

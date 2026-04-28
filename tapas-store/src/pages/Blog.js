@@ -12,6 +12,8 @@ import {
 } from '../data/journalPosts';
 import { useJournalPosts } from '../cms/hooks';
 import { adaptJournalPosts } from '../cms/adapters';
+import PageRenderer from '../blocks/PageRenderer';
+import { useSiteContent } from '../context/SiteContent';
 
 function useDebounced(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -40,6 +42,18 @@ function filterArticles(articles, category, query) {
 }
 
 export default function Blog() {
+  const content = useSiteContent();
+  if (content?.pages?.blog?.use_blocks) {
+    return (
+      <div style={{ minHeight: '100vh' }}>
+        <PageRenderer pageKey="blog" />
+      </div>
+    );
+  }
+  return <BlogLegacy />;
+}
+
+function BlogLegacy() {
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounced(query, 200);

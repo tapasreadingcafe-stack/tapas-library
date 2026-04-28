@@ -1329,3 +1329,195 @@ export function TapasPressQuotes() {
     </section>
   );
 }
+
+// =====================================================================
+// Phase 2 (Blog page) blocks — featured article, sidebar 3-card stack,
+// archive grid (with built-in category filter + search).
+// =====================================================================
+
+function _useJournal() {
+  const { useJournalPosts } = require('../cms/hooks');
+  const { adaptJournalPosts } = require('../cms/adapters');
+  const { data: rows } = useJournalPosts();
+  return adaptJournalPosts(rows || []);
+}
+
+function _renderJournalTitle(parts) {
+  if (!Array.isArray(parts)) return null;
+  return parts.map((p, i) => p.em
+    ? <em key={i} style={{ fontStyle: 'italic', color: HS_PURPLE }}>{p.t}</em>
+    : <React.Fragment key={i}>{p.t}</React.Fragment>);
+}
+
+export function TapasBlogFeatured() {
+  const j = _useJournal();
+  const a = j?.featured;
+  if (!a) return null;
+  return (
+    <Link to={`/blog/${a.slug}`} style={{
+      display: 'block', textDecoration: 'none', color: 'inherit',
+      background: HS_INK, color2: HS_LIME,
+      borderRadius: 28, padding: '52px 56px', position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', right: -80, top: -80,
+        width: 280, height: 280, borderRadius: '50%',
+        background: HS_LIME, opacity: 0.18,
+      }} aria-hidden="true" />
+      <div style={{
+        fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em',
+        textTransform: 'uppercase', color: HS_LIME, marginBottom: 16,
+      }}>
+        {(a.kicker || 'FEATURED').toUpperCase()}
+      </div>
+      <h2 style={{
+        margin: 0, color: '#fff',
+        fontFamily: 'serif', fontWeight: 600,
+        fontSize: 'clamp(36px, 4.4vw, 60px)', lineHeight: 1.05, letterSpacing: '-0.01em',
+      }}>{_renderJournalTitle(a.title)}</h2>
+      {a.excerpt && (
+        <p style={{ marginTop: 18, color: 'rgba(255,255,255,0.78)', maxWidth: '52ch', fontSize: 16, lineHeight: 1.6 }}>
+          {a.excerpt}
+        </p>
+      )}
+      <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{
+          width: 36, height: 36, borderRadius: '50%',
+          background: HS_LIME, color: HS_INK,
+          display: 'grid', placeItems: 'center',
+          fontFamily: 'serif', fontWeight: 700,
+        }}>{a.author?.initial}</span>
+        <div style={{ color: '#fff', fontSize: 14 }}>
+          {a.author?.name}
+          {a.readMinutes && <span style={{ opacity: 0.6 }}> · {a.readMinutes} min read</span>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export function TapasBlogSidebar() {
+  const j = _useJournal();
+  const list = j?.sidebar || [];
+  if (list.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {list.map((c) => (
+        <Link key={c.slug} to={`/blog/${c.slug}`} style={{
+          textDecoration: 'none', color: 'inherit',
+          background: HS_CARD, border: `1px solid ${HS_RULE}`,
+          borderRadius: 18, padding: '20px 22px',
+        }}>
+          <div style={{
+            fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.14em',
+            textTransform: 'uppercase', color: HS_PURPLE, marginBottom: 8,
+          }}>{(c.kicker || '').toUpperCase()}</div>
+          <h3 style={{ margin: 0, fontFamily: 'serif', fontWeight: 600, fontSize: 20, lineHeight: 1.15, color: HS_INK }}>
+            {_renderJournalTitle(c.title)}
+          </h3>
+          {c.excerpt && <p style={{ margin: '8px 0 12px', fontSize: 14, color: 'rgba(31,27,22,0.7)', lineHeight: 1.55 }}>{c.excerpt}</p>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(31,27,22,0.6)' }}>
+            <span>{c.author?.name}</span>
+            <span>{c.readMinutes} min</span>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// Self-contained archive: handles its own category filter + search box.
+// Does NOT receive props from external state — that's the whole point of
+// being a block. Categories pulled from FILTER_TO_CATEGORY constant.
+export function TapasBlogArchive({ props = {} }) {
+  const {
+    eyebrow = 'The Archive',
+    heading_html = 'More from <em>the room.</em>',
+    lede = 'Essays and interviews, sorted however’s useful.',
+  } = props;
+  const j = _useJournal();
+  const archive = j?.archive || [];
+  const { FILTER_TO_CATEGORY, titleText } = require('../data/journalPosts');
+
+  const [category, setCategory] = React.useState('All');
+  const [query, setQuery] = React.useState('');
+  const filtered = React.useMemo(() => {
+    const mapped = FILTER_TO_CATEGORY[category];
+    const q = query.trim().toLowerCase();
+    return archive.filter((a) => {
+      if (mapped && a.category !== mapped) return false;
+      if (q) {
+        const haystack = [titleText(a.title), a.excerpt || '', a.author?.name || ''].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [archive, category, query, FILTER_TO_CATEGORY, titleText]);
+
+  const cats = ['All', ...Object.keys(FILTER_TO_CATEGORY).filter(k => k !== 'All')];
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <header style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, alignItems: 'end', marginBottom: 28 }}>
+        <div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{eyebrow}</div>
+          <h2 style={{ margin: '8px 0 0', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(30px, 3.6vw, 48px)', lineHeight: 1.05, color: HS_INK }} dangerouslySetInnerHTML={{ __html: heading_html }} />
+        </div>
+        <p style={{ margin: 0, fontSize: 15, color: 'rgba(31,27,22,0.7)' }}>{lede}</p>
+      </header>
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 22 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {cats.map(c => (
+            <button key={c} onClick={() => setCategory(c)} style={{
+              padding: '8px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600,
+              border: `1px solid ${category === c ? HS_INK : HS_RULE}`,
+              background: category === c ? HS_INK : '#fff',
+              color: category === c ? '#fff' : HS_INK,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>{c}</button>
+          ))}
+        </div>
+        <input
+          type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search"
+          style={{
+            marginLeft: 'auto', minWidth: 240, padding: '10px 16px',
+            borderRadius: 999, border: `1px solid ${HS_RULE}`, background: '#fff',
+            fontSize: 14, fontFamily: 'inherit', color: HS_INK, outline: 'none',
+          }}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ padding: '40px 20px', textAlign: 'center', color: 'rgba(31,27,22,0.6)', background: HS_CARD, border: `1px dashed ${HS_RULE}`, borderRadius: 16 }}>
+          No notes yet from that corner. Try another category.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {filtered.map((a) => (
+            <Link key={a.slug} to={`/blog/${a.slug}`} style={{
+              textDecoration: 'none', color: 'inherit',
+              background: HS_CARD, border: `1px solid ${HS_RULE}`,
+              borderRadius: 16, padding: '20px 22px',
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: HS_PURPLE }}>
+                {a.category || 'NOTE'}
+              </div>
+              <h3 style={{ margin: 0, fontFamily: 'serif', fontWeight: 600, fontSize: 20, lineHeight: 1.2, color: HS_INK }}>
+                {_renderJournalTitle(a.title)}
+              </h3>
+              {a.excerpt && <p style={{ margin: 0, fontSize: 14, color: 'rgba(31,27,22,0.7)', lineHeight: 1.55 }}>{a.excerpt}</p>}
+              <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(31,27,22,0.6)', paddingTop: 10, borderTop: `1px dashed ${HS_RULE}` }}>
+                <span>{a.author?.name}</span>
+                {a.readMinutes && <span>{a.readMinutes} min</span>}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
