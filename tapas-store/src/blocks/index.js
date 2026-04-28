@@ -35,6 +35,7 @@ import {
   TapasTestimonials, TapasNewsletter, TapasSection,
   TapasEventsCalendar, TapasPricingSplit, TapasFeaturedTestimonial,
   TapasClubsGrid, TapasFeaturedSupper,
+  TapasFindUs, TapasHoursStrip, TapasFaqAccordion,
 } from './TapasFigmaBlocks';
 import { TapasGroup, ComponentRef } from './PageRenderer';
 
@@ -977,6 +978,46 @@ export const BLOCK_REGISTRY = {
     schema: [
       { key: 'menu_kicker', label: 'Menu — kicker', type: 'text' },
       { key: 'menu_title',  label: 'Menu — title',  type: 'text' },
+    ],
+  },
+
+  tapas_find_us: {
+    label: 'Tapas Find Us (address + contacts)',
+    category: 'Content',
+    Renderer: TapasFindUs,
+    defaultProps: {
+      eyebrow: 'Find us',
+      heading_html: 'The <em>room itself.</em>',
+      lede: 'The fastest way is the front door. For everything else:',
+    },
+    schema: [
+      { key: 'eyebrow',      label: 'Eyebrow',                       type: 'text' },
+      { key: 'heading_html', label: 'Heading (HTML, <em> allowed)',  type: 'text' },
+      { key: 'lede',         label: 'Lede',                          type: 'textarea' },
+    ],
+  },
+
+  tapas_hours_strip: {
+    label: 'Tapas Hours Strip (live)',
+    category: 'Content',
+    Renderer: TapasHoursStrip,
+    defaultProps: {},
+    schema: [],
+  },
+
+  tapas_faq_accordion: {
+    label: 'Tapas FAQ Accordion (live)',
+    category: 'Content',
+    Renderer: TapasFaqAccordion,
+    defaultProps: {
+      eyebrow: 'Good to know',
+      heading_html: 'A few <em>common questions.</em>',
+      lede: 'If you can’t find it here, just ask us at the counter.',
+    },
+    schema: [
+      { key: 'eyebrow',      label: 'Eyebrow',                       type: 'text' },
+      { key: 'heading_html', label: 'Heading (HTML, <em> allowed)',  type: 'text' },
+      { key: 'lede',         label: 'Lede',                          type: 'textarea' },
     ],
   },
 

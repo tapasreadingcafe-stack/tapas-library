@@ -1004,3 +1004,163 @@ export function TapasFeaturedSupper({ props = {} }) {
     </section>
   );
 }
+
+// =====================================================================
+// Phase 2 (Contact page) blocks
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// TapasFindUs — "Find us" address/phone/email card. Pulls from
+// contact_info via useContactInfo() with safe fallbacks.
+// ---------------------------------------------------------------------
+export function TapasFindUs({ props = {} }) {
+  const {
+    eyebrow = 'Find us',
+    heading_html = 'The <em>room itself.</em>',
+    lede = 'The fastest way is the front door. For everything else:',
+  } = props;
+  const { useContactInfo } = require('../cms/hooks');
+  const { adaptContactInfo } = require('../cms/adapters');
+  const { data: row } = useContactInfo();
+  const i = adaptContactInfo(row) || {};
+
+  const Row = ({ label, children }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 14, padding: '12px 0', borderTop: `1px dashed ${HS_RULE}`, alignItems: 'baseline' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: HS_PURPLE }}>{label}</div>
+      <div style={{ fontSize: 15, color: HS_INK, lineHeight: 1.5 }}>{children}</div>
+    </div>
+  );
+
+  return (
+    <section style={{ padding: 'clamp(24px, 4vw, 48px) 0' }}>
+      <div style={{ background: HS_CARD, border: `1px solid ${HS_RULE}`, borderRadius: 24, padding: '36px 36px' }}>
+        <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{eyebrow}</div>
+        <h3 style={{ margin: '8px 0 12px', fontFamily: 'serif', fontSize: 32, fontWeight: 600, color: HS_INK, lineHeight: 1.1 }} dangerouslySetInnerHTML={{ __html: heading_html }} />
+        <p style={{ margin: '0 0 14px', fontSize: 15, color: 'rgba(31,27,22,0.7)' }}>{lede}</p>
+
+        {(i.address?.bold || i.address?.line) && (
+          <Row label="Address">
+            {i.address?.bold && <strong style={{ display: 'block' }}>{i.address.bold}</strong>}
+            {i.address?.line}
+          </Row>
+        )}
+        {i.phone && (
+          <Row label="Phone">
+            <a href={`tel:${String(i.phone).replace(/[^+\d]/g, '')}`} style={{ color: HS_INK }}>{i.phone}</a>
+          </Row>
+        )}
+        {i.email && (
+          <Row label="Email">
+            <a href={`mailto:${i.email}`} style={{ color: HS_INK }}>{i.email}</a>
+          </Row>
+        )}
+        {i.events && (
+          <Row label="Events">
+            <a href={`mailto:${i.events}`} style={{ color: HS_INK }}>{i.events}</a>
+          </Row>
+        )}
+        {i.press && (
+          <Row label="Press">
+            <a href={`mailto:${i.press}`} style={{ color: HS_INK }}>{i.press}</a>
+          </Row>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TapasHoursStrip — weekly hours with "Today" highlight. Pulls from
+// hours table via useHours() + adaptHours().
+// ---------------------------------------------------------------------
+export function TapasHoursStrip({ props = {} }) {
+  const { useHours } = require('../cms/hooks');
+  const { adaptHours } = require('../cms/adapters');
+  const { data: rows } = useHours();
+  const list = require('../cms/adapters').adaptHours(rows || []);
+  const todayIdx = new Date().getDay();
+  const _ = adaptHours; const __ = useHours; void _; void __;
+
+  return (
+    <section style={{ padding: 'clamp(24px, 4vw, 48px) 0' }}>
+      <style>{`
+        .tpx-hours { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+          background: ${HS_CARD}; border: 1px solid ${HS_RULE}; border-radius: 18px; overflow: hidden; }
+        .tpx-hours-d { padding: 18px 14px; text-align: center; border-left: 1px solid ${HS_RULE}; }
+        .tpx-hours-d:first-child { border-left: 0; }
+        .tpx-hours-d.today { background: ${HS_LIME}; color: ${HS_INK}; }
+        .tpx-hours-name { font-family: monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: ${HS_PURPLE}; }
+        .tpx-hours-d.today .tpx-hours-name { color: ${HS_INK}; }
+        .tpx-hours-val { margin-top: 8px; font-family: serif; font-size: 16px; color: ${HS_INK}; }
+        .tpx-hours-val.closed { font-style: italic; opacity: 0.55; }
+        @media (max-width: 767px) { .tpx-hours { grid-template-columns: repeat(2, 1fr); } .tpx-hours-d { border-left: 0; border-top: 1px solid ${HS_RULE}; } .tpx-hours-d:nth-child(2n) { border-left: 1px solid ${HS_RULE}; } }
+      `}</style>
+      <div className="tpx-hours" role="list">
+        {list.length === 0 ? (
+          <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'rgba(31,27,22,0.6)' }}>Hours not configured.</div>
+        ) : list.map((d) => {
+          const isToday = d.dayIndex === todayIdx;
+          return (
+            <div key={d.key} role="listitem" className={`tpx-hours-d${isToday ? ' today' : ''}`}>
+              <div className="tpx-hours-name">{d.short}{isToday ? ' · TODAY' : ''}</div>
+              <div className={`tpx-hours-val${d.closed ? ' closed' : ''}`}>{d.hours}</div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TapasFaqAccordion — FAQ accordion pulled from faqs table via
+// useFaqs() + adaptFaqs(). Native <details> for keyboard a11y.
+// ---------------------------------------------------------------------
+export function TapasFaqAccordion({ props = {} }) {
+  const {
+    eyebrow = 'Good to know',
+    heading_html = 'A few <em>common questions.</em>',
+    lede = 'If you can’t find it here, just ask us at the counter.',
+  } = props;
+  const { useFaqs } = require('../cms/hooks');
+  const { adaptFaqs } = require('../cms/adapters');
+  const { data: rows } = useFaqs();
+  const list = adaptFaqs(rows || []);
+
+  return (
+    <section style={{ padding: 'clamp(40px, 6vw, 80px) 0' }}>
+      <style>{`
+        .tpx-faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .tpx-faq { background: ${HS_CARD}; border: 1px solid ${HS_RULE}; border-radius: 14px;
+          padding: 14px 20px; cursor: pointer; }
+        .tpx-faq summary { list-style: none; font-family: serif; font-weight: 600; font-size: 17px;
+          color: ${HS_INK}; cursor: pointer; padding: 6px 0; }
+        .tpx-faq summary::-webkit-details-marker { display: none; }
+        .tpx-faq summary::after { content: '+'; float: right; font-family: monospace; opacity: 0.5; }
+        .tpx-faq[open] summary::after { content: '−'; }
+        .tpx-faq p { margin: 8px 0 0; font-size: 14.5px; color: rgba(31,27,22,0.75); line-height: 1.55; }
+        @media (max-width: 767px) { .tpx-faq-grid { grid-template-columns: 1fr; } }
+      `}</style>
+      <div style={{ marginBottom: 24, display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, alignItems: 'end' }}>
+        <div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>
+            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: HS_PURPLE, marginRight: 8 }} />
+            {eyebrow}
+          </div>
+          <h2 style={{ margin: '8px 0 0', fontFamily: 'serif', fontWeight: 600, fontSize: 'clamp(28px, 3.5vw, 44px)', lineHeight: 1.1, color: HS_INK }} dangerouslySetInnerHTML={{ __html: heading_html }} />
+        </div>
+        <p style={{ margin: 0, fontSize: 15, color: 'rgba(31,27,22,0.7)' }}>{lede}</p>
+      </div>
+      <div className="tpx-faq-grid">
+        {list.length === 0 ? (
+          <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'rgba(31,27,22,0.6)' }}>No FAQs yet.</div>
+        ) : list.map((f, idx) => (
+          <details key={f.q || idx} className="tpx-faq" open={idx === 0 || undefined}>
+            <summary>{f.q}</summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
