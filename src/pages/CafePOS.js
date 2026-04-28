@@ -171,28 +171,48 @@ export default function CafePOS() {
         quantity: c.qty,
         total_price: c.price * c.qty,
       }));
-      await supabase.from('cafe_order_items').insert(items);
+      const { error: itemsErr } = await supabase.from('cafe_order_items').insert(items);
+      if (itemsErr) {
+        // Compensate: delete the orphan order header so it doesn't show up
+        // in reports as a paid order with no line items.
+        await supabase.from('cafe_orders').delete().eq('id', order.id);
+        throw itemsErr;
+      }
 
-      // Deduct from cafe inventory for each item sold
+      // Best-effort inventory deduction. cafe_inventory may not exist on
+      // every install; surface failures via toast but don't fail the sale
+      // (the order is already paid + receipted).
       for (const c of cart) {
         try {
-          const { data: inv } = await supabase
+          const { data: inv, error: invErr } = await supabase
             .from('cafe_inventory')
             .select('id, current_stock, min_stock_level, item_name')
             .ilike('item_name', c.name)
             .limit(1);
-          const item = inv?.[0];
-          if (item) {
-            const newStock = (Number(item.current_stock) || 0) - c.qty;
-            await supabase.from('cafe_inventory').update({
-              current_stock: newStock,
-              updated_at: new Date().toISOString(),
-            }).eq('id', item.id);
-            if (newStock <= (Number(item.min_stock_level) || 0)) {
-              toast.warning(`Low stock: ${item.item_name} (${newStock} left)`);
-            }
+          if (invErr) {
+            // Missing-table or RLS: report once, then bail out of the loop.
+            console.warn('[CafePOS] inventory lookup failed', invErr);
+            toast.warning('Inventory not deducted — check cafe_inventory setup.');
+            break;
           }
-        } catch {}
+          const item = inv?.[0];
+          if (!item) continue;
+          const newStock = (Number(item.current_stock) || 0) - c.qty;
+          const { error: updErr } = await supabase.from('cafe_inventory').update({
+            current_stock: newStock,
+            updated_at: new Date().toISOString(),
+          }).eq('id', item.id);
+          if (updErr) {
+            console.warn('[CafePOS] inventory update failed', updErr);
+            toast.warning(`Could not deduct stock for ${c.name}.`);
+            continue;
+          }
+          if (newStock <= (Number(item.min_stock_level) || 0)) {
+            toast.warning(`Low stock: ${item.item_name} (${newStock} left)`);
+          }
+        } catch (e) {
+          console.warn('[CafePOS] inventory deduction error', e);
+        }
       }
 
       setLastOrder({ ...order, items: cart, customerName: orderData.customer_name });

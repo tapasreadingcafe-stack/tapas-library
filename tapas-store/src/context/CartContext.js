@@ -13,6 +13,11 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 
 const CartContext = createContext(null);
 
+// Per-line hard cap. Books/memberships should never exceed this in one
+// order; respects per-item `max_qty` when the source data supplies it
+// (e.g. a book carries `quantity_available`).
+const MAX_LINE_QTY = 99;
+
 const STORAGE_KEY = 'tapas_cart_v1';
 // Cart "extras" (gift-wrap / pickup / note / promo) live in a
 // separate key so legacy carts that persisted a bare items-array
@@ -71,10 +76,15 @@ export function CartProvider({ children }) {
 
   const addBook = useCallback((book, qty = 1) => {
     const key = `book:${book.id}`;
+    const stock = Number(book.quantity_available);
+    const cap = Math.min(MAX_LINE_QTY, Number.isFinite(stock) && stock > 0 ? stock : MAX_LINE_QTY);
+    const safeQty = Math.max(1, Math.min(Math.floor(Number(qty) || 1), cap));
     setItems(prev => {
       const existing = prev.find(i => i.key === key);
       if (existing) {
-        return prev.map(i => i.key === key ? { ...i, quantity: i.quantity + qty } : i);
+        return prev.map(i => i.key === key
+          ? { ...i, quantity: Math.min(i.quantity + safeQty, cap), max_qty: cap }
+          : i);
       }
       return [...prev, {
         key,
@@ -84,7 +94,8 @@ export function CartProvider({ children }) {
         author: book.author,
         cover_image: book.book_image || book.cover_image || null,
         unit_price: Number(book.sales_price || 0),
-        quantity: qty,
+        quantity: safeQty,
+        max_qty: cap,
       }];
     });
   }, []);
@@ -107,9 +118,14 @@ export function CartProvider({ children }) {
   }, []);
 
   const updateQty = useCallback((key, quantity) => {
+    const q = Math.floor(Number(quantity) || 0);
     setItems(prev => {
-      if (quantity <= 0) return prev.filter(i => i.key !== key);
-      return prev.map(i => i.key === key ? { ...i, quantity } : i);
+      if (q <= 0) return prev.filter(i => i.key !== key);
+      return prev.map(i => {
+        if (i.key !== key) return i;
+        const cap = Math.min(MAX_LINE_QTY, Number.isFinite(i.max_qty) && i.max_qty > 0 ? i.max_qty : MAX_LINE_QTY);
+        return { ...i, quantity: Math.min(q, cap) };
+      });
     });
   }, []);
 
