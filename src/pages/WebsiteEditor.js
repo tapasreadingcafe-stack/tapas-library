@@ -563,6 +563,159 @@ function escapeAttrValue(v) {
   return String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+// =====================================================================
+// IframeCanvas — Webflow-style live preview.
+//
+// Renders the actual storefront in an <iframe> at `?preview=draft`
+// instead of trying to re-render block JSON in the editor's native
+// tag-tree renderer. The storefront (tapas-store) handles all the
+// pixel-perfect rendering of type-keyed blocks (tapas_hero,
+// tapas_pricing_split, etc.) that the editor's TreeNode can't display.
+//
+// Two-way bridge:
+//   * Editor → iframe: posts the current draft `content` blob via
+//     `tapas:apply-content` (storefront SiteContent.js applies it
+//     immediately, no DB round-trip).
+//   * Iframe → editor: storefront's click + hover listeners post
+//     `tapas:select` / `tapas:hover` with { editable, selector,
+//     tag, rect } — the editor uses `editable` (= "pages.{slug}.blocks.{id}")
+//     to set selectedId and uses `selector` to set selectedElementSel.
+//
+// STOREFRONT_URL: defaults to localhost:3001 in dev / the production
+// custom domain otherwise. Override via REACT_APP_STOREFRONT_URL.
+// =====================================================================
+const STOREFRONT_URL = (typeof process !== 'undefined' && process.env?.REACT_APP_STOREFRONT_URL)
+  || (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:3001'
+      : 'https://www.tapasreadingcafe.com');
+
+function IframeCanvas({ content, pageKey, device, onDeviceChange, onSelect }) {
+  const iframeRef = useRef(null);
+  const [zoom, setZoom] = useState(100);
+  const [hoverRect, setHoverRect] = useState(null);
+  const [selectedRect, setSelectedRect] = useState(null);
+  const vp = DEVICES.find(d => d.key === device) || DEVICES[0];
+
+  const slug = content?.pages?.[pageKey]?.slug || `/${pageKey === 'home' ? '' : pageKey}`;
+  const url = `${STOREFRONT_URL}${slug.startsWith('/') ? slug : '/' + slug}?preview=draft&v2=1`;
+
+  // Push the latest draft content into the iframe whenever it changes,
+  // and once on first iframe load. Storefront SiteContent.js's
+  // `tapas:apply-content` listener (gated on IS_DRAFT) re-renders.
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const send = () => {
+      try {
+        iframe.contentWindow?.postMessage(
+          { type: 'tapas:apply-content', content },
+          '*',
+        );
+      } catch {}
+    };
+    iframe.addEventListener('load', send);
+    // Try once immediately too — covers re-renders after the iframe
+    // already loaded.
+    send();
+    return () => iframe.removeEventListener('load', send);
+  }, [content, pageKey]);
+
+  // Inbound bridge — selection + hover from the iframe.
+  useEffect(() => {
+    const onMsg = (e) => {
+      const msg = e.data;
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.type === 'tapas:select') {
+        setSelectedRect(msg.rect || null);
+        if (onSelect) onSelect(msg);
+      } else if (msg.type === 'tapas:hover') {
+        setHoverRect(msg.rect || null);
+      } else if (msg.type === 'tapas:hover-clear') {
+        setHoverRect(null);
+      }
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [onSelect]);
+
+  return (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      background: '#1f1f1f', overflow: 'hidden', minWidth: 0,
+    }}>
+      {/* Toolbar — minimal slice: device chips + zoom */}
+      <div style={{
+        flexShrink: 0, height: 36, padding: '0 12px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        color: '#aaa', fontSize: 12,
+      }}>
+        {DEVICES.map(d => (
+          <button key={d.key} onClick={() => onDeviceChange(d.key)} style={{
+            background: device === d.key ? '#2a2a2a' : 'transparent',
+            color: device === d.key ? '#fff' : '#888',
+            border: 'none', borderRadius: 3, padding: '3px 10px',
+            fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+          }}>{d.label || d.key}</button>
+        ))}
+        <span style={{ marginLeft: 'auto', fontFamily: 'ui-monospace, monospace' }}>
+          <button onClick={() => setZoom(z => Math.max(25, z - 25))} style={{ background: 'transparent', color: '#888', border: 'none', cursor: 'pointer', padding: '0 6px' }}>−</button>
+          {zoom}%
+          <button onClick={() => setZoom(z => Math.min(200, z + 25))} style={{ background: 'transparent', color: '#888', border: 'none', cursor: 'pointer', padding: '0 6px' }}>+</button>
+        </span>
+        <span style={{ marginLeft: 12, color: '#666', fontSize: 11 }} title={url}>
+          live preview · {STOREFRONT_URL.replace(/^https?:\/\//, '')}
+        </span>
+      </div>
+
+      {/* Iframe surface */}
+      <div style={{
+        flex: 1, padding: 24, overflow: 'auto',
+        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+      }}>
+        <div style={{
+          position: 'relative',
+          width: vp.width, maxWidth: '100%',
+          transform: `scale(${zoom / 100})`, transformOrigin: 'top center',
+          background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)',
+        }}>
+          <iframe
+            ref={iframeRef}
+            src={url}
+            title="Storefront live preview"
+            style={{
+              width: '100%', height: 'min(140vh, 1400px)',
+              border: 'none', display: 'block', background: '#fff',
+            }}
+          />
+          {hoverRect && (
+            <div aria-hidden style={{
+              position: 'absolute',
+              top: hoverRect.top, left: hoverRect.left,
+              width: hoverRect.width, height: hoverRect.height,
+              outline: '1px dashed #146ef5',
+              outlineOffset: '-1px',
+              pointerEvents: 'none',
+              zIndex: 10,
+            }} />
+          )}
+          {selectedRect && (
+            <div aria-hidden style={{
+              position: 'absolute',
+              top: selectedRect.top, left: selectedRect.left,
+              width: selectedRect.width, height: selectedRect.height,
+              outline: '2px solid #f97316',
+              outlineOffset: '-2px',
+              pointerEvents: 'none',
+              zIndex: 11,
+            }} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Canvas({
   tree, classes, selectedId, onSelect, device, onDeviceChange,
   onDropBlock, onDropAsset,
@@ -1779,6 +1932,22 @@ export default function WebsiteEditor() {
   // this path to scope element_styles overrides per-element rather
   // than per-block. null = no sub-selection (block selection only).
   const [selectedElementSel, setSelectedElementSel] = useState(null);
+  // Iframe-canvas mode (Webflow-style live storefront preview). When
+  // on, the canvas renders an <iframe src=storefront/{slug}?preview=draft>
+  // instead of the editor's native tag-tree TreeNode renderer. Lets
+  // staff see the actual storefront design in the canvas when blocks
+  // use type-keyed schemas (tapas_hero / tapas_pricing_split / etc.)
+  // that the native renderer can't display. Auto-on when the page's
+  // first block is a type-keyed block; can be forced via `?canvas=iframe`
+  // or off via `?canvas=tree`.
+  const [iframeCanvasOverride] = useState(() => {
+    try {
+      const v = new URLSearchParams(window.location.search).get('canvas');
+      if (v === 'iframe') return true;
+      if (v === 'tree') return false;
+    } catch {}
+    return null;
+  });
   const [railActive, setRailActive] = useState('navigator');
   const [styleState, setStyleState] = useState('base');
   // Active breakpoint / device frame. Drives both the canvas width and
@@ -2134,6 +2303,18 @@ export default function WebsiteEditor() {
 
   const tree = getEffectivePage(content, activePageKey)?.tree || null;
   const classes = content?.classes || {};
+
+  // Detect type-keyed blocks (storefront-style) on the active page.
+  // The native tag-tree renderer can't display them; if any exist,
+  // default the canvas to iframe mode unless the URL forces otherwise.
+  const pageHasTypeBlocks = (() => {
+    const blocks = content?.pages?.[pageKey]?.blocks;
+    if (!Array.isArray(blocks) || blocks.length === 0) return false;
+    return blocks.some((b) => b && typeof b === 'object' && typeof b.type === 'string' && !b.tag);
+  })();
+  const iframeCanvasMode = iframeCanvasOverride === null
+    ? pageHasTypeBlocks
+    : iframeCanvasOverride;
 
   // Re-usable id → node index. Built once per tree reference so
   // every downstream lookup (selectedNode, findNode-based callbacks)
@@ -3065,27 +3246,45 @@ export default function WebsiteEditor() {
               return <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />;
           }
         })()}
-        <Canvas
-          tree={tree}
-          classes={classes}
-          selectedId={selectedId}
-          onSelect={(id) => { setSelectedId(id); setSelectedElementSel(null); }}
-          selectedElementSel={selectedElementSel}
-          onSelectElement={setSelectedElementSel}
-          device={device}
-          onDeviceChange={setDevice}
-          onDropBlock={handleDropBlock}
-          onDropAsset={handleDropAsset}
-          editingNodeId={editingNodeId}
-          onStartEdit={handleStartEdit}
-          onCommitEdit={handleCommitEdit}
-          onCommitRuns={handleCommitRuns}
-          onCancelEdit={handleCancelEdit}
-          editableRef={editableRef}
-          components={content?.components}
-          onContextMenu={(id, x, y) => setContextMenu({ nodeId: id, x, y })}
-          previewSliderId={previewSliderId}
-        />
+        {iframeCanvasMode ? (
+          <IframeCanvas
+            content={content}
+            pageKey={pageKey}
+            device={device}
+            onDeviceChange={setDevice}
+            onSelect={(payload) => {
+              // payload = { editable, selector, tag, rect, text }
+              // editable looks like "pages.{slug}.blocks.{blockId}".
+              const blockId = payload?.editable?.split('.').pop();
+              if (blockId) {
+                setSelectedId(blockId);
+                setSelectedElementSel(payload.selector || null);
+              }
+            }}
+          />
+        ) : (
+          <Canvas
+            tree={tree}
+            classes={classes}
+            selectedId={selectedId}
+            onSelect={(id) => { setSelectedId(id); setSelectedElementSel(null); }}
+            selectedElementSel={selectedElementSel}
+            onSelectElement={setSelectedElementSel}
+            device={device}
+            onDeviceChange={setDevice}
+            onDropBlock={handleDropBlock}
+            onDropAsset={handleDropAsset}
+            editingNodeId={editingNodeId}
+            onStartEdit={handleStartEdit}
+            onCommitEdit={handleCommitEdit}
+            onCommitRuns={handleCommitRuns}
+            onCancelEdit={handleCancelEdit}
+            editableRef={editableRef}
+            components={content?.components}
+            onContextMenu={(id, x, y) => setContextMenu({ nodeId: id, x, y })}
+            previewSliderId={previewSliderId}
+          />
+        )}
         <RightPanel
           selectedNode={selectedNode}
           className={primaryClass}

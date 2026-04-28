@@ -433,6 +433,39 @@ function loadGoogleFont(family) {
   document.head.appendChild(link);
 }
 
+// Walk up from `target` to find the nearest [data-editable="pages.…"]
+// ancestor (the block root) AND build a CSS-ish selector for the leaf.
+// Mirrors the editor-side computeElementSelector — kept here so the
+// editor doesn't need to peek into the iframe's DOM (cross-origin
+// would block it anyway).
+function describeClickedElement(target, doc) {
+  let blockEl = target;
+  while (blockEl && blockEl !== doc.body) {
+    const e = blockEl.getAttribute?.('data-editable');
+    if (e && e.startsWith('pages.')) break;
+    blockEl = blockEl.parentElement;
+  }
+  if (!blockEl || blockEl === doc.body) return null;
+  const segs = [];
+  for (let cur = target; cur && cur !== blockEl; cur = cur.parentElement) {
+    const parent = cur.parentElement;
+    if (!parent) break;
+    const node = cur;
+    const tag = node.tagName.toLowerCase();
+    const sameTag = Array.from(parent.children).filter((c) => c.tagName === node.tagName);
+    const idx = sameTag.indexOf(node) + 1;
+    segs.unshift(sameTag.length > 1 ? `${tag}:nth-of-type(${idx})` : tag);
+  }
+  const rect = target.getBoundingClientRect();
+  return {
+    editable: blockEl.getAttribute('data-editable'),
+    selector: segs.join(' > ') || null,
+    tag: target.tagName.toLowerCase(),
+    rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+    text: (target.textContent || '').slice(0, 80).trim(),
+  };
+}
+
 export function SiteContentProvider({ children }) {
   // Initial state: cached content if we have it, otherwise defaults.
   // useState's lazy initializer runs exactly once on first render,
@@ -449,6 +482,58 @@ export function SiteContentProvider({ children }) {
     // Only needs to re-run when the cached/default content first loads.
     // Subsequent theme updates happen inside the fetch effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Editor-iframe outbound bridge: when running in preview-draft mode,
+  // intercept clicks on any [data-editable="pages.…"] element and
+  // postMessage the selection up to the editor parent. Lets the editor
+  // canvas render selection overlays without needing same-origin DOM
+  // access into this storefront iframe (which would be blocked across
+  // localhost:3000 ↔ localhost:3001 anyway).
+  useEffect(() => {
+    if (!IS_DRAFT) return;
+    const onClick = (e) => {
+      // Editor-mode: hijack ALL clicks so navigation links don't yank
+      // staff away from the canvas. Modifier-clicks (cmd/ctrl/middle)
+      // still pass through so staff can intentionally open in a new tab.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      const info = describeClickedElement(e.target, document);
+      if (!info) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        window.parent.postMessage({ type: 'tapas:select', ...info }, '*');
+      } catch {}
+    };
+    // capture-phase so we run before any inner handler stops propagation.
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
+
+  // Hover bridge — same shape as click but throttled, so the editor can
+  // draw a hover outline without polling the iframe's DOM.
+  useEffect(() => {
+    if (!IS_DRAFT) return;
+    let lastEditable = null;
+    const onOver = (e) => {
+      const info = describeClickedElement(e.target, document);
+      const next = info?.editable || null;
+      if (next === lastEditable) {
+        // Same block, but re-emit so the rect updates with the new
+        // sub-element under the cursor.
+      }
+      lastEditable = next;
+      try {
+        window.parent.postMessage(
+          info
+            ? { type: 'tapas:hover', ...info }
+            : { type: 'tapas:hover-clear' },
+          '*',
+        );
+      } catch {}
+    };
+    document.addEventListener('mouseover', onOver, true);
+    return () => document.removeEventListener('mouseover', onOver, true);
   }, []);
 
   // Live preview bridge: when running inside the dashboard editor iframe,
