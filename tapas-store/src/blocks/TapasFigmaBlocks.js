@@ -582,3 +582,294 @@ export function TapasNewsletter({ props = {} }) {
   );
 }
 
+
+// =====================================================================
+// Below: 3 blocks added in Phase 1 of the visual-builder migration
+// (PR follow-up to #58). They each mirror one section of the live
+// HomeSections.js (UpcomingEventsSection / PricingSection /
+// TestimonialSection) so a block-tree home page can recreate it.
+// Inline CSS — no external stylesheet dependency.
+// =====================================================================
+
+// Local palette mirrored from HomeSections.js so blocks render
+// identically when the host page doesn't include the hs-* classes.
+const HS_INK    = '#1F1B16';
+const HS_LIME   = '#caf27e';
+const HS_PURPLE = '#7E22CE';
+const HS_ORANGE = '#FF934A';
+const HS_PINK   = '#EF3D7B';
+const HS_RULE   = 'rgba(31,27,22,0.10)';
+const HS_CARD   = '#fffaf0';
+
+const _MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function _isoMD(iso) {
+  if (!iso) return { m: '', d: '' };
+  const [, mm, dd] = String(iso).split('-');
+  return { m: _MONTHS[parseInt(mm, 10) - 1] || '', d: parseInt(dd, 10) || '' };
+}
+function _badgeText(e) {
+  const map = { 'weekly': 'WEEKLY', 'monthly': 'MONTHLY', 'prix-fixe': 'PRIX FIXE', 'drop-in': 'DROP IN', 'guest-night': 'GUEST' };
+  const base = map[e.badge] || (e.category || '').toUpperCase();
+  const { m, d } = _isoMD(e.iso);
+  return base ? `${base} · ${m} ${d}` : `${m} ${d}`;
+}
+function _chipBg(category) {
+  switch (category) {
+    case 'silent-reading': return { bg: '#e4f5bf', fg: '#4a6418' };
+    case 'guest-night':    return { bg: '#ffeedd', fg: '#a84a0f' };
+    case 'book-club':      return { bg: '#f0e3ff', fg: '#5a2b9a' };
+    case 'poetry-supper':  return { bg: '#ffe1eb', fg: '#a30039' };
+    case 'members-only':   return { bg: '#ffe1eb', fg: '#a30039' };
+    default:               return { bg: '#f0e3ff', fg: '#5a2b9a' };
+  }
+}
+
+// ---------------------------------------------------------------------
+// TapasEventsCalendar — calendar-grid block matching the live home
+// UpcomingEventsSection (date column · title+lede · category chip ·
+// arrow-button row).
+// ---------------------------------------------------------------------
+export function TapasEventsCalendar({ props = {} }) {
+  const {
+    eyebrow = 'Upcoming Events',
+    heading_html = 'On the calendar <em>this season.</em>',
+    lede = 'Weekly clubs, translator evenings, poetry suppers, and the occasional quiet Saturday. All welcome, members first.',
+    limit = 5,
+    cta_href = '/events',
+  } = props;
+
+  // Lazy-required so blocks/index.js can import this component without
+  // pulling the whole CMS hook graph for static-only callers.
+  const { useEvents } = require('../cms/hooks');
+  const { splitEvents } = require('../cms/adapters');
+  const { data: rows } = useEvents();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const events = (splitEvents(rows || []).upcoming || [])
+    .filter((e) => e.iso >= today)
+    .sort((a, b) => (a.iso || '').localeCompare(b.iso || ''))
+    .slice(0, Math.max(1, Math.min(20, Number(limit) || 5)));
+
+  return (
+    <section style={{ padding: 'clamp(60px, 8vw, 96px) 20px 40px' }}>
+      <style>{`
+        .tpx-cal { display: grid; grid-template-columns: 1fr; gap: 0;
+          background: ${HS_CARD}; border: 1px solid ${HS_RULE};
+          border-radius: 24px; overflow: hidden; }
+        .tpx-cal-row { display: grid; grid-template-columns: 120px 1.4fr 1fr auto;
+          gap: 32px; align-items: center; padding: 24px 32px;
+          border-top: 1px solid ${HS_RULE}; cursor: pointer;
+          transition: background .15s; text-decoration: none; color: inherit; }
+        .tpx-cal-row:first-child { border-top: 0; }
+        .tpx-cal-row:hover { background: #fbf7ec; }
+        .tpx-cal-d { font-family: serif; font-weight: 700; font-size: 14px;
+          letter-spacing: 0.04em; text-transform: uppercase; color: ${HS_PURPLE}; }
+        .tpx-cal-d b { display: block; font-size: 40px; color: ${HS_INK};
+          letter-spacing: -0.02em; text-transform: none; margin-top: 2px; line-height: 1; }
+        .tpx-cal-t h4 { font-size: 22px; line-height: 1.15; margin: 0; font-family: serif; font-weight: 600; color: ${HS_INK}; }
+        .tpx-cal-t h4 em { color: ${HS_PURPLE}; font-style: italic; font-weight: 400; }
+        .tpx-cal-t p { font-size: 14px; color: rgba(31,27,22,0.65); margin: 4px 0 0; }
+        .tpx-cal-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+          text-transform: uppercase; padding: 6px 12px; border-radius: 999px; justify-self: start; }
+        .tpx-cal-go { width: 38px; height: 38px; border-radius: 999px; background: ${HS_INK};
+          color: #fff; display: grid; place-items: center; font-size: 14px; transition: background .2s; }
+        .tpx-cal-row:hover .tpx-cal-go { background: ${HS_PINK}; }
+        @media (max-width: 1023px) {
+          .tpx-cal-row { grid-template-columns: 80px 1fr auto; gap: 16px; padding: 20px; }
+          .tpx-cal-tag { display: none; }
+        }
+      `}</style>
+      <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, marginBottom: 36 }}>
+          <div>
+            <div style={{ color: HS_PURPLE, fontWeight: 700, fontSize: 12, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{eyebrow}</div>
+            <h2 style={{ margin: '8px 0 0', fontSize: 'clamp(34px, 4vw, 56px)', fontFamily: 'serif', lineHeight: 1.05, color: HS_INK }} dangerouslySetInnerHTML={{ __html: heading_html }} />
+          </div>
+          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, color: 'rgba(31,27,22,0.7)' }}>{lede}</p>
+        </div>
+        <div className="tpx-cal">
+          {events.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'rgba(31,27,22,0.6)' }}>No upcoming events.</div>
+          ) : events.map((e) => {
+            const { m, d } = _isoMD(e.iso);
+            const chip = _chipBg(e.category);
+            return (
+              <Link key={e.slug || e.id} to={cta_href} className="tpx-cal-row">
+                <div className="tpx-cal-d">{m}<b>{d}</b></div>
+                <div className="tpx-cal-t">
+                  <h4>{e.title} {e.italic && <em>{e.italic}</em>}</h4>
+                  {e.description && <p>{e.description}</p>}
+                </div>
+                <span className="tpx-cal-tag" style={{ background: chip.bg, color: chip.fg }}>{_badgeText(e)}</span>
+                <span className="tpx-cal-go">→</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TapasPricingSplit — 2-column "Drop-in vs Membership" panel matching
+// the live home PricingSection. Defaults preserve current copy; staff
+// can edit each panel's title/lede/list/price/CTA.
+// ---------------------------------------------------------------------
+export function TapasPricingSplit({ props = {} }) {
+  const {
+    eyebrow = 'Pricing & Plans',
+    heading_html = 'Two ways to <em>pull up a chair.</em>',
+    lede = 'Drop in whenever you like — or become a member and unlock every club, a quarterly book, and 10% off the kitchen.',
+    left_kicker = 'Drop-in',
+    left_title = 'The Reading Room',
+    left_body = 'Free to enter. Borrow one book at a time, read all afternoon. Buy a coffee or a plate if the mood strikes.',
+    left_features = ['Lending library, honor system', 'Wi-Fi, quiet tables, long hours', 'One guest club visit per month'],
+    left_price = 'Free',
+    left_cta_text = 'Visit today',
+    left_cta_href = '/library',
+    right_kicker = 'Membership',
+    right_title = 'The Chair',
+    right_body = 'A seat at every club, a book of your choice each quarter, 10% off the kitchen, and first dibs on supper events.',
+    right_features = ['All six weekly book clubs', 'One book per quarter, on us', '10% off food, wine & coffee', 'Priority RSVP for supper events'],
+    right_price = '₹467',
+    right_price_suffix = '/month',
+    right_cta_text = 'Become a member',
+    right_cta_href = '/sign-up',
+  } = props;
+
+  const PanelStyle = (variant) => ({
+    background: variant === 'ink' ? HS_INK : '#fff',
+    color: variant === 'ink' ? '#fff' : HS_INK,
+    border: variant === 'ink' ? 'none' : `1px solid ${HS_RULE}`,
+    borderRadius: 28, padding: 48, display: 'flex', flexDirection: 'column', gap: 22, minHeight: 420,
+  });
+
+  return (
+    <section style={{ padding: 'clamp(60px, 8vw, 96px) 20px 40px' }}>
+      <style>{`
+        .tpx-split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1180px; margin: 0 auto; }
+        .tpx-split-list { display: flex; flex-direction: column; gap: 10px; margin: 6px 0; padding: 0; list-style: none; }
+        .tpx-split-list li { display: flex; gap: 12px; align-items: center; font-size: 15px; }
+        .tpx-split-list li::before { content: "✓"; width: 22px; height: 22px; border-radius: 999px;
+          display: grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .tpx-split-lime .tpx-split-list li::before { background: ${HS_INK}; color: ${HS_LIME}; }
+        .tpx-split-ink  .tpx-split-list li::before { background: ${HS_PINK}; color: #fff; }
+        .tpx-split-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; gap: 20px; }
+        .tpx-split-price { font-family: serif; font-weight: 700; font-size: 54px; line-height: 1; letter-spacing: -0.03em; }
+        .tpx-split-price small { font-size: 16px; font-weight: 500; opacity: 0.7; margin-left: 6px; font-family: sans-serif; }
+        .tpx-split-btn { border: 0; padding: 14px 22px; border-radius: 999px; font-weight: 600; font-size: 14.5px;
+          display: inline-flex; align-items: center; gap: 10px; cursor: pointer; text-decoration: none; }
+        .tpx-split-lime .tpx-split-btn { background: ${HS_INK}; color: #fff; }
+        .tpx-split-ink  .tpx-split-btn { background: ${HS_LIME}; color: ${HS_INK}; }
+        @media (max-width: 1023px) {
+          .tpx-split { grid-template-columns: 1fr; }
+          .tpx-split > div { padding: 36px !important; min-height: 0 !important; }
+        }
+      `}</style>
+      <div style={{ maxWidth: '1180px', margin: '0 auto 36px' }}>
+        <div style={{ color: HS_PURPLE, fontWeight: 700, fontSize: 12, letterSpacing: '2.5px', textTransform: 'uppercase' }}>{eyebrow}</div>
+        <h2 style={{ margin: '8px 0 14px', fontSize: 'clamp(34px, 4vw, 56px)', fontFamily: 'serif', lineHeight: 1.05, color: HS_INK }} dangerouslySetInnerHTML={{ __html: heading_html }} />
+        <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, color: 'rgba(31,27,22,0.7)', maxWidth: 640 }}>{lede}</p>
+      </div>
+      <div className="tpx-split">
+        <div className="tpx-split-lime" style={PanelStyle('lime')}>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_PURPLE }}>{left_kicker}</div>
+          <h3 style={{ margin: 0, fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.02em', fontFamily: 'serif' }}>{left_title}</h3>
+          <p style={{ margin: 0, opacity: 0.85, maxWidth: '42ch', fontSize: 15.5 }}>{left_body}</p>
+          <ul className="tpx-split-list">
+            {(left_features || []).map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+          <div className="tpx-split-foot">
+            <div className="tpx-split-price">{left_price}</div>
+            <Link className="tpx-split-btn" to={left_cta_href}>{left_cta_text} →</Link>
+          </div>
+        </div>
+        <div className="tpx-split-ink" style={PanelStyle('ink')}>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.18em', textTransform: 'uppercase', color: HS_LIME }}>{right_kicker}</div>
+          <h3 style={{ margin: 0, fontSize: 40, lineHeight: 1.02, letterSpacing: '-0.02em', fontFamily: 'serif', color: '#fff' }}>{right_title}</h3>
+          <p style={{ margin: 0, opacity: 0.85, maxWidth: '42ch', fontSize: 15.5 }}>{right_body}</p>
+          <ul className="tpx-split-list">
+            {(right_features || []).map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+          <div className="tpx-split-foot">
+            <div className="tpx-split-price">{right_price}{right_price_suffix && <small>{right_price_suffix}</small>}</div>
+            <Link className="tpx-split-btn" to={right_cta_href}>{right_cta_text} →</Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// TapasFeaturedTestimonial — large quote-mark + orange panel single
+// quote layout matching the live home TestimonialSection. Pulls a
+// featured testimonial from `home_testimonials` when source='live',
+// or uses the static prop fields otherwise.
+// ---------------------------------------------------------------------
+export function TapasFeaturedTestimonial({ props = {} }) {
+  const {
+    source = 'static',           // 'static' | 'live'
+    background = HS_ORANGE,
+    kicker = 'What readers say',
+    quote_html = 'My new shelf is so much faster and easier to browse than my old library app.',
+    author_name = 'Corey Valdez',
+    author_context = 'Founder at Zenix',
+    initials = 'CV',
+  } = props;
+
+  const { useHomeTestimonials } = require('../cms/hooks');
+  const { data: rows } = useHomeTestimonials();
+  const live = (rows || []).find((r) => r.is_featured) || (rows || [])[0];
+
+  const display = source === 'live' && live ? {
+    quote: live.quote || quote_html,
+    name: live.name || author_name,
+    context: live.context || author_context,
+    initials: live.initials || initials,
+  } : { quote: quote_html, name: author_name, context: author_context, initials };
+
+  return (
+    <section style={{ padding: '40px 20px clamp(60px, 8vw, 96px)' }}>
+      <style>{`
+        .tpx-tm { background: ${background}; border-radius: 28px; padding: 72px 64px;
+          display: grid; grid-template-columns: 1fr 1.2fr; gap: 48px;
+          align-items: center; color: #1a1a1a; max-width: 1180px; margin: 0 auto; }
+        .tpx-tm-q { font-family: serif; font-weight: 700; font-size: 160px;
+          line-height: 0.7; color: #1a1a1a; }
+        .tpx-tm-k { font-family: monospace; font-size: 12px; letter-spacing: 0.18em;
+          text-transform: uppercase; margin-top: 10px; }
+        .tpx-tm blockquote { margin: 0; font-family: serif; font-weight: 400; font-style: italic;
+          font-size: 28px; line-height: 1.25; letter-spacing: -0.01em; color: ${HS_INK}; }
+        .tpx-tm-who { margin-top: 28px; display: flex; align-items: center; gap: 14px; }
+        .tpx-tm-ava { width: 48px; height: 48px; border-radius: 999px; background: ${HS_INK};
+          color: ${HS_LIME}; display: grid; place-items: center; font-weight: 700;
+          font-family: serif; font-size: 18px; }
+        .tpx-tm-who b { display: block; font-weight: 600; font-size: 15px; }
+        .tpx-tm-who span { font-size: 13px; opacity: 0.7; }
+        @media (max-width: 1023px) {
+          .tpx-tm { grid-template-columns: 1fr; padding: 48px 36px; gap: 24px; }
+          .tpx-tm-q { font-size: 96px; }
+          .tpx-tm blockquote { font-size: 22px; }
+        }
+      `}</style>
+      <div className="tpx-tm">
+        <div>
+          <div className="tpx-tm-q">“</div>
+          <div className="tpx-tm-k">{kicker}</div>
+        </div>
+        <div>
+          <blockquote dangerouslySetInnerHTML={{ __html: display.quote }} />
+          <div className="tpx-tm-who">
+            <div className="tpx-tm-ava">{display.initials}</div>
+            <div>
+              <b>{display.name}</b>
+              <span>{display.context}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
