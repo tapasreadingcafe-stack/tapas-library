@@ -9,6 +9,8 @@ import LIBRARY_CSS from './library/libraryStyles';
 import { matchesBook } from '../data/libraryBooks';
 import { useLibraryShelves } from '../cms/hooks';
 import { adaptLibraryShelves } from '../cms/adapters';
+import PageRenderer from '../blocks/PageRenderer';
+import { useSiteContent } from '../context/SiteContent';
 
 // Search input debounce — 200ms per spec so typing doesn't thrash
 // the filter pipeline.
@@ -22,6 +24,18 @@ function useDebounced(value, delay) {
 }
 
 export default function Library() {
+  const content = useSiteContent();
+  if (content?.pages?.library?.use_blocks) {
+    return (
+      <div style={{ minHeight: '100vh' }}>
+        <PageRenderer pageKey="library" />
+      </div>
+    );
+  }
+  return <LibraryLegacy />;
+}
+
+function LibraryLegacy() {
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounced(query, 200);
