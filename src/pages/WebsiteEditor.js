@@ -568,6 +568,7 @@ function Canvas({
   onDropBlock, onDropAsset,
   editingNodeId, onStartEdit, onCommitEdit, onCommitRuns, onCancelEdit,
   editableRef, components, onContextMenu, previewSliderId,
+  selectedElementSel, onSelectElement,
 }) {
   const setDevice = onDeviceChange;
   const [zoom, setZoom] = useState(100);
@@ -996,6 +997,7 @@ function Canvas({
             tree={tree}
             selectedId={selectedId}
             onSelect={onSelect}
+            onSelectElement={onSelectElement}
             onHover={setHoverId}
             editingNodeId={editingNodeId}
             onStartEdit={onStartEdit}
@@ -1026,6 +1028,17 @@ function Canvas({
             tree={tree}
             kind="hover"
           />
+          {/* Sub-element selection overlay — drawn TIGHTER (orange) inside
+              the block selection (blue) to show exactly which DOM element
+              the user clicked. Only renders when the user has drilled
+              into a block; clears on next block selection or ESC. */}
+          {!editingNodeId && selectedId && selectedElementSel && (
+            <ElementSelectionOverlay
+              blockId={selectedId}
+              selector={selectedElementSel}
+              rootRef={canvasInnerRef}
+            />
+          )}
           <DropIndicator
             drop={dropHover}
             rootRef={canvasInnerRef}
@@ -1142,6 +1155,110 @@ function SelectionOverlay({ targetId, rootRef, tree, kind }) {
   );
 }
 
+// =====================================================================
+// Element-level sub-selection (Webflow-feature 1: select any DOM
+// element inside a block, not just the block as a whole).
+//
+// Path format: a CSS-ish selector relative to the block root, using
+// `tag:nth-of-type(n)` segments. Stable across re-renders as long as
+// the block's internal JSX doesn't change. Future style-panel slices
+// will use this as the key under content.element_styles for per-
+// element CSS overrides. SiteContent.js already applies element_styles
+// keyed by [data-editable] paths, so the same plumbing scales here
+// once we generate matching data-editable attrs.
+// =====================================================================
+function computeElementSelector(rootEl, targetEl) {
+  if (!rootEl || !targetEl || rootEl === targetEl) return null;
+  if (!rootEl.contains(targetEl)) return null;
+  const segments = [];
+  let cur = targetEl;
+  while (cur && cur !== rootEl) {
+    const parent = cur.parentElement;
+    if (!parent) break;
+    const tag = cur.tagName.toLowerCase();
+    const sameTag = Array.from(parent.children).filter(c => c.tagName === cur.tagName);
+    const idx = sameTag.indexOf(cur) + 1;
+    segments.unshift(sameTag.length > 1 ? `${tag}:nth-of-type(${idx})` : tag);
+    cur = parent;
+  }
+  return segments.join(' > ') || null;
+}
+
+function ElementSelectionOverlay({ blockId, selector, rootRef }) {
+  const [rect, setRect] = useState(null);
+  const [label, setLabel] = useState('');
+
+  const measure = useCallback(() => {
+    if (!blockId || !selector || !rootRef?.current) { setRect(null); return; }
+    const root = rootRef.current;
+    const blockEl = root.querySelector(`[data-tapas-node-id="${escapeAttrValue(blockId)}"]`);
+    if (!blockEl) { setRect(null); return; }
+    let el;
+    try { el = blockEl.querySelector(selector); }
+    catch { el = null; }
+    if (!el) { setRect(null); return; }
+    let top = 0, left = 0;
+    let cur = el;
+    while (cur && cur !== root) {
+      top  += cur.offsetTop;
+      left += cur.offsetLeft;
+      cur = cur.offsetParent;
+    }
+    setRect({ top, left, width: el.offsetWidth, height: el.offsetHeight });
+    setLabel(el.tagName.toLowerCase());
+  }, [blockId, selector, rootRef]);
+
+  useLayoutEffect(() => { measure(); }, [measure]);
+  useEffect(() => {
+    if (!blockId || !selector) return;
+    const onScroll = () => measure();
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', measure);
+    const t = setTimeout(measure, 50);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', measure);
+      clearTimeout(t);
+    };
+  }, [blockId, selector, measure]);
+
+  if (!rect) return null;
+  const color = '#f97316'; // orange — distinct from block-selection blue
+  return (
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: rect.top, left: rect.left,
+          width: rect.width, height: rect.height,
+          outline: `1px solid ${color}`,
+          outlineOffset: '-1px',
+          pointerEvents: 'none',
+          zIndex: 12,
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: rect.top - 18, left: rect.left + rect.width - 80,
+          width: 80, textAlign: 'right',
+          background: color, color: '#fff',
+          fontSize: '10px', fontWeight: 500,
+          padding: '2px 6px',
+          borderRadius: '2px 2px 0 0',
+          fontFamily: 'ui-monospace, monospace',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden', textOverflow: 'ellipsis',
+          pointerEvents: 'none',
+          zIndex: 13,
+        }}
+      >&lt;{label}&gt;</div>
+    </>
+  );
+}
+
 function toolbarBtn(W) {
   return {
     width: '28px', height: '22px', padding: 0,
@@ -1220,7 +1337,7 @@ function DropIndicator({ drop, rootRef }) {
 }
 
 function CanvasSelectionShell({
-  tree, selectedId, onSelect, onHover,
+  tree, selectedId, onSelect, onSelectElement, onHover,
   editingNodeId, onStartEdit, onCommitText, onCommitRuns, onCancelEdit,
   editableRef, components, onContextMenu, previewSliderId,
 }) {
@@ -1231,6 +1348,12 @@ function CanvasSelectionShell({
       el = el.parentElement;
     }
     return null;
+  };
+  // Find the DOM element that owns the given block id, scanning down
+  // from the surface root.
+  const findBlockEl = (rootEl, id) => {
+    if (!rootEl || !id) return null;
+    return rootEl.querySelector(`[data-tapas-node-id="${escapeAttrValue(id)}"]`);
   };
   const onClick = (e) => {
     // Clicks inside the editable element are already stopped by
@@ -1245,6 +1368,18 @@ function CanvasSelectionShell({
       onSelect(parent?.id || id);
     } else {
       onSelect(id);
+    }
+    // Capture the deeper DOM element selector inside the block so the
+    // editor can draw a tighter sub-selection rect. If the click landed
+    // exactly on the block root, clear the sub-selection (the block-
+    // level rect is enough). Skip on alt+click — that's a parent jump,
+    // not a drill-down.
+    if (!e.altKey && onSelectElement) {
+      const blockEl = findBlockEl(e.currentTarget, id);
+      const sel = blockEl && blockEl !== e.target
+        ? computeElementSelector(blockEl, e.target)
+        : null;
+      onSelectElement(sel);
     }
     e.preventDefault(); e.stopPropagation();
   };
@@ -1431,6 +1566,14 @@ export default function WebsiteEditor() {
   // top bar.
   const [editingComponentId, setEditingComponentId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  // Sub-selection: when the user clicks DEEP inside a block (e.g. on
+  // the headline of a tapas_hero), this captures a relative CSS
+  // selector pointing at that exact DOM element. Lets the canvas
+  // render a tighter highlight around the clicked element on top of
+  // the block-level selection. Future style-panel slices will use
+  // this path to scope element_styles overrides per-element rather
+  // than per-block. null = no sub-selection (block selection only).
+  const [selectedElementSel, setSelectedElementSel] = useState(null);
   const [railActive, setRailActive] = useState('navigator');
   const [styleState, setStyleState] = useState('base');
   // Active breakpoint / device frame. Drives both the canvas width and
@@ -2453,6 +2596,14 @@ export default function WebsiteEditor() {
       // Selection moves (no meta key)
       if (!mod) {
         if (e.key === 'Escape') {
+          // First press: clear element sub-selection (so the user pops
+          // back from "headline inside hero" to "the hero block").
+          // Subsequent presses: walk up to parent block as before.
+          if (selectedElementSel) {
+            setSelectedElementSel(null);
+            e.preventDefault();
+            return;
+          }
           const p = parentOf(tree, selectedId);
           if (p) { setSelectedId(p.id); e.preventDefault(); }
           return;
@@ -2673,7 +2824,9 @@ export default function WebsiteEditor() {
           tree={tree}
           classes={classes}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={(id) => { setSelectedId(id); setSelectedElementSel(null); }}
+          selectedElementSel={selectedElementSel}
+          onSelectElement={setSelectedElementSel}
           device={device}
           onDeviceChange={setDevice}
           onDropBlock={handleDropBlock}
