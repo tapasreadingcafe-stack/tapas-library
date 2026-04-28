@@ -10,6 +10,8 @@ import SHOP_CSS from './shop/shopStyles';
 import { SHOP_PRICE_MAX } from '../data/shopBooks';
 import { useShopBooks } from '../cms/hooks';
 import { adaptShopBooks } from '../cms/adapters';
+import PageRenderer from '../blocks/PageRenderer';
+import { useSiteContent } from '../context/SiteContent';
 
 const PAGE_SIZE = 12;
 
@@ -90,6 +92,18 @@ function applySort(books, sort) {
 }
 
 export default function Shop() {
+  const content = useSiteContent();
+  if (content?.pages?.shop?.use_blocks) {
+    return (
+      <div style={{ minHeight: '100vh' }}>
+        <PageRenderer pageKey="shop" />
+      </div>
+    );
+  }
+  return <ShopLegacy />;
+}
+
+function ShopLegacy() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [sort, setSort] = useState('recommended');
   const [page, setPage] = useState(1);
