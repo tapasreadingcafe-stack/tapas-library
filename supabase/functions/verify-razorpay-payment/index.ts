@@ -121,6 +121,42 @@ serve(async (req) => {
       return json({ error: "order_update_failed" }, 500);
     }
 
+    // ---- decrement inventory --------------------------------------
+    // Pull line items and reduce books.quantity_available per book.
+    // Best-effort: if a row has been edited concurrently we log + move
+    // on (the order is already paid, oversell will be flagged in the
+    // staff orders queue rather than blocking the customer).
+    try {
+      const { data: lineItems, error: liErr } = await svcClient
+        .from("customer_order_items")
+        .select("book_id, quantity, item_type")
+        .eq("order_id", order.id);
+      if (liErr) {
+        console.warn("inventory: could not load line items", liErr);
+      } else {
+        for (const li of (lineItems || [])) {
+          if (li.item_type !== "book" || !li.book_id || !li.quantity) continue;
+          const { data: bk, error: bkErr } = await svcClient
+            .from("books")
+            .select("quantity_available")
+            .eq("id", li.book_id)
+            .single();
+          if (bkErr || !bk) {
+            console.warn("inventory: book not found", li.book_id, bkErr);
+            continue;
+          }
+          const next = Math.max(0, Number(bk.quantity_available || 0) - Number(li.quantity || 0));
+          const { error: upErr } = await svcClient
+            .from("books")
+            .update({ quantity_available: next })
+            .eq("id", li.book_id);
+          if (upErr) console.warn("inventory: decrement failed", li.book_id, upErr);
+        }
+      }
+    } catch (e) {
+      console.warn("inventory decrement loop failed", e);
+    }
+
     return json({ ok: true, customer_order_id: order.id });
   } catch (err) {
     console.error("verify-razorpay-payment unexpected error", err);

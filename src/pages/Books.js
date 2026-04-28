@@ -78,6 +78,7 @@ export default function Books() {
     // Storefront display
     slug: '',
     shelf_id: '',  // empty string = unset; required when is_borrowable=true
+    status: 'published', // 'published' = visible on storefront; 'draft' = hidden
   };
 
   const [formData, setFormData] = useState(emptyForm);
@@ -758,6 +759,18 @@ export default function Books() {
               <div style={{ marginBottom: '15px', padding: '12px 14px', background: '#f8f9ff', borderRadius: '6px', border: '1px dashed #c0c8f5' }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#5a67d8', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   🌐 Online Store
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', fontSize: '14px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '700', color: '#5a67d8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Publish status</label>
+                  <select
+                    value={formData.status || 'published'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    style={{ padding: '6px 10px', border: '1px solid #c0c8f5', borderRadius: '4px', fontSize: '13px', background: 'white' }}
+                    disabled={isReadOnly}
+                  >
+                    <option value="published">Published — visible on storefront</option>
+                    <option value="draft">Draft — hidden from storefront</option>
+                  </select>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', cursor: 'pointer', fontSize: '14px' }}>
                   <input

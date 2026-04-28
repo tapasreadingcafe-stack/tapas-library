@@ -149,6 +149,8 @@ const EmailCampaigns        = lazyWithRetry(() => import('./pages/EmailCampaigns
 const Tasks                 = lazyWithRetry(() => import('./pages/Tasks'));
 const MarketingTools        = lazyWithRetry(() => import('./pages/MarketingTools'));
 const PromoCodes            = lazyWithRetry(() => import('./pages/PromoCodes'));
+const StorePromoCodes       = lazyWithRetry(() => import('./pages/StorePromoCodes'));
+const StoreCMS              = lazyWithRetry(() => import('./pages/StoreCMS'));
 const MarketingHub          = lazyWithRetry(() => import('./pages/MarketingHub'));
 const LoyaltySystem         = lazyWithRetry(() => import('./pages/LoyaltySystem'));
 const GrowthTools           = lazyWithRetry(() => import('./pages/GrowthTools'));
@@ -297,6 +299,8 @@ const NAV_CONFIG = [
     icon: '🛒', label: 'Online Store', key: 'store',
     children: [
       { to: '/store/orders',     icon: '📦', label: 'Online Orders' },
+      { to: '/store/promo-codes', icon: '🏷', label: 'Promo Codes' },
+      { to: '/store/cms',        icon: '📝', label: 'Store Content' },
       { to: '/store/inbox',      icon: '📨', label: 'Contact Inbox' },
       { to: '/store/reviews',    icon: '★',  label: 'Reviews' },
       { to: '/store/rsvps',      icon: '🎟', label: 'Event RSVPs' },
@@ -796,6 +800,8 @@ function DashboardShell() {
 
             {/* Online Store */}
             <Route path="/store/orders"                       element={<CustomerOrders />} />
+            <Route path="/store/promo-codes"                  element={<StorePromoCodes />} />
+            <Route path="/store/cms"                          element={<StoreCMS />} />
             <Route path="/store/inbox"                        element={<ContactInbox />} />
             <Route path="/store/reviews"                      element={<ReviewsInbox />} />
             <Route path="/store/rsvps"                        element={<EventRsvpInbox />} />

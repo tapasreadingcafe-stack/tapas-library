@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '../../utils/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 function isValidEmail(s) {
   return typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+}
+
+function friendlyAuthError(message) {
+  const m = (message || '').toLowerCase();
+  if (m.includes('invalid login credentials') || m.includes('invalid grant')) {
+    return 'Email or password is incorrect.';
+  }
+  if (m.includes('email not confirmed')) {
+    return 'Please confirm your email first — check your inbox for the verification link.';
+  }
+  return message || 'Could not sign in. Please try again.';
 }
 
 const GoogleIcon = () => (
@@ -21,13 +34,24 @@ const AppleIcon = () => (
 );
 
 export default function SignInForm() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get('next') || '/';
+  const { authUser } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [keep, setKeep] = useState(true);
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
 
-  const onSubmit = (e) => {
+  // If a session is already established (e.g. user navigated here while
+  // signed in), bounce to the next destination.
+  React.useEffect(() => {
+    if (authUser) navigate(next, { replace: true });
+  }, [authUser, next, navigate]);
+
+  const onSubmit = async (e) => {
     e.preventDefault();
     if (!isValidEmail(email)) {
       setError('That email doesn’t look right.');
@@ -39,27 +63,36 @@ export default function SignInForm() {
     }
     setError(null);
     setProcessing(true);
-    // Fake 800ms delay so the button transition reads. Swap this for
-    // the real Supabase auth call when wiring it up.
-    setTimeout(() => {
-      // TODO: wire to Supabase auth. The project already imports
-      // @supabase/supabase-js (see src/utils/supabase.js); the call
-      // site is `supabase.auth.signInWithPassword({ email, password })`
-      // with a redirect to "/" on success.
-      // eslint-disable-next-line no-console
-      console.log('[sign-in] submit', { email, keep });
-      // eslint-disable-next-line no-alert
-      window.alert('Sign-in not wired yet — Supabase auth integration pending.');
+    try {
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (err) throw err;
+      // AuthContext picks up the SIGNED_IN event and rehydrates the
+      // member row; we just need to leave this page.
+      navigate(next, { replace: true });
+    } catch (err) {
+      setError(friendlyAuthError(err?.message));
+    } finally {
       setProcessing(false);
-    }, 800);
+    }
   };
 
-  const onOAuth = (provider) => {
-    // TODO: supabase.auth.signInWithOAuth({ provider })
-    // eslint-disable-next-line no-console
-    console.log('[sign-in] oauth', { provider });
-    // eslint-disable-next-line no-alert
-    window.alert('OAuth not wired yet — coming soon.');
+  const onOAuth = async (provider) => {
+    setError(null);
+    try {
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}${next}`,
+        },
+      });
+      if (err) throw err;
+      // OAuth navigates away; nothing else to do here.
+    } catch (err) {
+      setError(friendlyAuthError(err?.message));
+    }
   };
 
   return (
