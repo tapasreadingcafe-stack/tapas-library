@@ -21,10 +21,10 @@ import { DEFAULT_CONTENT } from '../utils/defaultContent';
 // =====================================================================
 
 // Draft-preview mode: when the store is loaded with `?preview=draft`, it
-// reads the `store_content_draft` row from app_settings instead of the live
-// `store_content`. This lets the dashboard editor iframe show unpushed
-// changes without affecting real visitors. Cache keys are namespaced so
-// draft and live never overwrite each other in localStorage.
+// reads the draft rows from app_settings instead of the live ones. This
+// lets the dashboard editor iframe show unpushed changes without
+// affecting real visitors. Cache keys are namespaced so draft and live
+// never overwrite each other in localStorage.
 function isDraftPreview() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -35,7 +35,35 @@ function isDraftPreview() {
 }
 
 const IS_DRAFT = isDraftPreview();
-const CONTENT_ROW_KEY = IS_DRAFT ? 'store_content_draft' : 'store_content';
+
+// Two app_settings rows can hold storefront content:
+//   * store_content (v1)    — older flat content (brand/typography/page copy)
+//   * store_content_v2      — block-tree authored by the dashboard
+//                             WebsiteEditor (src/pages/WebsiteEditor.js)
+// Historically these were disconnected: editor wrote v2, storefront only
+// read v1. We now optionally fetch BOTH and deep-merge (v2 wins) when the
+// `REACT_APP_USE_BLOCKS_V2` env var is truthy, OR when the URL carries
+// `?v2=1`. The flag stays off by default until we re-seed v2 with the
+// current live design — otherwise the stale v2 snapshot would clobber
+// real content. Draft preview always layers both rows so the editor
+// iframe shows the editor's own writes.
+function v2Enabled() {
+  if (IS_DRAFT) return true;
+  if (typeof process !== 'undefined' && process.env?.REACT_APP_USE_BLOCKS_V2) return true;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('v2') === '1';
+  } catch {
+    return false;
+  }
+}
+const USE_V2 = v2Enabled();
+
+const CONTENT_ROW_KEYS = (() => {
+  const liveBase = IS_DRAFT ? 'store_content_draft' : 'store_content';
+  const v2Row    = IS_DRAFT ? 'store_content_v2_draft' : 'store_content_v2';
+  return USE_V2 ? [liveBase, v2Row] : [liveBase];
+})();
 const CACHE_KEY = IS_DRAFT ? 'tapas_store_content_draft_v1' : 'tapas_store_content_v1';
 
 function loadFromCache() {
@@ -444,18 +472,24 @@ export function SiteContentProvider({ children }) {
 
     (async () => {
       try {
-        const { data } = await supabase
+        // Fetch both rows in parallel. CONTENT_ROW_KEYS is ordered
+        // [v1, v2]; v2 wins on deep-merge conflict so editor edits flow
+        // straight to the storefront.
+        const { data: rows } = await supabase
           .from('app_settings')
-          .select('value')
-          .eq('key', CONTENT_ROW_KEY)
-          .maybeSingle();
+          .select('key, value')
+          .in('key', CONTENT_ROW_KEYS);
         if (!mounted) return;
-        if (data?.value) {
-          const raw = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-          const merged = stripDeletedPages(deepMerge(DEFAULT_CONTENT, raw));
-          // Only update state if the DB actually differs from what we're
-          // already showing. Avoids a pointless re-render for returning
-          // visitors whose cache matches production.
+
+        const byKey = new Map((rows || []).map((r) => [r.key, r.value]));
+        const parse = (v) => (v == null ? null : (typeof v === 'string' ? JSON.parse(v) : v));
+        const v1 = parse(byKey.get(CONTENT_ROW_KEYS[0]));
+        const v2 = parse(byKey.get(CONTENT_ROW_KEYS[1]));
+
+        if (v1 || v2) {
+          // Layered merge: defaults < v1 < v2.
+          const layeredRaw = deepMerge(deepMerge({}, v1 || {}), v2 || {});
+          const merged = stripDeletedPages(deepMerge(DEFAULT_CONTENT, layeredRaw));
           const currentStr = JSON.stringify(content);
           const mergedStr  = JSON.stringify(merged);
           if (currentStr !== mergedStr) {
@@ -464,12 +498,11 @@ export function SiteContentProvider({ children }) {
             if (merged.brand?.heading_font) loadGoogleFont(merged.brand.heading_font);
             if (merged.brand?.body_font)    loadGoogleFont(merged.brand.body_font);
           }
-          // Cache the raw DB value (not the merged one) so we can re-merge
-          // against future DEFAULT_CONTENT changes on next load.
-          saveToCache(raw);
+          // Cache the layered raw value (pre-DEFAULT_CONTENT merge) so a
+          // future DEFAULT_CONTENT bump can re-merge cleanly on next load.
+          saveToCache(layeredRaw);
         } else {
-          // No DB row — reset to DEFAULT_CONTENT and clear any stale cache
-          // so a returning visitor doesn't see content from a deleted row.
+          // No rows at all — reset to defaults and clear any stale cache.
           try { localStorage.removeItem(CACHE_KEY); } catch {}
           const currentStr = JSON.stringify(content);
           const defaultStr = JSON.stringify(DEFAULT_CONTENT);
