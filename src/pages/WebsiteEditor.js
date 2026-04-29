@@ -1585,6 +1585,162 @@ function CanvasSelectionShell({
 // Style tab is live in Phase 3. Settings + Interactions still stubbed.
 // =====================================================================
 // =====================================================================
+// TAPAS_BLOCK_CATALOG — the list staff pick from when adding a new
+// block to a type-keyed page. Empty defaultProps; the storefront
+// renderer falls back to its own per-block defaults from BLOCK_REGISTRY.
+// =====================================================================
+const TAPAS_BLOCK_CATALOG = [
+  { type: 'tapas_hero',                  label: 'Hero (lime wave)' },
+  { type: 'tapas_services',              label: 'Services (3 cards)' },
+  { type: 'tapas_pricing_split',         label: 'Pricing — split panel' },
+  { type: 'tapas_new_arrivals',          label: 'New Arrivals (live books)' },
+  { type: 'tapas_events_calendar',       label: 'Events Calendar (live)' },
+  { type: 'tapas_clubs_grid',            label: 'Clubs Grid (live)' },
+  { type: 'tapas_featured_supper',       label: 'Featured Supper (live)' },
+  { type: 'tapas_featured_testimonial',  label: 'Featured Testimonial' },
+  { type: 'tapas_testimonials',          label: 'Testimonials (multi)' },
+  { type: 'tapas_inspiration',           label: 'Inspiration (split images)' },
+  { type: 'tapas_section',               label: 'Section header' },
+  { type: 'tapas_newsletter',            label: 'Newsletter strip' },
+  { type: 'tapas_find_us',               label: 'Find Us (address card)' },
+  { type: 'tapas_hours_strip',           label: 'Hours Strip (live)' },
+  { type: 'tapas_faq_accordion',         label: 'FAQ Accordion (live)' },
+  { type: 'tapas_blog_featured',         label: 'Blog — Featured Article' },
+  { type: 'tapas_blog_sidebar',          label: 'Blog — Sidebar Cards' },
+  { type: 'tapas_blog_archive',          label: 'Blog — Archive Grid' },
+  { type: 'tapas_library_stats',         label: 'Library — Stats Row' },
+  { type: 'tapas_library_shelves',       label: 'Library — Shelves Browser' },
+  { type: 'tapas_library_house_rules',   label: 'Library — House Rules' },
+  { type: 'tapas_shop_featured',         label: 'Shop — Featured Book' },
+  { type: 'tapas_shop_browser',          label: 'Shop — Browser' },
+  { type: 'tapas_manifesto',             label: 'About — Manifesto' },
+  { type: 'tapas_stats_strip',           label: 'About — Stats Strip' },
+  { type: 'tapas_timeline',              label: 'About — Timeline' },
+  { type: 'tapas_compromises',           label: 'About — Compromises' },
+  { type: 'tapas_team_grid',             label: 'About — Team Grid' },
+  { type: 'tapas_press_quotes',          label: 'About — Press Quotes' },
+];
+
+// =====================================================================
+// PageBlocksPanel — left-rail list of every block on the active type-
+// keyed page, with add / remove / reorder actions. Replaces the
+// legacy <Navigator> when iframeCanvasMode is on (the navigator's
+// tag-tree representation can't render type-keyed blocks).
+// =====================================================================
+function PageBlocksPanel({ blocks, selectedId, onSelect, onAdd, onRemove, onMove }) {
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [filter, setFilter] = React.useState('');
+  const list = TAPAS_BLOCK_CATALOG.filter((b) => {
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return b.type.toLowerCase().includes(q) || b.label.toLowerCase().includes(q);
+  });
+  const W = { panelBorder: 'rgba(255,255,255,0.08)', text: '#eee', textDim: '#888' };
+  const rowBtn = (active) => ({
+    flex: 1, textAlign: 'left',
+    padding: '8px 10px', height: 'auto',
+    background: active ? 'rgba(20,110,245,0.18)' : 'transparent',
+    color: active ? '#fff' : W.text,
+    border: 'none', borderRadius: 3,
+    fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  });
+  const iconBtn = {
+    width: 22, height: 22, padding: 0,
+    background: 'transparent', color: W.textDim,
+    border: 'none', borderRadius: 3, cursor: 'pointer',
+    fontSize: 12, fontFamily: 'inherit', flexShrink: 0,
+  };
+  return (
+    <div style={{
+      width: 240, flexShrink: 0,
+      background: '#181818',
+      borderRight: `1px solid ${W.panelBorder}`,
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '10px 12px',
+        borderBottom: `1px solid ${W.panelBorder}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: W.text, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Blocks · {blocks.length}
+        </span>
+        <button
+          type="button" onClick={() => setShowAdd((v) => !v)}
+          style={{
+            width: 22, height: 22, lineHeight: '22px',
+            background: showAdd ? '#146ef5' : '#2a2a2a', color: '#fff',
+            border: 'none', borderRadius: 3,
+            fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+          title={showAdd ? 'Close add menu' : 'Add a new block'}
+        >+</button>
+      </div>
+
+      {showAdd && (
+        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${W.panelBorder}`, background: '#1c1c1c' }}>
+          <input
+            value={filter} onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search blocks…"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              height: 24, padding: '0 8px',
+              background: '#0e0e0e', color: W.text,
+              border: `1px solid ${W.panelBorder}`, borderRadius: 3,
+              fontSize: 11, fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+          <div style={{ marginTop: 6, maxHeight: 240, overflowY: 'auto' }}>
+            {list.length === 0 && (
+              <div style={{ padding: 8, fontSize: 11, color: W.textDim }}>No matches.</div>
+            )}
+            {list.map((b) => (
+              <button
+                key={b.type} type="button"
+                onClick={() => { onAdd(b.type); setShowAdd(false); setFilter(''); }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '6px 8px', background: 'transparent', color: W.text,
+                  border: 'none', borderRadius: 3, cursor: 'pointer',
+                  fontSize: 11, fontFamily: 'inherit',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ fontWeight: 600 }}>{b.label}</div>
+                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, color: W.textDim }}>{b.type}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 6px' }}>
+        {blocks.length === 0 && (
+          <div style={{ padding: 16, fontSize: 12, color: W.textDim, textAlign: 'center' }}>
+            Empty page. Click + to add a block.
+          </div>
+        )}
+        {blocks.map((b, idx) => (
+          <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '2px 0' }}>
+            <button type="button" onClick={() => onSelect(b.id)} style={rowBtn(selectedId === b.id)} title={b.id}>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: W.textDim, marginRight: 6 }}>
+                {String(idx + 1).padStart(2, '0')}
+              </span>
+              {b.type?.replace(/^tapas_/, '') || 'block'}
+            </button>
+            <button type="button" onClick={() => onMove(b.id, 'up')}   disabled={idx === 0}                style={{ ...iconBtn, opacity: idx === 0 ? 0.3 : 1 }} title="Move up">↑</button>
+            <button type="button" onClick={() => onMove(b.id, 'down')} disabled={idx === blocks.length - 1} style={{ ...iconBtn, opacity: idx === blocks.length - 1 ? 0.3 : 1 }} title="Move down">↓</button>
+            <button type="button" onClick={() => onRemove(b.id)}      style={iconBtn} title="Delete">×</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
 // ImageField — text input + thumbnail + Upload button. Click Upload
 // → native file picker → uploadAsset() pushes the file into the
 // editor-assets Supabase bucket → public URL is written into the
@@ -2737,6 +2893,56 @@ export default function WebsiteEditor() {
     });
   }, [selectedId, activePageKey, styleState, device, applyEdit]);
 
+  // Block CRUD on the active type-keyed page (slice 3 — add / remove
+  // / reorder). All three go through applyEdit so undo/redo + autosave
+  // + conflict-detection keep working.
+  const handleAddBlock = useCallback((type) => {
+    if (!type || !pageKey) return;
+    applyEdit((c) => {
+      const pages = { ...(c?.pages || {}) };
+      const page = { ...(pages[pageKey] || {}) };
+      const blocks = Array.isArray(page.blocks) ? page.blocks.slice() : [];
+      // Generate a stable-ish id; collisions are extremely unlikely
+      // and the editor de-dupes by id when looking up blocks.
+      const id = `${type.replace(/^tapas_/, '')}_${Date.now().toString(36)}`;
+      blocks.push({ id, type, props: {} });
+      page.blocks = blocks;
+      pages[pageKey] = page;
+      return { ...c, pages };
+    });
+  }, [pageKey, applyEdit]);
+
+  const handleRemoveBlock = useCallback((blockId) => {
+    if (!blockId || !pageKey) return;
+    if (typeof window !== 'undefined' && !window.confirm('Delete this block?')) return;
+    applyEdit((c) => {
+      const pages = { ...(c?.pages || {}) };
+      const page = { ...(pages[pageKey] || {}) };
+      const blocks = (Array.isArray(page.blocks) ? page.blocks : []).filter((b) => b?.id !== blockId);
+      page.blocks = blocks;
+      pages[pageKey] = page;
+      return { ...c, pages };
+    });
+    if (selectedId === blockId) setSelectedId(null);
+  }, [pageKey, selectedId, applyEdit]);
+
+  const handleMoveBlock = useCallback((blockId, direction) => {
+    if (!blockId || !pageKey) return;
+    applyEdit((c) => {
+      const pages = { ...(c?.pages || {}) };
+      const page = { ...(pages[pageKey] || {}) };
+      const blocks = Array.isArray(page.blocks) ? page.blocks.slice() : [];
+      const idx = blocks.findIndex((b) => b?.id === blockId);
+      if (idx === -1) return c;
+      const swap = direction === 'up' ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= blocks.length) return c;
+      [blocks[idx], blocks[swap]] = [blocks[swap], blocks[idx]];
+      page.blocks = blocks;
+      pages[pageKey] = page;
+      return { ...c, pages };
+    });
+  }, [pageKey, applyEdit]);
+
   // Inline text-edit handler — invoked when the storefront iframe
   // postMessages `tapas:text-edit` ({ editable, oldText, newText }).
   // Resolves the block via `editable` ("pages.{slug}.blocks.{id}"),
@@ -3581,6 +3787,18 @@ export default function WebsiteEditor() {
               );
             case 'navigator':
             default:
+              if (iframeCanvasMode) {
+                return (
+                  <PageBlocksPanel
+                    blocks={content?.pages?.[pageKey]?.blocks || []}
+                    selectedId={selectedId}
+                    onSelect={(id) => { setSelectedId(id); setSelectedElementSel(null); }}
+                    onAdd={(type) => handleAddBlock(type)}
+                    onRemove={handleRemoveBlock}
+                    onMove={handleMoveBlock}
+                  />
+                );
+              }
               return <Navigator tree={tree} selectedId={selectedId} onSelect={setSelectedId} />;
           }
         })()}
