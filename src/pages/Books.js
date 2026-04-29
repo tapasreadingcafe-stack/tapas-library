@@ -18,6 +18,48 @@ const PRESET_CATEGORIES = [
   'Travel', 'Cooking', 'Art', 'Sports', 'Politics', 'Economics', 'Health',
 ];
 
+// Map a free-form category string from an external API onto our preset list.
+// Returns the matching preset (canonical case) or null when nothing fits, so
+// auto-fill never injects ad-hoc tags like "Bears" or "Java" into the dropdown.
+const matchPresetCategory = (raw) => {
+  if (!raw) return null;
+  const lower = String(raw).toLowerCase();
+  const direct = PRESET_CATEGORIES.find(p => p.toLowerCase() === lower);
+  if (direct) return direct;
+  // Substring fallback — handles "Juvenile fiction" → Fiction, "Computers" → Technology, etc.
+  const aliases = {
+    Fiction: ['fiction', 'novel', 'literature'],
+    'Non-Fiction': ['non-fiction', 'nonfiction'],
+    Science: ['science', 'physics', 'chemistry', 'biology', 'astronomy'],
+    History: ['history', 'historical'],
+    Biography: ['biography', 'autobiography', 'memoir'],
+    Mystery: ['mystery', 'detective', 'crime'],
+    Fantasy: ['fantasy', 'magic'],
+    Romance: ['romance', 'romantic'],
+    Thriller: ['thriller', 'suspense'],
+    'Self-Help': ['self-help', 'self help', 'personal development', 'motivational'],
+    Business: ['business', 'management', 'finance', 'entrepreneur'],
+    Technology: ['technology', 'computers', 'computing', 'programming', 'software', 'engineering'],
+    Children: ['children', 'juvenile', 'kids', 'picture book'],
+    'Young Adult': ['young adult', 'ya '],
+    Poetry: ['poetry', 'poems', 'verse'],
+    Drama: ['drama', 'plays', 'theatre', 'theater'],
+    Philosophy: ['philosophy', 'philosophical'],
+    Religion: ['religion', 'religious', 'spirituality', 'theology'],
+    Travel: ['travel', 'tourism'],
+    Cooking: ['cooking', 'cookery', 'food', 'recipe'],
+    Art: ['art', 'painting', 'sculpture', 'design'],
+    Sports: ['sports', 'sport', 'athletics'],
+    Politics: ['politics', 'political'],
+    Economics: ['economics', 'economic'],
+    Health: ['health', 'medicine', 'medical', 'fitness', 'wellness'],
+  };
+  for (const [preset, keys] of Object.entries(aliases)) {
+    if (keys.some(k => lower.includes(k))) return preset;
+  }
+  return null;
+};
+
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
 const CONDITION_STYLE = {
@@ -230,7 +272,10 @@ export default function Books() {
           const newForm = { ...formData, isbn };
           if (olBook.title) newForm.title = olBook.title;
           if (olBook.authors?.length) newForm.author = olBook.authors.map(a => a.name).join(', ');
-          if (olBook.subjects?.length) newForm.category = olBook.subjects[0].name;
+          if (olBook.subjects?.length) {
+            const mapped = olBook.subjects.map(s => matchPresetCategory(s.name)).find(Boolean);
+            if (mapped) newForm.category = mapped;
+          }
           if (olBook.cover?.medium) {
             newForm.book_image = olBook.cover.medium.replace('http:', 'https:');
             setImagePreview(newForm.book_image);
@@ -254,7 +299,10 @@ export default function Books() {
             const newForm = { ...formData, isbn };
             if (info.title) newForm.title = info.title;
             if (info.authors) newForm.author = info.authors.join(', ');
-            if (info.categories?.length) newForm.category = info.categories[0];
+            if (info.categories?.length) {
+              const mapped = info.categories.map(c => matchPresetCategory(c)).find(Boolean);
+              if (mapped) newForm.category = mapped;
+            }
             if (info.imageLinks?.thumbnail) {
               newForm.book_image = info.imageLinks.thumbnail.replace('http:', 'https:');
               setImagePreview(newForm.book_image);
