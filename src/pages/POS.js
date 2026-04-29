@@ -955,7 +955,7 @@ export default function POS() {
               <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px' }}>CUSTOMER (F1)</div>
               <button onClick={() => { setShowAddMember(true); setNewMemberForm({ name: '', phone: '', email: '' }); }} title="Add new member"
                 style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                + <PersonIcon size={12} /> New
+                <PersonIcon size={14} /> New
               </button>
             </div>
             <div style={{ position: 'relative' }}>
@@ -1793,15 +1793,19 @@ export default function POS() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// PersonIcon — flat black silhouette of head + shoulders. Inherits
-// currentColor so the white-on-indigo "+ New" customer button picks
-// up white. Matches the user's reference image.
+// PersonIcon — person silhouette with a + badge in the bottom-right
+// corner ("add user"). Inherits currentColor so the white-on-indigo
+// button keeps its tint. Matches the user's reference image.
 // ─────────────────────────────────────────────────────────────────────
 function PersonIcon({ size = 14 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
-      <circle cx="12" cy="7" r="4.5"/>
-      <path d="M3 22c0-5 4-8 9-8s9 3 9 8H3z"/>
+      {/* Head */}
+      <circle cx="10" cy="6.5" r="4.5"/>
+      {/* Shoulders — clipped on the right where the + badge sits */}
+      <path d="M2.5 22c0-5 3.5-8 7.5-8 1.6 0 3.1.5 4.3 1.4-.5.7-.8 1.6-.8 2.6 0 1 .3 1.9.8 2.7-.4.4-.6.8-.8 1.3H2.5z"/>
+      {/* Plus badge */}
+      <path d="M19 13a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2.5a.9.9 0 0 0-.9.9V17h-1.6a.9.9 0 0 0 0 1.8h1.6v1.6a.9.9 0 0 0 1.8 0v-1.6h1.6a.9.9 0 0 0 0-1.8h-1.6v-1.6a.9.9 0 0 0-.9-.9z"/>
     </svg>
   );
 }
