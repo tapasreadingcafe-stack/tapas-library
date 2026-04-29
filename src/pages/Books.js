@@ -245,27 +245,78 @@ export default function Books() {
 
       // Fallback to Google Books API
       if (!found) {
-        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-        const data = await res.json();
-        if (data.items && data.items.length > 0) {
-          const info = data.items[0].volumeInfo;
-          const newForm = { ...formData, isbn };
-          if (info.title) newForm.title = info.title;
-          if (info.authors) newForm.author = info.authors.join(', ');
-          if (info.categories?.length) newForm.category = info.categories[0];
-          if (info.imageLinks?.thumbnail) {
-            newForm.book_image = info.imageLinks.thumbnail.replace('http:', 'https:');
-            setImagePreview(newForm.book_image);
+        try {
+          const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            const info = data.items[0].volumeInfo;
+            const newForm = { ...formData, isbn };
+            if (info.title) newForm.title = info.title;
+            if (info.authors) newForm.author = info.authors.join(', ');
+            if (info.categories?.length) newForm.category = info.categories[0];
+            if (info.imageLinks?.thumbnail) {
+              newForm.book_image = info.imageLinks.thumbnail.replace('http:', 'https:');
+              setImagePreview(newForm.book_image);
+            }
+            setFormData(newForm);
+            found = true;
           }
-          setFormData(newForm);
-          found = true;
-        }
+        } catch {}
+      }
+
+      // Fallback: Open Library search index (different from books API; covers
+      // some titles the bibkey lookup misses, including regional editions)
+      if (!found) {
+        try {
+          const res = await fetch(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1`);
+          const data = await res.json();
+          const doc = data.docs?.[0];
+          if (doc) {
+            const newForm = { ...formData, isbn };
+            if (doc.title) newForm.title = doc.title;
+            if (doc.author_name?.length) newForm.author = doc.author_name.join(', ');
+            if (doc.cover_i) {
+              newForm.book_image = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+              setImagePreview(newForm.book_image);
+            }
+            setFormData(newForm);
+            found = true;
+          }
+        } catch {}
+      }
+
+      // Fallback: Wikidata SPARQL — has decent coverage for Indian publishers
+      // (Fingerprint, Rupa, Westland, etc.) that OL/Google miss.
+      if (!found) {
+        try {
+          const sparql = `SELECT ?book ?bookLabel ?authorLabel ?image WHERE {
+            ?book (wdt:P212|wdt:P957) "${isbn}".
+            OPTIONAL { ?book wdt:P50 ?author }
+            OPTIONAL { ?book wdt:P18 ?image }
+            SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+          } LIMIT 1`;
+          const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
+          const res = await fetch(url, { headers: { Accept: 'application/sparql-results+json' } });
+          const data = await res.json();
+          const row = data.results?.bindings?.[0];
+          if (row) {
+            const newForm = { ...formData, isbn };
+            if (row.bookLabel?.value) newForm.title = row.bookLabel.value;
+            if (row.authorLabel?.value) newForm.author = row.authorLabel.value;
+            if (row.image?.value) {
+              newForm.book_image = row.image.value;
+              setImagePreview(newForm.book_image);
+            }
+            setFormData(newForm);
+            found = true;
+          }
+        } catch {}
       }
 
       if (found) {
         toast.success('Book details auto-filled!');
       } else {
-        toast.warning('No book found for this ISBN. Try entering details manually.');
+        toast.warning('No book found in Open Library, Google Books, or Wikidata. Please enter details manually.');
       }
     } catch (err) {
       console.error(err);
