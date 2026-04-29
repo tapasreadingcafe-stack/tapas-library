@@ -816,7 +816,7 @@ export default function POS() {
             />
             <button onClick={() => setShowPosScanner(true)}
               style={{ padding: isMobile ? '12px 16px' : '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', flexShrink: 0, minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Scan barcode"><ScannerIcon /></button>
+              title="Scan barcode"><ScannerIcon size={28} /></button>
           </div>
 
           {/* Category tabs */}
@@ -954,8 +954,8 @@ export default function POS() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px' }}>CUSTOMER (F1)</div>
               <button onClick={() => { setShowAddMember(true); setNewMemberForm({ name: '', phone: '', email: '' }); }} title="Add new member"
-                style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
-                + New
+                style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                + <PersonIcon size={12} /> New
               </button>
             </div>
             <div style={{ position: 'relative' }}>
@@ -1717,7 +1717,9 @@ export default function POS() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
           onClick={() => setShowAddMember(false)}>
           <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '450px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '16px' }}>👤 Add New Member</h3>
+            <h3 style={{ margin: '0 0 14px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <PersonIcon size={16} /> Add New Member
+            </h3>
             <p style={{ fontSize: '11px', color: '#999', margin: '0 0 12px' }}>Adding as a member (no plan). Membership is separate — assign plans in Members page.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
               <div>
@@ -1787,6 +1789,20 @@ export default function POS() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PersonIcon — flat black silhouette of head + shoulders. Inherits
+// currentColor so the white-on-indigo "+ New" customer button picks
+// up white. Matches the user's reference image.
+// ─────────────────────────────────────────────────────────────────────
+function PersonIcon({ size = 14 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
+      <circle cx="12" cy="7" r="4.5"/>
+      <path d="M3 22c0-5 4-8 9-8s9 3 9 8H3z"/>
+    </svg>
   );
 }
 
