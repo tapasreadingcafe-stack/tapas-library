@@ -558,13 +558,13 @@ function Members() {
                   <td className="actions-cell">
                     <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly || !canManageMembers}><ActionIcon name="edit" /></button>
                     <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile"><ActionIcon name="view" /></button>
-                    {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew" style={{ color: '#38a169' }}><ActionIcon name="renew" /></button>}
+                    {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew"><ActionIcon name="renew" /></button>}
                     {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Email Renewal Reminder"><ActionIcon name="email" /></button>}
                     {member.phone && member.subscription_end && <button className="btn-icon" onClick={async () => {
                       const result = await sendWhatsApp(member.phone, membershipExpiryWhatsAppMsg({ memberName: member.name, plan: member.plan || 'Standard', expiryDate: formatDate(member.subscription_end) }));
                       if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');
                       else toast.error(result.error || 'Failed');
-                    }} title="WhatsApp Renewal Reminder" style={{ color: '#25D366' }}><ActionIcon name="phone" /></button>}
+                    }} title="WhatsApp Renewal Reminder"><ActionIcon name="phone" /></button>}
                     {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete"><ActionIcon name="delete" /></button>}
                   </td>
                 </tr>
