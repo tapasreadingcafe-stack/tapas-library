@@ -66,7 +66,7 @@ export default function LandingHero() {
           position: absolute;
           top: 0; right: 0; bottom: 0;
           width: 70%;
-          z-index: 1;
+          z-index: 3;
         }
         .lh-photo {
           width: 100%;
@@ -95,7 +95,7 @@ export default function LandingHero() {
            content never ends up under the nav bar. */
         .lh-content {
           position: relative;
-          z-index: 3;
+          z-index: 4;
           max-width: 1280px;
           margin: 0 auto;
           /* top padding clears the pulled-up nav area and pushes
@@ -223,22 +223,6 @@ export default function LandingHero() {
             className="lh-photo"
           />
         </div>
-
-        <svg
-          className="lh-lime"
-          viewBox="0 0 1440 900"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M 0,0
-               L 820,0
-               C 780,220 900,480 760,700
-               C 680,820 780,900 720,900
-               L 0,900 Z"
-            fill={LIME}
-          />
-        </svg>
 
         <div className="lh-content">
           <div className="lh-block">
