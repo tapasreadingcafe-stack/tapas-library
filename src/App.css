@@ -396,8 +396,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Brand indigo (dark) — SVG icons inherit via fill: currentColor */
-  color: #4c51bf;
+  /* Match the row's body-text color — SVG icons inherit via
+     fill: currentColor so they read the same weight as the cells
+     next to them (e.g. the "10%" discount text). */
+  color: inherit;
 }
 
 .btn-icon:hover {
