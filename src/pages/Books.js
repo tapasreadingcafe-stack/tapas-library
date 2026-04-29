@@ -961,21 +961,9 @@ export default function Books() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
-                    <button onClick={() => handleEditBook(book)} disabled={isReadOnly}
-                      style={{ width: '36px', height: '36px', background: isReadOnly ? '#ccc' : '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      title="Edit book">
-                      ✏️
-                    </button>
-                    <button onClick={() => navigate(`/books/${book.id}/copies`)}
-                      style={{ width: '36px', height: '36px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      title="Manage copies">
-                      📦
-                    </button>
-                    {!isReadOnly && canDeleteBooks && <button onClick={() => handleDeleteBook(book.id)}
-                      style={{ width: '36px', height: '36px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      title="Delete book">
-                      🗑️
-                    </button>}
+                    <button className="btn-icon" onClick={() => handleEditBook(book)} disabled={isReadOnly} title="Edit book"><BookActionIcon name="edit" /></button>
+                    <button className="btn-icon" onClick={() => navigate(`/books/${book.id}/copies`)} title="Manage copies"><BookActionIcon name="copies" /></button>
+                    {!isReadOnly && canDeleteBooks && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteBook(book.id)} title="Delete book"><BookActionIcon name="delete" /></button>}
                   </div>
                 </div>
               );
@@ -1028,21 +1016,9 @@ export default function Books() {
                       <td style={{ padding: '12px', fontWeight: '600', color: '#155724' }}>{book.sales_price ? `₹${book.sales_price.toLocaleString('en-IN')}` : book.mrp ? `₹${book.mrp.toLocaleString('en-IN')}` : '—'}</td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: '5px' }}>
-                          <button onClick={() => handleEditBook(book)} disabled={isReadOnly}
-                            style={{ padding: '4px 8px', background: isReadOnly ? '#ccc' : '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px' }}
-                            title="Edit book">
-                            ✏️
-                          </button>
-                          <button onClick={() => navigate(`/books/${book.id}/copies`)}
-                            style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                            title="Manage copies & print barcodes">
-                            📦
-                          </button>
-                          {!isReadOnly && canDeleteBooks && <button onClick={() => handleDeleteBook(book.id)}
-                            style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                            title="Delete book">
-                            🗑️
-                          </button>}
+                          <button className="btn-icon" onClick={() => handleEditBook(book)} disabled={isReadOnly} title="Edit book"><BookActionIcon name="edit" /></button>
+                          <button className="btn-icon" onClick={() => navigate(`/books/${book.id}/copies`)} title="Manage copies & print barcodes"><BookActionIcon name="copies" /></button>
+                          {!isReadOnly && canDeleteBooks && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteBook(book.id)} title="Delete book"><BookActionIcon name="delete" /></button>}
                         </div>
                       </td>
                     </tr>
@@ -1102,4 +1078,42 @@ export default function Books() {
       )}
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BookActionIcon — black silhouette SVGs for the Books table actions
+// (edit / copies / delete). Same currentColor pattern as the Members
+// page's ActionIcon so .btn-icon's brand tint or color: inherit
+// applies uniformly.
+// ─────────────────────────────────────────────────────────────────────
+function BookActionIcon({ name, size = 18 }) {
+  const common = {
+    width: size, height: size,
+    fill: 'currentColor', stroke: 'none',
+    display: 'inline-block', verticalAlign: 'middle',
+  };
+  switch (name) {
+    case 'edit':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+      );
+    case 'copies':
+      // Box (single, top fold visible)
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5v-7zm-9-3.2 6.5 4-2.5 1.5L9.5 6.8 12 5.3zM5 9.6l6 3.7v6L5 15.6V9.6zm8 9.7v-6l6-3.7v6L13 19.3z"/>
+        </svg>
+      );
+    case 'delete':
+      // Thick rounded X (matches Members)
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M3.515 3.515a1.75 1.75 0 0 1 2.475 0L12 9.525l6.01-6.01a1.75 1.75 0 1 1 2.475 2.475L14.475 12l6.01 6.01a1.75 1.75 0 1 1-2.475 2.475L12 14.475l-6.01 6.01a1.75 1.75 0 1 1-2.475-2.475L9.525 12l-6.01-6.01a1.75 1.75 0 0 1 0-2.475z"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
