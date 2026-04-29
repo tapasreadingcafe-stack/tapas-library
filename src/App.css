@@ -396,6 +396,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Brand indigo — SVG icons inherit via fill: currentColor */
+  color: #667eea;
 }
 
 .btn-icon:hover {
