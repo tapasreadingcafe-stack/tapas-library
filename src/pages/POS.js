@@ -816,7 +816,7 @@ export default function POS() {
             />
             <button onClick={() => setShowPosScanner(true)}
               style={{ padding: isMobile ? '12px 16px' : '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', flexShrink: 0, minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Scan barcode">📷</button>
+              title="Scan barcode"><ScannerIcon /></button>
           </div>
 
           {/* Category tabs */}
@@ -1689,7 +1689,9 @@ export default function POS() {
           onClick={() => setShowPosScanner(false)}>
           <div style={{ background: 'white', borderRadius: isMobile ? '20px 20px 0 0' : '14px', padding: '20px', maxWidth: '420px', width: isMobile ? '100%' : '90%', maxHeight: isMobile ? '85vh' : 'auto', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px' }}>📷 Scan Barcode</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ScannerIcon size={20} /> Scan Barcode
+              </h3>
               <button onClick={() => setShowPosScanner(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
             <BarcodeScanner
@@ -1785,5 +1787,25 @@ export default function POS() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ScannerIcon — bold barcode bars inside L-shaped corner brackets,
+// matching the user's reference glyph. Inherits currentColor so the
+// orange POS scanner button (white text) tints it correctly.
+// ─────────────────────────────────────────────────────────────────────
+function ScannerIcon({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
+      {/* Corner brackets */}
+      <path d="M3 8V4a1 1 0 0 1 1-1h4v2H5v3H3zm18 0V5h-3V3h4a1 1 0 0 1 1 1v4h-2zM3 16h2v3h3v2H4a1 1 0 0 1-1-1v-4zm18 0v4a1 1 0 0 1-1 1h-4v-2h3v-3h2z"/>
+      {/* Barcode bars */}
+      <rect x="6.5"  y="7" width="1.6" height="10" rx="0.8"/>
+      <rect x="9.2"  y="7" width="1.2" height="10" rx="0.6"/>
+      <rect x="11.4" y="9" width="1.2" height="6"  rx="0.6"/>
+      <rect x="13.6" y="7" width="1.2" height="10" rx="0.6"/>
+      <rect x="15.9" y="7" width="1.6" height="10" rx="0.8"/>
+    </svg>
   );
 }
