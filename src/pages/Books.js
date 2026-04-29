@@ -613,9 +613,11 @@ export default function Books() {
                       {isbnLooking ? '...' : '🔍'}
                     </button>
                     <button type="button" onClick={() => setShowIsbnScanner(true)}
-                      style={{ padding: '10px 12px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto' }}
+                      style={{ padding: '10px 12px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Scan barcode">
-                      📷
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                        <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
+                      </svg>
                     </button>
                   </div>
                   <p style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>Enter ISBN or scan barcode, then auto-fill from Open Library / Google Books</p>
