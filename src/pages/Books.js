@@ -692,15 +692,34 @@ export default function Books() {
 
               {hasCondition && (
                 <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Book Condition</label>
-                  <select
-                    name="condition"
-                    value={formData.condition || 'Good'}
-                    onChange={handleInputChange}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
-                  >
-                    {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Book Condition</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {CONDITIONS.map(c => {
+                      const selected = (formData.condition || 'Good') === c;
+                      const s = CONDITION_STYLE[c] || {};
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, condition: c }))}
+                          style={{
+                            padding: isMobile ? '10px 16px' : '8px 14px',
+                            minHeight: isMobile ? '44px' : 'auto',
+                            border: selected ? `1px solid ${s.text}` : '1px solid #d1d5db',
+                            background: selected ? s.bg : '#fff',
+                            color: selected ? s.text : '#6b7280',
+                            borderRadius: '999px',
+                            fontWeight: selected ? 700 : 500,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {c}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
