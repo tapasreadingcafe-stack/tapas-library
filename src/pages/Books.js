@@ -1100,10 +1100,10 @@ function BookActionIcon({ name, size = 18 }) {
         </svg>
       );
     case 'copies':
-      // Box (single, top fold visible)
+      // Barcode — vertical bars of varying widths
       return (
         <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
-          <path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5v-7zm-9-3.2 6.5 4-2.5 1.5L9.5 6.8 12 5.3zM5 9.6l6 3.7v6L5 15.6V9.6zm8 9.7v-6l6-3.7v6L13 19.3z"/>
+          <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
         </svg>
       );
     case 'delete':
