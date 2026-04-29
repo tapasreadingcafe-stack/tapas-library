@@ -556,16 +556,16 @@ function Members() {
                   <td className="text-center">{member.borrow_limit || 0}</td>
                   <td className="text-center">{member.discount_percent || 0}%</td>
                   <td className="actions-cell">
-                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly || !canManageMembers}>✏️</button>
-                    <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile">👁️</button>
-                    {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew" style={{ color: '#38a169' }}>🔄</button>}
-                    {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Email Renewal Reminder">📧</button>}
+                    <button className="btn-icon" onClick={() => handleEditMember(member)} title="Edit" disabled={isReadOnly || !canManageMembers}><ActionIcon name="edit" /></button>
+                    <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile"><ActionIcon name="view" /></button>
+                    {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew" style={{ color: '#38a169' }}><ActionIcon name="renew" /></button>}
+                    {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Email Renewal Reminder"><ActionIcon name="email" /></button>}
                     {member.phone && member.subscription_end && <button className="btn-icon" onClick={async () => {
                       const result = await sendWhatsApp(member.phone, membershipExpiryWhatsAppMsg({ memberName: member.name, plan: member.plan || 'Standard', expiryDate: formatDate(member.subscription_end) }));
                       if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');
                       else toast.error(result.error || 'Failed');
-                    }} title="WhatsApp Renewal Reminder" style={{ color: '#25D366' }}>📱</button>}
-                    {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete">🗑️</button>}
+                    }} title="WhatsApp Renewal Reminder" style={{ color: '#25D366' }}><ActionIcon name="phone" /></button>}
+                    {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete"><ActionIcon name="delete" /></button>}
                   </td>
                 </tr>
               ))
@@ -844,6 +844,62 @@ function Members() {
       )}
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ActionIcon — black silhouette SVGs replacing the colored emoji
+// glyphs that were in the actions column. Each icon inherits
+// `currentColor` so the parent button's `style={{ color }}` (used to
+// tint the renew button green and the WhatsApp button green) keeps
+// working — no extra wiring needed.
+// ─────────────────────────────────────────────────────────────────────
+function ActionIcon({ name, size = 18 }) {
+  const common = {
+    width: size, height: size,
+    fill: 'currentColor', stroke: 'none',
+    display: 'inline-block', verticalAlign: 'middle',
+  };
+  switch (name) {
+    case 'edit':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+      );
+    case 'view':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M12 5C6.5 5 2.7 8.6 1 12c1.7 3.4 5.5 7 11 7s9.3-3.6 11-7c-1.7-3.4-5.5-7-11-7zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
+        </svg>
+      );
+    case 'renew':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M17.65 6.35A8 8 0 0 0 4.34 9H6.5l-3 3-3-3h2A10 10 0 1 1 12 22V20a8 8 0 0 0 5.65-13.65zM12 8v5l4.25 2.52.75-1.27-3.5-2.07V8H12z"/>
+        </svg>
+      );
+    case 'email':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+          <text x="12" y="17" textAnchor="middle" fontSize="6" fontWeight="700" fill="currentColor" stroke="none">E</text>
+        </svg>
+      );
+    case 'phone':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm-5 21a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zM17 18H7V4h10v14z"/>
+        </svg>
+      );
+    case 'delete':
+      return (
+        <svg viewBox="0 0 24 24" style={common} aria-hidden="true">
+          <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 export default Members;
