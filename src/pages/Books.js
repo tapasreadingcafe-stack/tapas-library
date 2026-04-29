@@ -48,6 +48,7 @@ export default function Books() {
   const [isbnLooking, setIsbnLooking] = useState(false);
   const [printAfterAdd, setPrintAfterAdd] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
+  const [notForSale, setNotForSale] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -439,6 +440,7 @@ export default function Books() {
     setImagePreview(book.book_image || '');
     setEditingId(book.id);
     setShowAddForm(true);
+    setNotForSale(!book.mrp && !book.sales_price);
   };
 
   const handleDeleteBook = async (id) => {
@@ -482,6 +484,7 @@ export default function Books() {
               setEditingId(null);
               setImagePreview('');
               setFormData(emptyForm);
+              setNotForSale(false);
             }}
             data-tour="add-book"
             style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
@@ -725,7 +728,24 @@ export default function Books() {
 
               {/* PRICING SECTION */}
               <div style={{ background: '#f8f9ff', padding: '14px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e0e8ff' }}>
-                <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', fontSize: '14px', color: '#667eea' }}>💰 Pricing</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <label style={{ fontWeight: 'bold', fontSize: '14px', color: '#667eea', margin: 0 }}>💰 Pricing</label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: notForSale ? '#c0392b' : '#6b7280', fontWeight: notForSale ? 700 : 500 }}>
+                    <input
+                      type="checkbox"
+                      checked={notForSale}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        setNotForSale(v);
+                        if (v) {
+                          setFormData(prev => ({ ...prev, mrp: '', sales_price: '', discount_percent: '' }));
+                        }
+                      }}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#c0392b' }}
+                    />
+                    Not for sale
+                  </label>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Buying Price (₹)</label>
@@ -746,6 +766,7 @@ export default function Books() {
                       type="number"
                       name="mrp"
                       value={formData.mrp}
+                      disabled={notForSale}
                       onChange={(e) => {
                         const mrp = parseFloat(e.target.value) || 0;
                         const disc = parseFloat(formData.discount_percent) || 0;
@@ -753,8 +774,8 @@ export default function Books() {
                         setFormData(prev => ({ ...prev, mrp: e.target.value, sales_price: sellingPrice || '' }));
                       }}
                       min="0"
-                      placeholder="Maximum Retail Price"
-                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
+                      placeholder={notForSale ? 'Not for sale' : 'Maximum Retail Price'}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit', background: notForSale ? '#f1f3f5' : '#fff', cursor: notForSale ? 'not-allowed' : 'text' }}
                     />
                   </div>
                 </div>
@@ -765,6 +786,7 @@ export default function Books() {
                       type="number"
                       name="discount_percent"
                       value={formData.discount_percent}
+                      disabled={notForSale}
                       onChange={(e) => {
                         const disc = parseFloat(e.target.value) || 0;
                         const mrp = parseFloat(formData.mrp) || 0;
@@ -773,15 +795,16 @@ export default function Books() {
                       }}
                       min="0" max="100" step="0.5"
                       placeholder="0"
-                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit', background: notForSale ? '#f1f3f5' : '#fff', cursor: notForSale ? 'not-allowed' : 'text' }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#667eea' }}>Selling Price (₹)</label>
+                    <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: notForSale ? '#9ca3af' : '#667eea' }}>Selling Price (₹)</label>
                     <input
                       type="number"
                       name="sales_price"
                       value={formData.sales_price}
+                      disabled={notForSale}
                       onChange={(e) => {
                         const sp = parseFloat(e.target.value) || 0;
                         const mrp = parseFloat(formData.mrp) || 0;
@@ -789,8 +812,8 @@ export default function Books() {
                         setFormData(prev => ({ ...prev, sales_price: e.target.value, discount_percent: disc || prev.discount_percent }));
                       }}
                       min="0"
-                      placeholder="Auto from MRP - Discount"
-                      style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '4px', fontWeight: '700', color: '#667eea', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
+                      placeholder={notForSale ? 'Not for sale' : 'Auto from MRP - Discount'}
+                      style={{ width: '100%', padding: '10px', border: notForSale ? '1px solid #ddd' : '2px solid #667eea', borderRadius: '4px', fontWeight: '700', color: notForSale ? '#9ca3af' : '#667eea', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit', background: notForSale ? '#f1f3f5' : '#fff', cursor: notForSale ? 'not-allowed' : 'text' }}
                     />
                     {formData.mrp && formData.sales_price && parseFloat(formData.sales_price) < parseFloat(formData.mrp) && (
                       <p style={{ fontSize: '11px', color: '#27ae60', marginTop: '2px', fontWeight: '600' }}>
