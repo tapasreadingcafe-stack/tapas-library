@@ -61,9 +61,8 @@ const HOME_SECTIONS_CSS = `
   .hs-section { padding: 100px 0; }
   .hs-head {
     display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
-    align-items: start; margin-bottom: 56px;
+    align-items: center; margin-bottom: 56px;
   }
-  .hs-head > div:last-child { padding-top: 18px; }   /* baseline-align lede with heading first line */
   .hs-kicker {
     font-family: var(--hs-mono); font-size: 12px; letter-spacing: 0.18em;
     text-transform: uppercase; color: var(--hs-purple); margin-bottom: 14px;
@@ -381,15 +380,15 @@ function ServicesSection() {
   return (
     <section className="hs-section" id="services">
       <div className="hs-wrap">
-        <div className="hs-head">
-          <div>
-            <div className="hs-kicker">Our Services</div>
+        <div style={{ marginBottom: 56 }}>
+          <div className="hs-kicker">Our Services</div>
+          <div className="hs-head" style={{ marginBottom: 0, alignItems: 'center' }}>
             <h2>Everything a reader needs, <span className="p">under one roof.</span></h2>
+            <p className="hs-lede">
+              Three ways to use the room: take a book home, borrow one for a week, or come read with a group.
+              Coffee, wine, and tapas served throughout.
+            </p>
           </div>
-          <p className="hs-lede">
-            Three ways to use the room: take a book home, borrow one for a week, or come read with a group.
-            Coffee, wine, and tapas served throughout.
-          </p>
         </div>
         <div className="hs-services">
           <div className="hs-service">
