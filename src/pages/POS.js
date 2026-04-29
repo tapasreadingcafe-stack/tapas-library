@@ -816,7 +816,7 @@ export default function POS() {
             />
             <button onClick={() => setShowPosScanner(true)}
               style={{ padding: isMobile ? '12px 16px' : '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', flexShrink: 0, minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Scan barcode"><ScannerIcon /></button>
+              title="Scan barcode"><ScannerIcon size={28} /></button>
           </div>
 
           {/* Category tabs */}
