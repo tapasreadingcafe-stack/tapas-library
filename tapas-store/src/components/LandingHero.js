@@ -29,7 +29,6 @@ const NAV_H = 87; // Keep in sync with TapasStickyNav's measured height.
 export default function LandingHero() {
   const photoSrc = `${process.env.PUBLIC_URL || ''}/HERO-LIBRARY.png`;
   const { data: page } = usePage('home');
-  const kicker = page?.hero_kicker || 'Welcome to Tapas';
   const headingHtml = page?.hero_heading_html || 'Where Stories Begin &amp; Families Connect';
   const lede = page?.hero_lede ||
     'A cozy reading space for kids and parents — discover books, enjoy simple treats, and build a love for reading together.';
@@ -226,7 +225,6 @@ export default function LandingHero() {
 
         <div className="lh-content">
           <div className="lh-block">
-            <div className="lh-kicker">{kicker}</div>
             <h1 className="lh-title" dangerouslySetInnerHTML={{ __html: headingHtml }} />
             <p className="lh-lede">{lede}</p>
             <div className="lh-ctas">
