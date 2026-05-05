@@ -434,15 +434,19 @@ export default function Books() {
         toast.success('Book updated!');
         logActivity(ACTIONS.BOOK_UPDATED, `Updated book: ${formData.title}`, { book_title: formData.title });
       } else {
-        // Check if same book (by ISBN or title+author) already exists
+        // Dedup against existing catalog. ISBN is the source of
+        // truth when present — different ISBN = different book even
+        // if title/author happen to match (e.g. multiple volumes of
+        // a series share a series name). Title+author fallback only
+        // runs for ISBN-less books to avoid merging distinct titles.
         let existingBook = null;
         if (payload.isbn) {
           const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category').eq('isbn', payload.isbn).limit(1);
           if (data?.length) existingBook = data[0];
-        }
-        if (!existingBook && payload.title) {
-          const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category').eq('title', payload.title).eq('author', payload.author || '').limit(1);
-          if (data?.length) existingBook = data[0];
+        } else if (payload.title) {
+          const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category, isbn').eq('title', payload.title).eq('author', payload.author || '').limit(1);
+          // Only merge when the matched record also has no ISBN.
+          if (data?.length && !data[0].isbn) existingBook = data[0];
         }
 
         if (existingBook) {
