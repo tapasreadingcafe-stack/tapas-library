@@ -254,8 +254,31 @@ export default function Books() {
     if (!isbn) { toast.warning('Enter an ISBN first'); return; }
     setIsbnLooking(true);
     try {
-      // Try Open Library first (better ISBN coverage)
       let found = false;
+
+      // Local DB first: if this ISBN already exists in our catalog (a
+      // copy was added manually before), prefill from that record. This
+      // makes scanning a known book always work — even when external
+      // APIs (OpenLibrary / Google / Wikidata) have no data on it.
+      // Only matches when not editing the same record.
+      const norm = (s) => (s || '').replace(/[-\s]/g, '');
+      const existing = books.find(b => norm(b.isbn) === isbn && b.id !== editingId);
+      if (existing) {
+        const newForm = { ...formData, isbn };
+        if (existing.title)      newForm.title    = existing.title;
+        if (existing.author)     newForm.author   = existing.author;
+        if (existing.category)   newForm.category = existing.category;
+        if (existing.book_image) {
+          newForm.book_image = existing.book_image;
+          setImagePreview(existing.book_image);
+        }
+        setFormData(newForm);
+        toast.success('Pre-filled from existing book in your catalog');
+        setIsbnLooking(false);
+        return;
+      }
+
+      // Try Open Library first (better ISBN coverage)
       try {
         const olRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
         const olData = await olRes.json();
@@ -523,6 +546,22 @@ export default function Books() {
             style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
           >
             ➕ Add Book
+          </button>}
+          {!isReadOnly && <button
+            onClick={() => {
+              setShowAddForm(true);
+              setEditingId(null);
+              setImagePreview('');
+              setFormData(emptyForm);
+              setNotForSale(false);
+              setShowIsbnScanner(true);
+            }}
+            title="Scan barcode → auto-fill book details → fill the rest"
+            style={{ padding: isMobile ? '10px 14px' : '8px 12px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
+            </svg>
           </button>}
           {!isReadOnly && canExportData && <div style={{ position: 'relative' }} data-tour="import-export">
             <button onClick={() => setShowImportExport(!showImportExport)}
