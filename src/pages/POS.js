@@ -243,11 +243,24 @@ export default function POS() {
   const fetchBooks = async () => {
     setBooksLoading(true);
     try {
-      const { data } = await supabase
-        .from('books')
-        .select('id, book_id, title, author, category, price, sales_price, quantity_available, quantity_total, book_image')
-        .order('title').limit(300);
-      setAllBooks(data || []);
+      // Paginate in 1000-row batches to bypass Supabase's default
+      // server cap. Stops when a batch returns fewer rows than the
+      // page size, which means we've reached the end of the catalog.
+      const PAGE = 1000;
+      const cols = 'id, book_id, title, author, category, price, sales_price, quantity_available, quantity_total, book_image';
+      const all = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from('books')
+          .select(cols)
+          .order('title')
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+      }
+      setAllBooks(all);
     } catch (e) { console.error(e); }
     finally { setBooksLoading(false); }
   };
