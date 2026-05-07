@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
 export default function InventoryLibrary() {
   const { isReadOnly } = usePermission();
+  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -96,11 +98,11 @@ export default function InventoryLibrary() {
         <div className="inv-lib-table-wrap">
           <table className="inv-lib-table">
             <thead>
-              <tr><th>Title</th><th>Author</th><th>Category</th><th>Total</th><th>Available</th><th>Status</th></tr>
+              <tr><th>Title</th><th>Author</th><th>Category</th><th>Total</th><th>Available</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan="6" style={{ textAlign: 'center', color: '#999', padding: '30px' }}>No books found</td></tr>
+                <tr><td colSpan="7" style={{ textAlign: 'center', color: '#999', padding: '30px' }}>No books found</td></tr>
               ) : filtered.map(book => {
                 const avail = book.quantity_available || 0;
                 const stockClass = avail === 0 ? 'stock-out' : avail <= 2 ? 'stock-low' : 'stock-ok';
@@ -113,6 +115,16 @@ export default function InventoryLibrary() {
                     <td style={{ fontWeight: '600' }}>{book.quantity_total || 0}</td>
                     <td style={{ fontWeight: '600', color: avail === 0 ? '#e74c3c' : avail <= 2 ? '#f39c12' : '#27ae60' }}>{avail}</td>
                     <td><span className={`stock-badge ${stockClass}`}>{stockLabel}</span></td>
+                    <td>
+                      <button
+                        onClick={() => navigate(`/books?edit=${book.id}`)}
+                        disabled={isReadOnly}
+                        title="Edit book"
+                        style={{ padding: '6px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '5px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}
+                      >
+                        Edit
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
