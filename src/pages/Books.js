@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
@@ -72,6 +72,7 @@ const CONDITION_STYLE = {
 
 export default function Books() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const confirm = useConfirm();
   const { isReadOnly, canDeleteBooks, canExportData } = usePermission();
@@ -136,6 +137,22 @@ export default function Books() {
     fetchBooks();
   }, [filterCategory]);
 
+  // Deep-link: open edit form when ?edit=<bookId> is in the URL.
+  // Used by other pages (e.g. Inventory → "Edit") to jump straight
+  // to a specific book's edit form. Clears the param after handling
+  // so a refresh doesn't reopen.
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId || books.length === 0) return;
+    const book = books.find(b => String(b.id) === String(editId));
+    if (book) {
+      handleEditBook(book);
+      searchParams.delete('edit');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [books, searchParams]);
+
   const probeCondition = async () => {
     const { error } = await supabase.from('books').select('condition').limit(0);
     setHasCondition(!error);
@@ -144,19 +161,26 @@ export default function Books() {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('books')
-        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (filterCategory !== 'all') {
-        query = query.eq('category', filterCategory);
+      // Paginate in 1000-row batches to bypass Supabase's default
+      // server cap. Stops when a batch returns fewer rows than the
+      // page size, which means we've reached the end of the catalog.
+      const PAGE = 1000;
+      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status';
+      const all = [];
+      for (let offset = 0; ; offset += PAGE) {
+        let q = supabase
+          .from('books')
+          .select(cols)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PAGE - 1);
+        if (filterCategory !== 'all') q = q.eq('category', filterCategory);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setBooks(data || []);
+      setBooks(all);
     } catch (error) {
       console.error('Error fetching books:', error);
     } finally {
