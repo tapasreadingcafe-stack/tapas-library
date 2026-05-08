@@ -132,24 +132,38 @@ export default function Books() {
     fetchCategories();
   }, []);
 
-  // Re-fetch books whenever filter changes
+  // Single source of truth for fetching books: server-side filter + search.
+  // Debounces typing so we don't hammer the DB on every keystroke. Default
+  // load returns the 200 most recent books; a search term widens the lookup
+  // across the whole catalog via ilike. Heavy image columns are excluded
+  // here for speed and lazy-loaded only when needed (edit form).
   useEffect(() => {
-    fetchBooks();
-  }, [filterCategory]);
+    const term = searchTerm.trim();
+    const t = setTimeout(() => { fetchBooks({ term }); }, term ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [searchTerm, filterCategory, filterCondition, hasCondition]);
 
   // Deep-link: open edit form when ?edit=<bookId> is in the URL.
-  // Used by other pages (e.g. Inventory → "Edit") to jump straight
-  // to a specific book's edit form. Clears the param after handling
-  // so a refresh doesn't reopen.
+  // The book may be outside the currently-loaded slice (e.g. older than
+  // the 200-row default), so fall back to a direct fetch by id.
   useEffect(() => {
     const editId = searchParams.get('edit');
-    if (!editId || books.length === 0) return;
-    const book = books.find(b => String(b.id) === String(editId));
-    if (book) {
-      handleEditBook(book);
+    if (!editId) return;
+    const fromList = books.find(b => String(b.id) === String(editId));
+    if (fromList) {
+      handleEditBook(fromList);
       searchParams.delete('edit');
       setSearchParams(searchParams, { replace: true });
+      return;
     }
+    (async () => {
+      const { data } = await supabase.from('books').select('*').eq('id', editId).single();
+      if (data) {
+        handleEditBook(data);
+        searchParams.delete('edit');
+        setSearchParams(searchParams, { replace: true });
+      }
+    })();
   }, [books, searchParams]);
 
   const probeCondition = async () => {
@@ -157,29 +171,33 @@ export default function Books() {
     setHasCondition(!error);
   };
 
-  const fetchBooks = async () => {
+  // Fetch books from Supabase. Excludes the heavy book_image column —
+  // mobile thumbnails fall back to cover_url (always a small URL); the
+  // edit form lazy-loads the full row when needed.
+  // Without a search term: returns the 200 most-recent rows.
+  // With a search term: ilike across title/author/book_id/isbn,
+  // capped at 100 rows.
+  const LIST_COLS = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status';
+  const fetchBooks = async ({ term = '' } = {}) => {
     setLoading(true);
     try {
-      // Paginate in 1000-row batches to bypass Supabase's default
-      // server cap. Stops when a batch returns fewer rows than the
-      // page size, which means we've reached the end of the catalog.
-      const PAGE = 1000;
-      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status';
-      const all = [];
-      for (let offset = 0; ; offset += PAGE) {
-        let q = supabase
-          .from('books')
-          .select(cols)
-          .order('created_at', { ascending: false })
-          .range(offset, offset + PAGE - 1);
-        if (filterCategory !== 'all') q = q.eq('category', filterCategory);
-        const { data, error } = await q;
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < PAGE) break;
+      let q = supabase.from('books').select(LIST_COLS);
+      if (term) {
+        // Strip PostgREST control chars so user input can't break the .or() filter string.
+        const safe = term.replace(/[(),]/g, ' ').trim().slice(0, 100);
+        if (safe) {
+          q = q.or(`title.ilike.%${safe}%,author.ilike.%${safe}%,book_id.ilike.%${safe}%,isbn.ilike.%${safe}%`).limit(100);
+        } else {
+          q = q.order('created_at', { ascending: false }).limit(200);
+        }
+      } else {
+        q = q.order('created_at', { ascending: false }).limit(200);
       }
-      setBooks(all);
+      if (filterCategory !== 'all') q = q.eq('category', filterCategory);
+      if (hasCondition && filterCondition !== 'all') q = q.eq('condition', filterCondition);
+      const { data, error } = await q;
+      if (error) throw error;
+      setBooks(data || []);
     } catch (error) {
       console.error('Error fetching books:', error);
     } finally {
@@ -447,13 +465,13 @@ export default function Books() {
       const copyCount = parseInt(payload.quantity_total) || 1;
 
       if (editingId) {
-        const { error } = await supabase.from('books').update(payload).eq('id', editingId);
+        const { data: updated, error } = await supabase.from('books').update(payload).eq('id', editingId).select(LIST_COLS).single();
         if (error) throw error;
+        if (updated) setBooks(prev => prev.map(b => b.id === editingId ? updated : b));
         setEditingId(null);
         setFormData(emptyForm);
         setImagePreview('');
         setShowAddForm(false);
-        fetchBooks();
         toast.success('Book updated!');
         logActivity(ACTIONS.BOOK_UPDATED, `Updated book: ${formData.title}`, { book_title: formData.title });
       } else {
@@ -477,13 +495,13 @@ export default function Books() {
           const newTotal = (existingBook.quantity_total || 0) + copyCount;
           const newAvail = (existingBook.quantity_available || 0) + copyCount;
           await supabase.from('books').update({ quantity_total: newTotal, quantity_available: newAvail }).eq('id', existingBook.id);
+          setBooks(prev => prev.map(b => b.id === existingBook.id ? { ...b, quantity_total: newTotal, quantity_available: newAvail } : b));
           try {
             await createBookCopies(existingBook.id, existingBook.category || payload.category, copyCount);
           } catch (e) { console.warn('Copies:', e.message); }
           setFormData(emptyForm);
           setImagePreview('');
           setShowAddForm(false);
-          fetchBooks();
           toast.success(`${copyCount} copies added to existing "${payload.title}" (Total: ${newTotal})`);
           logActivity(ACTIONS.BOOK_ADDED, `Added ${copyCount} copies to: ${payload.title} (total: ${newTotal})`, { book_title: payload.title });
           if (printAfterAdd) navigate(`/books/${existingBook.id}/copies`);
@@ -497,15 +515,15 @@ export default function Books() {
           if (lastCopy?.length) { const m = lastCopy[0].copy_code.match(/-(\d+)$/); if (m) nextNum = parseInt(m[1]) + 1; }
           payload.book_id = `B-${prefix}-${String(nextNum).padStart(4, '0')}`;
 
-          const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
+          const { data: newBook, error } = await supabase.from('books').insert([payload]).select(LIST_COLS).single();
           if (error) throw error;
+          if (newBook) setBooks(prev => [newBook, ...prev]);
           try {
             await createBookCopies(newBook.id, payload.category, copyCount);
           } catch (e) { console.warn('Copies:', e.message); }
           setFormData(emptyForm);
           setImagePreview('');
           setShowAddForm(false);
-          fetchBooks();
           toast.success(`Book added with ${copyCount} copies!`);
           logActivity(ACTIONS.BOOK_ADDED, `Added book: ${payload.title} (${copyCount} copies)`, { book_title: payload.title });
           if (printAfterAdd) navigate(`/books/${newBook.id}/copies`);
@@ -518,12 +536,22 @@ export default function Books() {
     }
   };
 
-  const handleEditBook = (book) => {
+  const handleEditBook = async (book) => {
+    // Open the form immediately with what we already have so the UI
+    // feels instant; backfill book_image asynchronously since the list
+    // query intentionally skips it for speed.
     setFormData(book);
-    setImagePreview(book.book_image || '');
+    setImagePreview(book.book_image || book.cover_url || '');
     setEditingId(book.id);
     setShowAddForm(true);
     setNotForSale(!book.mrp && !book.sales_price);
+    if (!book.book_image) {
+      const { data } = await supabase.from('books').select('book_image').eq('id', book.id).single();
+      if (data?.book_image) {
+        setFormData(prev => ({ ...prev, book_image: data.book_image }));
+        setImagePreview(data.book_image);
+      }
+    }
   };
 
   const handleDeleteBook = async (id) => {
@@ -535,7 +563,7 @@ export default function Books() {
         .delete()
         .eq('id', id);
       if (error) throw error;
-      fetchBooks();
+      setBooks(prev => prev.filter(b => b.id !== id));
       toast.success('Book deleted!');
     } catch (error) {
       console.error('Error deleting book:', error);
@@ -1111,8 +1139,8 @@ export default function Books() {
               return (
                 <div key={book.id} style={{ background: 'white', borderRadius: '10px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid #f0f0f0' }}>
                   <div style={{ width: '50px', height: '70px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {book.book_image ? (
-                      <img src={book.book_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
+                    {book.cover_url || book.book_image ? (
+                      <img src={book.cover_url || book.book_image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
                     ) : (
                       <span style={{ fontSize: '20px' }}>📚</span>
                     )}
