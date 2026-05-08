@@ -1,5 +1,5 @@
 const ABOUT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .ab-root {
   --ab-lime:   #caf27e;
@@ -11,9 +11,9 @@ const ABOUT_CSS = `
   --ab-muted:  #6e6e6e;
   --ab-rule:   #ececea;
   --ab-bg:     #faf8f4;
-  --ab-f-display: "DM Serif Display", Georgia, serif;
-  --ab-f-ui:      "Inter", system-ui, sans-serif;
-  --ab-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --ab-f-display: "Poppins", system-ui, sans-serif;
+  --ab-f-ui:      "Poppins", system-ui, sans-serif;
+  --ab-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--ab-f-ui);
   color: var(--ab-ink);
@@ -66,7 +66,7 @@ const ABOUT_CSS = `
 }
 .ab-hero-title {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -121,7 +121,7 @@ const ABOUT_CSS = `
 }
 .ab-section-title {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(32px, 5vw, 72px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -146,7 +146,7 @@ const ABOUT_CSS = `
 }
 .ab-paragraph::first-letter {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   float: left;
   font-size: 72px;
   line-height: 0.9;
@@ -164,7 +164,7 @@ const ABOUT_CSS = `
 }
 .ab-stats-title {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -191,7 +191,7 @@ const ABOUT_CSS = `
 .ab-stat:first-child { border-left: 0; }
 .ab-stat-value {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 52px;
   line-height: 0.95;
   letter-spacing: -0.015em;
@@ -224,7 +224,7 @@ const ABOUT_CSS = `
 }
 .ab-history-title {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -258,7 +258,7 @@ const ABOUT_CSS = `
 .ab-history-cell:first-child { border-left: 0; }
 .ab-history-year {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 44px;
   line-height: 1;
   letter-spacing: -0.015em;
@@ -267,7 +267,7 @@ const ABOUT_CSS = `
 }
 .ab-history-heading {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 17px;
   color: #fff;
   margin: 0 0 8px;
@@ -290,7 +290,7 @@ const ABOUT_CSS = `
 }
 .ab-head-title {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -339,7 +339,7 @@ const ABOUT_CSS = `
 }
 .ab-compromise-n {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 52px;
   line-height: 0.9;
   letter-spacing: -0.015em;
@@ -349,7 +349,7 @@ const ABOUT_CSS = `
 .ab-compromise.is-orange .ab-compromise-n { color: #fff; }
 .ab-compromise-title {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -389,7 +389,7 @@ const ABOUT_CSS = `
   display: grid;
   place-items: center;
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 96px;
   letter-spacing: -0.015em;
   color: rgba(0,0,0,0.15);
@@ -402,7 +402,7 @@ const ABOUT_CSS = `
 }
 .ab-member-name {
   font-family: var(--ab-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--ab-ink);
   letter-spacing: -0.005em;

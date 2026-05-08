@@ -1,5 +1,5 @@
 const SIGN_UP_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .su-root {
   --su-lime:   #caf27e;
@@ -12,9 +12,9 @@ const SIGN_UP_CSS = `
   --su-rule:   #ececea;
   --su-bg:     #faf8f4;
   --su-card:   #ffffff;
-  --su-f-display: "DM Serif Display", Georgia, serif;
-  --su-f-ui:      "Inter", system-ui, sans-serif;
-  --su-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --su-f-display: "Poppins", system-ui, sans-serif;
+  --su-f-ui:      "Poppins", system-ui, sans-serif;
+  --su-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--su-f-ui);
   color: var(--su-ink);
