@@ -39,20 +39,20 @@ const HOME_SECTIONS_CSS = `
     --hs-rule: #ececea;
     --hs-bg: #caf27e;
     --hs-card: #ffffff;
-    --hs-display: 'DM Serif Display', Georgia, serif;
+    --hs-display: 'Poppins', system-ui, sans-serif;
     --hs-ui: 'Poppins', system-ui, sans-serif;
-    --hs-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --hs-mono: 'Poppins', system-ui, sans-serif;
     background: var(--hs-bg);
     color: var(--hs-ink);
     font-family: var(--hs-ui);
   }
   .home-sections * { box-sizing: border-box; }
   .home-sections h2, .home-sections h3, .home-sections h4 {
-    font-family: var(--hs-display); font-weight: 400; margin: 0;
-    letter-spacing: -0.015em; color: var(--hs-ink);
+    font-family: var(--hs-display); font-weight: 700; margin: 0;
+    letter-spacing: -0.018em; color: var(--hs-ink);
   }
   .home-sections h2 em, .home-sections h3 em, .home-sections h4 em {
-    font-style: italic; font-weight: 400;
+    font-style: italic; font-weight: 700;
   }
   .home-sections p { line-height: 1.6; margin: 0; }
   .home-sections a { color: inherit; text-decoration: none; }
@@ -67,12 +67,49 @@ const HOME_SECTIONS_CSS = `
   .hs-kicker {
     font-family: var(--hs-mono); font-size: 12px; letter-spacing: 0.18em;
     text-transform: uppercase; color: var(--hs-purple); margin-bottom: 14px;
+    font-weight: 600;
     display: inline-flex; align-items: center; gap: 10px;
   }
   .hs-kicker::before { content: "●"; color: var(--hs-pink); font-size: 10px; }
   .hs-head h2 { font-size: clamp(40px, 4.6vw, 64px); line-height: 1.02; letter-spacing: -0.022em; }
-  .hs-head h2 .p { color: var(--hs-purple); font-style: italic; font-weight: 400; }
+  .hs-head h2 .p { color: var(--hs-purple); font-style: italic; font-weight: 700; }
   .hs-lede { font-size: 18px; line-height: 1.55; color: var(--hs-ink-2); max-width: 44ch; }
+  .hs-head-centered {
+    grid-template-columns: 1fr; gap: 22px; text-align: center;
+    justify-items: center; max-width: 880px; margin: 0 auto 56px;
+  }
+  .hs-head-centered .hs-kicker {
+    font-size: 24px; font-weight: 600; letter-spacing: 1.63px;
+    line-height: 1.2; color: #8A58DB; margin-bottom: 0;
+  }
+  .hs-head-centered .hs-kicker::before { display: none; }
+  .hs-head-arrivals {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; margin-bottom: 36px; gap: 24px;
+  }
+  .hs-head-arrivals .hs-kicker {
+    grid-column: 2; justify-self: center;
+    font-size: 24px; font-weight: 600; letter-spacing: 0;
+    line-height: 1.2; color: #8A58DB; margin-bottom: 0;
+  }
+  .hs-head-arrivals .hs-kicker::before { display: none; }
+  a.hs-head-viewall {
+    grid-column: 3; justify-self: end;
+    color: var(--hs-pink); font-weight: 600; font-size: 15px;
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none;
+  }
+  .hs-head-viewall .a { transition: transform .2s; display: inline-block; }
+  .hs-head-viewall:hover .a { transform: translateX(4px); }
+  .hs-head-centered .hs-head-headline {
+    font-size: 24px; font-weight: 500;
+    line-height: 42px; letter-spacing: 0; color: var(--hs-ink);
+    max-width: 56ch;
+  }
+  .hs-head-centered .hs-head-sublede {
+    font-size: 16px; font-weight: 400; line-height: 1.6;
+    color: var(--hs-ink-2); max-width: 64ch;
+  }
 
   /* ---------- SERVICES ---------- */
   .hs-services { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
@@ -220,8 +257,8 @@ const HOME_SECTIONS_CSS = `
     border-radius: 22px; position: relative; min-width: 0;
   }
   .hs-pricing-card .price {
-    font-family: var(--hs-display); font-weight: 400; font-size: 48px;
-    line-height: 1; color: var(--hs-ink); letter-spacing: -0.02em;
+    font-family: var(--hs-display); font-weight: 700; font-size: 44px;
+    line-height: 1; color: var(--hs-ink); letter-spacing: -0.025em;
   }
   .hs-pricing-card .price small {
     font-size: 14px; color: var(--hs-muted); font-weight: 500;
@@ -229,8 +266,8 @@ const HOME_SECTIONS_CSS = `
     letter-spacing: 0.04em; text-transform: lowercase;
   }
   .hs-pricing-card h3 {
-    font-family: var(--hs-display); font-weight: 400; font-size: 28px;
-    color: var(--hs-ink); letter-spacing: -0.012em; line-height: 1.05;
+    font-family: var(--hs-display); font-weight: 600; font-size: 26px;
+    color: var(--hs-ink); letter-spacing: -0.018em; line-height: 1.1;
   }
   .hs-pricing-card > p {
     color: var(--hs-ink-2); font-size: 14.5px; line-height: 1.55;
@@ -297,6 +334,43 @@ const HOME_SECTIONS_CSS = `
   }
   .hs-pricing-card.featured .hs-pricing-btn:hover { background: #fff; color: var(--hs-purple); }
 
+  .hs-pricing-card .deposit {
+    font-family: var(--hs-mono); font-size: 12px; letter-spacing: 0.04em;
+    color: var(--hs-muted); margin: -12px 0 0;
+  }
+  .hs-pricing-card.featured .deposit { color: rgba(255,255,255,0.78); }
+  .hs-pricing-card .fineprint {
+    font-size: 12.5px; line-height: 1.5; color: var(--hs-muted);
+    font-style: italic; margin: 0; opacity: 0.85;
+  }
+  .hs-pricing-card.featured .fineprint { color: rgba(255,255,255,0.85); opacity: 0.9; }
+
+  .hs-pricing-extras {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px;
+  }
+  .hs-pricing-extra {
+    background: var(--hs-card); border: 1px solid var(--hs-rule);
+    border-radius: 22px; padding: 28px 32px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .hs-pricing-extra .kicker {
+    font-family: var(--hs-mono); font-size: 11px;
+    letter-spacing: 0.18em; color: var(--hs-purple);
+    text-transform: uppercase; font-weight: 700;
+  }
+  .hs-pricing-extra .title {
+    font-family: var(--hs-display); font-weight: 600; font-size: 24px;
+    color: var(--hs-ink); line-height: 1.15; letter-spacing: -0.018em;
+  }
+  .hs-pricing-extra p {
+    font-size: 14.5px; color: var(--hs-ink-2); line-height: 1.55; margin: 0;
+  }
+  .hs-pricing-extra--featured {
+    background: linear-gradient(135deg, #fff 0%, var(--hs-lime) 110%);
+    border-color: transparent;
+  }
+  .hs-pricing-extra--featured .kicker { color: var(--hs-pink); }
+
   .hs-pricing-card .badge {
     position: absolute; top: 22px; right: 22px;
     background: var(--hs-pink); color: #fff;
@@ -330,7 +404,7 @@ const HOME_SECTIONS_CSS = `
     letter-spacing: -0.02em; text-transform: none; margin-top: 2px; line-height: 1;
   }
   .hs-row-ev .t h4 { font-size: 22px; line-height: 1.15; }
-  .hs-row-ev .t h4 em { color: var(--hs-purple); font-style: italic; font-weight: 400; }
+  .hs-row-ev .t h4 em { color: var(--hs-purple); font-style: italic; font-weight: 700; }
   .hs-row-ev .t p { font-size: 14px; color: var(--hs-muted); margin-top: 4px; }
   .hs-row-ev .tag {
     font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
@@ -363,8 +437,8 @@ const HOME_SECTIONS_CSS = `
     text-transform: uppercase; margin-top: 10px;
   }
   .hs-testimonial blockquote {
-    margin: 0; font-family: var(--hs-display); font-weight: 400; font-style: italic;
-    font-size: 28px; line-height: 1.25; letter-spacing: -0.01em; color: var(--hs-ink);
+    margin: 0; font-family: var(--hs-display); font-weight: 500; font-style: italic;
+    font-size: 26px; line-height: 1.3; letter-spacing: -0.012em; color: var(--hs-ink);
   }
   .hs-testimonial blockquote em { font-style: italic; }
   .hs-testimonial .who { margin-top: 28px; display: flex; align-items: center; gap: 14px; }
@@ -396,12 +470,12 @@ const HOME_SECTIONS_CSS = `
     color: var(--hs-lime); margin-bottom: 12px;
   }
   .home-sections .blog-dispatch-title {
-    font-family: var(--hs-display); font-weight: 400;
+    font-family: var(--hs-display); font-weight: 700;
     font-size: clamp(30px, 3.4vw, 44px); line-height: 1.05;
-    letter-spacing: -0.015em; color: #fff; margin: 0 0 14px;
+    letter-spacing: -0.018em; color: #fff; margin: 0 0 14px;
   }
   .home-sections .blog-dispatch-title em {
-    color: var(--hs-lime); font-style: italic; font-weight: 400;
+    color: var(--hs-lime); font-style: italic; font-weight: 700;
   }
   .home-sections .blog-dispatch-lede {
     color: rgba(255,255,255,0.75); font-size: 15px; line-height: 1.6;
@@ -443,6 +517,12 @@ const HOME_SECTIONS_CSS = `
     .hs-panel { padding: 36px; min-height: 0; }
     .hs-pricing { grid-template-columns: repeat(2, 1fr); padding: 16px; }
     .hs-pricing-card.featured { margin: 0; padding: 40px 26px 32px; }
+    .hs-pricing-extras { grid-template-columns: 1fr; }
+    .hs-pricing-extra { padding: 24px; }
+    .hs-pricing-extra .title { font-size: 22px; }
+    .hs-head-arrivals { grid-template-columns: 1fr; gap: 12px; text-align: center; }
+    .hs-head-arrivals .hs-kicker { grid-column: 1; }
+    a.hs-head-viewall { grid-column: 1; justify-self: center; }
     .hs-row-ev { grid-template-columns: 80px 1fr auto; gap: 16px; padding: 20px; }
     .hs-row-ev .tag { display: none; }
     .hs-testimonial { grid-template-columns: 1fr; padding: 48px 36px; gap: 24px; }
@@ -486,15 +566,9 @@ function ServicesSection() {
   return (
     <section className="hs-section" id="services">
       <div className="hs-wrap">
-        <div className="hs-head hs-head-services">
-          <div>
-            <div className="hs-kicker">Our Services</div>
-            <h2>Everything a reader needs, <span className="p">under one roof.</span></h2>
-          </div>
-          <p className="hs-lede">
-            Three ways to use the room: take a book home, borrow one for a week, or come read with a group.
-            Coffee, wine, and tapas served throughout.
-          </p>
+        <div className="hs-head hs-head-centered">
+          <div className="hs-kicker">Our Services</div>
+          <h2 className="hs-head-headline">From discovering books to spending quality time together&mdash;we&rsquo;ve created a space for both kids and parents.</h2>
         </div>
         <div className="hs-services">
           <Link className="hs-service" to="/shop">
@@ -536,14 +610,9 @@ function NewArrivalsSection() {
   return (
     <section className="hs-section" id="arrivals" style={{ paddingTop: 20 }}>
       <div className="hs-wrap">
-        <div className="hs-head">
-          <div>
-            <div className="hs-kicker">New on the shelf</div>
-            <h2>This week’s <span className="p">arrivals.</span></h2>
-          </div>
-          <p className="hs-lede">
-            Freshly unpacked from the small-press boxes and the translators’ stacks. Borrow for free, or take one home.
-          </p>
+        <div className="hs-head hs-head-arrivals">
+          <div className="hs-kicker hs-kicker-mini">Fresh stories just in</div>
+          <Link to="/shop" className="hs-head-viewall">View All <span className="a">→</span></Link>
         </div>
         <div className="hs-arrivals">
           {books.map((b) => (
@@ -578,62 +647,81 @@ function PricingSection() {
   return (
     <section className="hs-section" id="membership" style={{ paddingTop: 40 }}>
       <div className="hs-wrap">
-        <div className="hs-head">
-          <div>
-            <div className="hs-kicker">Pricing &amp; Plans</div>
-            <h2>Four ways to <span className="p">pull up a chair.</span></h2>
-          </div>
-          <p className="hs-lede">
-            Drop in whenever you like — or become a member and unlock every club, a quarterly book, and 10% off the kitchen.
-          </p>
+        <div className="hs-head hs-head-centered">
+          <div className="hs-kicker">Pricing &amp; Plans</div>
+          <h2 className="hs-head-headline">Choose the perfect plan for your family</h2>
+          <p className="hs-head-sublede">Flexible memberships designed for reading, borrowing, events, and cozy café moments.</p>
         </div>
         <div className="hs-pricing">
           <div className="hs-pricing-card">
-            <div className="price">₹299 <small>/day</small></div>
-            <h3>Intro</h3>
-            <p>Perfect for first-time visitors</p>
+            <div className="price">₹499 <small>/visit</small></div>
+            <h3>Day Pass</h3>
+            <p>Perfect for first-time visitors who want to try the space.</p>
             <ul>
-              <li>Reading space access for 1 hour</li>
-              <li>1 complimentary beverage</li>
+              <li>Reading space access for the day</li>
+              <li>1 cappuccino on the house</li>
+              <li>1 storytelling session, if scheduled that day</li>
+              <li>Free Wi-Fi</li>
             </ul>
+            <p className="fineprint">Sign up the same day → ₹200 off your first membership.</p>
             <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
           </div>
           <div className="hs-pricing-card">
-            <div className="price">₹199 <small>/month</small></div>
-            <h3>Base</h3>
-            <p>For casual readers easing into the routine</p>
+            <div className="price">₹1,499 <small>/month</small></div>
+            <div className="deposit">+ ₹2,500 refundable deposit</div>
+            <h3>Explorer</h3>
+            <p>Best for regular young readers easing into the routine.</p>
             <ul>
+              <li>Unlimited library access during operating hours</li>
               <li>Borrow up to 2 books at a time</li>
-              <li>Access to the reading room</li>
-              <li>1 guest club visit per month</li>
-              <li>5% off the kitchen</li>
+              <li>7-day borrowing period</li>
+              <li>10% off paid events</li>
+              <li>5% off the café</li>
             </ul>
             <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
           </div>
           <div className="hs-pricing-card featured">
             <span className="badge">MOST POPULAR</span>
-            <div className="price">₹467 <small>/month</small></div>
-            <h3>Member</h3>
-            <p>For most readers who want the full experience</p>
+            <div className="price">₹2,499 <small>/month</small></div>
+            <div className="deposit">+ ₹3,500 refundable deposit</div>
+            <h3>Discoverer</h3>
+            <p>For active readers and frequent visitors who want the full experience.</p>
             <ul>
-              <li>All six weekly book clubs</li>
-              <li>One book per quarter, on us</li>
-              <li>10% off food, wine &amp; coffee</li>
-              <li>Priority RSVP for supper events</li>
+              <li>Unlimited library access</li>
+              <li>Borrow up to 4 books at a time</li>
+              <li>14-day borrowing period</li>
+              <li>Priority booking for workshops &amp; events</li>
+              <li>10% off the café</li>
+              <li>Birthday-month special activity voucher</li>
             </ul>
             <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
           </div>
           <div className="hs-pricing-card">
-            <div className="price">₹899 <small>/month</small></div>
-            <h3>Patron</h3>
-            <p>For families and the truly devoted</p>
+            <div className="price">₹4,999 <small>/month</small></div>
+            <div className="deposit">+ ₹6,000 refundable deposit</div>
+            <h3>Family</h3>
+            <p>Best for families with multiple kids.</p>
             <ul>
-              <li>Everything in Member</li>
-              <li>Bring up to 3 family members</li>
-              <li>Reserved table on weekends</li>
-              <li>20% off the kitchen</li>
+              <li>Covers 2 adults + up to 2 children</li>
+              <li>Shared borrowing of 8 books</li>
+              <li>Free access to regular weekend events</li>
+              <li>Priority event booking</li>
+              <li>15% off the café</li>
+              <li>Special holiday activity access</li>
             </ul>
             <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
+          </div>
+        </div>
+        <div className="hs-pricing-extras">
+          <div className="hs-pricing-extra">
+            <div className="kicker">Annual Plan</div>
+            <div className="title">Pay 10 months, get 12.</div>
+            <p>Commit for the year and we'll cover two months. Same membership, two extra months of clubs, books, and café perks.</p>
+          </div>
+          <div className="hs-pricing-extra hs-pricing-extra--featured">
+            <div className="kicker">Founding Member · First 100</div>
+            <div className="title">Lock in lifetime pricing.</div>
+            <p>Welcome kit, extra borrowing privileges, and an exclusive member badge — your rate never goes up, even when ours does.</p>
           </div>
         </div>
       </div>
@@ -653,14 +741,9 @@ function UpcomingEventsSection() {
   return (
     <section className="hs-section" id="upcoming" style={{ paddingTop: 40 }}>
       <div className="hs-wrap">
-        <div className="hs-head">
-          <div>
-            <div className="hs-kicker">Upcoming Events</div>
-            <h2>On the calendar <span className="p">this season.</span></h2>
-          </div>
-          <p className="hs-lede">
-            Weekly clubs, translator evenings, poetry suppers, and the occasional quiet Saturday. All welcome, members first.
-          </p>
+        <div className="hs-head hs-head-centered">
+          <div className="hs-kicker">Upcoming Events</div>
+          <p className="hs-head-sublede">Weekly clubs, translator evenings, poetry suppers, and the occasional quiet Saturday. All welcome, members first.</p>
         </div>
         <div className="hs-calendar">
           {events.map((e) => {

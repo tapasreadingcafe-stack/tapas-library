@@ -108,7 +108,7 @@ export default function LandingHero() {
         .lh-block { max-width: 560px; }
 
         .lh-kicker {
-          font-family: "JetBrains Mono", ui-monospace, monospace;
+          font-family: "Poppins", system-ui, sans-serif;
           font-size: 12px;
           letter-spacing: 0.16em;
           text-transform: uppercase;
@@ -127,7 +127,7 @@ export default function LandingHero() {
         }
 
         .lh-title {
-          font-family: "DM Serif Display", Georgia, serif;
+          font-family: "Poppins", system-ui, sans-serif;
           font-weight: 400;
           font-size: clamp(44px, 5.5vw, 72px);
           line-height: 1.05;
