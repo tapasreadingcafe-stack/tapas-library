@@ -19,7 +19,6 @@ import { Link } from 'react-router-dom';
 import {
   useShopBooks,
   useEvents,
-  useHomeTestimonials,
 } from '../cms/hooks';
 import { adaptShopBooks, splitEvents } from '../cms/adapters';
 
@@ -760,34 +759,6 @@ function UpcomingEventsSection() {
               </Link>
             );
           })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TestimonialSection() {
-  const { data: rows } = useHomeTestimonials();
-  const t = (rows || []).find((r) => r.is_featured) || (rows || [])[0];
-  if (!t) return null;
-  return (
-    <section className="hs-section" style={{ paddingTop: 0 }}>
-      <div className="hs-wrap">
-        <div className="hs-testimonial">
-          <div>
-            <div className="hs-quote-mark">“</div>
-            <div className="hs-tm-kicker">What readers say</div>
-          </div>
-          <div>
-            <blockquote dangerouslySetInnerHTML={{ __html: t.quote }} />
-            <div className="who">
-              <div className="ava">{t.initials}</div>
-              <div>
-                <b>{t.name}</b>
-                <span>{t.context}</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
