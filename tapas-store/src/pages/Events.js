@@ -27,7 +27,7 @@ const CSS = `
   .ev-wrap {
     max-width: 1280px;
     margin: 0 auto;
-    padding: 48px 64px 96px;
+    padding: 24px 64px 96px;
   }
   .ev-grid {
     display: grid;

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const CSS = `
   .page-breadcrumb {
     background: #F6F8F7;
-    padding: 56px 0 64px;
+    padding: 40px 0 32px;
     font-family: 'Poppins', system-ui, sans-serif;
   }
   .page-breadcrumb.no-title { padding: 24px 0; }

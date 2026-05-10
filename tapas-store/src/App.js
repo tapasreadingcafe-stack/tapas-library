@@ -54,7 +54,6 @@ function lazyWithRetry(importFn) {
 }
 
 const Home            = lazyWithRetry(() => import('./pages/Home'));
-const Catalog         = lazyWithRetry(() => import('./pages/Catalog'));
 const BookDetail      = lazyWithRetry(() => import('./pages/BookDetail'));
 const Offers          = lazyWithRetry(() => import('./pages/Offers'));
 const About           = lazyWithRetry(() => import('./pages/About'));
@@ -124,7 +123,6 @@ function AppShell() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/"              element={<Home />} />
-            <Route path="/books"         element={<Catalog />} />
             <Route path="/books/:id"     element={<BookDetail />} />
             <Route path="/offers"        element={<Offers />} />
             <Route path="/about"         element={<About />} />

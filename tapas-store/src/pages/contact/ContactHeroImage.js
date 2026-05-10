@@ -2,7 +2,7 @@ import React from 'react';
 
 const CSS = `
   .contact-hero-image {
-    padding: 32px 0 0;
+    padding: 24px 0 0;
     background: #F6F8F7;
     font-family: 'Poppins', system-ui, sans-serif;
   }

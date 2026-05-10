@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const CSS = `
   .contact-git {
     background: #F6F8F7;
-    padding: 72px 0 96px;
+    padding: 40px 0 96px;
     font-family: 'Poppins', system-ui, sans-serif;
   }
   .contact-git-wrap {

@@ -123,7 +123,7 @@ const HOME_SECTIONS_CSS = `
     color: var(--hs-ink);
     margin-bottom: 8px;
   }
-  .hs-service-icon svg { width: 100%; height: 100%; }
+  .hs-service-icon svg { width: auto; height: 64px; max-width: 100%; }
   h3.hs-service-cat {
     font-size: 24px; font-weight: 500; letter-spacing: -0.5px;
     line-height: 34px; color: #000; margin: 0;
@@ -148,11 +148,15 @@ const HOME_SECTIONS_CSS = `
   /* ---------- ARRIVALS (book grid) ---------- */
   .hs-arrivals { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; }
   .hs-book-card {
-    background: transparent; border: 0; border-radius: 0;
-    padding: 0; display: flex; flex-direction: column; gap: 12px;
-    transition: transform .2s;
+    background: #fff; border: 1px solid var(--hs-rule); border-radius: 14px;
+    padding: 14px 14px 18px; display: flex; flex-direction: column; gap: 14px;
+    transition: transform .2s, box-shadow .2s;
+    text-decoration: none;
   }
-  .hs-book-card:hover { transform: translateY(-4px); }
+  .hs-book-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.08);
+  }
   .hs-cover {
     aspect-ratio: 240 / 370; border-radius: 14px; position: relative; overflow: hidden;
     box-shadow: 0 6px 20px -10px rgba(0,0,0,0.18);
@@ -183,6 +187,11 @@ const HOME_SECTIONS_CSS = `
   .hs-book-card .hs-book-title {
     font-family: var(--hs-ui); font-weight: 500; font-size: 16px;
     line-height: 1.3; color: #000; text-align: center; padding: 0 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(1.3em * 2);
   }
   .hs-book-card .hs-book-price {
     font-family: var(--hs-ui); font-weight: 500; font-size: 14px;
@@ -241,17 +250,46 @@ const HOME_SECTIONS_CSS = `
   /* ---------- PRICING (4-tier) ---------- */
   .hs-pricing {
     display: grid; grid-template-columns: repeat(4, 1fr);
-    background: var(--hs-card); border-radius: 28px;
-    padding: 24px; gap: 0;
-    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    gap: 18px;
     align-items: stretch;
     position: relative;
-    border: 1px solid var(--hs-rule);
+    background: transparent;
+    padding: 0;
+    border: 0;
   }
   .hs-pricing-card {
     padding: 36px 26px 28px; display: flex; flex-direction: column; gap: 18px;
     border-radius: 22px; position: relative; min-width: 0;
+    background: var(--hs-card);
+    border: 1px solid var(--hs-rule);
+    transition: background .25s ease, color .25s ease, transform .25s ease, box-shadow .25s ease;
+    cursor: default;
+    overflow: hidden;
   }
+  /* Hover state — any card becomes the "selected" purple card */
+  .hs-pricing-card:hover {
+    background: var(--hs-purple);
+    color: #fff;
+    transform: translateY(-4px);
+    box-shadow: 0 28px 60px -20px rgba(143,79,214,0.45);
+    border-color: transparent;
+  }
+  .hs-pricing-card:hover::after {
+    content: ""; position: absolute; right: -60px; top: -60px;
+    width: 280px; height: 280px;
+    background: radial-gradient(circle, var(--hs-lime) 0%, transparent 60%);
+    opacity: 0.18; pointer-events: none;
+  }
+  .hs-pricing-card:hover > * { position: relative; z-index: 1; }
+  .hs-pricing-card:hover .price,
+  .hs-pricing-card:hover h3 { color: #fff; }
+  .hs-pricing-card:hover .price small { color: rgba(255,255,255,0.8); }
+  .hs-pricing-card:hover > p { color: rgba(255,255,255,0.92); opacity: 1; }
+  .hs-pricing-card:hover li { color: rgba(255,255,255,0.95); }
+  .hs-pricing-card:hover .deposit { color: rgba(255,255,255,0.78); }
+  .hs-pricing-card:hover .fineprint { color: rgba(255,255,255,0.85); opacity: 0.9; }
+  .hs-pricing-card:hover .hs-pricing-btn { background: var(--hs-lime); color: var(--hs-ink); }
+  .hs-pricing-card:hover .hs-pricing-btn:hover { background: #fff; color: var(--hs-purple); }
   .hs-pricing-card .price {
     font-family: var(--hs-display); font-weight: 700; font-size: 44px;
     line-height: 1; color: var(--hs-ink); letter-spacing: -0.025em;
@@ -301,45 +339,15 @@ const HOME_SECTIONS_CSS = `
   .hs-pricing-btn:hover { background: var(--hs-pink); transform: translateY(-1px); }
   .hs-pricing-btn:hover::after { transform: translateX(3px); }
 
-  .hs-pricing-card.featured {
-    background: var(--hs-purple);
-    color: #fff;
-    margin: -36px -8px -36px;
-    padding: 56px 28px 40px;
-    box-shadow: 0 28px 60px -20px rgba(143,79,214,0.45);
-    overflow: hidden;
-    border-radius: 24px;
-  }
-  .hs-pricing-card.featured::after {
-    content: ""; position: absolute; right: -60px; top: -60px;
-    width: 280px; height: 280px;
-    background: radial-gradient(circle, var(--hs-lime) 0%, transparent 60%);
-    opacity: 0.18; pointer-events: none;
-  }
-  .hs-pricing-card.featured > * { position: relative; z-index: 1; }
-  .hs-pricing-card.featured .price,
-  .hs-pricing-card.featured h3 { color: #fff; }
-  .hs-pricing-card.featured .price small { color: rgba(255,255,255,0.8); }
-  .hs-pricing-card.featured > p { color: rgba(255,255,255,0.92); opacity: 1; }
-  .hs-pricing-card.featured li { color: rgba(255,255,255,0.95); }
-  .hs-pricing-card.featured li::before {
-    background: var(--hs-lime); color: var(--hs-ink);
-  }
-  .hs-pricing-card.featured .hs-pricing-btn {
-    background: var(--hs-lime); color: var(--hs-ink);
-  }
-  .hs-pricing-card.featured .hs-pricing-btn:hover { background: #fff; color: var(--hs-purple); }
 
   .hs-pricing-card .deposit {
     font-family: var(--hs-mono); font-size: 12px; letter-spacing: 0.04em;
     color: var(--hs-muted); margin: -12px 0 0;
   }
-  .hs-pricing-card.featured .deposit { color: rgba(255,255,255,0.78); }
   .hs-pricing-card .fineprint {
     font-size: 12.5px; line-height: 1.5; color: var(--hs-muted);
     font-style: italic; margin: 0; opacity: 0.85;
   }
-  .hs-pricing-card.featured .fineprint { color: rgba(255,255,255,0.85); opacity: 0.9; }
 
   .hs-pricing-extras {
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px;
@@ -368,14 +376,14 @@ const HOME_SECTIONS_CSS = `
   .hs-pricing-extra--featured .kicker { color: var(--hs-pink); }
 
   .hs-pricing-card .badge {
-    position: absolute; top: 22px; right: 22px;
+    position: absolute; top: 14px; right: 14px;
     background: var(--hs-pink); color: #fff;
-    font-size: 10px; padding: 6px 12px; border-radius: 999px;
-    font-weight: 700; letter-spacing: 0.18em;
-    font-family: var(--hs-mono); display: inline-flex; align-items: center; gap: 6px;
+    font-size: 8px; padding: 3px 8px; border-radius: 999px;
+    font-weight: 700; letter-spacing: 0.14em;
+    font-family: var(--hs-mono); display: inline-flex; align-items: center; gap: 4px;
   }
   .hs-pricing-card .badge::before {
-    content: "●"; color: var(--hs-lime); font-size: 8px;
+    content: "●"; color: var(--hs-lime); font-size: 6px;
   }
 
   /* ---------- EVENTS CALENDAR ---------- */
@@ -512,7 +520,6 @@ const HOME_SECTIONS_CSS = `
     .hs-split { grid-template-columns: 1fr; }
     .hs-panel { padding: 36px; min-height: 0; }
     .hs-pricing { grid-template-columns: repeat(2, 1fr); padding: 16px; }
-    .hs-pricing-card.featured { margin: 0; padding: 40px 26px 32px; }
     .hs-pricing-extras { grid-template-columns: 1fr; }
     .hs-pricing-extra { padding: 24px; }
     .hs-pricing-extra .title { font-size: 22px; }
@@ -569,10 +576,9 @@ function ServicesSection() {
         <div className="hs-services">
           <Link className="hs-service" to="/shop">
             <div className="hs-service-icon">
-              <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M16 26h48l-3 36a4 4 0 0 1-4 4H23a4 4 0 0 1-4-4l-3-36z" />
-                <path d="M26 26v-6a14 14 0 0 1 28 0v6" />
-                <path d="M30 38v18M50 38v18M30 38h20" />
+              <svg viewBox="9 4 30 43" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M11 16h26l-2 26a3 3 0 0 1-3 3H16a3 3 0 0 1-3-3l-2-26z" />
+                <path d="M17 16v-3a7 7 0 0 1 14 0v3" />
               </svg>
             </div>
             <h3 className="hs-service-cat">BUY BOOKS</h3>
@@ -580,13 +586,11 @@ function ServicesSection() {
             <p>Explore hand picked books for every age&mdash;from toddlers to teens.</p>
             <span className="hs-service-cta">Buy Now <span className="a">&rarr;</span></span>
           </Link>
-          <Link className="hs-service" to="/library">
+          <Link className="hs-service" to="/shop">
             <div className="hs-service-icon">
-              <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M22 16h22a4 4 0 0 1 4 4v36a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4z" />
-                <path d="M28 26h12M28 34h12M28 42h8" />
-                <path d="M58 22v14M58 22l-5 5M58 22l5 5" />
-                <path d="M58 58v-14M58 44l-5 5M58 44l5 5" />
+              <svg viewBox="0 14 340 310" fill="currentColor" aria-hidden="true">
+                <path d="M189.5 24.65H68.989c-.033 0-.064.009-.1.01s-.063-.007-.095-.006c-.3.015-29.945 1.83-29.945 35.688v104.7c-4.8 5.676-12.848 15.17-19.885 23.423a34.15 34.15 0 0 0-7.939 18.2c-1.3 11.041-2.546 27.705-1.061 44.385a49.141 49.141 0 0 0 .813 5.462A133.423 133.423 0 0 0 18.1 280.3a18.389 18.389 0 0 1 1.38 7.1v23.95a4 4 0 0 0 4 4h74.643a4 4 0 0 0 4-4v-32.567a43.356 43.356 0 0 0 8.919-23.226 4 4 0 0 0-7.98-.572A35.114 35.114 0 0 1 95.2 274.6a4 4 0 0 0-1.079 2.733v30.017h-66.64V287.4a26.349 26.349 0 0 0-1.993-10.175 125.178 125.178 0 0 1-6.87-22.317 40.247 40.247 0 0 1-.682-4.568c-1.426-16-.223-32.071 1.037-42.737a26.165 26.165 0 0 1 6.082-13.952c4.562-5.35 9.543-11.217 13.8-16.235v24.934a30.661 30.661 0 0 0-9.33 20.123L28 245.879a4 4 0 0 0 7.983.521l1.517-23.407a22.683 22.683 0 0 1 6.94-14.923 84.957 84.957 0 0 1 18.211-13.215 4.966 4.966 0 0 1 4.012-.318 4.667 4.667 0 0 1 2.808 2.6c3.337 7.915.424 16.34-8.656 25.043a4.023 4.023 0 0 0 .356 6.08c.618.474 15.059 11.955 8.123 40.332a4 4 0 0 0 2.936 4.836 4.057 4.057 0 0 0 .953.115 4 4 0 0 0 3.887-3.043c3.1-12.664 2.422-22.583.33-30.067h112.1a4 4 0 0 0 .971-7.881c-1.038-.268-10.149-2.942-10.149-13.981s9.111-13.712 10.122-13.973c.117-.029.225-.078.337-.116s.219-.065.322-.111a4.11 4.11 0 0 0 .429-.232c.074-.044.153-.079.224-.127a4 4 0 0 0 1.042-1.042c.051-.074.088-.157.134-.234a4.05 4.05 0 0 0 .225-.415c.041-.093.068-.193.1-.29a4.156 4.156 0 0 0 .132-.428c.023-.1.034-.2.05-.309a4.076 4.076 0 0 0 .046-.459c0-.042.012-.082.012-.124V28.65a4 4 0 0 0-3.997-4zM94.036 196.708a4 4 0 0 0 0 8H176.8a21.436 21.436 0 0 0-4.168 9.86h-16.079a4 4 0 0 0 0 8h16.078a21.454 21.454 0 0 0 4.168 9.862H74.269a36.808 36.808 0 0 0-5.028-7.43c11.579-12.742 10.642-23.764 7.605-30.968a12.739 12.739 0 0 0-7.539-7.049 12.978 12.978 0 0 0-10.482.847 96.574 96.574 0 0 0-11.973 7.719V60.342c0-19.263 11.657-25.149 18.137-26.933V171.53a4 4 0 0 0 8 0V32.65H185.5v164.058zM259.543 178.853H233.29a4 4 0 0 0-4 4v82.172h-11.833a4 4 0 0 0-3.292 6.271l28.959 41.974a4 4 0 0 0 6.584 0l28.959-41.97a4 4 0 0 0-3.292-6.271h-11.832v-82.176a4 4 0 0 0-4-4zm8.213 94.172-21.34 30.93-21.339-30.93h8.213a4 4 0 0 0 4-4v-82.172h18.253v82.172a4 4 0 0 0 4 4zM297.749 99.652a4 4 0 0 0-3.292 1.729L265.5 143.354a4 4 0 0 0 3.292 6.272h11.832V231.8a4 4 0 0 0 4 4h26.254a4 4 0 0 0 4-4v-82.174h11.832a4 4 0 0 0 3.29-6.272l-28.959-41.973a4 4 0 0 0-3.292-1.729zm13.127 41.974a4 4 0 0 0-4 4V227.8h-18.254v-82.174a4 4 0 0 0-4-4h-8.212l21.339-30.93 21.34 30.93z" />
+                <path d="M135.97 222.568h2.23a4 4 0 0 0 0-8h-2.23a4 4 0 0 0 0 8zM85.348 218.568a4 4 0 0 0 4 4h27.48a4 4 0 0 0 0-8h-27.48a4 4 0 0 0-4 4z" />
               </svg>
             </div>
             <h3 className="hs-service-cat">BORROW BOOKS</h3>
@@ -596,14 +600,11 @@ function ServicesSection() {
           </Link>
           <Link className="hs-service" to="/events">
             <div className="hs-service-icon">
-              <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M14 64l10-28 18 18-28 10z" />
-                <path d="M24 36l34-22" />
-                <path d="M62 16l-3-7M68 22l7-3M64 28l6 0M58 12l0-6" />
-                <circle cx="50" cy="18" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="44" cy="26" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="38" cy="42" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="68" cy="40" r="1.5" fill="currentColor" stroke="none" />
+              <svg viewBox="5 4 38 40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="7" y="10" width="34" height="32" rx="3" />
+                <path d="M7 19h34" />
+                <path d="M16 6v8M32 6v8" />
+                <path d="M24 24l2.4 4.9 5.4.8-3.9 3.8.9 5.4L24 36.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z" />
               </svg>
             </div>
             <h3 className="hs-service-cat">Events</h3>
@@ -688,7 +689,7 @@ function PricingSection() {
             </ul>
             <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
           </div>
-          <div className="hs-pricing-card featured">
+          <div className="hs-pricing-card">
             <span className="badge">MOST RECOMMEND</span>
             <div className="price">₹2,499 <small>/month</small></div>
             <div className="deposit">+ ₹3,500 refundable deposit</div>
@@ -733,6 +734,9 @@ function UpcomingEventsSection() {
     .filter((e) => e.iso >= today)
     .sort((a, b) => (a.iso || '').localeCompare(b.iso || ''))
     .slice(0, 5);
+
+  // Hide the whole section when nothing is upcoming.
+  if (events.length === 0) return null;
 
   return (
     <section className="hs-section" id="upcoming" style={{ paddingTop: 40 }}>
@@ -799,7 +803,6 @@ export default function HomeSections() {
       <NewArrivalsSection />
       <PricingSection />
       <UpcomingEventsSection />
-      <TestimonialSection />
     </div>
   );
 }

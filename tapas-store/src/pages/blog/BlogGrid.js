@@ -4,7 +4,7 @@ import BlogGridCard from './BlogGridCard';
 const CSS = `
   .blog-grid-section {
     background: #F6F8F7;
-    padding: 64px 0 96px;
+    padding: 24px 0 96px;
     font-family: 'Poppins', system-ui, sans-serif;
   }
   .blog-grid-wrap {

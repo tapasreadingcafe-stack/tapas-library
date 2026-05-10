@@ -3,7 +3,7 @@ import React from 'react';
 const CSS = `
   .about-intro {
     background: #F6F8F7;
-    padding: 64px 0 96px;
+    padding: 24px 0 96px;
     font-family: 'Poppins', system-ui, sans-serif;
   }
   .about-intro-wrap {

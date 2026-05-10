@@ -65,7 +65,8 @@ export default function TapasStickyNav() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
-  const { itemCount } = useCart();
+  const { items } = useCart();
+  const itemCount = items.length;
 
   useEffect(() => {
     if (searchOpen) {

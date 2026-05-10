@@ -22,6 +22,7 @@ export default function BookCard({ book, memberDiscount }) {
       title: book.title,
       author: book.author,
       sales_price: effective,
+      cover_url: book.coverUrl || null,
     });
   };
 

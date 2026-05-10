@@ -34,7 +34,7 @@ const CSS = `
   .bd-main {
     max-width: 1320px;
     margin: 0 auto;
-    padding: 56px 64px 80px;
+    padding: 24px 64px 80px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 80px;
