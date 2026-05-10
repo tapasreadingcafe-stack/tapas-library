@@ -14,10 +14,19 @@ const CSS = `
   .contact-hero-image-frame {
     position: relative;
     width: 100%;
-    aspect-ratio: 16 / 5;
-    background: linear-gradient(180deg, #87b8d4 0%, #a4c8d8 60%, #d8d8d0 100%);
+    aspect-ratio: 16 / 4;
+    background: #d8d8d0;
     border-radius: 6px;
     overflow: hidden;
+  }
+  .contact-hero-image-frame img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 48%;
+    display: block;
   }
   .contact-hero-chips {
     position: absolute;
@@ -49,16 +58,13 @@ const CSS = `
 `;
 
 export default function ContactHeroImage() {
+  const photoSrc = `${process.env.PUBLIC_URL || ''}/contact-hero.png`;
   return (
     <section className="contact-hero-image" aria-hidden="true">
       <style>{CSS}</style>
       <div className="contact-hero-image-wrap">
         <div className="contact-hero-image-frame">
-          <div className="contact-hero-chips">
-            <span className="contact-hero-chip">Aenean Eleifend</span>
-            <span className="contact-hero-chip">Aenean Eleifend</span>
-            <span className="contact-hero-chip">Aliquam</span>
-          </div>
+          <img src={photoSrc} alt="" />
         </div>
       </div>
     </section>
