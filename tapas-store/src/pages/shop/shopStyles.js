@@ -4,7 +4,7 @@
 // spec) so they don't collide with other pages.
 
 const SHOP_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .shop-root {
   --shop-lime:   #caf27e;
@@ -15,11 +15,11 @@ const SHOP_CSS = `
   --shop-ink-2:  #3a3a3a;
   --shop-muted:  #6e6e6e;
   --shop-rule:   #ececea;
-  --shop-bg:     #faf8f4;
+  --shop-bg:     #F6F8F7;
   --shop-card:   #ffffff;
-  --shop-f-display: "DM Serif Display", Georgia, serif;
-  --shop-f-ui:      "Inter", system-ui, sans-serif;
-  --shop-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --shop-f-display: "Poppins", system-ui, sans-serif;
+  --shop-f-ui:      "Poppins", system-ui, sans-serif;
+  --shop-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--shop-f-ui);
   color: var(--shop-ink);
@@ -68,7 +68,7 @@ const SHOP_CSS = `
 }
 .shop-hero-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -125,7 +125,7 @@ const SHOP_CSS = `
 }
 .shop-featured-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 38px;
   line-height: 1.08;
   letter-spacing: -0.015em;
@@ -202,7 +202,7 @@ const SHOP_CSS = `
 }
 .shop-featured-cover-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 36px;
   line-height: 1.05;
   letter-spacing: -0.01em;
@@ -221,7 +221,34 @@ const SHOP_CSS = `
   grid-template-columns: 260px 1fr;
   gap: 48px;
   padding: 0;
+  transition: grid-template-columns 220ms ease;
 }
+.shop-layout.is-collapsed { grid-template-columns: 1fr; gap: 0; }
+.shop-layout.is-collapsed .shop-filters-aside { display: none; }
+.shop-layout.is-collapsed > div { min-width: 0; }
+.shop-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.shop-toggle-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--shop-rule);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--shop-ink, #1a1a1a);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+.shop-toggle-filters:hover { background: #f5f5f5; }
+.shop-toggle-filters svg { width: 16px; height: 16px; }
 
 /* ---- Filter sidebar ---- */
 .shop-filters { font-size: 14px; }
@@ -377,7 +404,7 @@ const SHOP_CSS = `
 .shop-empty-emoji { font-size: 40px; margin-bottom: 10px; }
 .shop-empty h3 {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   color: var(--shop-ink);
   margin: 0 0 8px;
@@ -385,6 +412,13 @@ const SHOP_CSS = `
 .shop-empty p { margin: 0; font-size: 14px; }
 
 /* ---- Book card ---- */
+.shop-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
 .shop-card {
   position: relative;
   background: var(--shop-card);
@@ -444,7 +478,7 @@ const SHOP_CSS = `
 }
 .shop-cover-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 19px;
   line-height: 1.08;
   letter-spacing: -0.01em;
@@ -474,14 +508,26 @@ const SHOP_CSS = `
 .shop-card-meta { display: flex; flex-direction: column; gap: 2px; }
 .shop-card-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 17px;
-  line-height: 1.15;
+  line-height: 1.2;
   color: var(--shop-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(1.2em * 2);
 }
 .shop-card-author {
   font-size: 13px;
+  line-height: 1.4;
   color: var(--shop-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(1.4em * 1);
+  min-width: 0;
 }
 .shop-card-row {
   display: flex;
@@ -497,7 +543,7 @@ const SHOP_CSS = `
 }
 .shop-card-price-now {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--shop-ink);
 }
@@ -602,7 +648,7 @@ const SHOP_CSS = `
 .shop-drawer-head h3 {
   margin: 0;
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
   color: var(--shop-ink);
 }

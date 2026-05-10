@@ -1,11 +1,8 @@
 import React from 'react';
-import ContactHero from './contact/ContactHero';
-import HoursStrip from './contact/HoursStrip';
+import PageBreadcrumb from '../components/PageBreadcrumb';
+import ContactHeroImage from './contact/ContactHeroImage';
+import ContactGetInTouch from './contact/ContactGetInTouch';
 import StylizedMap from './contact/StylizedMap';
-import FindUsCard from './contact/FindUsCard';
-import ContactForm from './contact/ContactForm';
-import FAQSection from './contact/FAQSection';
-import CONTACT_CSS from './contact/contactStyles';
 import PageRenderer from '../blocks/PageRenderer';
 import { useSiteContent } from '../context/SiteContent';
 
@@ -18,27 +15,12 @@ export default function Contact() {
       </div>
     );
   }
-  return <ContactLegacy />;
-}
-
-function ContactLegacy() {
   return (
-    <div className="contact-root">
-      <style>{CONTACT_CSS}</style>
-
-      <ContactHero />
-
-      <div className="contact-wrap">
-        <div className="contact-layout">
-          <FindUsCard />
-          <ContactForm />
-        </div>
-
-        <HoursStrip />
-        <StylizedMap />
-
-        <FAQSection />
-      </div>
+    <div style={{ background: '#F6F8F7' }}>
+      <PageBreadcrumb name="Contact Us" />
+      <ContactHeroImage />
+      <ContactGetInTouch />
+      <StylizedMap />
     </div>
   );
 }

@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { SHOP_BOOKS } from '../data/shopBooks';
+import { UPCOMING_EVENTS } from '../data/eventsData';
+import { JOURNAL_ARCHIVE, titleText } from '../data/journalPosts';
 
 // Primary site nav. Sticky, green, matches the Figma redesign.
 // Lives outside the v2 tree so active-state styling can react to the
@@ -15,7 +18,6 @@ const INK = '#1a1a1a';
 const NAV_LINKS = [
   { to: '/about',   label: 'About Us' },
   { to: '/shop',    label: 'Shop' },
-  { to: '/library', label: 'Library' },
   { to: '/events',  label: 'Events' },
   { to: '/blog',    label: 'Blogs' },
   { to: '/contact', label: 'Contact Us' },
@@ -58,8 +60,65 @@ const CloseIcon = () => (
 
 export default function TapasStickyNav() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
   const { itemCount } = useCart();
+
+  useEffect(() => {
+    if (searchOpen) {
+      const t = setTimeout(() => searchInputRef.current?.focus(), 280);
+      const onKey = (e) => { if (e.key === 'Escape') setSearchOpen(false); };
+      const onDocClick = (e) => {
+        const form = searchInputRef.current?.closest('.tapas-snav-search-inline');
+        if (form && !form.contains(e.target)) setSearchOpen(false);
+      };
+      window.addEventListener('keydown', onKey);
+      document.addEventListener('mousedown', onDocClick);
+      return () => {
+        clearTimeout(t);
+        window.removeEventListener('keydown', onKey);
+        document.removeEventListener('mousedown', onDocClick);
+      };
+    }
+  }, [searchOpen]);
+
+  const submitSearch = (e) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearchOpen(false);
+
+    const ql = q.toLowerCase();
+    const enc = encodeURIComponent(q);
+
+    // Stay on contextual pages — let the page filter against ?q.
+    if (pathname.startsWith('/shop'))   { navigate(`/shop?q=${enc}`);   return; }
+    if (pathname.startsWith('/events')) { navigate(`/events?q=${enc}`); return; }
+    if (pathname.startsWith('/blog'))   { navigate(`/blog?q=${enc}`);   return; }
+
+    // Otherwise route to whichever section has the first match.
+    const matchesBook = SHOP_BOOKS.some((b) =>
+      [b.title, b.author, b.category].some((s) => (s || '').toLowerCase().includes(ql))
+    );
+    if (matchesBook) { navigate(`/shop?q=${enc}`); return; }
+
+    const matchesPost = JOURNAL_ARCHIVE.some((p) =>
+      [titleText(p.title), p.excerpt, p.category, p.author?.name].some((s) => (s || '').toLowerCase().includes(ql))
+    );
+    if (matchesPost) { navigate(`/blog?q=${enc}`); return; }
+
+    const matchesEvent = UPCOMING_EVENTS.some((ev) =>
+      [ev.title, ev.italic, ev.description, ev.category].some((s) => (s || '').toLowerCase().includes(ql))
+    );
+    if (matchesEvent) { navigate(`/events?q=${enc}`); return; }
+
+    // No match — fall back to shop with the query so the user sees an
+    // empty-state on the most common page.
+    navigate(`/shop?q=${enc}`);
+  };
 
   // Transparent at the top, lime + soft shadow once the user has
   // scrolled past a short threshold. 50px mirrors the usual "leave
@@ -196,6 +255,67 @@ export default function TapasStickyNav() {
           cursor: pointer; padding: 8px; border-radius: 8px;
         }
         .tapas-snav-hamburger:hover { background: rgba(0,0,0,0.08); }
+        .tapas-snav-search-inline {
+          display: inline-flex;
+          align-items: center;
+          height: 40px;
+          width: 40px;
+          background: transparent;
+          border: 1.5px solid transparent;
+          border-radius: 999px;
+          overflow: hidden;
+          padding: 0;
+          transition: width 260ms cubic-bezier(.2,.8,.2,1), border-color 200ms, background 200ms, padding 260ms cubic-bezier(.2,.8,.2,1);
+        }
+        .tapas-snav-search-inline.is-open {
+          width: 280px;
+          border-color: ${INK};
+          background: transparent;
+          padding-left: 18px;
+        }
+        .tapas-snav-search-inline input {
+          flex: 1;
+          min-width: 0;
+          width: 0;
+          background: transparent;
+          border: 0;
+          outline: none;
+          box-shadow: none;
+          -webkit-appearance: none;
+          appearance: none;
+          font-family: 'Poppins', system-ui, sans-serif;
+          font-size: 14px;
+          color: ${INK};
+          padding: 0;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 180ms 80ms;
+        }
+        .tapas-snav-search-inline input::-webkit-search-decoration,
+        .tapas-snav-search-inline input::-webkit-search-cancel-button,
+        .tapas-snav-search-inline input::-webkit-search-results-button,
+        .tapas-snav-search-inline input::-webkit-search-results-decoration { display: none; }
+        .tapas-snav-search-inline.is-open input { opacity: 1; pointer-events: auto; }
+        .tapas-snav-search-inline input::placeholder { color: rgba(0,0,0,0.45); }
+        .tapas-snav-search-toggle {
+          flex: 0 0 auto;
+          background: transparent;
+          border: 0;
+          color: ${INK};
+          width: 40px;
+          height: 40px;
+          padding: 0;
+          border-radius: 999px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 150ms;
+        }
+        .tapas-snav-search-inline:not(.is-open) .tapas-snav-search-toggle:hover { background: rgba(0,0,0,0.08); }
+        @media (max-width: 767px) {
+          .tapas-snav-search-inline.is-open { width: 200px; padding-left: 14px; }
+        }
         .tapas-snav-mobile {
           display: none;
           background: ${LIME};
@@ -261,9 +381,38 @@ export default function TapasStickyNav() {
           </div>
 
           <div className="tapas-snav-right">
-            <Link to="/search" className="tapas-snav-icon" aria-label="Search">
-              <SearchIcon />
-            </Link>
+            <form
+              className={`tapas-snav-search-inline${searchOpen ? ' is-open' : ''}`}
+              onSubmit={submitSearch}
+              role="search"
+            >
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                aria-label="Search"
+                aria-hidden={!searchOpen}
+                tabIndex={searchOpen ? 0 : -1}
+              />
+              <button
+                type="button"
+                className="tapas-snav-search-toggle"
+                aria-label={searchOpen ? 'Submit search' : 'Open search'}
+                aria-expanded={searchOpen}
+                onClick={(e) => {
+                  if (!searchOpen) {
+                    e.preventDefault();
+                    setSearchOpen(true);
+                  } else {
+                    submitSearch(e);
+                  }
+                }}
+              >
+                <SearchIcon />
+              </button>
+            </form>
             <Link
               to="/cart"
               className="tapas-snav-icon"

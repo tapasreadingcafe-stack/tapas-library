@@ -3,70 +3,317 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../App';
 import { useCart } from '../context/CartContext';
-import ReviewForm from '../components/ReviewForm';
 import { BlockSlot } from '../blocks/PageRenderer';
 
-// =====================================================================
-// BookDetail — Modern Heritage design system
-// Parchment bg, Newsreader headings, ambient shadows, teal CTAs,
-// gold accent prices, no hard borders, extreme white space.
-// =====================================================================
+const PINK = '#E0004F';
+const PINK_DARK = '#B8003F';
+const GREEN = '#1f9d55';
+const INK = '#1a1a1a';
 
-function StarRating({ rating, interactive, onRate, size = 18 }) {
-  const [hover, setHover] = useState(0);
+const CSS = `
+  .bd-root { background: #F6F8F7; color: ${INK}; font-family: 'Poppins', system-ui, sans-serif; }
+
+  .bd-crumb {
+    background: #f3f3f4;
+    padding: 16px 0;
+    font-size: 13px;
+  }
+  .bd-crumb-wrap {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 0 64px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bd-crumb-wrap a { color: ${INK}; text-decoration: none; }
+  .bd-crumb-wrap a:hover { color: #6e6e6e; }
+  .bd-crumb-sep { color: #6e6e6e; }
+  .bd-crumb-current { font-weight: 500; }
+
+  .bd-main {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 56px 64px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+  .bd-cover {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f5f5f5;
+    display: grid;
+    place-items: center;
+  }
+  .bd-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .bd-cover-placeholder { font-size: 64px; opacity: 0.4; }
+
+  .bd-info-title-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .bd-title {
+    margin: 0;
+    font-weight: 600;
+    font-size: clamp(26px, 2.6vw, 36px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: ${INK};
+  }
+  .bd-stock {
+    background: #d8f3df;
+    color: #137a3e;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .bd-stock.out { background: #ffe1e3; color: #b80042; }
+
+  .bd-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    color: ${INK};
+    margin-bottom: 18px;
+  }
+  .bd-meta-dot { width: 4px; height: 4px; border-radius: 50%; background: #b0b0b0; }
+  .bd-stars { color: #f0a020; letter-spacing: 1px; font-size: 14px; }
+  .bd-meta-label { color: #6e6e6e; font-weight: 500; }
+
+  .bd-price-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+  }
+  .bd-price-old { color: #9a9a9a; text-decoration: line-through; font-size: 18px; }
+  .bd-price-new { color: ${GREEN}; font-weight: 700; font-size: 26px; letter-spacing: -0.01em; }
+  .bd-discount {
+    background: #d8f3df;
+    color: #137a3e;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .bd-divider { height: 1px; background: #ececea; margin: 22px 0; }
+
+  .bd-desc {
+    font-size: 14px;
+    line-height: 1.65;
+    color: #2a2a2a;
+    margin: 0 0 22px;
+  }
+
+  .bd-share {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .bd-share-label { font-size: 14px; color: ${INK}; }
+  .bd-share-list { display: flex; gap: 10px; }
+  .bd-share-btn {
+    width: 34px; height: 34px;
+    border-radius: 999px;
+    border: 0;
+    background: #efeff1;
+    color: #6e6e6e;
+    display: inline-grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 150ms, color 150ms, transform 150ms;
+  }
+  .bd-share-btn:hover { transform: translateY(-1px); }
+  .bd-share-btn.fb { background: ${PINK}; color: #fff; }
+  .bd-share-btn svg { width: 14px; height: 14px; }
+
+  .bd-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .bd-qty {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #d6d6d6;
+    border-radius: 999px;
+    padding: 4px;
+  }
+  .bd-qty button {
+    width: 32px; height: 32px;
+    border: 0; background: transparent;
+    color: ${INK};
+    font-size: 18px; line-height: 1;
+    cursor: pointer; border-radius: 999px;
+    display: grid; place-items: center;
+  }
+  .bd-qty button:hover { background: #f3f3f4; }
+  .bd-qty input {
+    width: 40px;
+    border: 0; outline: none;
+    text-align: center;
+    font-family: inherit;
+    font-size: 14px;
+    background: transparent;
+    color: ${INK};
+  }
+  .bd-add {
+    flex: 1 1 auto;
+    background: ${PINK};
+    color: #fff;
+    border: 0;
+    border-radius: 999px;
+    padding: 14px 32px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 240px;
+    transition: background 150ms, transform 150ms;
+  }
+  .bd-add:hover { background: ${PINK_DARK}; transform: translateY(-1px); }
+  .bd-add:disabled { background: #c0c0c0; cursor: not-allowed; transform: none; }
+  .bd-wish {
+    width: 48px; height: 48px;
+    border-radius: 999px;
+    border: 0;
+    background: #fde0e8;
+    color: ${PINK};
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: background 150ms, transform 150ms;
+  }
+  .bd-wish:hover { background: #fbcad8; transform: translateY(-1px); }
+  .bd-wish.is-active { background: ${PINK}; color: #fff; }
+
+  .bd-category {
+    margin-top: 24px;
+    font-size: 14px;
+    color: ${INK};
+  }
+  .bd-category-label { color: #6e6e6e; margin-right: 6px; }
+
+  .bd-msg {
+    margin-top: 12px;
+    font-size: 13px;
+    color: ${GREEN};
+  }
+
+  .bd-similar {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 0 64px 80px;
+  }
+  .bd-similar h3 {
+    margin: 0 0 28px;
+    font-weight: 600;
+    font-size: 22px;
+    color: ${INK};
+  }
+  .bd-similar-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  .bd-similar-card {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .bd-similar-cover {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f5f5f5;
+    display: grid; place-items: center;
+    transition: transform 200ms;
+  }
+  .bd-similar-card:hover .bd-similar-cover { transform: translateY(-2px); }
+  .bd-similar-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .bd-similar-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: ${INK};
+    margin: 0;
+    line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .bd-similar-price {
+    font-size: 12px;
+    color: #6e6e6e;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 1023px) {
+    .bd-crumb-wrap, .bd-main, .bd-similar { padding-left: 40px; padding-right: 40px; }
+    .bd-main { gap: 48px; padding-top: 40px; padding-bottom: 64px; }
+    .bd-similar-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  }
+  @media (max-width: 767px) {
+    .bd-crumb-wrap, .bd-main, .bd-similar { padding-left: 20px; padding-right: 20px; }
+    .bd-main { grid-template-columns: 1fr; gap: 32px; padding-top: 28px; }
+    .bd-add { width: 100%; min-width: 0; }
+  }
+`;
+
+function StarRow({ rating }) {
+  const r = Math.round(rating || 0);
   return (
-    <span>
-      {[1, 2, 3, 4, 5].map(i => (
-        <span
-          key={i}
-          style={{
-            color: i <= (hover || rating) ? 'var(--accent)' : 'var(--bg-card)',
-            fontSize: interactive ? 28 : size,
-            cursor: interactive ? 'pointer' : 'default',
-            marginRight: '2px',
-            transition: 'color 150ms',
-          }}
-          onMouseEnter={() => interactive && setHover(i)}
-          onMouseLeave={() => interactive && setHover(0)}
-          onClick={() => interactive && onRate && onRate(i)}
-        >★</span>
-      ))}
+    <span className="bd-stars" aria-label={`${r} of 5 stars`}>
+      {Array.from({ length: 5 }).map((_, i) => (i < r ? '★' : '☆')).join('')}
     </span>
   );
 }
 
+function FbIcon() { return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 22v-8h2.7l.4-3.1h-3.1V8.9c0-.9.25-1.5 1.55-1.5H17V4.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.45-4 4.1v2.3H8v3.1h2.6V22h2.9z"/></svg>; }
+function TwIcon() { return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.8c-.7.3-1.5.6-2.3.7.8-.5 1.5-1.3 1.8-2.2-.8.5-1.7.8-2.6 1-1.5-1.6-4-1.7-5.6-.2-1 1-1.5 2.5-1.2 3.9C8.8 8.8 5.8 7.2 3.8 4.7c-1 1.7-.5 4 1.2 5.1-.6 0-1.3-.2-1.9-.5 0 1.8 1.3 3.4 3 3.8-.6.2-1.2.2-1.8.1.5 1.6 2 2.7 3.7 2.7-1.6 1.2-3.6 1.8-5.5 1.6 1.8 1.2 3.9 1.8 6 1.8 7.2 0 11.2-6 11.2-11.2v-.5c.8-.5 1.4-1.2 1.9-2.0z"/></svg>; }
+function PinIcon() { return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 4 5.7 4 8.7c0 1.8.7 3.4 2.2 4 .2.1.4 0 .5-.2 0-.2.2-.7.2-.9.1-.3.1-.4-.1-.7-.5-.6-.8-1.4-.8-2.5C5.9 6 7.7 4 11.2 4c2.7 0 4.4 1.6 4.4 3.9 0 2.9-1.3 5.4-3.2 5.4-1.1 0-1.9-.9-1.6-2 .3-1.3.9-2.7.9-3.7 0-.8-.5-1.5-1.4-1.5-1.1 0-2 1.1-2 2.7 0 1 .3 1.6.3 1.6L7.3 16c-.4 1.5-.1 3.4-.1 3.6 0 .1.1.1.2.1.1-.1 1.3-1.6 1.7-3.1.1-.4.7-2.7.7-2.7.3.6 1.3 1.2 2.4 1.2 3.1 0 5.3-2.9 5.3-6.7C17.4 4.6 14.8 2 12 2z"/></svg>; }
+function IgIcon() { return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.4c2.5 0 2.8 0 3.7.05 1.7.08 2.5.9 2.6 2.6.05.95.05 1.2.05 3.7s0 2.8-.05 3.7c-.08 1.7-.9 2.5-2.6 2.6-.95.05-1.2.05-3.7.05s-2.8 0-3.7-.05c-1.7-.08-2.5-.9-2.6-2.6C5.6 14.8 5.6 14.5 5.6 12s0-2.8.05-3.7c.08-1.7.9-2.5 2.6-2.6.95-.05 1.2-.05 3.75-.05M12 2.5c-2.6 0-2.9 0-3.9.06-2.4.1-3.7 1.4-3.8 3.8C4.25 7.4 4.2 7.7 4.2 12s.05 4.6.1 5.6c.1 2.4 1.4 3.7 3.8 3.8 1 .06 1.3.06 3.9.06s2.9 0 3.9-.06c2.4-.1 3.7-1.4 3.8-3.8.06-1 .06-1.3.06-5.6s0-4.6-.06-5.6c-.1-2.4-1.4-3.7-3.8-3.8-1-.06-1.3-.06-3.9-.06zm0 4.6c-2.7 0-4.9 2.2-4.9 4.9s2.2 4.9 4.9 4.9 4.9-2.2 4.9-4.9-2.2-4.9-4.9-4.9zm0 8.1c-1.75 0-3.2-1.45-3.2-3.2s1.45-3.2 3.2-3.2 3.2 1.45 3.2 3.2-1.45 3.2-3.2 3.2zm5.1-9.5c-.6 0-1.15.5-1.15 1.15s.5 1.15 1.15 1.15c.65 0 1.15-.5 1.15-1.15s-.5-1.15-1.15-1.15z"/></svg>; }
+function CartIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6h15l-1.5 9H7L5 6zM5 6L4 3H2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="17" cy="19" r="1.5" fill="currentColor"/></svg>; }
+function HeartIcon({ filled }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} aria-hidden="true">
+      <path d="M12 20.5s-7.5-4.6-7.5-10.2C4.5 7.4 6.6 5.5 9 5.5c1.4 0 2.7.7 3 1.7.3-1 1.6-1.7 3-1.7 2.4 0 4.5 1.9 4.5 4.8 0 5.6-7.5 10.2-7.5 10.2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+function MinusIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>; }
+function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>; }
+
 function SimilarTile({ book }) {
   const src = book.book_image || book.cover_image;
+  const price = book.sales_price ? `RS. ${Number(book.sales_price).toFixed(2)}` : null;
   return (
-    <Link to={`/books/${book.id}`} className="tps-card tps-card-interactive" style={{
-      textDecoration: 'none', color: 'inherit',
-      display: 'flex', flexDirection: 'column', gap: '12px',
-      cursor: 'pointer', padding: '16px', borderRadius: 'var(--radius-lg)',
-      background: 'var(--bg-card)', border: 'none',
-      boxShadow: 'var(--shadow-ambient)',
-    }}>
-      <div style={{
-        width: '100%', aspectRatio: '3/4',
-        borderRadius: 'var(--radius-md)', overflow: 'hidden',
-        background: 'linear-gradient(160deg, #ede8d0, #d4c9a8)',
-        boxShadow: '0 16px 48px rgba(38,23,12,0.18)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {src
-          ? <img src={src} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <span style={{ fontSize: '36px' }}>📖</span>}
+    <Link to={`/books/${book.id}`} className="bd-similar-card">
+      <div className="bd-similar-cover">
+        {src ? <img src={src} alt={book.title} /> : <span style={{ fontSize: 36, opacity: 0.4 }}>📖</span>}
       </div>
       <div>
-        <h4 style={{
-          fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--text)',
-          marginBottom: '4px', lineHeight: 1.3, fontWeight: '600',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>
-          {book.title}
-        </h4>
-        <p style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--text-muted)', fontFamily: 'var(--font-body)', margin: 0 }}>
-          {book.author}
-        </p>
+        <p className="bd-similar-title">{book.title}</p>
+        {price && <p className="bd-similar-price">{price}</p>}
       </div>
     </Link>
   );
@@ -78,19 +325,18 @@ export default function BookDetail() {
   const { member } = useApp();
   const { addBook } = useCart();
 
-  const [book, setBook]           = useState(null);
-  const [reviews, setReviews]     = useState([]);
-  const [similar, setSimilar]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [reserving, setReserving] = useState(false);
+  const [book, setBook] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [similar, setSimilar] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [wishlisting, setWishlisting] = useState(false);
-  const [inWishlist, setInWishlist]   = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
-  const [addedToCart, setAddedToCart] = useState(false);
+  const [qty, setQty] = useState(1);
 
   useEffect(() => {
     if (id) fetchAll();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchAll = async () => {
@@ -113,7 +359,7 @@ export default function BookDetail() {
           .eq('store_visible', true)
           .ilike('genre', `%${bookRes.data.genre}%`)
           .neq('id', id)
-          .limit(5);
+          .limit(4);
         setSimilar(simRes || []);
       }
 
@@ -130,27 +376,9 @@ export default function BookDetail() {
 
   const handleAddToCart = () => {
     if (!book) return;
-    addBook(book, 1);
-    setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2500);
-  };
-
-  const handleReserve = async () => {
-    if (!member) { navigate('/login'); return; }
-    setReserving(true);
-    try {
-      const { error } = await supabase.from('reservations').insert([{
-        member_id: member.id,
-        book_id: book.id,
-        status: 'pending',
-      }]);
-      if (error) throw error;
-      setActionMsg('Reserved! We\'ll notify you when your copy is ready to pick up.');
-    } catch (err) {
-      setActionMsg(err.message || 'Could not reserve this book.');
-    } finally {
-      setReserving(false);
-    }
+    addBook(book, qty);
+    setActionMsg(`Added ${qty} to cart.`);
+    setTimeout(() => setActionMsg(''), 2200);
   };
 
   const handleWishlist = async () => {
@@ -171,411 +399,124 @@ export default function BookDetail() {
     }
   };
 
-  /* Loading state */
   if (loading) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '70vh', flexDirection: 'column', gap: '16px',
-        background: 'var(--bg)', fontFamily: 'var(--font-body)',
-      }}>
-        <div className="tps-skeleton" style={{ width: '240px', height: '320px', borderRadius: 'var(--radius-xl)' }} />
-        <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontStyle: 'italic' }}>Loading book…</p>
+      <div className="bd-root" style={{ minHeight: '70vh', display: 'grid', placeItems: 'center' }}>
+        <style>{CSS}</style>
+        <p style={{ color: '#6e6e6e' }}>Loading book…</p>
       </div>
     );
   }
   if (!book) return null;
 
-  const src       = book.book_image || book.cover_image;
-  const inStock   = book.quantity_available > 0;
-  const forSale   = Number(book.sales_price || 0) > 0 && book.store_visible !== false;
-  const borrowable = book.is_borrowable !== false;
+  const src = book.book_image || book.cover_image;
+  const inStock = book.quantity_available > 0;
   const avgRating = reviews.length
-    ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1)
-    : null;
+    ? reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length
+    : 0;
+  const sale = Number(book.sales_price || 0);
+  const list = Number(book.list_price || book.price || 0);
+  const showOld = list > sale && sale > 0;
+  const discount = showOld ? Math.round(((list - sale) / list) * 100) : 0;
+  const isbn = book.isbn || book.isbn_13 || book.barcode || '—';
 
   return (
-    <div style={{ background: 'var(--bg)', fontFamily: 'var(--font-body)', minHeight: '90vh' }}>
+    <div className="bd-root">
+      <style>{CSS}</style>
       <BlockSlot pageKey="book_detail" slot="above_blocks" />
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px 96px' }}>
 
-        {/* Breadcrumb */}
-        <nav style={{
-          marginBottom: '48px', fontSize: '13px', color: 'var(--text-subtle)',
-          display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap',
-          fontFamily: 'var(--font-body)',
-        }}>
-          <Link to="/" style={{ color: 'var(--text-subtle)', textDecoration: 'none' }}>Home</Link>
-          <span style={{ color: 'var(--text-subtle)' }}>/</span>
-          <Link to="/books" style={{ color: 'var(--text-subtle)', textDecoration: 'none' }}>Books</Link>
-          {book.genre && <>
-            <span style={{ color: 'var(--text-subtle)' }}>/</span>
-            <Link to={`/books?genre=${encodeURIComponent(book.genre)}`} style={{ color: 'var(--text-subtle)', textDecoration: 'none' }}>{book.genre}</Link>
-          </>}
-          <span style={{ color: 'var(--text-subtle)' }}>/</span>
-          <span style={{ color: 'var(--text)', fontWeight: '600' }}>{book.title}</span>
-        </nav>
+      <nav className="bd-crumb" aria-label="Breadcrumb">
+        <div className="bd-crumb-wrap">
+          <Link to="/">Home</Link>
+          <span className="bd-crumb-sep">›</span>
+          <Link to="/shop">Shop</Link>
+          <span className="bd-crumb-sep">›</span>
+          <span className="bd-crumb-current" title={book.title}>{book.title}</span>
+        </div>
+      </nav>
 
-        {/* Main two-column layout */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(260px, 400px) 1fr',
-          gap: '72px', marginBottom: '96px',
-        }} className="detail-grid">
-
-          {/* LEFT — cover + actions */}
-          <div style={{ position: 'sticky', top: '96px', alignSelf: 'start' }}>
-            {/* Cover */}
-            <div style={{
-              width: '100%', aspectRatio: '3/4',
-              borderRadius: 'var(--radius-xl)', overflow: 'hidden',
-              background: 'linear-gradient(160deg, #ede8d0, #d4c9a8)',
-              boxShadow: '0 30px 70px rgba(38,23,12,0.18)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: '28px',
-            }}>
-              {src ? (
-                <img src={src} alt={book.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ textAlign: 'center', padding: '30px' }}>
-                  <div style={{ fontSize: '80px', marginBottom: '16px' }}>📖</div>
-                  <div style={{
-                    color: 'var(--text-subtle)', fontSize: '14px', fontWeight: '600',
-                    fontFamily: 'var(--font-display)',
-                  }}>
-                    {book.genre || 'Book'}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Stock chip */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-              <span className={inStock ? 'tps-chip tps-chip-teal' : 'tps-chip'} style={{
-                padding: '8px 20px', fontSize: '12px', fontWeight: '700',
-                fontFamily: 'var(--font-body)',
-                ...(!inStock ? { background: '#d44', color: '#fff' } : {}),
-              }}>
-                {inStock ? `In stock · ${book.quantity_available} available` : 'Currently sold out'}
-              </span>
-            </div>
-
-            {/* CTAs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {forSale && inStock && (
-                <button onClick={handleAddToCart} className="tps-btn tps-btn-teal tps-btn-lg tps-btn-block" style={{
-                  fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: '700',
-                }}>
-                  {addedToCart ? '\u2713 Added to Cart' : 'Add to Cart'}
-                </button>
-              )}
-              {borrowable && (
-                <button onClick={handleReserve} disabled={reserving} className="tps-btn tps-btn-primary tps-btn-lg tps-btn-block" style={{
-                  fontFamily: 'var(--font-body)', fontSize: '15px', fontWeight: '700',
-                }}>
-                  {reserving ? 'Reserving…' : 'Reserve to Borrow'}
-                </button>
-              )}
-              <button onClick={handleWishlist} disabled={wishlisting} className="tps-btn tps-btn-ghost tps-btn-block" style={{
-                fontFamily: 'var(--font-body)', fontSize: '14px',
-                color: inWishlist ? '#c44' : 'var(--text-muted)',
-              }}>
-                {wishlisting ? '…' : inWishlist ? 'Remove from Wishlist' : 'Save to Wishlist'}
-              </button>
-            </div>
-
-            {actionMsg && (
-              <div style={{
-                marginTop: '16px', padding: '14px 18px', fontSize: '13px',
-                background: 'var(--bg-card)', borderRadius: 'var(--radius-md)',
-                color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5,
-                fontFamily: 'var(--font-body)',
-              }}>
-                {actionMsg}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT — editorial copy */}
-          <div>
-            {/* Genre eyebrow */}
-            {book.genre && (
-              <div style={{
-                marginBottom: '20px', fontFamily: 'var(--font-body)',
-                fontSize: '12px', fontWeight: '700', textTransform: 'uppercase',
-                letterSpacing: '2.5px', color: 'var(--text-subtle)',
-              }}>
-                {book.genre}
-              </div>
-            )}
-
-            {/* Title */}
-            <h1 style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(32px, 5vw, 56px)',
-              fontWeight: '700',
-              color: 'var(--text)',
-              lineHeight: 1.05,
-              marginBottom: '16px',
-              letterSpacing: '-0.02em',
-            }}>
-              {book.title}
-            </h1>
-
-            {/* Author */}
-            <p style={{
-              fontSize: '20px', color: 'var(--text-subtle)', marginBottom: '28px',
-              fontStyle: 'italic', fontFamily: 'var(--font-body)',
-            }}>
-              by <span style={{ fontWeight: '700', color: 'var(--text-muted)', fontStyle: 'normal' }}>{book.author}</span>
-            </p>
-
-            {/* Rating */}
-            {avgRating && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
-                <StarRating rating={Math.round(parseFloat(avgRating))} />
-                <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
-                  {avgRating} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
-                </span>
-              </div>
-            )}
-
-            {/* Price */}
-            {forSale && (
-              <div style={{ marginBottom: '40px', paddingBottom: '32px' }}>
-                <span style={{
-                  fontSize: '48px', fontWeight: '700', color: 'var(--accent)',
-                  fontFamily: 'var(--font-display)',
-                }}>
-                  ₹{book.sales_price}
-                </span>
-                {book.mrp && Number(book.mrp) > Number(book.sales_price) && (
-                  <>
-                    <span style={{
-                      fontSize: '18px', marginLeft: '14px', textDecoration: 'line-through',
-                      color: 'var(--text-subtle)',
-                    }}>
-                      ₹{book.mrp}
-                    </span>
-                    <span className="tps-chip tps-chip-teal" style={{ marginLeft: '12px', fontSize: '11px' }}>
-                      Save ₹{Number(book.mrp) - Number(book.sales_price)}
-                    </span>
-                  </>
-                )}
-                <div style={{
-                  fontSize: '13px', marginTop: '10px', color: 'var(--text-subtle)',
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  Purchase price · In-store pickup
-                </div>
-              </div>
-            )}
-
-            {/* Staff pick callout */}
-            {book.is_staff_pick && book.staff_pick_blurb && (
-              <div style={{
-                background: 'var(--bg-card)',
-                borderLeft: '4px solid var(--secondary)',
-                padding: '24px 28px',
-                marginBottom: '36px',
-                borderRadius: 'var(--radius-md)',
-              }}>
-                <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: '700',
-                  textTransform: 'uppercase', letterSpacing: '2px',
-                  color: 'var(--secondary)', marginBottom: '10px',
-                }}>
-                  Staff pick
-                </div>
-                <p style={{
-                  color: 'var(--text-muted)', fontSize: '15px', lineHeight: 1.8,
-                  fontStyle: 'italic', margin: 0, fontFamily: 'var(--font-display)',
-                }}>
-                  "{book.staff_pick_blurb}"
-                </p>
-              </div>
-            )}
-
-            {/* Description */}
-            {book.description && (
-              <div style={{ marginBottom: '48px' }}>
-                <h3 style={{
-                  fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: '600',
-                  color: 'var(--text)', marginBottom: '16px',
-                }}>
-                  About this book
-                </h3>
-                <p style={{
-                  color: 'var(--text-muted)', lineHeight: 1.9, fontSize: '16px',
-                  whiteSpace: 'pre-line', fontFamily: 'var(--font-body)',
-                }}>
-                  {book.description}
-                </p>
-              </div>
-            )}
-
-            {/* Meta grid */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-              gap: '24px',
-              background: 'var(--bg-section)', borderRadius: 'var(--radius-lg)',
-              padding: '28px 24px',
-            }}>
-              {[
-                { label: 'ISBN',       value: book.isbn || '—' },
-                { label: 'Publisher',   value: book.publisher || '—' },
-                { label: 'Year',        value: book.publication_year || '—' },
-                { label: 'Language',    value: book.language || 'English' },
-                { label: 'Condition',   value: book.condition || '—' },
-                { label: 'Total copies', value: book.quantity_total || 1 },
-              ].map(d => (
-                <div key={d.label}>
-                  <div style={{
-                    fontSize: '12px', fontWeight: '600', color: 'var(--text-subtle)',
-                    fontFamily: 'var(--font-display)', fontStyle: 'italic',
-                    marginBottom: '6px',
-                  }}>
-                    {d.label}
-                  </div>
-                  <div style={{
-                    fontSize: '15px', color: 'var(--text)', fontWeight: '600',
-                    fontFamily: 'var(--font-body)',
-                  }}>
-                    {d.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="bd-main">
+        <div className="bd-cover">
+          {src ? <img src={src} alt={book.title} /> : <span className="bd-cover-placeholder">📖</span>}
         </div>
 
-        {/* Reviews */}
-        <section style={{ marginBottom: '96px' }}>
-          <h2 style={{
-            fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: '700',
-            color: 'var(--text)', marginBottom: '24px',
-          }}>
-            Member reviews
-          </h2>
+        <div className="bd-info">
+          <div className="bd-info-title-row">
+            <h1 className="bd-title">{book.title}</h1>
+            <span className={`bd-stock${inStock ? '' : ' out'}`}>{inStock ? 'In Stock' : 'Out of Stock'}</span>
+          </div>
 
-          {/* AI review digest (cached) */}
-          {book.review_summary && reviews.length >= 5 && (
-            <div style={{
-              padding: '24px 28px',
-              marginBottom: '28px',
-              background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-section) 100%)',
-              borderRadius: 'var(--radius-lg)',
-              borderLeft: '4px solid var(--accent)',
-            }}>
-              <div style={{
-                fontSize: '11px', fontWeight: 700, letterSpacing: '2px',
-                textTransform: 'uppercase', color: 'var(--accent)',
-                marginBottom: '10px',
-              }}>
-                ✨ What readers are saying
-              </div>
-              <p style={{
-                color: 'var(--text-muted)', lineHeight: 1.8, fontSize: '15px',
-                margin: 0, fontStyle: 'italic', fontFamily: 'var(--font-display)',
-                whiteSpace: 'pre-line',
-              }}>
-                {book.review_summary}
-              </p>
-            </div>
-          )}
+          <div className="bd-meta">
+            <StarRow rating={avgRating} />
+            <span>{reviews.length} Review{reviews.length === 1 ? '' : 's'}</span>
+            <span className="bd-meta-dot" aria-hidden="true" />
+            <span className="bd-meta-label">ISBN</span>
+            <span>{isbn}</span>
+          </div>
 
-          {/* Write-a-review widget */}
-          <ReviewForm
-            bookId={book.id}
-            member={member}
-            onReviewSaved={(r) => {
-              setReviews(prev => {
-                const without = prev.filter(p => p.id !== r.id);
-                return [r, ...without].slice(0, 10);
-              });
-            }}
-          />
+          <div className="bd-price-row">
+            {showOld && <span className="bd-price-old">${list.toFixed(2)}</span>}
+            <span className="bd-price-new">${sale.toFixed(2)}</span>
+            {showOld && <span className="bd-discount">{discount}% Off</span>}
+          </div>
 
-          {reviews.length === 0 ? (
-            <div style={{
-              padding: '40px', textAlign: 'center', color: 'var(--text-subtle)',
-              fontSize: '14px', background: 'var(--bg-section)',
-              borderRadius: 'var(--radius-md)',
-            }}>
-              No reviews yet — be the first.
-            </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: '24px',
-            }}>
-              {reviews.map(review => (
-                <div key={review.id} className="tps-card" style={{
-                  padding: '28px',
-                  background: 'var(--bg-card)',
-                  borderRadius: 'var(--radius-md)',
-                  borderLeft: '3px solid var(--secondary)',
-                  boxShadow: 'var(--shadow-ambient)',
-                }}>
-                  <StarRating rating={review.rating || 5} size={14} />
-                  {review.review_text && (
-                    <p style={{
-                      color: 'var(--text-muted)', lineHeight: 1.8, fontStyle: 'italic',
-                      margin: '14px 0', fontSize: '14px', fontFamily: 'var(--font-body)',
-                    }}>
-                      "{review.review_text}"
-                    </p>
-                  )}
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    fontSize: '12px', color: 'var(--text-subtle)', marginTop: '12px',
-                    fontFamily: 'var(--font-body)',
-                  }}>
-                    <span style={{ fontWeight: '700', color: 'var(--text)' }}>
-                      — {review.members?.name || 'Anonymous'}
-                    </span>
-                    <span>{review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+          <div className="bd-divider" />
 
-        {/* Similar books */}
-        {similar.length > 0 && (
-          <section style={{ marginBottom: '48px' }}>
-            <h2 style={{
-              fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: '700',
-              color: 'var(--text)', marginBottom: '36px',
-            }}>
-              You might also like
-            </h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: '24px',
-            }}>
-              {similar.map(b => <SimilarTile key={b.id} book={b} />)}
+          {book.description && <p className="bd-desc">{book.description}</p>}
+
+          <div className="bd-share">
+            <span className="bd-share-label">Share item:</span>
+            <div className="bd-share-list">
+              <button type="button" className="bd-share-btn fb" aria-label="Share on Facebook"><FbIcon /></button>
+              <button type="button" className="bd-share-btn" aria-label="Share on Twitter"><TwIcon /></button>
+              <button type="button" className="bd-share-btn" aria-label="Save on Pinterest"><PinIcon /></button>
+              <button type="button" className="bd-share-btn" aria-label="Share on Instagram"><IgIcon /></button>
             </div>
-          </section>
-        )}
+          </div>
+
+          <div className="bd-actions">
+            <div className="bd-qty">
+              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Decrease quantity"><MinusIcon /></button>
+              <input type="number" min="1" value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} aria-label="Quantity" />
+              <button type="button" onClick={() => setQty((q) => q + 1)} aria-label="Increase quantity"><PlusIcon /></button>
+            </div>
+            <button
+              type="button"
+              className="bd-add"
+              onClick={handleAddToCart}
+              disabled={!inStock}
+            >
+              Add to Cart <CartIcon />
+            </button>
+            <button
+              type="button"
+              className={`bd-wish${inWishlist ? ' is-active' : ''}`}
+              onClick={handleWishlist}
+              disabled={wishlisting}
+              aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+            >
+              <HeartIcon filled={inWishlist} />
+            </button>
+          </div>
+
+          {actionMsg && <div className="bd-msg" role="status">{actionMsg}</div>}
+
+          <div className="bd-category">
+            <span className="bd-category-label">Category:</span>
+            {book.genre || 'Fiction'}
+          </div>
+        </div>
       </div>
 
-      <style>{`
-        @media (max-width: 820px) {
-          .detail-grid {
-            grid-template-columns: 1fr !important;
-            gap: 48px !important;
-          }
-          .detail-grid > div:first-child {
-            position: static !important;
-            max-width: 340px;
-            margin: 0 auto;
-          }
-        }
-      `}</style>
+      {similar.length > 0 && (
+        <section className="bd-similar">
+          <h3>You may also like</h3>
+          <div className="bd-similar-grid">
+            {similar.slice(0, 4).map((b) => <SimilarTile key={b.id} book={b} />)}
+          </div>
+        </section>
+      )}
+
       <BlockSlot pageKey="book_detail" slot="below_blocks" />
     </div>
   );

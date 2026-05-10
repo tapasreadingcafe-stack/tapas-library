@@ -7,11 +7,26 @@ const SORTS = [
   { key: 'author-az',    label: 'Author: A–Z' },
 ];
 
-export default function Toolbar({ totalCount, newCount, sort, onSortChange, onOpenFilters }) {
+export default function Toolbar({ totalCount, newCount, sort, onSortChange, onOpenFilters, sidebarOpen, onToggleSidebar }) {
   return (
     <div className="shop-toolbar">
-      <div className="shop-toolbar-count">
-        {totalCount} {totalCount === 1 ? 'title' : 'titles'} · {newCount} new this week
+      <div className="shop-toolbar-left">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            className="shop-toggle-filters"
+            onClick={onToggleSidebar}
+            aria-expanded={sidebarOpen}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            {sidebarOpen ? 'Hide filters' : 'Show filters'}
+          </button>
+        )}
+        <div className="shop-toolbar-count">
+          {totalCount} {totalCount === 1 ? 'book' : 'books'} · {newCount} new this week
+        </div>
       </div>
       <div className="shop-toolbar-actions">
         <button

@@ -13,7 +13,7 @@ import './App.css';
 // Auth flows get a dedicated split-screen layout; stacking the
 // sticky navbar on top would compete with the focused form. Add any
 // new auth routes to this set to hide the nav there.
-const HIDE_NAV_ROUTES = new Set(['/sign-in', '/sign-up', '/forgot-password']);
+const HIDE_NAV_ROUTES = new Set([]);
 
 function GlobalHeader() {
   const { pathname } = useLocation();
@@ -69,7 +69,6 @@ const BlogPost        = lazyWithRetry(() => import('./pages/BlogPost'));
 const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
 const SearchPage      = lazyWithRetry(() => import('./pages/Search'));
 const Shop            = lazyWithRetry(() => import('./pages/Shop'));
-const Library         = lazyWithRetry(() => import('./pages/Library'));
 const Contact         = lazyWithRetry(() => import('./pages/Contact'));
 const Events          = lazyWithRetry(() => import('./pages/Events'));
 const SignIn          = lazyWithRetry(() => import('./pages/SignIn'));
@@ -78,6 +77,7 @@ const ForgotPassword  = lazyWithRetry(() => import('./pages/ForgotPassword'));
 const Welcome         = lazyWithRetry(() => import('./pages/Welcome'));
 const CodeOfTheRoom   = lazyWithRetry(() => import('./pages/CodeOfTheRoom'));
 const Privacy         = lazyWithRetry(() => import('./pages/Privacy'));
+const ComingSoon      = lazyWithRetry(() => import('./pages/ComingSoon'));
 
 // ---------------------------------------------------------------------
 // Backward-compat shim: existing pages (BookDetail, CustomerLogin, the
@@ -110,7 +110,7 @@ function AppShell() {
   const { pathname } = useLocation();
   return (
     <>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" />
       <style>{`
         :root {
           --tapas-heading-font: 'Poppins', system-ui, sans-serif;
@@ -119,7 +119,7 @@ function AppShell() {
         body, html { font-family: 'Poppins', system-ui, sans-serif; }
       `}</style>
       <StoreEditorSync />
-      <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 86, transition:'background 200ms, color 200ms' }}>
+      <div style={{ minHeight:'100vh', background:'#F6F8F7', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 86, transition:'background 200ms, color 200ms' }}>
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -140,7 +140,6 @@ function AppShell() {
             <Route path="/order/:id/track" element={<OrderTracking />} />
             <Route path="/search"        element={<SearchPage />} />
             <Route path="/shop"          element={<Shop />} />
-            <Route path="/library"       element={<Library />} />
             <Route path="/contact"       element={<Contact />} />
             <Route path="/events"        element={<Events />} />
             <Route path="/sign-in"       element={<SignIn />} />
@@ -149,6 +148,13 @@ function AppShell() {
             <Route path="/welcome"       element={<Welcome />} />
             <Route path="/code-of-the-room" element={<CodeOfTheRoom />} />
             <Route path="/privacy"       element={<Privacy />} />
+            <Route path="/orders"        element={<ComingSoon />} />
+            <Route path="/wishlist"      element={<ComingSoon />} />
+            <Route path="/faq"           element={<ComingSoon />} />
+            <Route path="/faqs"          element={<ComingSoon />} />
+            <Route path="/terms"         element={<ComingSoon />} />
+            <Route path="/products"      element={<ComingSoon />} />
+            <Route path="/track-order"   element={<ComingSoon />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
             <Route path="*"              element={<CustomPage />} />

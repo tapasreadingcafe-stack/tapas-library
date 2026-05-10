@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useFavorites } from '../../hooks/useFavorites';
 import { formatInr, MEMBER_DISCOUNT_RATE } from '../../data/shopBooks';
@@ -36,21 +37,23 @@ export default function BookCard({ book, memberDiscount }) {
         {fav ? '\u2665' : '\u2661'}
       </button>
 
-      {book.coverUrl ? (
-        <div className="shop-cover shop-cover-photo" aria-hidden="true">
-          <img src={book.coverUrl} alt="" loading="lazy" />
-        </div>
-      ) : (
-        <div className={`shop-cover c-${book.coverVariant}`} aria-hidden="true">
-          <div className="shop-cover-title">{book.coverLabel}</div>
-          <div className="shop-cover-author">{book.author}</div>
-        </div>
-      )}
+      <Link to={`/books/${book.id}`} className="shop-card-link" aria-label={book.title}>
+        {book.coverUrl ? (
+          <div className="shop-cover shop-cover-photo" aria-hidden="true">
+            <img src={book.coverUrl} alt="" loading="lazy" />
+          </div>
+        ) : (
+          <div className={`shop-cover c-${book.coverVariant}`} aria-hidden="true">
+            <div className="shop-cover-title">{book.coverLabel}</div>
+            <div className="shop-cover-author">{book.author}</div>
+          </div>
+        )}
 
-      <div className="shop-card-meta">
-        <div className="shop-card-title">{book.title}</div>
-        <div className="shop-card-author">{book.author}</div>
-      </div>
+        <div className="shop-card-meta">
+          <div className="shop-card-title">{book.title}</div>
+          <div className="shop-card-author">{book.author}</div>
+        </div>
+      </Link>
 
       <div className="shop-card-row">
         <div className="shop-card-price">

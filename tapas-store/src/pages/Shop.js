@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import HeroBand from './shop/HeroBand';
-import FeaturedBook from './shop/FeaturedBook';
+import { useSearchParams } from 'react-router-dom';
+import PageBreadcrumb from '../components/PageBreadcrumb';
 import FilterSidebar from './shop/FilterSidebar';
 import FilterDrawer from './shop/FilterDrawer';
 import Toolbar from './shop/Toolbar';
@@ -104,11 +104,19 @@ export default function Shop() {
 }
 
 function ShopLegacy() {
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [searchParams] = useSearchParams();
+  const urlQ = searchParams.get('q') || '';
+  const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS, search: urlQ }));
   const [sort, setSort] = useState('recommended');
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const gridRef = useRef(null);
+
+  useEffect(() => {
+    setFilters((f) => (f.search === urlQ ? f : { ...f, search: urlQ }));
+    setPage(1);
+  }, [urlQ]);
 
   const { data: rows, loading } = useShopBooks();
   const books = useMemo(() => adaptShopBooks(rows), [rows]);
@@ -155,10 +163,9 @@ function ShopLegacy() {
   return (
     <div className="shop-root">
       <style>{SHOP_CSS}</style>
-      <HeroBand />
+      <PageBreadcrumb name="Shop" hideTitle />
       <div className="shop-wrap">
-        <FeaturedBook memberDiscount={filters.memberDiscount} />
-        <div className="shop-layout">
+        <div className={`shop-layout${sidebarOpen ? '' : ' is-collapsed'}`}>
           <aside className="shop-filters-aside">
             <FilterSidebar filters={filters} setFilters={setFilters} categoryCounts={categoryCounts} />
           </aside>
@@ -169,6 +176,8 @@ function ShopLegacy() {
               sort={sort}
               onSortChange={setSort}
               onOpenFilters={() => setDrawerOpen(true)}
+              sidebarOpen={sidebarOpen}
+              onToggleSidebar={() => setSidebarOpen((v) => !v)}
             />
             {loading && books.length === 0 ? (
               <div className="shop-grid" ref={gridRef} aria-busy="true" />
