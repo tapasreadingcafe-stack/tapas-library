@@ -129,16 +129,20 @@ function warpToFlatRect(cv, sourceCanvas, corners) {
   }
 }
 
-// Loads `blob` into a canvas and returns it.
-function blobToCanvas(blob) {
+// Decodes `blob` into a canvas, capped at `maxDim` on the longer side.
+// Phone cameras hit 12MP+ — full-resolution canvases run a phone out
+// of memory in JS, so we downscale before any processing.
+function blobToCanvas(blob, maxDim = 1600) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
     img.onload = () => {
+      const longest = Math.max(img.naturalWidth, img.naturalHeight);
+      const scale = longest > maxDim ? maxDim / longest : 1;
       const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       resolve(canvas);
     };
@@ -147,49 +151,69 @@ function blobToCanvas(blob) {
   });
 }
 
-// Main entry: takes a Blob (from camera capture or file picker),
-// returns a deskewed Blob suitable for upload. Falls back to the
-// original blob if OpenCV can't find a cover quad.
+function canvasToBlob(canvas, quality = 0.9) {
+  return new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/jpeg', quality));
+}
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms)),
+  ]);
+}
+
+// Main entry: takes a Blob (camera capture or file picker), returns a
+// deskewed Blob suitable for upload. On any failure (no OpenCV, no quad
+// found, timeout, OOM) returns the downscaled raw image instead, so the
+// caller always gets *something* to upload.
 export async function processBookCoverImage(blob) {
-  let cv;
+  // First: always downscale to a sane size. This is the fallback blob.
+  let workCanvas;
   try {
-    cv = await loadOpenCV();
+    workCanvas = await blobToCanvas(blob, 1600);
   } catch (err) {
-    console.warn('OpenCV unavailable, using raw image:', err);
+    console.warn('Could not decode image, using raw blob:', err);
     return blob;
   }
+  const downscaledBlob = await canvasToBlob(workCanvas, 0.9) || blob;
 
-  const fullCanvas = await blobToCanvas(blob);
+  // Try to load OpenCV with a tight timeout. On mobile cellular the
+  // 8MB script can stall — in that case we just ship the downscaled image.
+  let cv;
+  try {
+    cv = await withTimeout(loadOpenCV(), 15000, 'OpenCV load');
+  } catch (err) {
+    console.warn('OpenCV unavailable, using downscaled image:', err);
+    return downscaledBlob;
+  }
 
-  // Detect on a downscaled copy for speed; map corners back to full res.
+  // Detect on an even smaller copy for speed; map corners back to working size.
   const MAX_DETECT = 800;
-  const scale = Math.min(1, MAX_DETECT / Math.max(fullCanvas.width, fullCanvas.height));
-  let detectCanvas = fullCanvas;
-  if (scale < 1) {
+  const detectScale = Math.min(1, MAX_DETECT / Math.max(workCanvas.width, workCanvas.height));
+  let detectCanvas = workCanvas;
+  if (detectScale < 1) {
     detectCanvas = document.createElement('canvas');
-    detectCanvas.width = Math.round(fullCanvas.width * scale);
-    detectCanvas.height = Math.round(fullCanvas.height * scale);
-    detectCanvas.getContext('2d').drawImage(fullCanvas, 0, 0, detectCanvas.width, detectCanvas.height);
+    detectCanvas.width = Math.round(workCanvas.width * detectScale);
+    detectCanvas.height = Math.round(workCanvas.height * detectScale);
+    detectCanvas.getContext('2d').drawImage(workCanvas, 0, 0, detectCanvas.width, detectCanvas.height);
   }
 
   let corners = null;
   try {
     const detected = detectCorners(cv, detectCanvas);
-    if (detected) corners = detected.map(p => ({ x: p.x / scale, y: p.y / scale }));
+    if (detected) corners = detected.map(p => ({ x: p.x / detectScale, y: p.y / detectScale }));
   } catch (err) {
-    console.warn('Cover detection failed:', err);
+    console.warn('Cover detection failed, using downscaled image:', err);
   }
 
-  if (!corners) {
-    // No quad found — return original blob untouched.
-    return blob;
-  }
+  if (!corners) return downscaledBlob;
 
   try {
-    const outCanvas = warpToFlatRect(cv, fullCanvas, corners);
-    return await new Promise(resolve => outCanvas.toBlob(b => resolve(b || blob), 'image/jpeg', 0.9));
+    const outCanvas = warpToFlatRect(cv, workCanvas, corners);
+    const warped = await canvasToBlob(outCanvas, 0.9);
+    return warped || downscaledBlob;
   } catch (err) {
-    console.warn('Warp failed:', err);
-    return blob;
+    console.warn('Warp failed, using downscaled image:', err);
+    return downscaledBlob;
   }
 }
