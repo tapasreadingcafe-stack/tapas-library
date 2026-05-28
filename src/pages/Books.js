@@ -828,6 +828,7 @@ export default function Books() {
                   />
                 </div>
                 {ocrLoading && <p style={{ fontSize: '12px', color: '#667eea', marginTop: '4px' }}>⏳ Reading title from photo… (first time downloads ~3MB)</p>}
+                {!ocrLoading && <p style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>📷 tip: zoom in on just the title text — not the whole cover — for best results.</p>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginBottom: '15px' }}>

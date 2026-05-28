@@ -25,21 +25,51 @@ function loadTesseract() {
   return tessLoadingPromise;
 }
 
-// Runs OCR on an image blob. Returns the recognised text (may contain
-// multiple lines). Throws on failure — caller decides how to handle.
+// Runs OCR on an image blob. Returns Tesseract's full `data` object
+// (includes per-line bboxes + confidence). Throws on failure.
 export async function recognizeText(blob) {
   const Tess = await loadTesseract();
   const { data } = await Tess.recognize(blob, 'eng');
-  return (data?.text || '').trim();
+  return data;
 }
 
-// Convenience: returns the most prominent line (longest non-empty
-// stretch), which for a title-only photo is usually the title text.
-export function pickTitleLine(rawText) {
-  if (!rawText) return '';
-  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  if (!lines.length) return '';
-  // Prefer the longest line — short lines are usually subtitle / author / noise.
-  lines.sort((a, b) => b.length - a.length);
-  return lines[0];
+// Pick the line that's most likely to be the book title.
+// Strategy: prefer lines with the largest font size (tallest bbox) and
+// reasonable text content. Book titles are nearly always the biggest
+// text on a cover.
+export function pickTitleLine(data) {
+  const rawText = data?.text || (typeof data === 'string' ? data : '');
+
+  // Use structured lines if available
+  const lines = (data?.lines || []).map(line => {
+    const text = (line.text || '').trim();
+    const height = (line.bbox?.y1 || 0) - (line.bbox?.y0 || 0);
+    return { text, height, confidence: line.confidence || 0 };
+  }).filter(l => l.text.length >= 3);
+
+  // Filter out obvious junk — mostly digits/punctuation/short fragments
+  const goodLines = lines.filter(l => {
+    const letters = (l.text.match(/[a-zA-Z]/g) || []).length;
+    return letters >= Math.max(3, l.text.length * 0.5);
+  });
+
+  const candidates = goodLines.length ? goodLines : lines;
+  if (candidates.length) {
+    // Biggest font wins — that's the title on a book cover.
+    candidates.sort((a, b) => b.height - a.height);
+    return cleanupTitle(candidates[0].text);
+  }
+
+  // Fallback for plain-text input
+  const fallback = rawText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  fallback.sort((a, b) => b.length - a.length);
+  return cleanupTitle(fallback[0] || '');
+}
+
+function cleanupTitle(s) {
+  return s
+    .replace(/^[^a-zA-Z0-9]+/, '')   // strip leading junk
+    .replace(/[^a-zA-Z0-9.!?]+$/, '') // strip trailing junk
+    .replace(/\s+/g, ' ')             // collapse whitespace
+    .trim();
 }
