@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
+import BookCoverScanner from '../components/BookCoverScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
@@ -203,15 +204,11 @@ export default function Books() {
     img.src = url;
   });
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
+  const uploadImageBlob = async (blob, { skipCompress = false } = {}) => {
     setUploadingImage(true);
     try {
-      const compressed = await compressImage(file);
+      const compressed = skipCompress ? blob : await compressImage(blob);
 
-      // Try imgbb first
       let uploaded = false;
       try {
         const fd = new FormData();
@@ -229,15 +226,17 @@ export default function Books() {
         }
       } catch {}
 
-      // Fallback: convert to base64 data URL
       if (!uploaded) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const dataUrl = ev.target.result;
-          setFormData(prev => ({ ...prev, book_image: dataUrl }));
-          setImagePreview(dataUrl);
-        };
-        reader.readAsDataURL(compressed);
+        await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target.result;
+            setFormData(prev => ({ ...prev, book_image: dataUrl }));
+            setImagePreview(dataUrl);
+            resolve();
+          };
+          reader.readAsDataURL(compressed);
+        });
       }
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -245,6 +244,19 @@ export default function Books() {
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadImageBlob(file);
+  };
+
+  const [showCoverScanner, setShowCoverScanner] = useState(false);
+
+  const handleScannerCapture = async (blob) => {
+    setShowCoverScanner(false);
+    await uploadImageBlob(blob);
   };
 
   const [showIsbnScanner, setShowIsbnScanner] = useState(false);
@@ -637,13 +649,24 @@ export default function Books() {
               {/* IMAGE UPLOAD BUTTON */}
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Or Upload Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', cursor: uploadingImage ? 'not-allowed' : 'pointer' }}
-                />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px', cursor: uploadingImage ? 'not-allowed' : 'pointer' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCoverScanner(true)}
+                    disabled={uploadingImage}
+                    title="Scan book cover with camera"
+                    style={{ padding: '10px 14px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: uploadingImage ? 'not-allowed' : 'pointer', fontSize: '18px', whiteSpace: 'nowrap' }}
+                  >
+                    📷
+                  </button>
+                </div>
                 {uploadingImage && <p style={{ color: '#667eea', marginTop: '5px' }}>⏳ Uploading...</p>}
               </div>
 
@@ -1142,6 +1165,14 @@ export default function Books() {
           type="books"
           onSuccess={fetchBooks}
           onClose={() => setShowImport(false)}
+        />
+      )}
+
+      {/* Book Cover Camera Scanner */}
+      {showCoverScanner && (
+        <BookCoverScanner
+          onCapture={handleScannerCapture}
+          onClose={() => setShowCoverScanner(false)}
         />
       )}
 
