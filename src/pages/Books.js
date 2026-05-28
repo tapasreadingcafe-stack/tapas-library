@@ -85,7 +85,12 @@ export default function Books() {
   const [categories, setCategories] = useState([]);
   const [showImport, setShowImport] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
+  const [coverLoaded, setCoverLoaded] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Reset cover-loaded flag whenever the preview URL changes so the
+  // "Loading cover…" indicator reappears for each new image.
+  useEffect(() => { setCoverLoaded(false); }, [imagePreview]);
   const [hasCondition, setHasCondition] = useState(false);
   const [filterCondition, setFilterCondition] = useState('all');
   const [isbnLooking, setIsbnLooking] = useState(false);
@@ -700,15 +705,22 @@ export default function Books() {
             <h2>{editingId ? 'Edit Book' : 'Add New Book'}</h2>
             <form onSubmit={handleAddBook}>
               {/* IMAGE PREVIEW SECTION */}
-              <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px', textAlign: 'center' }}>
+              <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px', textAlign: 'center', minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>📸 Book Cover Image</label>
+                {imagePreview && !coverLoaded && (
+                  <p style={{ color: '#667eea', fontSize: '13px', margin: '8px 0' }}>⏳ Loading cover…</p>
+                )}
                 {imagePreview && (
                   <img
+                    key={imagePreview}
                     src={imagePreview}
                     alt="Book Cover"
-                    loading="lazy"
-                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px', background: '#f0f0f0' }}
-                    onError={e => { e.target.style.display = 'none'; }}
+                    loading="eager"
+                    fetchpriority="high"
+                    decoding="async"
+                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px', background: '#f0f0f0', display: coverLoaded ? 'block' : 'none' }}
+                    onLoad={() => setCoverLoaded(true)}
+                    onError={e => { setCoverLoaded(false); e.target.style.display = 'none'; }}
                   />
                 )}
                 {!imagePreview && <p style={{ color: '#999' }}>No image selected</p>}
