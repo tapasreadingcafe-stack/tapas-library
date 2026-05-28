@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
-import { processBookCoverImage, preloadOpenCV } from '../components/BookCoverScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
@@ -290,30 +289,13 @@ export default function Books() {
 
   const cameraInputRef = useRef(null);
 
+  // Camera capture takes the same path as a regular file upload —
+  // simplest possible: photo in, image uploaded, done.
   const handleCameraCapture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = ''; // reset so picking the same file again re-fires onChange
-    setUploadingImage(true);
-    // Overall safety timer — no matter what gets stuck, release the
-    // upload spinner after 60s so the UI never wedges.
-    const safety = setTimeout(() => {
-      console.warn('Camera capture safety timeout fired');
-      setUploadingImage(false);
-      toast.error('Upload timed out. Try again or use Choose File.');
-    }, 60000);
-    try {
-      const processed = await processBookCoverImage(file);
-      // processBookCoverImage already returns a downscaled JPEG blob,
-      // no need to compress again.
-      await uploadImageBlob(processed, { skipCompress: true });
-    } catch (err) {
-      console.error('Camera processing failed:', err);
-      toast.error('Could not process photo: ' + (err.message || err));
-      setUploadingImage(false);
-    } finally {
-      clearTimeout(safety);
-    }
+    await uploadImageBlob(file);
   };
 
   const [showIsbnScanner, setShowIsbnScanner] = useState(false);
@@ -760,9 +742,8 @@ export default function Books() {
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    onMouseEnter={() => preloadOpenCV()}
                     disabled={uploadingImage}
-                    title="Take photo of book cover (auto-cropped)"
+                    title="Take photo of book cover"
                     style={{ padding: '10px 14px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: uploadingImage ? 'not-allowed' : 'pointer', fontSize: '18px', whiteSpace: 'nowrap' }}
                   >
                     📷
