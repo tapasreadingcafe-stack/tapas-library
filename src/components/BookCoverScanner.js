@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 const OPENCV_URL = 'https://docs.opencv.org/4.10.0/opencv.js';
 
@@ -373,29 +374,30 @@ export default function BookCoverScanner({ onCapture, onClose }) {
     minHeight: '44px',
   });
 
-  return (
+  const modal = (
     <div style={overlay}>
       <button
+        type="button"
         onClick={onClose}
-        style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', borderRadius: '50%', width: 40, height: 40, fontSize: 22, cursor: 'pointer' }}
+        style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', borderRadius: '50%', width: 44, height: 44, fontSize: 24, cursor: 'pointer', zIndex: 10 }}
         aria-label="Close"
       >×</button>
 
       {error && (
         <div style={{ color: 'white', textAlign: 'center', maxWidth: 400, marginBottom: 16 }}>
           <p style={{ fontSize: 16 }}>⚠️ {error}</p>
-          <button onClick={onClose} style={btn('#667eea')}>Close</button>
+          <button type="button" onClick={onClose} style={btn('#667eea')}>Close</button>
         </div>
       )}
 
       {!error && stage === 'camera' && (
         <>
-          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: 'calc(100vh - 160px)' }}>
+          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: 'calc(100vh - 200px)' }}>
             <video
               ref={videoRef}
               playsInline
               muted
-              style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 160px)', borderRadius: 8, background: '#000' }}
+              style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 200px)', borderRadius: 8, background: '#000', pointerEvents: 'none' }}
             />
             <div style={{
               position: 'absolute', inset: '10%',
@@ -406,8 +408,8 @@ export default function BookCoverScanner({ onCapture, onClose }) {
             Frame the book cover inside the dashed box
           </p>
           <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-            <button onClick={onClose} style={btn('rgba(255,255,255,0.2)')}>Cancel</button>
-            <button onClick={handleCapture} style={btn('#667eea')}>📷 Capture</button>
+            <button type="button" onClick={onClose} style={btn('rgba(255,255,255,0.2)')}>Cancel</button>
+            <button type="button" onClick={handleCapture} style={btn('#667eea')}>📷 Capture</button>
           </div>
         </>
       )}
@@ -433,8 +435,8 @@ export default function BookCoverScanner({ onCapture, onClose }) {
             onTouchEnd={handlePointerUp}
           />
           <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-            <button onClick={handleRetake} disabled={processing} style={btn('rgba(255,255,255,0.2)')}>↻ Retake</button>
-            <button onClick={handleDone} disabled={processing} style={btn('#10b981')}>
+            <button type="button" onClick={handleRetake} disabled={processing} style={btn('rgba(255,255,255,0.2)')}>↻ Retake</button>
+            <button type="button" onClick={handleDone} disabled={processing} style={btn('#10b981')}>
               {processing ? '⏳ Processing…' : '✓ Done'}
             </button>
           </div>
@@ -442,4 +444,6 @@ export default function BookCoverScanner({ onCapture, onClose }) {
       )}
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
