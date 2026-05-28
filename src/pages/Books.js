@@ -215,16 +215,22 @@ export default function Books() {
   const compressImage = (file) => new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
+    const done = (result) => { URL.revokeObjectURL(url); resolve(result); };
+    // Belt-and-braces timeout — if neither load nor error fires (some
+    // mobile browsers go quiet on unsupported formats like HEIC), fall
+    // back to the original file so the upload doesn't hang.
+    const timer = setTimeout(() => done(file), 10000);
     img.onload = () => {
+      clearTimeout(timer);
       const MAX = 800;
       const scale = Math.min(1, MAX / Math.max(img.width, img.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(resolve, 'image/jpeg', 0.82);
+      canvas.toBlob((blob) => done(blob || file), 'image/jpeg', 0.82);
     };
+    img.onerror = () => { clearTimeout(timer); done(file); };
     img.src = url;
   });
 
@@ -237,10 +243,14 @@ export default function Books() {
       try {
         const fd = new FormData();
         fd.append('image', compressed, 'cover.jpg');
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 30000);
         const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`, {
           method: 'POST',
           body: fd,
+          signal: controller.signal,
         });
+        clearTimeout(tid);
         const data = await response.json();
         if (data.success) {
           const imageUrl = data.data.display_url;
@@ -248,7 +258,9 @@ export default function Books() {
           setImagePreview(imageUrl);
           uploaded = true;
         }
-      } catch {}
+      } catch (err) {
+        console.warn('imgbb upload failed, falling back to base64:', err);
+      }
 
       if (!uploaded) {
         await new Promise((resolve) => {
@@ -283,14 +295,24 @@ export default function Books() {
     if (!file) return;
     e.target.value = ''; // reset so picking the same file again re-fires onChange
     setUploadingImage(true);
+    // Overall safety timer — no matter what gets stuck, release the
+    // upload spinner after 60s so the UI never wedges.
+    const safety = setTimeout(() => {
+      console.warn('Camera capture safety timeout fired');
+      setUploadingImage(false);
+      toast.error('Upload timed out. Try again or use Choose File.');
+    }, 60000);
     try {
-      toast.info?.('📷 Processing cover…');
       const processed = await processBookCoverImage(file);
-      await uploadImageBlob(processed);
+      // processBookCoverImage already returns a downscaled JPEG blob,
+      // no need to compress again.
+      await uploadImageBlob(processed, { skipCompress: true });
     } catch (err) {
       console.error('Camera processing failed:', err);
       toast.error('Could not process photo: ' + (err.message || err));
       setUploadingImage(false);
+    } finally {
+      clearTimeout(safety);
     }
   };
 
