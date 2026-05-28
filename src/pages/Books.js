@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
 import BookCoverScanner from '../components/BookCoverScanner';
@@ -73,6 +73,7 @@ const CONDITION_STYLE = {
 
 export default function Books() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const confirm = useConfirm();
   const { isReadOnly, canDeleteBooks, canExportData } = usePermission();
@@ -137,6 +138,22 @@ export default function Books() {
     fetchBooks();
   }, [filterCategory]);
 
+  // Deep-link: open edit form when ?edit=<bookId> is in the URL.
+  // Used by other pages (e.g. Inventory → "Edit") to jump straight
+  // to a specific book's edit form. Clears the param after handling
+  // so a refresh doesn't reopen.
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId || books.length === 0) return;
+    const book = books.find(b => String(b.id) === String(editId));
+    if (book) {
+      handleEditBook(book);
+      searchParams.delete('edit');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line
+  }, [books, searchParams]);
+
   const probeCondition = async () => {
     const { error } = await supabase.from('books').select('condition').limit(0);
     setHasCondition(!error);
@@ -145,19 +162,26 @@ export default function Books() {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('books')
-        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (filterCategory !== 'all') {
-        query = query.eq('category', filterCategory);
+      // Paginate in 1000-row batches to bypass Supabase's default
+      // server cap. Stops when a batch returns fewer rows than the
+      // page size, which means we've reached the end of the catalog.
+      const PAGE = 1000;
+      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status';
+      const all = [];
+      for (let offset = 0; ; offset += PAGE) {
+        let q = supabase
+          .from('books')
+          .select(cols)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PAGE - 1);
+        if (filterCategory !== 'all') q = q.eq('category', filterCategory);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setBooks(data || []);
+      setBooks(all);
     } catch (error) {
       console.error('Error fetching books:', error);
     } finally {
@@ -266,8 +290,31 @@ export default function Books() {
     if (!isbn) { toast.warning('Enter an ISBN first'); return; }
     setIsbnLooking(true);
     try {
-      // Try Open Library first (better ISBN coverage)
       let found = false;
+
+      // Local DB first: if this ISBN already exists in our catalog (a
+      // copy was added manually before), prefill from that record. This
+      // makes scanning a known book always work — even when external
+      // APIs (OpenLibrary / Google / Wikidata) have no data on it.
+      // Only matches when not editing the same record.
+      const norm = (s) => (s || '').replace(/[-\s]/g, '');
+      const existing = books.find(b => norm(b.isbn) === isbn && b.id !== editingId);
+      if (existing) {
+        const newForm = { ...formData, isbn };
+        if (existing.title)      newForm.title    = existing.title;
+        if (existing.author)     newForm.author   = existing.author;
+        if (existing.category)   newForm.category = existing.category;
+        if (existing.book_image) {
+          newForm.book_image = existing.book_image;
+          setImagePreview(existing.book_image);
+        }
+        setFormData(newForm);
+        toast.success('Pre-filled from existing book in your catalog');
+        setIsbnLooking(false);
+        return;
+      }
+
+      // Try Open Library first (better ISBN coverage)
       try {
         const olRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
         const olData = await olRes.json();
@@ -423,15 +470,19 @@ export default function Books() {
         toast.success('Book updated!');
         logActivity(ACTIONS.BOOK_UPDATED, `Updated book: ${formData.title}`, { book_title: formData.title });
       } else {
-        // Check if same book (by ISBN or title+author) already exists
+        // Dedup against existing catalog. ISBN is the source of
+        // truth when present — different ISBN = different book even
+        // if title/author happen to match (e.g. multiple volumes of
+        // a series share a series name). Title+author fallback only
+        // runs for ISBN-less books to avoid merging distinct titles.
         let existingBook = null;
         if (payload.isbn) {
           const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category').eq('isbn', payload.isbn).limit(1);
           if (data?.length) existingBook = data[0];
-        }
-        if (!existingBook && payload.title) {
-          const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category').eq('title', payload.title).eq('author', payload.author || '').limit(1);
-          if (data?.length) existingBook = data[0];
+        } else if (payload.title) {
+          const { data } = await supabase.from('books').select('id, quantity_total, quantity_available, category, isbn').eq('title', payload.title).eq('author', payload.author || '').limit(1);
+          // Only merge when the matched record also has no ISBN.
+          if (data?.length && !data[0].isbn) existingBook = data[0];
         }
 
         if (existingBook) {
@@ -535,6 +586,22 @@ export default function Books() {
             style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
           >
             ➕ Add Book
+          </button>}
+          {!isReadOnly && <button
+            onClick={() => {
+              setShowAddForm(true);
+              setEditingId(null);
+              setImagePreview('');
+              setFormData(emptyForm);
+              setNotForSale(false);
+              setShowIsbnScanner(true);
+            }}
+            title="Scan barcode → auto-fill book details → fill the rest"
+            style={{ padding: isMobile ? '10px 14px' : '8px 12px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
+            </svg>
           </button>}
           {!isReadOnly && canExportData && <div style={{ position: 'relative' }} data-tour="import-export">
             <button onClick={() => setShowImportExport(!showImportExport)}
