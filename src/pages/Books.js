@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
-import BookCoverScanner from '../components/BookCoverScanner';
+import { processBookCoverImage, preloadOpenCV } from '../components/BookCoverScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
@@ -276,11 +276,22 @@ export default function Books() {
     await uploadImageBlob(file);
   };
 
-  const [showCoverScanner, setShowCoverScanner] = useState(false);
+  const cameraInputRef = useRef(null);
 
-  const handleScannerCapture = async (blob) => {
-    setShowCoverScanner(false);
-    await uploadImageBlob(blob);
+  const handleCameraCapture = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = ''; // reset so picking the same file again re-fires onChange
+    setUploadingImage(true);
+    try {
+      toast.info?.('📷 Processing cover…');
+      const processed = await processBookCoverImage(file);
+      await uploadImageBlob(processed);
+    } catch (err) {
+      console.error('Camera processing failed:', err);
+      toast.error('Could not process photo: ' + (err.message || err));
+      setUploadingImage(false);
+    }
   };
 
   const [showIsbnScanner, setShowIsbnScanner] = useState(false);
@@ -726,13 +737,22 @@ export default function Books() {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowCoverScanner(true)}
+                    onClick={() => cameraInputRef.current?.click()}
+                    onMouseEnter={() => preloadOpenCV()}
                     disabled={uploadingImage}
-                    title="Scan book cover with camera"
+                    title="Take photo of book cover (auto-cropped)"
                     style={{ padding: '10px 14px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: uploadingImage ? 'not-allowed' : 'pointer', fontSize: '18px', whiteSpace: 'nowrap' }}
                   >
                     📷
                   </button>
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleCameraCapture}
+                    style={{ display: 'none' }}
+                  />
                 </div>
                 {uploadingImage && <p style={{ color: '#667eea', marginTop: '5px' }}>⏳ Uploading...</p>}
               </div>
@@ -1232,14 +1252,6 @@ export default function Books() {
           type="books"
           onSuccess={fetchBooks}
           onClose={() => setShowImport(false)}
-        />
-      )}
-
-      {/* Book Cover Camera Scanner */}
-      {showCoverScanner && (
-        <BookCoverScanner
-          onCapture={handleScannerCapture}
-          onClose={() => setShowCoverScanner(false)}
         />
       )}
 
