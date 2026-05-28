@@ -293,6 +293,8 @@ export default function Books() {
   };
 
   const cameraInputRef = useRef(null);
+  const titleCameraInputRef = useRef(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
 
   // Camera capture takes the same path as a regular file upload —
   // simplest possible: photo in, image uploaded, done.
@@ -301,6 +303,30 @@ export default function Books() {
     if (!file) return;
     e.target.value = ''; // reset so picking the same file again re-fires onChange
     await uploadImageBlob(file);
+  };
+
+  // OCR a photo of the book title and fill the Title field.
+  const handleTitleCameraCapture = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setOcrLoading(true);
+    try {
+      const { recognizeText, pickTitleLine } = await import('../utils/ocr');
+      const raw = await recognizeText(file);
+      const guess = pickTitleLine(raw);
+      if (!guess) {
+        toast.warning?.('Could not read any text. Try a clearer photo.');
+        return;
+      }
+      setFormData(prev => ({ ...prev, title: guess }));
+      toast.success?.('Title detected');
+    } catch (err) {
+      console.error('OCR failed:', err);
+      toast.error('Could not read title: ' + (err.message || err));
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const [showIsbnScanner, setShowIsbnScanner] = useState(false);
@@ -774,14 +800,34 @@ export default function Books() {
 
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Title *</label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  required
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    required
+                    style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => titleCameraInputRef.current?.click()}
+                    disabled={ocrLoading}
+                    title="Scan title from a photo (OCR)"
+                    style={{ padding: '10px 14px', background: ocrLoading ? '#999' : '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: ocrLoading ? 'wait' : 'pointer', fontSize: '18px', whiteSpace: 'nowrap' }}
+                  >
+                    {ocrLoading ? '⏳' : '📷'}
+                  </button>
+                  <input
+                    ref={titleCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleTitleCameraCapture}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+                {ocrLoading && <p style={{ fontSize: '12px', color: '#667eea', marginTop: '4px' }}>⏳ Reading title from photo… (first time downloads ~3MB)</p>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
