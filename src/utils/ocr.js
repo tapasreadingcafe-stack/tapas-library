@@ -75,27 +75,54 @@ export async function recognizeText(blob) {
   return { text: parsed, lines: lines.map(text => ({ text })) };
 }
 
-// Pick the line most likely to be the book title — biggest font isn't
-// available from OCR.space's plain endpoint, so we use heuristics:
-//  • lines that are mostly letters (not catalogue codes / barcodes)
-//  • prefer longer lines (titles are usually multi-word)
-//  • drop obvious noise (publishing tags, ISBNs, etc.)
+// Patterns that signal the end of the title region — author credits,
+// copyright, edition / age info. Anything after this we ignore.
+const TITLE_TERMINATOR = /^(by\b|written\b|illustrated\b|story\b|author|adapted|translated|©|copyright|published|edition|volume|vol\.|book\s*\d|chapter|ages?\s*\d|level\s*\d)/i;
+
+// Pick the most likely book title from OCR output.
+// Strategy: walk lines from the top, keep all "word-like" lines
+// (mostly letters), stop at the first author/credit/copyright line,
+// then join them with spaces. Handles single-line titles AND stylised
+// covers like "TEN / APPLES / UP / ON / TOP" where every word is on
+// its own line.
 export function pickTitleLine(data) {
-  const lines = data?.lines?.map(l => l.text) || [];
+  const lines = (data?.lines?.map(l => (l.text || '').trim()) || []).filter(Boolean);
   if (!lines.length) return '';
 
-  const scored = lines.map(text => {
+  const isWordLike = (text) => {
+    if (text.length < 1) return false;
     const letters = (text.match(/[a-zA-Z]/g) || []).length;
     const ratio = letters / Math.max(1, text.length);
-    return { text, letters, ratio, length: text.length };
-  });
+    // Mostly letters, and at least one real letter run of ≥ 1 char.
+    return letters >= 1 && ratio >= 0.55;
+  };
 
-  const good = scored.filter(l => l.length >= 3 && l.ratio >= 0.6);
-  const candidates = good.length ? good : scored;
-  // Longest line with high letter-ratio usually wins.
-  candidates.sort((a, b) => b.length - a.length);
+  const titleParts = [];
+  for (const line of lines) {
+    if (TITLE_TERMINATOR.test(line)) break;
+    if (!isWordLike(line)) {
+      // Junk line between title words (e.g. a stray ":" or "—").
+      // Skip but don't terminate — the next real word may still be
+      // part of the title.
+      continue;
+    }
+    titleParts.push(line);
+    // Hard cap so we never grab a whole back-cover blurb.
+    if (titleParts.join(' ').length > 120) break;
+  }
 
-  return cleanupTitle(candidates[0]?.text || '');
+  if (titleParts.length) {
+    return cleanupTitle(titleParts.join(' '));
+  }
+
+  // Fallback: nothing matched — pick longest letter-dominant line.
+  const scored = lines.map(text => ({
+    text,
+    letters: (text.match(/[a-zA-Z]/g) || []).length,
+    length: text.length,
+  }));
+  scored.sort((a, b) => b.length - a.length);
+  return cleanupTitle(scored[0]?.text || '');
 }
 
 function cleanupTitle(s) {
