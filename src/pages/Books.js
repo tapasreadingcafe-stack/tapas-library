@@ -649,6 +649,13 @@ export default function Books() {
               <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
             </svg>
           </button>}
+          {!isReadOnly && <button
+            onClick={() => navigate('/books/bulk')}
+            title="Open spreadsheet-style bulk edit"
+            style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
+          >
+            📊 Bulk Edit
+          </button>}
           {!isReadOnly && canExportData && <div style={{ position: 'relative' }} data-tour="import-export">
             <button onClick={() => setShowImportExport(!showImportExport)}
               style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}>

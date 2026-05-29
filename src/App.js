@@ -52,6 +52,7 @@ function lazyWithRetry(importFn) {
 const Dashboard        = lazyWithRetry(() => import('./pages/Dashboard'));
 const Members          = lazyWithRetry(() => import('./pages/Members'));
 const Books            = lazyWithRetry(() => import('./pages/Books'));
+const BooksBulkEdit    = lazyWithRetry(() => import('./pages/BooksBulkEdit'));
 const Borrow           = lazyWithRetry(() => import('./pages/Borrow'));
 const POS              = lazyWithRetry(() => import('./pages/POS'));
 const Reports          = lazyWithRetry(() => import('./pages/Reports'));
@@ -740,6 +741,7 @@ function DashboardShell() {
 
             {/* Library */}
             <Route path="/books"                              element={<Books />} />
+            <Route path="/books/bulk"                         element={<BooksBulkEdit />} />
             <Route path="/books/:bookId/copies"                 element={<BookCopies />} />
             <Route path="/barcodes"                              element={<BarcodeManager />} />
             <Route path="/barcodes/editor"                       element={<BarcodeEditor />} />
@@ -850,3 +852,4 @@ function DashboardShell() {
 }
 
 export default App;
+// trigger recompile 1777380998
