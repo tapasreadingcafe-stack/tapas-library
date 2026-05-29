@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { generateBarcodeSVG, generateBarcodeSVGString, encodeCode128B, generateZPL } from '../utils/barcodeUtils';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import BarcodeScanner from '../BarcodeScanner';
 
 const PER_PAGE = 25;
 
@@ -51,6 +52,10 @@ export default function BarcodeManager() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showScanner, setShowScanner] = useState(false);
+  const [highlightCopyId, setHighlightCopyId] = useState(null);
+  const [scanSessionCount, setScanSessionCount] = useState(0);
+  const [recentScans, setRecentScans] = useState([]); // {ok, code, title} for last few scans
   const [currentPage, setCurrentPage] = useState(1);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
@@ -60,7 +65,7 @@ export default function BarcodeManager() {
     try {
       const { data, error } = await supabase
         .from('book_copies')
-        .select('*, books(title, category, price, mrp, sales_price, author)')
+        .select('*, books(title, category, price, mrp, sales_price, author, isbn)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setCopies(data || []);
@@ -71,6 +76,55 @@ export default function BarcodeManager() {
   }, []);
 
   useEffect(() => { fetchCopies(); }, [fetchCopies]);
+
+  // Handle a scan from the camera scanner OR a handheld scanner that
+  // typed into the modal's input. Detects:
+  //   • Our copy code (B-XXX-NNNN)  → jump to that copy
+  //   • Anything else (ISBN, etc.)  → match against books.isbn / title
+  // Modal stays OPEN after each scan so you can scan book-after-book
+  // and accumulate selections — close manually with the Done button.
+  const handleScan = useCallback((rawCode) => {
+    if (!rawCode) return;
+    const code = rawCode.trim();
+    if (!code) return;
+
+    const isCopyCode = /^B-[A-Z0-9]+-\d+$/i.test(code);
+    let match;
+    if (isCopyCode) {
+      match = copies.find(c => c.copy_code?.toLowerCase() === code.toLowerCase());
+    } else {
+      const digits = code.replace(/[-\s]/g, '');
+      match = copies.find(c => (c.books?.isbn || '').replace(/[-\s]/g, '') === digits);
+    }
+
+    if (!match) {
+      setRecentScans(prev => [{ ok: false, code, title: 'No match' }, ...prev].slice(0, 6));
+      toast.warning(`No copy found for "${code}"`);
+      return;
+    }
+    setSelectedIds(prev => {
+      // If already selected, treat the re-scan as a duplicate — surface
+      // it so the user knows they've already counted this book.
+      if (prev.has(match.id)) {
+        setRecentScans(rs => [{ ok: 'dup', code: match.copy_code, title: match.books?.title }, ...rs].slice(0, 6));
+        toast.info?.(`Already selected: ${match.copy_code}`);
+        return prev;
+      }
+      return new Set([...prev, match.id]);
+    });
+    setScanSessionCount(n => n + 1);
+    setRecentScans(prev => [{ ok: true, code: match.copy_code, title: match.books?.title }, ...prev].slice(0, 6));
+    setHighlightCopyId(match.id);
+    setTimeout(() => setHighlightCopyId(null), 2500);
+  }, [copies, toast]);
+
+  const openScanner = () => {
+    setScanSessionCount(0);
+    setRecentScans([]);
+    setShowScanner(true);
+  };
+
+  const closeScanner = () => setShowScanner(false);
 
   // Fetch saved label templates, auto-select first if none chosen
   useEffect(() => {
@@ -130,12 +184,15 @@ export default function BarcodeManager() {
       });
     }
 
-    // Search filter
+    // Search filter — matches copy code, title, OR ISBN so handheld
+    // scanners can drop straight into the search.
     if (search.trim()) {
       const q = search.toLowerCase();
+      const qDigits = q.replace(/[-\s]/g, '');
       result = result.filter(c =>
         (c.copy_code && c.copy_code.toLowerCase().includes(q)) ||
-        (c.books?.title && c.books.title.toLowerCase().includes(q))
+        (c.books?.title && c.books.title.toLowerCase().includes(q)) ||
+        (c.books?.isbn && c.books.isbn.toLowerCase().replace(/[-\s]/g, '').includes(qDigits))
       );
     }
 
@@ -185,6 +242,22 @@ export default function BarcodeManager() {
     return selected;
   };
 
+  const setShowPriceBulk = async (visible) => {
+    if (selectedIds.size === 0) { toast.warning('No copies selected'); return; }
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('book_copies').update({ show_price: visible }).in('id', ids);
+    if (error) { toast.error('Failed: ' + error.message); return; }
+    setCopies(prev => prev.map(c => ids.includes(c.id) ? { ...c, show_price: visible } : c));
+    toast.success(`${visible ? 'Showing' : 'Hiding'} price on ${ids.length} label${ids.length === 1 ? '' : 's'}`);
+  };
+
+  const toggleShowPrice = async (copy) => {
+    const newVal = !(copy.show_price !== false); // treat null/undefined as true
+    const { error } = await supabase.from('book_copies').update({ show_price: newVal }).eq('id', copy.id);
+    if (error) { toast.error('Failed: ' + error.message); return; }
+    setCopies(prev => prev.map(c => c.id === copy.id ? { ...c, show_price: newVal } : c));
+  };
+
   const handlePrintSelected = () => {
     const selected = getSelectedForPrint();
     if (!selected) return;
@@ -197,9 +270,10 @@ export default function BarcodeManager() {
       const selling = Number(c.books?.sales_price) || 0;
       const displayPrice = selling > 0 ? selling : mrp;
       const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
+      const showPrice = c.show_price !== false; // default true
 
       let priceHtml = '';
-      if (displayPrice > 0) {
+      if (showPrice && displayPrice > 0) {
         if (hasDiscount) {
           priceHtml = `<span class="sell-price">Rs.${selling}</span> <span class="mrp-strike">Rs.${mrp}</span>`;
         } else {
@@ -260,12 +334,13 @@ export default function BarcodeManager() {
         const selling = Number(c.books?.sales_price) || 0;
         const displayPrice = selling > 0 ? selling : mrp;
         const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
+        const showPrice = c.show_price !== false;
         return {
           brand: 'TAPAS READING CAFE',
           copyCode: c.copy_code,
           title: c.books?.title || 'Unknown',
-          price: displayPrice > 0 ? `Rs.${displayPrice}` : '',
-          mrpStrike: hasDiscount ? `Rs.${mrp}` : '',
+          price: showPrice && displayPrice > 0 ? `Rs.${displayPrice}` : '',
+          mrpStrike: showPrice && hasDiscount ? `Rs.${mrp}` : '',
         };
       });
 
@@ -341,6 +416,31 @@ export default function BarcodeManager() {
               <option key={t.key} value={t.key}>{t.key.replace('barcode_template_', '')}</option>
             ))}
           </select>
+          <button
+            onClick={openScanner}
+            style={{ ...buttonStyle, background: '#0ea5e9' }}
+            title="Scan multiple ISBNs/copy codes to select them all at once"
+          >
+            {'\uD83D\uDCF7'} Scan
+          </button>
+          {selectedIds.size > 0 && (
+            <>
+              <button
+                onClick={() => setShowPriceBulk(true)}
+                style={{ ...buttonStyle, background: '#10b981' }}
+                title="Show price on labels for selected copies"
+              >
+                {'\u20B9'} Show ({selectedIds.size})
+              </button>
+              <button
+                onClick={() => setShowPriceBulk(false)}
+                style={{ ...buttonStyle, background: '#6b7280' }}
+                title="Hide price on labels for selected copies"
+              >
+                {'\u20B9'} Hide ({selectedIds.size})
+              </button>
+            </>
+          )}
           <button data-tour="direct-print" onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
             {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : `Direct Print${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
           </button>
@@ -493,12 +593,17 @@ export default function BarcodeManager() {
                 <th style={{ padding: '10px 8px' }}>Book Title</th>
                 <th style={{ padding: '10px 8px' }}>Category</th>
                 <th style={{ padding: '10px 8px' }}>Status</th>
+                <th style={{ padding: '10px 8px' }} title="Show price on label?">₹ Label</th>
                 <th style={{ padding: '10px 8px' }}>Created</th>
               </tr>
             </thead>
             <tbody>
               {paginated.map(copy => (
-                <tr key={copy.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                <tr key={copy.id} style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  background: copy.id === highlightCopyId ? '#fef9c3' : undefined,
+                  transition: 'background 0.6s ease',
+                }}>
                   <td style={{ padding: '10px 8px' }}>
                     <input
                       type="checkbox"
@@ -538,6 +643,22 @@ export default function BarcodeManager() {
                     }}>
                       {copy.status ? copy.status.charAt(0).toUpperCase() + copy.status.slice(1) : '—'}
                     </span>
+                  </td>
+                  <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleShowPrice(copy)}
+                      title={copy.show_price !== false ? 'Price IS printed on this label — click to hide' : 'Price is HIDDEN on this label — click to show'}
+                      style={{
+                        background: copy.show_price !== false ? '#10b981' : '#e5e7eb',
+                        color: copy.show_price !== false ? 'white' : '#6b7280',
+                        border: 'none', borderRadius: '4px',
+                        padding: '4px 10px', fontSize: '11px', fontWeight: 600,
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {copy.show_price !== false ? '₹ Show' : '₹ Hide'}
+                    </button>
                   </td>
                   <td style={{ padding: '10px 8px', color: '#666', whiteSpace: 'nowrap' }}>
                     {formatDate(copy.created_at)}
@@ -581,6 +702,78 @@ export default function BarcodeManager() {
             >
               Next
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-scan session: stays open after each scan so you can blast
+          through 10+ books and accumulate selections. Close with Done. */}
+      {showScanner && (
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={closeScanner}
+        >
+          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '460px', width: '94%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '17px' }}>📷 Multi-scan</h3>
+              <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 700 }}>
+                ✓ {scanSessionCount} scanned · {selectedIds.size} total selected
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+              Scan book after book — each one stays ticked. Hit <strong>Done</strong> when finished, then print or set price all at once.
+            </p>
+
+            <BarcodeScanner onScan={handleScan} onClose={closeScanner} />
+
+            <div style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: 600 }}>
+                Or use a USB/Bluetooth scanner — focus stays here:
+              </p>
+              <input
+                type="text"
+                autoFocus
+                placeholder="ISBN or B-XXX-XXXX, then Enter"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = e.target.value.trim();
+                    if (val) handleScan(val);
+                    e.target.value = '';
+                  }
+                }}
+                style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '6px', fontSize: '16px', textAlign: 'center', fontFamily: 'monospace', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {recentScans.length > 0 && (
+              <div style={{ marginTop: '12px', maxHeight: '180px', overflowY: 'auto', background: '#f9fafb', borderRadius: '6px', padding: '8px' }}>
+                <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Recent scans
+                </p>
+                {recentScans.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', fontSize: '12px' }}>
+                    <span style={{
+                      display: 'inline-block', width: '18px', textAlign: 'center',
+                      color: s.ok === true ? '#10b981' : s.ok === 'dup' ? '#f59e0b' : '#ef4444',
+                      fontWeight: 700,
+                    }}>{s.ok === true ? '✓' : s.ok === 'dup' ? '↻' : '✗'}</span>
+                    <span style={{ fontFamily: 'monospace', color: '#374151' }}>{s.code}</span>
+                    <span style={{ color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+              <button
+                onClick={() => { setSelectedIds(new Set()); setScanSessionCount(0); setRecentScans([]); }}
+                style={{ flex: 1, padding: '10px 12px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
+              >Clear all</button>
+              <button
+                onClick={closeScanner}
+                style={{ flex: 2, padding: '10px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+              >Done ({selectedIds.size})</button>
+            </div>
           </div>
         </div>
       )}
