@@ -38,26 +38,103 @@ export default function BooksBulkEdit() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [multiCopyOnly, setMultiCopyOnly] = useState(false);
+  const [mismatchOnly, setMismatchOnly] = useState(false);
+  const [orphanIds, setOrphanIds] = useState([]);   // copies whose book_id no longer exists
+  const [excessIds, setExcessIds] = useState([]);   // available copies beyond a book's quantity_total
+  const [excessByBook, setExcessByBook] = useState({}); // bookId -> excess count (for highlighting rows)
+  const [totalCopyCount, setTotalCopyCount] = useState(0);
+  const [cleaningOrphans, setCleaningOrphans] = useState(false);
 
-  // Initial load
+  // Initial load — fetch books and copy counts in parallel.
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('books')
-        .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, store_visible, is_borrowable, status')
-        .order('title');
-      if (error) {
-        toast.error('Failed to load books: ' + error.message);
-      } else {
-        const cloned = (data || []).map(r => ({ ...r }));
-        setRows(cloned);
-        setOriginalRows(JSON.parse(JSON.stringify(cloned)));
+      const [booksRes, copiesRes] = await Promise.all([
+        supabase
+          .from('books')
+          .select('id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, store_visible, is_borrowable, status')
+          .order('title'),
+        supabase.from('book_copies').select('id, book_id, status, created_at'),
+      ]);
+      if (booksRes.error) {
+        toast.error('Failed to load books: ' + booksRes.error.message);
+        setLoading(false);
+        return;
       }
+      const books = booksRes.data || [];
+      const allCopies = copiesRes.data || [];
+      const bookMap = new Map(books.map(b => [b.id, b]));
+
+      // Group copies by book.
+      const copiesByBook = new Map();
+      const orphans = [];
+      for (const c of allCopies) {
+        if (c.book_id == null || !bookMap.has(c.book_id)) {
+          orphans.push(c.id);
+          continue;
+        }
+        if (!copiesByBook.has(c.book_id)) copiesByBook.set(c.book_id, []);
+        copiesByBook.get(c.book_id).push(c);
+      }
+
+      // For each book, if it has more copies than quantity_total, mark
+      // the surplus as excess. Prefer deleting available copies first
+      // (don't disturb issued/sold/lost ones), newest first.
+      const excessIdList = [];
+      const excessMap = {};
+      for (const [bookId, list] of copiesByBook) {
+        const book = bookMap.get(bookId);
+        const expected = book.quantity_total || 1;
+        if (list.length > expected) {
+          const surplus = list.length - expected;
+          excessMap[bookId] = surplus;
+          const sorted = [...list].sort((a, b) => {
+            if (a.status === 'available' && b.status !== 'available') return -1;
+            if (b.status === 'available' && a.status !== 'available') return 1;
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          });
+          // Only auto-target the available ones from the surplus.
+          const targets = sorted.slice(0, surplus).filter(c => c.status === 'available');
+          excessIdList.push(...targets.map(c => c.id));
+        }
+      }
+
+      const copyCount = {};
+      for (const [bookId, list] of copiesByBook) copyCount[bookId] = list.length;
+
+      const cloned = books.map(r => ({
+        ...r,
+        copies: copyCount[r.id] || 0,
+        excess: excessMap[r.id] || 0,
+      }));
+      setRows(cloned);
+      setOriginalRows(JSON.parse(JSON.stringify(cloned)));
+      setOrphanIds(orphans);
+      setExcessIds(excessIdList);
+      setExcessByBook(excessMap);
+      setTotalCopyCount(allCopies.length);
       setLoading(false);
     })();
     // eslint-disable-next-line
   }, []);
+
+  // Filter rows. AG Grid receives the already-filtered set so the
+  // count + selection stay in sync.
+  const visibleRows = useMemo(() => {
+    let r = rows;
+    if (mismatchOnly) r = r.filter(b => (b.excess || 0) > 0);
+    if (multiCopyOnly) r = r.filter(b => (b.copies || 0) > 1);
+    return r;
+  }, [rows, multiCopyOnly, mismatchOnly]);
+  const multiCopyCount = useMemo(
+    () => rows.filter(r => (r.copies || 0) > 1).length,
+    [rows]
+  );
+  const mismatchCount = useMemo(
+    () => rows.filter(r => (r.excess || 0) > 0).length,
+    [rows]
+  );
 
   const recordEdit = useCallback((id, field, value) => {
     setEdits(prev => {
@@ -168,6 +245,42 @@ export default function BooksBulkEdit() {
     setSelectedIds([]);
   };
 
+  const handleCleanCopies = async () => {
+    const toDelete = [...orphanIds, ...excessIds];
+    if (toDelete.length === 0) return;
+    if (!canDeleteBooks) {
+      toast.error('You do not have permission to delete copies.');
+      return;
+    }
+    const parts = [];
+    if (orphanIds.length) parts.push(`${orphanIds.length} orphaned (book no longer exists)`);
+    if (excessIds.length) parts.push(`${excessIds.length} excess (available copies beyond quantity_total)`);
+    const ok = await confirm({
+      title: 'Clean up extra barcoded copies?',
+      message: `Found ${toDelete.length} copies to remove:\n• ${parts.join('\n• ')}\n\nOnly safe-to-delete copies are included (issued/sold/lost copies are left alone). Continue?`,
+      confirmText: `Delete ${toDelete.length}`,
+      danger: true,
+    });
+    if (!ok) return;
+    setCleaningOrphans(true);
+    const { error } = await supabase.from('book_copies').delete().in('id', toDelete);
+    setCleaningOrphans(false);
+    if (error) {
+      toast.error('Cleanup failed: ' + error.message);
+      return;
+    }
+    toast.success(`Deleted ${toDelete.length} extra copies`);
+    setTotalCopyCount(prev => prev - toDelete.length);
+    // Drop the excess from rows' copy count + flags.
+    setRows(prev => prev.map(r => {
+      const ex = excessByBook[r.id] || 0;
+      return ex > 0 ? { ...r, copies: Math.max(0, (r.copies || 0) - ex), excess: 0 } : r;
+    }));
+    setOrphanIds([]);
+    setExcessIds([]);
+    setExcessByBook({});
+  };
+
   const handleExportSelection = () => {
     const rowsToExport = selectedIds.length
       ? rows.filter(r => selectedIds.includes(r.id))
@@ -196,6 +309,11 @@ export default function BooksBulkEdit() {
     { field: 'discount_percent', headerName: 'Disc %', editable: !isReadOnly, width: 100, type: 'numericColumn', valueParser: numericParser },
     { field: 'quantity_total', headerName: 'Total', editable: !isReadOnly, width: 90, type: 'numericColumn', valueParser: numericParser },
     { field: 'quantity_available', headerName: 'Avail', editable: !isReadOnly, width: 90, type: 'numericColumn', valueParser: numericParser },
+    {
+      field: 'copies', headerName: 'Copies (live)', editable: false, width: 110, type: 'numericColumn',
+      cellStyle: (params) => params.value > 1 ? { backgroundColor: '#fef9c3', fontWeight: 600 } : null,
+      headerTooltip: 'Real count of barcoded copies in book_copies for this title',
+    },
     {
       field: 'is_borrowable', headerName: 'Borrow', editable: !isReadOnly, width: 100,
       cellDataType: 'boolean',
@@ -253,9 +371,19 @@ export default function BooksBulkEdit() {
           >← Back to Books</button>
           <h1 style={{ margin: 0, fontSize: '22px' }}>📊 Bulk Edit</h1>
           <span style={{ color: '#666', fontSize: '13px' }}>
-            {rows.length} books · {selectedIds.length > 0 && `${selectedIds.length} selected · `}
+            {visibleRows.length} of {rows.length} books · {selectedIds.length > 0 && `${selectedIds.length} selected · `}
             {editCount > 0 ? <strong style={{ color: '#d97706' }}>{editCount} pending edit{editCount === 1 ? '' : 's'}</strong> : 'no changes'}
           </span>
+          {multiCopyCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setMultiCopyOnly(v => !v)}
+              title={multiCopyOnly ? 'Show all books' : `Show only the ${multiCopyCount} titles with 2+ copies`}
+              style={{ padding: '6px 12px', background: multiCopyOnly ? '#f59e0b' : '#fef3c7', color: multiCopyOnly ? 'white' : '#92400e', border: '1px solid ' + (multiCopyOnly ? '#d97706' : '#fde68a'), borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            >
+              {multiCopyOnly ? '✕ Showing multi-copy' : `📚 Multi-copy (${multiCopyCount})`}
+            </button>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
@@ -285,6 +413,41 @@ export default function BooksBulkEdit() {
         </div>
       </div>
 
+      {/* Data-integrity diagnostic banner */}
+      {!loading && (orphanIds.length > 0 || excessIds.length > 0) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '18px' }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: '300px' }}>
+            <div style={{ fontWeight: 600, color: '#991b1b' }}>
+              {totalCopyCount} barcoded copies vs {rows.length} books — {orphanIds.length + excessIds.length} extra copy{orphanIds.length + excessIds.length === 1 ? '' : 's'} to clean
+            </div>
+            <div style={{ fontSize: '12px', color: '#7f1d1d', marginTop: '2px' }}>
+              {orphanIds.length > 0 && <>• {orphanIds.length} orphaned (book was deleted){' '}</>}
+              {excessIds.length > 0 && <>• {excessIds.length} excess (book’s quantity was reduced but copy wasn’t)</>}
+            </div>
+          </div>
+          {mismatchCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setMismatchOnly(v => !v)}
+              style={{ padding: '6px 12px', background: mismatchOnly ? '#dc2626' : '#fee2e2', color: mismatchOnly ? 'white' : '#991b1b', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            >
+              {mismatchOnly ? `✕ Showing ${mismatchCount} mismatched` : `🔍 Show ${mismatchCount} mismatched`}
+            </button>
+          )}
+          {canDeleteBooks && (
+            <button
+              type="button"
+              onClick={handleCleanCopies}
+              disabled={cleaningOrphans}
+              style={{ padding: '6px 14px', background: cleaningOrphans ? '#9ca3af' : '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: cleaningOrphans ? 'wait' : 'pointer', fontWeight: 600, fontSize: '13px' }}
+            >
+              {cleaningOrphans ? '⏳ Cleaning…' : `🗑️ Clean up ${orphanIds.length + excessIds.length}`}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Bulk action bar — only shown when rows are selected */}
       {selectedIds.length > 0 && !isReadOnly && (
         <BulkActionBar
@@ -302,7 +465,7 @@ export default function BooksBulkEdit() {
           <AgGridReact
             ref={gridRef}
             theme={themeQuartz}
-            rowData={rows}
+            rowData={visibleRows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             rowSelection={rowSelection}
