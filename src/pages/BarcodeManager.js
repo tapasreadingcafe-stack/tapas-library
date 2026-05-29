@@ -56,6 +56,7 @@ export default function BarcodeManager() {
   const [highlightCopyId, setHighlightCopyId] = useState(null);
   const [scanSessionCount, setScanSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState([]); // {ok, code, title} for last few scans
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
@@ -196,8 +197,14 @@ export default function BarcodeManager() {
       );
     }
 
+    // Selected-only filter: lets the user verify which books they
+    // just scanned without scrolling through the full catalogue.
+    if (selectedOnly) {
+      result = result.filter(c => selectedIds.has(c.id));
+    }
+
     return result;
-  }, [copies, statusFilter, dateFilter, customFrom, customTo, search]);
+  }, [copies, statusFilter, dateFilter, customFrom, customTo, search, selectedOnly, selectedIds]);
 
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [statusFilter, dateFilter, customFrom, customTo, search]);
@@ -480,6 +487,20 @@ export default function BarcodeManager() {
               <option key={d.value} value={d.value}>{d.label}</option>
             ))}
           </select>
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedOnly(v => !v)}
+              title={selectedOnly ? 'Show all rows again' : 'Show only the rows you have ticked'}
+              style={{
+                ...buttonStyle,
+                background: selectedOnly ? '#f59e0b' : '#fef3c7',
+                color: selectedOnly ? 'white' : '#92400e',
+              }}
+            >
+              {selectedOnly ? `✕ Showing selected (${selectedIds.size})` : `☑ Selected only (${selectedIds.size})`}
+            </button>
+          )}
           {dateFilter === 'custom' && (
             <>
               <input
@@ -724,7 +745,7 @@ export default function BarcodeManager() {
               Scan book after book — each one stays ticked. Hit <strong>Done</strong> when finished, then print or set price all at once.
             </p>
 
-            <BarcodeScanner onScan={handleScan} onClose={closeScanner} />
+            <BarcodeScanner onScan={handleScan} onClose={closeScanner} continuous={true} />
 
             <div style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
               <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: 600 }}>

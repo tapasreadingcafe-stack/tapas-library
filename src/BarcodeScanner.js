@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import jsQR from 'jsqr';
 
-export default function BarcodeScanner({ onScan, onClose }) {
+export default function BarcodeScanner({ onScan, onClose, continuous = false }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [error, setError] = useState(null);
@@ -95,12 +95,23 @@ export default function BarcodeScanner({ onScan, onClose }) {
         setFound(true);
         setLastScanned(code);
         onScan(code);
-        setTimeout(() => onClose(), 600);
+        if (continuous) {
+          // Multi-scan mode: brief cooldown so the user sees the green
+          // confirmation flash, then re-arm so the next book is read
+          // automatically. Clearing lastScanned lets the same code be
+          // re-scanned later (handler de-dupes).
+          setTimeout(() => {
+            setFound(false);
+            setLastScanned('');
+          }, 1200);
+        } else {
+          setTimeout(() => onClose(), 600);
+        }
       }
     }, 200);
 
     return () => clearInterval(interval);
-  }, [found, onScan, onClose, hasBarcodeDetector, lastScanned]);
+  }, [found, onScan, onClose, hasBarcodeDetector, lastScanned, continuous]);
 
   return (
     <div style={{
