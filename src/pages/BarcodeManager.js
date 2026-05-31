@@ -275,7 +275,17 @@ export default function BarcodeManager() {
   const getSelectedForPrint = () => {
     const selected = copies.filter(c => selectedIds.has(c.id));
     if (selected.length === 0) { toast.warning('No copies selected'); return null; }
-    return selected;
+    // Print in the order rows were selected/scanned, so the physical
+    // stack of labels matches the table top→bottom and the order the
+    // user picked up books off the shelf. Falls back to created_at
+    // for anything that's selected but isn't in the order map
+    // (shouldn't happen but defensive).
+    const orderIndex = new Map(selectionOrder.map((id, i) => [id, i]));
+    return [...selected].sort((a, b) => {
+      const ai = orderIndex.has(a.id) ? orderIndex.get(a.id) : Number.MAX_SAFE_INTEGER;
+      const bi = orderIndex.has(b.id) ? orderIndex.get(b.id) : Number.MAX_SAFE_INTEGER;
+      return ai - bi;
+    });
   };
 
   const setShowPriceBulk = async (visible) => {
