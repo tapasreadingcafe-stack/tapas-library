@@ -57,6 +57,11 @@ export default function BarcodeManager() {
   const [scanSessionCount, setScanSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState([]); // {ok, code, title} for last few scans
   const [selectedOnly, setSelectedOnly] = useState(false);
+  // Order in which rows were selected. Used to sort the "Selected
+  // only" view so the table reads top→bottom in scan order (1st scan
+  // at the top), regardless of when each copy was originally added
+  // to book_copies.
+  const [selectionOrder, setSelectionOrder] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
@@ -111,6 +116,9 @@ export default function BarcodeManager() {
         toast.info?.(`Already selected: ${match.copy_code}`);
         return prev;
       }
+      // Track scan order so "Selected only" lists them in the same
+      // order you scanned (1st scan at top).
+      setSelectionOrder(o => o.includes(match.id) ? o : [...o, match.id]);
       return new Set([...prev, match.id]);
     });
     setScanSessionCount(n => n + 1);
@@ -199,12 +207,21 @@ export default function BarcodeManager() {
 
     // Selected-only filter: lets the user verify which books they
     // just scanned without scrolling through the full catalogue.
+    // Also reorders the list so it reads top→bottom in scan order
+    // (1st book scanned at top), not by created_at as the rest of
+    // the page is sorted.
     if (selectedOnly) {
       result = result.filter(c => selectedIds.has(c.id));
+      const orderIndex = new Map(selectionOrder.map((id, i) => [id, i]));
+      result = [...result].sort((a, b) => {
+        const ai = orderIndex.has(a.id) ? orderIndex.get(a.id) : Number.MAX_SAFE_INTEGER;
+        const bi = orderIndex.has(b.id) ? orderIndex.get(b.id) : Number.MAX_SAFE_INTEGER;
+        return ai - bi;
+      });
     }
 
     return result;
-  }, [copies, statusFilter, dateFilter, customFrom, customTo, search, selectedOnly, selectedIds]);
+  }, [copies, statusFilter, dateFilter, customFrom, customTo, search, selectedOnly, selectedIds, selectionOrder]);
 
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [statusFilter, dateFilter, customFrom, customTo, search]);
@@ -227,7 +244,13 @@ export default function BarcodeManager() {
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        setSelectionOrder(o => o.filter(x => x !== id));
+      } else {
+        next.add(id);
+        setSelectionOrder(o => o.includes(id) ? o : [...o, id]);
+      }
       return next;
     });
   };
@@ -235,12 +258,18 @@ export default function BarcodeManager() {
   const toggleSelectAll = () => {
     if (selectedIds.size === paginated.length && paginated.every(c => selectedIds.has(c.id))) {
       setSelectedIds(new Set());
+      setSelectionOrder(o => o.filter(id => !paginated.some(c => c.id === id)));
     } else {
       setSelectedIds(new Set(paginated.map(c => c.id)));
+      setSelectionOrder(o => {
+        const existing = new Set(o);
+        const additions = paginated.map(c => c.id).filter(id => !existing.has(id));
+        return [...o, ...additions];
+      });
     }
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => { setSelectedIds(new Set()); setSelectionOrder([]); };
 
   // --- Print ---
   const getSelectedForPrint = () => {
@@ -787,7 +816,7 @@ export default function BarcodeManager() {
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
               <button
-                onClick={() => { setSelectedIds(new Set()); setScanSessionCount(0); setRecentScans([]); }}
+                onClick={() => { setSelectedIds(new Set()); setSelectionOrder([]); setScanSessionCount(0); setRecentScans([]); }}
                 style={{ flex: 1, padding: '10px 12px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
               >Clear all</button>
               <button
