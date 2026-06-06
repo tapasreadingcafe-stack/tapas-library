@@ -88,11 +88,32 @@ export default function Books() {
   const [showImport, setShowImport] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
   const [coverLoaded, setCoverLoaded] = useState(false);
+  const [coverError, setCoverError] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Reset cover-loaded flag whenever the preview URL changes so the
-  // "Loading cover…" indicator reappears for each new image.
-  useEffect(() => { setCoverLoaded(false); }, [imagePreview]);
+  // Collapsible Pricing / Online Store sections in the Add/Edit form.
+  // The open state persists across books so it reflects the user's last
+  // action — open it once and it stays open for the next book, and vice versa.
+  const [pricingOpen, setPricingOpen] = useState(() => localStorage.getItem('tapas_addbook_pricing_open') !== '0');
+  const [storeOpen, setStoreOpen] = useState(() => localStorage.getItem('tapas_addbook_store_open') !== '0');
+  const toggleSection = (which) => {
+    if (which === 'pricing') {
+      setPricingOpen(v => { const n = !v; localStorage.setItem('tapas_addbook_pricing_open', n ? '1' : '0'); return n; });
+    } else {
+      setStoreOpen(v => { const n = !v; localStorage.setItem('tapas_addbook_store_open', n ? '1' : '0'); return n; });
+    }
+  };
+
+  const stepQty = (field, delta, min) => {
+    setFormData(prev => {
+      const cur = parseInt(prev[field], 10) || 0;
+      return { ...prev, [field]: Math.max(min, cur + delta) };
+    });
+  };
+
+  // Reset cover flags whenever the preview URL changes so the loading /
+  // error indicators re-evaluate for each new image.
+  useEffect(() => { setCoverLoaded(false); setCoverError(false); }, [imagePreview]);
   const [hasCondition, setHasCondition] = useState(false);
   const [filterCondition, setFilterCondition] = useState('all');
   const [isbnLooking, setIsbnLooking] = useState(false);
@@ -756,9 +777,6 @@ export default function Books() {
               {/* IMAGE PREVIEW SECTION */}
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px', textAlign: 'center', minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>📸 Book Cover Image</label>
-                {imagePreview && !coverLoaded && (
-                  <p style={{ color: '#667eea', fontSize: '13px', margin: '8px 0' }}>⏳ Loading cover…</p>
-                )}
                 {imagePreview && (
                   <img
                     key={imagePreview}
@@ -767,10 +785,16 @@ export default function Books() {
                     loading="eager"
                     fetchpriority="high"
                     decoding="async"
-                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px', background: '#f0f0f0', display: coverLoaded ? 'block' : 'none' }}
-                    onLoad={() => setCoverLoaded(true)}
-                    onError={e => { setCoverLoaded(false); e.target.style.display = 'none'; }}
+                    style={{ maxWidth: '100%', maxHeight: '200px', marginBottom: '10px', borderRadius: '4px', background: '#f0f0f0', display: coverError ? 'none' : 'block' }}
+                    onLoad={() => { setCoverLoaded(true); setCoverError(false); }}
+                    onError={() => { setCoverLoaded(false); setCoverError(true); }}
                   />
+                )}
+                {imagePreview && !coverLoaded && !coverError && (
+                  <p style={{ color: '#667eea', fontSize: '13px', margin: '8px 0' }}>⏳ Loading cover…</p>
+                )}
+                {imagePreview && coverError && (
+                  <p style={{ color: '#c0392b', fontSize: '13px', margin: '8px 0' }}>⚠️ Couldn't load this image — check the URL or upload a photo.</p>
                 )}
                 {!imagePreview && <p style={{ color: '#999' }}>No image selected</p>}
               </div>
@@ -924,7 +948,7 @@ export default function Books() {
               {hasCondition && (
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Book Condition</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
                     {CONDITIONS.map(c => {
                       const selected = (formData.condition || 'Good') === c;
                       const s = CONDITION_STYLE[c] || {};
@@ -934,14 +958,16 @@ export default function Books() {
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, condition: c }))}
                           style={{
-                            padding: isMobile ? '10px 16px' : '8px 14px',
+                            flex: 1,
+                            minWidth: 0,
+                            padding: isMobile ? '10px 4px' : '8px 10px',
                             minHeight: isMobile ? '44px' : 'auto',
                             border: selected ? `1px solid ${s.text}` : '1px solid #d1d5db',
                             background: selected ? s.bg : '#fff',
                             color: selected ? s.text : '#6b7280',
                             borderRadius: '999px',
                             fontWeight: selected ? 700 : 500,
-                            fontSize: '13px',
+                            fontSize: isMobile ? '12px' : '13px',
                             cursor: 'pointer',
                             transition: 'all 0.15s',
                           }}
@@ -956,8 +982,15 @@ export default function Books() {
 
               {/* PRICING SECTION */}
               <div style={{ background: '#f8f9ff', padding: '14px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e0e8ff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                  <label style={{ fontWeight: 'bold', fontSize: '14px', color: '#667eea', margin: 0 }}>💰 Pricing</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: pricingOpen ? '10px' : 0, flexWrap: 'wrap', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('pricing')}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', color: '#667eea' }}
+                  >
+                    <span style={{ display: 'inline-block', transform: pricingOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', fontSize: '11px' }}>▶</span>
+                    💰 Pricing
+                  </button>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: notForSale ? '#c0392b' : '#6b7280', fontWeight: notForSale ? 700 : 500 }}>
                     <input
                       type="checkbox"
@@ -974,6 +1007,7 @@ export default function Books() {
                     Not for sale
                   </label>
                 </div>
+                {pricingOpen && (<>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', fontSize: '12px', color: '#666' }}>Buying Price (₹)</label>
@@ -1050,39 +1084,51 @@ export default function Books() {
                     )}
                   </div>
                 </div>
+                </>)}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Total Copies</label>
-                  <input
-                    type="number"
-                    name="quantity_total"
-                    value={formData.quantity_total}
-                    onChange={handleInputChange}
-                    min="1"
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Available Copies</label>
-                <input
-                  type="number"
-                  name="quantity_available"
-                  value={formData.quantity_available}
-                  onChange={handleInputChange}
-                  min="0"
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
+                {[
+                  { label: 'Total Copies', name: 'quantity_total', min: 1 },
+                  { label: 'Available Copies', name: 'quantity_available', min: 0 },
+                ].map(({ label, name, min }) => (
+                  <div key={name}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>{label}</label>
+                    <div style={{ display: 'flex', alignItems: 'stretch', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => stepQty(name, -1, min)}
+                        style={{ width: '44px', minHeight: '44px', flexShrink: 0, border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontSize: '22px', fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+                      >−</button>
+                      <input
+                        type="number"
+                        name={name}
+                        value={formData[name]}
+                        onChange={handleInputChange}
+                        min={min}
+                        style={{ flex: 1, minWidth: 0, padding: '10px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '4px', minHeight: '44px', fontSize: '16px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => stepQty(name, 1, min)}
+                        style={{ width: '44px', minHeight: '44px', flexShrink: 0, border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontSize: '20px', fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+                      >+</button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Store visibility + borrowability toggles (ecommerce) */}
               <div style={{ marginBottom: '15px', padding: '12px 14px', background: '#f8f9ff', borderRadius: '6px', border: '1px dashed #c0c8f5' }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#5a67d8', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection('store')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '12px', fontWeight: '700', color: '#5a67d8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: storeOpen ? '10px' : 0 }}
+                >
+                  <span style={{ display: 'inline-block', transform: storeOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', fontSize: '10px' }}>▶</span>
                   🌐 Online Store
-                </div>
+                </button>
+                {storeOpen && (<>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', fontSize: '14px' }}>
                   <label style={{ fontSize: '12px', fontWeight: '700', color: '#5a67d8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Publish status</label>
                   <select
@@ -1166,20 +1212,21 @@ export default function Books() {
                     </div>
                   </div>
                 )}
+                </>)}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button type="submit" disabled={isReadOnly} style={{ padding: '10px 20px', background: isReadOnly ? '#ccc' : '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                <button type="submit" disabled={isReadOnly} style={{ flex: 1, padding: '10px 8px', background: isReadOnly ? '#ccc' : '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '15px' : 'inherit', whiteSpace: 'nowrap' }}>
                   {editingId ? 'Update Book' : 'Add Book'}
                 </button>
                 {!editingId && !isReadOnly && (
-                  <button type="submit" onClick={() => setPrintAfterAdd(true)}
-                    style={{ padding: '10px 20px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
-                    Add + 🖨️ Print Barcode
+                  <button type="submit" onClick={() => setPrintAfterAdd(true)} title="Add and print barcode"
+                    style={{ flexShrink: 0, padding: '10px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: '18px', whiteSpace: 'nowrap' }}>
+                    Add +🖨️
                   </button>
                 )}
                 <button type="button" onClick={() => setShowAddForm(false)}
-                  style={{ padding: '10px 20px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}>
+                  style={{ flex: 1, padding: '10px 8px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '15px' : 'inherit', whiteSpace: 'nowrap' }}>
                   Cancel
                 </button>
               </div>
