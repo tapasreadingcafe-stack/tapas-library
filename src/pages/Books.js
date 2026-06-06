@@ -78,6 +78,8 @@ export default function Books() {
   const { isReadOnly, canDeleteBooks, canExportData } = usePermission();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Token to discard stale fetches when the filter changes mid-stream.
+  const fetchTokenRef = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -164,32 +166,46 @@ export default function Books() {
   };
 
   const fetchBooks = async () => {
+    // Each call gets a unique token; if the filter changes mid-stream and a
+    // newer fetch starts, stale batches from this call are discarded instead
+    // of overwriting the newer results.
+    const token = ++fetchTokenRef.current;
     setLoading(true);
+    setBooks([]);
     try {
-      // Paginate in 1000-row batches to bypass Supabase's default
-      // server cap. Stops when a batch returns fewer rows than the
-      // page size, which means we've reached the end of the catalog.
-      const PAGE = 1000;
+      // Stream the catalog in batches so the top rows render after the first
+      // round trip instead of waiting for the whole catalog to download.
+      // A small first page paints almost immediately; the rest fill in behind
+      // it. Each batch is appended to state as it arrives.
       const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status';
-      const all = [];
-      for (let offset = 0; ; offset += PAGE) {
+      const FIRST_PAGE = 50;
+      const PAGE = 1000;
+      let offset = 0;
+      let pageSize = FIRST_PAGE;
+      for (;;) {
         let q = supabase
           .from('books')
           .select(cols)
           .order('created_at', { ascending: false })
-          .range(offset, offset + PAGE - 1);
+          .range(offset, offset + pageSize - 1);
         if (filterCategory !== 'all') q = q.eq('category', filterCategory);
         const { data, error } = await q;
         if (error) throw error;
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < PAGE) break;
+        // A newer fetch superseded this one — abandon without touching state.
+        if (token !== fetchTokenRef.current) return;
+        if (data && data.length > 0) {
+          setBooks(prev => [...prev, ...data]);
+          // Drop the skeleton as soon as the first batch is on screen.
+          if (offset === 0) setLoading(false);
+        }
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+        pageSize = PAGE;
       }
-      setBooks(all);
     } catch (error) {
       console.error('Error fetching books:', error);
     } finally {
-      setLoading(false);
+      if (token === fetchTokenRef.current) setLoading(false);
     }
   };
 
