@@ -111,6 +111,9 @@ export default function Books() {
     });
   };
 
+  // Strip dashes/spaces so "978-0-13..." and "9780013..." compare equal.
+  const normIsbn = (s) => (s || '').replace(/[-\s]/g, '');
+
   // Reset cover flags whenever the preview URL changes so the loading /
   // error indicators re-evaluate for each new image.
   useEffect(() => { setCoverLoaded(false); setCoverError(false); }, [imagePreview]);
@@ -651,6 +654,27 @@ export default function Books() {
     return matchSearch && matchCondition;
   });
 
+  // When adding a new book, surface whether this title is already in the
+  // catalog (matched by ISBN, else by title+author) so staff can see existing
+  // stock before creating a duplicate. Skipped while editing an existing book.
+  const dupMatch = (() => {
+    if (editingId) return null;
+    const isbn = normIsbn(formData.isbn);
+    if (isbn) {
+      const byIsbn = books.find(b => normIsbn(b.isbn) && normIsbn(b.isbn) === isbn);
+      if (byIsbn) return byIsbn;
+    }
+    const title = (formData.title || '').trim().toLowerCase();
+    if (title) {
+      const author = (formData.author || '').trim().toLowerCase();
+      return books.find(b =>
+        (b.title || '').trim().toLowerCase() === title &&
+        (b.author || '').trim().toLowerCase() === author
+      ) || null;
+    }
+    return null;
+  })();
+
   return (
     <div style={{ padding: isMobile ? '12px' : '20px' }}>
       {isReadOnly && <ViewOnlyBanner />}
@@ -771,8 +795,19 @@ export default function Books() {
 
       {showAddForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          <div style={{ background: 'white', padding: isMobile ? '16px' : '30px', borderRadius: '8px', maxWidth: '700px', width: isMobile ? '95%' : '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2>{editingId ? 'Edit Book' : 'Add New Book'}</h2>
+          <div style={{ background: 'white', padding: isMobile ? '16px' : '30px', borderRadius: '8px', maxWidth: '700px', width: isMobile ? '95%' : '90%', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <h2 style={{ margin: 0 }}>{editingId ? 'Edit Book' : 'Add New Book'}</h2>
+              {dupMatch && (
+                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: '8px', padding: '6px 10px', lineHeight: 1.2 }}>
+                  <span style={{ fontSize: '11px', color: '#ad6800', fontWeight: 600 }}>Already in stock</span>
+                  <span style={{ fontSize: '18px', color: '#d46b08', fontWeight: 800 }}>
+                    {dupMatch.quantity_total} {dupMatch.quantity_total === 1 ? 'copy' : 'copies'}
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#ad6800' }}>{dupMatch.quantity_available} available</span>
+                </div>
+              )}
+            </div>
             <form onSubmit={handleAddBook}>
               {/* IMAGE PREVIEW SECTION */}
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px', textAlign: 'center', minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -1087,18 +1122,18 @@ export default function Books() {
                 </>)}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
                 {[
                   { label: 'Total Copies', name: 'quantity_total', min: 1 },
                   { label: 'Available Copies', name: 'quantity_available', min: 0 },
                 ].map(({ label, name, min }) => (
-                  <div key={name}>
-                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>{label}</label>
-                    <div style={{ display: 'flex', alignItems: 'stretch', gap: '6px' }}>
+                  <div key={name} style={{ minWidth: 0 }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: isMobile ? '13px' : 'inherit' }}>{label}</label>
+                    <div style={{ display: 'flex', alignItems: 'stretch', gap: '4px' }}>
                       <button
                         type="button"
                         onClick={() => stepQty(name, -1, min)}
-                        style={{ width: '44px', minHeight: '44px', flexShrink: 0, border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontSize: '22px', fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+                        style={{ width: '36px', flexShrink: 0, minHeight: '44px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontSize: '20px', fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}
                       >−</button>
                       <input
                         type="number"
@@ -1106,12 +1141,12 @@ export default function Books() {
                         value={formData[name]}
                         onChange={handleInputChange}
                         min={min}
-                        style={{ flex: 1, minWidth: 0, padding: '10px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '4px', minHeight: '44px', fontSize: '16px' }}
+                        style={{ flex: 1, width: '100%', minWidth: 0, padding: '10px 4px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '4px', minHeight: '44px', fontSize: '16px', boxSizing: 'border-box' }}
                       />
                       <button
                         type="button"
                         onClick={() => stepQty(name, 1, min)}
-                        style={{ width: '44px', minHeight: '44px', flexShrink: 0, border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontSize: '20px', fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+                        style={{ width: '36px', flexShrink: 0, minHeight: '44px', border: '1px solid #ddd', borderRadius: '4px', background: '#f5f5f5', color: '#667eea', fontSize: '20px', fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}
                       >+</button>
                     </div>
                   </div>
