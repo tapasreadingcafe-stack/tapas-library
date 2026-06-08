@@ -117,54 +117,6 @@ export default function Books() {
   // collapse whitespace. So "Ten Tremendous Tales!" == "ten tremendous tales".
   const normTitle = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-  // "Already in stock" detection. Queries the database directly (not the
-  // possibly-filtered in-memory list) so it's accurate regardless of the
-  // category filter or how much of the catalog has streamed in. ISBN is the
-  // authoritative key when present; title+author is used only when no ISBN is
-  // entered, which avoids false matches on different editions sharing a title.
-  const [dupMatch, setDupMatch] = useState(null);
-  useEffect(() => {
-    if (!showAddForm || editingId) { setDupMatch(null); return; }
-    const rawIsbn = (formData.isbn || '').trim();
-    const isbn = normIsbn(rawIsbn);
-    const title = (formData.title || '').trim();
-    if (!isbn && !title) { setDupMatch(null); return; }
-
-    let cancelled = false;
-    const handle = setTimeout(async () => {
-      let match = null;
-      try {
-        if (isbn) {
-          // Match by ISBN, tolerant of stored dash/space formatting.
-          const { data } = await supabase
-            .from('books')
-            .select('id, title, author, isbn, quantity_total, quantity_available')
-            .or(`isbn.eq.${rawIsbn},isbn.eq.${isbn}`)
-            .limit(20);
-          match = (data || []).find(b => normIsbn(b.isbn) === isbn) || null;
-        } else if (title) {
-          // No ISBN — fall back to an exact (case/punctuation-insensitive) title
-          // match, preferring the same author when one is given.
-          const { data } = await supabase
-            .from('books')
-            .select('id, title, author, isbn, quantity_total, quantity_available')
-            .ilike('title', title)
-            .limit(20);
-          const nt = normTitle(title);
-          const na = normTitle(formData.author);
-          const candidates = (data || []).filter(b => normTitle(b.title) === nt);
-          match = candidates.find(b => na && normTitle(b.author) === na) || candidates[0] || null;
-        }
-      } catch {
-        match = null;
-      }
-      if (!cancelled) setDupMatch(match);
-    }, 350);
-
-    return () => { cancelled = true; clearTimeout(handle); };
-    // eslint-disable-next-line
-  }, [showAddForm, editingId, formData.isbn, formData.title, formData.author]);
-
   // Reset cover flags whenever the preview URL changes so the loading /
   // error indicators re-evaluate for each new image.
   useEffect(() => { setCoverLoaded(false); setCoverError(false); }, [imagePreview]);
@@ -207,6 +159,56 @@ export default function Books() {
   };
 
   const [formData, setFormData] = useState(emptyForm);
+
+  // "Already in stock" detection. Queries the database directly (not the
+  // possibly-filtered in-memory list) so it's accurate regardless of the
+  // category filter or how much of the catalog has streamed in. ISBN is the
+  // authoritative key when present; title+author is used only when no ISBN is
+  // entered, which avoids false matches on different editions sharing a title.
+  // NOTE: declared after formData because the deps array reads formData.* at
+  // render time — placing it earlier hits the temporal dead zone and crashes.
+  const [dupMatch, setDupMatch] = useState(null);
+  useEffect(() => {
+    if (!showAddForm || editingId) { setDupMatch(null); return; }
+    const rawIsbn = (formData.isbn || '').trim();
+    const isbn = normIsbn(rawIsbn);
+    const title = (formData.title || '').trim();
+    if (!isbn && !title) { setDupMatch(null); return; }
+
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      let match = null;
+      try {
+        if (isbn) {
+          // Match by ISBN, tolerant of stored dash/space formatting.
+          const { data } = await supabase
+            .from('books')
+            .select('id, title, author, isbn, quantity_total, quantity_available')
+            .or(`isbn.eq.${rawIsbn},isbn.eq.${isbn}`)
+            .limit(20);
+          match = (data || []).find(b => normIsbn(b.isbn) === isbn) || null;
+        } else if (title) {
+          // No ISBN — fall back to an exact (case/punctuation-insensitive) title
+          // match, preferring the same author when one is given.
+          const { data } = await supabase
+            .from('books')
+            .select('id, title, author, isbn, quantity_total, quantity_available')
+            .ilike('title', title)
+            .limit(20);
+          const nt = normTitle(title);
+          const na = normTitle(formData.author);
+          const candidates = (data || []).filter(b => normTitle(b.title) === nt);
+          match = candidates.find(b => na && normTitle(b.author) === na) || candidates[0] || null;
+        }
+      } catch {
+        match = null;
+      }
+      if (!cancelled) setDupMatch(match);
+    }, 350);
+
+    return () => { cancelled = true; clearTimeout(handle); };
+    // eslint-disable-next-line
+  }, [showAddForm, editingId, formData.isbn, formData.title, formData.author]);
 
   // Run probe + categories only once on mount
   useEffect(() => {
