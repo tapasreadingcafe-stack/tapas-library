@@ -113,6 +113,57 @@ export default function Books() {
 
   // Strip dashes/spaces so "978-0-13..." and "9780013..." compare equal.
   const normIsbn = (s) => (s || '').replace(/[-\s]/g, '');
+  // Normalize a title for fuzzy comparison: lowercase, drop punctuation,
+  // collapse whitespace. So "Ten Tremendous Tales!" == "ten tremendous tales".
+  const normTitle = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+  // "Already in stock" detection. Queries the database directly (not the
+  // possibly-filtered in-memory list) so it's accurate regardless of the
+  // category filter or how much of the catalog has streamed in. ISBN is the
+  // authoritative key when present; title+author is used only when no ISBN is
+  // entered, which avoids false matches on different editions sharing a title.
+  const [dupMatch, setDupMatch] = useState(null);
+  useEffect(() => {
+    if (!showAddForm || editingId) { setDupMatch(null); return; }
+    const rawIsbn = (formData.isbn || '').trim();
+    const isbn = normIsbn(rawIsbn);
+    const title = (formData.title || '').trim();
+    if (!isbn && !title) { setDupMatch(null); return; }
+
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      let match = null;
+      try {
+        if (isbn) {
+          // Match by ISBN, tolerant of stored dash/space formatting.
+          const { data } = await supabase
+            .from('books')
+            .select('id, title, author, isbn, quantity_total, quantity_available')
+            .or(`isbn.eq.${rawIsbn},isbn.eq.${isbn}`)
+            .limit(20);
+          match = (data || []).find(b => normIsbn(b.isbn) === isbn) || null;
+        } else if (title) {
+          // No ISBN — fall back to an exact (case/punctuation-insensitive) title
+          // match, preferring the same author when one is given.
+          const { data } = await supabase
+            .from('books')
+            .select('id, title, author, isbn, quantity_total, quantity_available')
+            .ilike('title', title)
+            .limit(20);
+          const nt = normTitle(title);
+          const na = normTitle(formData.author);
+          const candidates = (data || []).filter(b => normTitle(b.title) === nt);
+          match = candidates.find(b => na && normTitle(b.author) === na) || candidates[0] || null;
+        }
+      } catch {
+        match = null;
+      }
+      if (!cancelled) setDupMatch(match);
+    }, 350);
+
+    return () => { cancelled = true; clearTimeout(handle); };
+    // eslint-disable-next-line
+  }, [showAddForm, editingId, formData.isbn, formData.title, formData.author]);
 
   // Reset cover flags whenever the preview URL changes so the loading /
   // error indicators re-evaluate for each new image.
@@ -654,27 +705,6 @@ export default function Books() {
     return matchSearch && matchCondition;
   });
 
-  // When adding a new book, surface whether this title is already in the
-  // catalog (matched by ISBN, else by title+author) so staff can see existing
-  // stock before creating a duplicate. Skipped while editing an existing book.
-  const dupMatch = (() => {
-    if (editingId) return null;
-    const isbn = normIsbn(formData.isbn);
-    if (isbn) {
-      const byIsbn = books.find(b => normIsbn(b.isbn) && normIsbn(b.isbn) === isbn);
-      if (byIsbn) return byIsbn;
-    }
-    const title = (formData.title || '').trim().toLowerCase();
-    if (title) {
-      const author = (formData.author || '').trim().toLowerCase();
-      return books.find(b =>
-        (b.title || '').trim().toLowerCase() === title &&
-        (b.author || '').trim().toLowerCase() === author
-      ) || null;
-    }
-    return null;
-  })();
-
   return (
     <div style={{ padding: isMobile ? '12px' : '20px' }}>
       {isReadOnly && <ViewOnlyBanner />}
@@ -693,22 +723,6 @@ export default function Books() {
             style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
           >
             ➕ Add Book
-          </button>}
-          {!isReadOnly && <button
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingId(null);
-              setImagePreview('');
-              setFormData(emptyForm);
-              setNotForSale(false);
-              setShowIsbnScanner(true);
-            }}
-            title="Scan barcode → auto-fill book details → fill the rest"
-            style={{ padding: isMobile ? '10px 14px' : '8px 12px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', minHeight: isMobile ? '44px' : 'auto', minWidth: isMobile ? '44px' : 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-              <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
-            </svg>
           </button>}
           {!isReadOnly && <button
             onClick={() => navigate('/books/bulk')}
@@ -1251,6 +1265,10 @@ export default function Books() {
               </div>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                <button type="button" onClick={() => setShowAddForm(false)}
+                  style={{ flex: 1, padding: '10px 8px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '15px' : 'inherit', whiteSpace: 'nowrap' }}>
+                  Cancel
+                </button>
                 <button type="submit" disabled={isReadOnly} style={{ flex: 1, padding: '10px 8px', background: isReadOnly ? '#ccc' : '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '15px' : 'inherit', whiteSpace: 'nowrap' }}>
                   {editingId ? 'Update Book' : 'Add Book'}
                 </button>
@@ -1260,10 +1278,6 @@ export default function Books() {
                     Add +🖨️
                   </button>
                 )}
-                <button type="button" onClick={() => setShowAddForm(false)}
-                  style={{ flex: 1, padding: '10px 8px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '15px' : 'inherit', whiteSpace: 'nowrap' }}>
-                  Cancel
-                </button>
               </div>
             </form>
           </div>
@@ -1459,6 +1473,27 @@ export default function Books() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Floating scan button — quick "scan barcode → add book" entry point */}
+      {!isReadOnly && !showAddForm && !showIsbnScanner && (
+        <button
+          onClick={() => {
+            setShowAddForm(true);
+            setEditingId(null);
+            setImagePreview('');
+            setFormData(emptyForm);
+            setNotForSale(false);
+            setShowIsbnScanner(true);
+          }}
+          title="Scan barcode → auto-fill book details"
+          aria-label="Scan barcode to add a book"
+          style={{ position: 'fixed', right: '20px', bottom: '24px', width: '60px', height: '60px', borderRadius: '50%', background: '#0ea5e9', color: 'white', border: 'none', boxShadow: '0 6px 18px rgba(14,165,233,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }}
+        >
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+            <path d="M3 5h1.5v14H3V5zm2.5 0H7v14H5.5V5zm2.5 0h2v14H8V5zm3 0h1v14h-1V5zm2 0h1.5v14H13V5zm2.5 0h2v14h-2V5zm3 0H20v14h-1.5V5zM21 5h.5v14H21V5z"/>
+          </svg>
+        </button>
       )}
     </div>
   );
