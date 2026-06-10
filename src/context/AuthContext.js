@@ -111,8 +111,21 @@ export function AuthProvider({ children }) {
       } catch (e) {
         console.error('[Auth] init error:', e);
         if (!cancelled) setLoading(false);
+      } finally {
+        if (!cancelled) clearTimeout(watchdog);
       }
     };
+
+    // Watchdog: never let the auth check spin forever. If getSession() or the
+    // staff lookup hangs (flaky mobile network, stale/corrupt token), drop the
+    // "Loading…" overlay after 10s so the gate falls through to the login
+    // screen instead of trapping the user on an infinite spinner.
+    const watchdog = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('[Auth] init watchdog fired — forcing loading=false');
+        setLoading(false);
+      }
+    }, 10000);
 
     init();
 
@@ -126,6 +139,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(watchdog);
       subscription.unsubscribe();
     };
   }, [updateHeartbeat]);
