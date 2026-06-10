@@ -38,6 +38,28 @@ export default function Login({ staffStatus, debugInfo }) {
     return '';
   })();
 
+  // Turn a raw auth/network error into a message that tells the user what
+  // actually went wrong, instead of blaming the password for everything.
+  const messageForError = (err) => {
+    const msg = (err?.message || '').toLowerCase();
+    const status = err?.status;
+    if (msg.includes('timed out'))
+      return 'Connection timed out. Check your internet and try again.';
+    if (status === 429 || msg.includes('rate limit') || msg.includes('too many'))
+      return 'Too many sign-in attempts. Please wait a minute, then try again.';
+    if (msg.includes('not a staff'))
+      return 'This account is not registered as staff. Contact your administrator.';
+    if (msg.includes('deactivated'))
+      return 'This staff account has been deactivated. Contact your administrator.';
+    if (msg.includes('email not confirmed'))
+      return 'Email not confirmed yet. Check your inbox for the confirmation link.';
+    if (msg.includes('failed to fetch') || msg.includes('network'))
+      return 'Network error. Check your connection and try again.';
+    if (msg.includes('invalid login') || msg.includes('invalid') || status === 400)
+      return 'Invalid email or password.';
+    return err?.message || 'Sign-in failed. Please try again.';
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password) return;
@@ -49,7 +71,8 @@ export default function Login({ staffStatus, debugInfo }) {
       // and either grants access or flips `staff` into a sentinel; the
       // App.js gate reacts automatically — no navigate() needed here.
     } catch (err) {
-      setError('Invalid email or password.');
+      console.error('[Login] sign-in failed:', err?.status, err?.message);
+      setError(messageForError(err));
     } finally {
       setLoading(false);
     }
