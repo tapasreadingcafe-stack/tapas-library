@@ -12,6 +12,17 @@ const LAST_ACTIVITY_KEY = 'tapas_last_activity';
 // No caching tricks, no event-handler dedup, no refs.
 // =====================================================================
 
+// Reject if a promise doesn't settle in time, so a hung auth/network call
+// surfaces as an error the UI can recover from instead of spinning forever.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out`)), ms)
+    ),
+  ]);
+}
+
 async function fetchStaffRow(email) {
   const { data, error } = await supabase
     .from('staff')
@@ -172,10 +183,14 @@ export function AuthProvider({ children }) {
 
   // ── Login ──────────────────────────────────────────────────────────
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithPassword({ email, password }),
+      15000,
+      'Sign-in'
+    );
     if (error) throw error;
 
-    const staffRow = await fetchStaffRow(data.user.email);
+    const staffRow = await withTimeout(fetchStaffRow(data.user.email), 15000, 'Staff lookup');
     if (staffRow && staffRow.is_active) {
       setUser(data.user);
       setStaff(staffRow);
