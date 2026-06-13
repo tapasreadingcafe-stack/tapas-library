@@ -71,11 +71,20 @@ export function getCategoryPrefix(category) {
   return category.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'GEN';
 }
 
-// Generate next copy ID: FIC-0001, FIC-0002, etc.
-export async function generateCopyIds(bookId, category, count) {
-  const prefix = getCategoryPrefix(category);
+// Copy kind → barcode letter. Library/borrow copies print B-, sale copies S-.
+const KIND_LETTER = { library: 'B', sale: 'S' };
 
-  const fullPrefix = `B-${prefix}`;
+// Full copy-code prefix, e.g. "B-FIC" (borrow) or "S-FIC" (sale).
+export function getCopyPrefix(category, kind = 'library') {
+  const letter = KIND_LETTER[kind] || 'B';
+  return `${letter}-${getCategoryPrefix(category)}`;
+}
+
+// Generate next copy IDs: B-FIC-0001 (library) or S-FIC-0001 (sale).
+// Sale and library copies number independently per category prefix.
+export async function generateCopyIds(bookId, category, count, kind = 'library') {
+  const copyKind = kind === 'sale' ? 'sale' : 'library';
+  const fullPrefix = getCopyPrefix(category, copyKind);
 
   // Get the highest existing number for this prefix
   const { data: existing } = await supabase
@@ -99,6 +108,7 @@ export async function generateCopyIds(bookId, category, count) {
       copy_code: `${fullPrefix}-${num}`,
       status: 'available',
       condition: 'New',
+      copy_kind: copyKind,
     });
   }
 
@@ -106,11 +116,17 @@ export async function generateCopyIds(bookId, category, count) {
 }
 
 // Create copies in DB
-export async function createBookCopies(bookId, category, count) {
-  const copies = await generateCopyIds(bookId, category, count);
+export async function createBookCopies(bookId, category, count, kind = 'library') {
+  const copies = await generateCopyIds(bookId, category, count, kind);
   if (copies.length === 0) return [];
 
-  const { data, error } = await supabase.from('book_copies').insert(copies).select();
+  let { data, error } = await supabase.from('book_copies').insert(copies).select();
+  // Older DBs may not have the copy_kind column yet — retry without it so
+  // copy creation never hard-fails before the migration is applied.
+  if (error && /copy_kind/i.test(error.message || '')) {
+    const stripped = copies.map(({ copy_kind, ...rest }) => rest);
+    ({ data, error } = await supabase.from('book_copies').insert(stripped).select());
+  }
   if (error) throw error;
   return data || [];
 }
@@ -141,6 +157,7 @@ CREATE TABLE IF NOT EXISTS book_copies (
   book_id UUID REFERENCES books(id) ON DELETE CASCADE,
   copy_code TEXT UNIQUE NOT NULL,
   status TEXT DEFAULT 'available',
+  copy_kind TEXT DEFAULT 'library',
   condition TEXT DEFAULT 'New',
   notes TEXT,
   current_borrower_id UUID REFERENCES members(id),

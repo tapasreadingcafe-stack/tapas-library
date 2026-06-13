@@ -104,6 +104,22 @@ export default function Books() {
     }
   };
 
+  // Add-book copy type: 'borrow' (B-), 'sale' (S-), or 'both'. Remembered
+  // across books like the pricing/store sections above.
+  const [copyMode, setCopyMode] = useState(() => localStorage.getItem('tapas_addbook_copy_mode') || 'borrow');
+  // Keep the borrow/sale counts consistent with the chosen mode.
+  const applyCopyMode = (mode, fd) => {
+    const next = { ...fd };
+    if (mode === 'borrow') { next.sale_copies = 0; if (!(parseInt(next.borrow_copies) > 0)) next.borrow_copies = 1; }
+    else if (mode === 'sale') { next.borrow_copies = 0; if (!(parseInt(next.sale_copies) > 0)) next.sale_copies = 1; }
+    return next; // 'both' keeps whatever is already entered
+  };
+  const changeCopyMode = (mode) => {
+    localStorage.setItem('tapas_addbook_copy_mode', mode);
+    setCopyMode(mode);
+    setFormData(prev => applyCopyMode(mode, prev));
+  };
+
   const stepQty = (field, delta, min) => {
     setFormData(prev => {
       const cur = parseInt(prev[field], 10) || 0;
@@ -147,6 +163,8 @@ export default function Books() {
     discount_percent: '',
     quantity_total: 1,
     quantity_available: 1,
+    borrow_copies: 1, // new copies to create as library/borrow stock (B- barcodes)
+    sale_copies: 0,   // new copies to create as sale stock (S- barcodes)
     book_image: '',
     condition: 'Good',
     store_visible: false,
@@ -203,12 +221,37 @@ export default function Books() {
       } catch {
         match = null;
       }
+      // Break the in-stock count into sale (S-) vs borrow (B-) copies so staff
+      // can see what kind of stock already exists before adding more.
+      if (match) {
+        try {
+          const { data: copies } = await supabase
+            .from('book_copies')
+            .select('copy_code, status')
+            .eq('book_id', match.id);
+          if (copies) {
+            const isSale = c => /^S-/i.test(c.copy_code);
+            const isBorrow = c => /^B-/i.test(c.copy_code);
+            match.saleCount = copies.filter(isSale).length;
+            match.borrowCount = copies.filter(isBorrow).length;
+            match.saleAvail = copies.filter(c => isSale(c) && c.status === 'available').length;
+            match.borrowAvail = copies.filter(c => isBorrow(c) && c.status === 'available').length;
+          }
+        } catch {}
+      }
       if (!cancelled) setDupMatch(match);
     }, 350);
 
     return () => { cancelled = true; clearTimeout(handle); };
     // eslint-disable-next-line
   }, [showAddForm, editingId, formData.isbn, formData.title, formData.author]);
+
+  // When the Add form opens, line the borrow/sale counts up with the
+  // remembered copy-type toggle.
+  useEffect(() => {
+    if (showAddForm && !editingId) setFormData(prev => applyCopyMode(copyMode, prev));
+    // eslint-disable-next-line
+  }, [showAddForm]);
 
   // Run probe + categories only once on mount
   useEffect(() => {
@@ -301,7 +344,8 @@ export default function Books() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    const updatedData = { ...formData, [name]: name === 'price' || name === 'sales_price' || name === 'quantity_total' || name === 'quantity_available' ? parseFloat(value) : value };
+    const numericFields = ['price', 'sales_price', 'quantity_total', 'quantity_available', 'borrow_copies', 'sale_copies'];
+    const updatedData = { ...formData, [name]: numericFields.includes(name) ? parseFloat(value) : value };
     setFormData(updatedData);
     
     if (name === 'book_image') {
@@ -596,7 +640,21 @@ export default function Books() {
       // Mirror book_image into cover_url so the storefront can render it directly.
       if (payload.book_image && !payload.cover_url) payload.cover_url = payload.book_image;
 
-      const copyCount = parseInt(payload.quantity_total) || 1;
+      // Case A: separate physical copies for borrow (B- barcodes) vs sale (S- barcodes).
+      // These two inputs drive copy creation; they are NOT columns on `books`.
+      let nBorrow = Math.max(0, parseInt(payload.borrow_copies) || 0);
+      let nSale = Math.max(0, parseInt(payload.sale_copies) || 0);
+      delete payload.borrow_copies;
+      delete payload.sale_copies;
+      if (!editingId && nBorrow + nSale === 0) nBorrow = 1; // never create a book with zero copies
+      const copyCount = editingId ? (parseInt(payload.quantity_total) || 1) : nBorrow + nSale;
+      if (!editingId) {
+        // Let the actual stock decide the flags (a manual toggle that's already on still wins).
+        if (nSale > 0) payload.store_visible = true;
+        if (nBorrow > 0) payload.is_borrowable = true;
+        payload.quantity_total = copyCount;
+        payload.quantity_available = copyCount;
+      }
 
       if (editingId) {
         const { error } = await supabase.from('books').update(payload).eq('id', editingId);
@@ -630,7 +688,9 @@ export default function Books() {
           const newAvail = (existingBook.quantity_available || 0) + copyCount;
           await supabase.from('books').update({ quantity_total: newTotal, quantity_available: newAvail }).eq('id', existingBook.id);
           try {
-            await createBookCopies(existingBook.id, existingBook.category || payload.category, copyCount);
+            const cat = existingBook.category || payload.category;
+            if (nBorrow > 0) await createBookCopies(existingBook.id, cat, nBorrow, 'library');
+            if (nSale > 0) await createBookCopies(existingBook.id, cat, nSale, 'sale');
           } catch (e) { console.warn('Copies:', e.message); }
           setFormData(emptyForm);
           setImagePreview('');
@@ -652,7 +712,8 @@ export default function Books() {
           const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
           if (error) throw error;
           try {
-            await createBookCopies(newBook.id, payload.category, copyCount);
+            if (nBorrow > 0) await createBookCopies(newBook.id, payload.category, nBorrow, 'library');
+            if (nSale > 0) await createBookCopies(newBook.id, payload.category, nSale, 'sale');
           } catch (e) { console.warn('Copies:', e.message); }
           setFormData(emptyForm);
           setImagePreview('');
@@ -821,6 +882,11 @@ export default function Books() {
                     {dupMatch.quantity_total} {dupMatch.quantity_total === 1 ? 'copy' : 'copies'}
                   </span>
                   <span style={{ fontSize: '10px', color: '#ad6800' }}>{dupMatch.quantity_available} available</span>
+                  {(dupMatch.saleCount > 0 || dupMatch.borrowCount > 0) && (
+                    <span style={{ fontSize: '10px', color: '#ad6800', fontWeight: 600, marginTop: '2px' }}>
+                      📚 {dupMatch.borrowCount || 0} borrow · 🛒 {dupMatch.saleCount || 0} sale
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -1138,11 +1204,33 @@ export default function Books() {
                 </>)}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-                {[
-                  { label: 'Total Copies', name: 'quantity_total', min: 1 },
-                  { label: 'Available Copies', name: 'quantity_available', min: 0 },
-                ].map(({ label, name, min }) => (
+              {!editingId && (
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: isMobile ? '13px' : 'inherit' }}>Copies to add</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[
+                      { key: 'borrow', label: '📚 Borrow' },
+                      { key: 'sale', label: '🛒 Sale' },
+                      { key: 'both', label: '📚🛒 Both' },
+                    ].map(opt => (
+                      <button key={opt.key} type="button" onClick={() => changeCopyMode(opt.key)}
+                        style={{ flex: 1, padding: '9px 4px', borderRadius: '6px', border: `2px solid ${copyMode === opt.key ? '#667eea' : '#e5e7eb'}`, background: copyMode === opt.key ? '#eef2ff' : '#fff', color: copyMode === opt.key ? '#4f46e5' : '#6b7280', fontWeight: 700, cursor: 'pointer', fontSize: '13px', minHeight: '42px' }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: (editingId || copyMode === 'both') ? '1fr 1fr' : '1fr', gap: '10px', marginBottom: editingId ? '15px' : '6px' }}>
+                {(editingId
+                  ? [{ label: 'Total Copies', name: 'quantity_total', min: 1 }, { label: 'Available Copies', name: 'quantity_available', min: 0 }]
+                  : copyMode === 'borrow'
+                  ? [{ label: '📚 Borrow copies (B-)', name: 'borrow_copies', min: 1 }]
+                  : copyMode === 'sale'
+                  ? [{ label: '🛒 Sale copies (S-)', name: 'sale_copies', min: 1 }]
+                  : [{ label: '📚 Borrow (B-)', name: 'borrow_copies', min: 0 }, { label: '🛒 Sale (S-)', name: 'sale_copies', min: 0 }]
+                ).map(({ label, name, min }) => (
                   <div key={name} style={{ minWidth: 0 }}>
                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: isMobile ? '13px' : 'inherit' }}>{label}</label>
                     <div style={{ display: 'flex', alignItems: 'stretch', gap: '4px' }}>
@@ -1168,6 +1256,16 @@ export default function Books() {
                   </div>
                 ))}
               </div>
+
+              {!editingId && (
+                <p style={{ fontSize: '11px', color: '#888', marginBottom: '15px' }}>
+                  {copyMode === 'both'
+                    ? <>Borrow copies print <strong style={{ color: '#667eea', fontFamily: 'monospace' }}>B-{getCategoryPrefix(formData.category || 'GEN')}-0001</strong> · sale copies print <strong style={{ color: '#c0392b', fontFamily: 'monospace' }}>S-{getCategoryPrefix(formData.category || 'GEN')}-0001</strong>.</>
+                    : copyMode === 'sale'
+                    ? <>Creates sale copies: <strong style={{ color: '#c0392b', fontFamily: 'monospace' }}>S-{getCategoryPrefix(formData.category || 'GEN')}-0001…</strong> — scanned at POS to sell.</>
+                    : <>Creates lending copies: <strong style={{ color: '#667eea', fontFamily: 'monospace' }}>B-{getCategoryPrefix(formData.category || 'GEN')}-0001…</strong> — members can borrow these.</>}
+                </p>
+              )}
 
               {/* Store visibility + borrowability toggles (ecommerce) */}
               <div style={{ marginBottom: '15px', padding: '12px 14px', background: '#f8f9ff', borderRadius: '6px', border: '1px dashed #c0c8f5' }}>
