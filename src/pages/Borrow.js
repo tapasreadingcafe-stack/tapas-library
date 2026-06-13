@@ -83,6 +83,7 @@ export default function Borrow() {
   // Copy selection state
   const [availableCopies, setAvailableCopies] = useState([]);
   const [selectedCopy, setSelectedCopy] = useState(null);
+  const borrowHandoffRef = useRef(false); // consumed once when arriving from POS "↔ Borrow"
   const [copiesLoading, setCopiesLoading] = useState(false);
   const [hasCopiesTable, setHasCopiesTable] = useState(false);
 
@@ -156,6 +157,26 @@ export default function Borrow() {
       if (child) setSelectedChild(child);
     }
   }, [location.state, childrenOfMember]);
+
+  // Pre-select the book when handed off from POS "↔ Borrow" (customer wants to
+  // borrow a book they'd otherwise buy). Runs once.
+  useEffect(() => {
+    if (!location.state?.bookId || borrowHandoffRef.current || books.length === 0) return;
+    const b = books.find(bk => bk.id === location.state.bookId);
+    if (b) {
+      borrowHandoffRef.current = true;
+      selectBook(b);
+    }
+  }, [location.state, books]);
+
+  // After copies load, pre-select the exact copy that was scanned at POS.
+  useEffect(() => {
+    if (!borrowHandoffRef.current || selectedCopy || availableCopies.length === 0) return;
+    const { copyId, copyCode } = location.state || {};
+    if (!copyId && !copyCode) return;
+    const c = availableCopies.find(cp => cp.id === copyId || cp.copy_code === copyCode);
+    if (c) setSelectedCopy(c);
+  }, [availableCopies, location.state, selectedCopy]);
 
   const probeChildIdColumn = async () => {
     const { error } = await supabase.from('circulation').select('child_id').limit(0);
@@ -350,6 +371,17 @@ export default function Borrow() {
           .from('book_copies')
           .update({ status: 'issued', current_borrower_id: selectedMember.id })
           .eq('id', selectedCopy.id);
+
+        // If a sale copy (S- barcode) is being borrowed, move it into library
+        // stock so it stays a lending copy after it's returned.
+        if (/^S-/i.test(selectedCopy.copy_code || '')) {
+          try {
+            await supabase.from('book_copies').update({ copy_kind: 'library' }).eq('id', selectedCopy.id);
+            if (selectedBook.is_borrowable === false) {
+              await supabase.from('books').update({ is_borrowable: true }).eq('id', selectedBook.id);
+            }
+          } catch (e) { console.warn('Sale→library convert:', e.message); }
+        }
       }
 
       setReceiptModal({ member: selectedMember, book: selectedBook, dueDate, child: selectedChild, copy: selectedCopy });

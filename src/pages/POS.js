@@ -8,6 +8,7 @@ import { useConfirm } from '../components/ConfirmModal';
 import BarcodeScanner from '../BarcodeScanner';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { useNavigate } from 'react-router-dom';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -105,6 +106,7 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
 export default function POS() {
   const { devMode } = useDevMode();
   const { isReadOnly, canProcessOrders } = usePermission();
+  const navigate = useNavigate();
 
   const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
 
@@ -363,18 +365,18 @@ export default function POS() {
     const trimmed = code.trim();
     if (!trimmed) return;
 
-    // 1. Try copy code (B-FIC-0001 or BCHI0001 without dashes) in book_copies → get book
+    // 1. Try copy code (B-FIC-0001 borrow / S-FIC-0001 sale, or without dashes) in book_copies → get book
     const upper = trimmed.toUpperCase();
-    if (upper.startsWith('B')) {
+    if (upper.startsWith('B') || upper.startsWith('S')) {
       try {
         // Try exact match first
         let { data: copy } = await supabase.from('book_copies').select('id, copy_code, status, book_id, books(*)').eq('copy_code', upper).limit(1);
-        // Try adding dashes: BCHI0001 → B-CHI-0001, BFIC0001 → B-FIC-0001
+        // Try adding dashes: BCHI0001 → B-CHI-0001, SFIC0001 → S-FIC-0001
         if (!copy?.length && !upper.includes('-')) {
-          // Try splitting: B + letters + digits → B-XXX-0000
-          const m = upper.match(/^B([A-Z]{2,4})(\d{3,4})$/);
+          // Try splitting: B/S + letters + digits → X-XXX-0000
+          const m = upper.match(/^([BS])([A-Z]{2,4})(\d{3,4})$/);
           if (m) {
-            const withDashes = `B-${m[1]}-${m[2].padStart(4, '0')}`;
+            const withDashes = `${m[1]}-${m[2]}-${m[3].padStart(4, '0')}`;
             const r = await supabase.from('book_copies').select('id, copy_code, status, book_id, books(*)').eq('copy_code', withDashes).limit(1);
             copy = r.data;
           }
@@ -445,9 +447,12 @@ export default function POS() {
         .order('copy_code');
 
       if (allCopies && allCopies.length > 0) {
-        // Find first available copy not already in cart
+        // Find an available copy not already in cart. POS sells, so prefer a
+        // sale copy (S-) over a borrow copy (B-); fall back to any available.
         const inCartCodes = new Set(cart.filter(c => c.copyCode).map(c => c.copyCode));
-        const nextAvailable = allCopies.find(c => c.status === 'available' && !inCartCodes.has(c.copy_code));
+        const isAvail = c => c.status === 'available' && !inCartCodes.has(c.copy_code);
+        const isSale = c => /^S-/i.test(c.copy_code);
+        const nextAvailable = allCopies.find(c => isAvail(c) && isSale(c)) || allCopies.find(isAvail);
 
         if (!nextAvailable) {
           showToast('No available copies left for this book', 'error');
@@ -496,6 +501,15 @@ export default function POS() {
   };
 
   const removeFromCart = (cartId) => setCart(prev => prev.filter(c => c.cartId !== cartId));
+
+  // Customer wants to borrow this book instead of buying it — hand off to the
+  // Borrow page with the book (and exact copy, if scanned) pre-filled, and drop
+  // it from the sale cart so it isn't accidentally sold too.
+  const borrowInstead = (item) => {
+    if (!item.bookId) return;
+    removeFromCart(item.cartId);
+    navigate('/borrow', { state: { bookId: item.bookId, copyId: item.copyId, copyCode: item.copyCode } });
+  };
 
   const updateQty = (cartId, delta) =>
     setCart(prev => prev
@@ -1101,6 +1115,11 @@ export default function POS() {
                           </div>
                         ) : null}
                       </div>
+                      {item.bookId && !isReadOnly && (
+                        <button onClick={() => borrowInstead(item)}
+                          style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', padding: '1px 6px', flexShrink: 0, color: '#4f46e5', fontWeight: '700', whiteSpace: 'nowrap' }}
+                          title="Customer wants to borrow this book instead — opens the Borrow page">↔ Borrow</button>
+                      )}
                       {item.bookId && (
                         <button onClick={() => window.open(`/books/${item.bookId}/copies`, '_blank')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '0 4px', flexShrink: 0 }}

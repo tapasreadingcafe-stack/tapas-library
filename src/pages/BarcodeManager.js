@@ -85,7 +85,7 @@ export default function BarcodeManager() {
 
   // Handle a scan from the camera scanner OR a handheld scanner that
   // typed into the modal's input. Detects:
-  //   • Our copy code (B-XXX-NNNN)  → jump to that copy
+  //   • Our copy code (B-XXX-NNNN borrow / S-XXX-NNNN sale)  → jump to that copy
   //   • Anything else (ISBN, etc.)  → match against books.isbn / title
   // Modal stays OPEN after each scan so you can scan book-after-book
   // and accumulate selections — close manually with the Done button.
@@ -94,7 +94,7 @@ export default function BarcodeManager() {
     const code = rawCode.trim();
     if (!code) return;
 
-    const isCopyCode = /^B-[A-Z0-9]+-\d+$/i.test(code);
+    const isCopyCode = /^[BS]-[A-Z0-9]+-\d+$/i.test(code);
     let match;
     if (isCopyCode) {
       match = copies.find(c => c.copy_code?.toLowerCase() === code.toLowerCase());
