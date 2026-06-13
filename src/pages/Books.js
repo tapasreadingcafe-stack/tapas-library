@@ -104,6 +104,22 @@ export default function Books() {
     }
   };
 
+  // Add-book copy type: 'borrow' (B-), 'sale' (S-), or 'both'. Remembered
+  // across books like the pricing/store sections above.
+  const [copyMode, setCopyMode] = useState(() => localStorage.getItem('tapas_addbook_copy_mode') || 'borrow');
+  // Keep the borrow/sale counts consistent with the chosen mode.
+  const applyCopyMode = (mode, fd) => {
+    const next = { ...fd };
+    if (mode === 'borrow') { next.sale_copies = 0; if (!(parseInt(next.borrow_copies) > 0)) next.borrow_copies = 1; }
+    else if (mode === 'sale') { next.borrow_copies = 0; if (!(parseInt(next.sale_copies) > 0)) next.sale_copies = 1; }
+    return next; // 'both' keeps whatever is already entered
+  };
+  const changeCopyMode = (mode) => {
+    localStorage.setItem('tapas_addbook_copy_mode', mode);
+    setCopyMode(mode);
+    setFormData(prev => applyCopyMode(mode, prev));
+  };
+
   const stepQty = (field, delta, min) => {
     setFormData(prev => {
       const cur = parseInt(prev[field], 10) || 0;
@@ -205,12 +221,37 @@ export default function Books() {
       } catch {
         match = null;
       }
+      // Break the in-stock count into sale (S-) vs borrow (B-) copies so staff
+      // can see what kind of stock already exists before adding more.
+      if (match) {
+        try {
+          const { data: copies } = await supabase
+            .from('book_copies')
+            .select('copy_code, status')
+            .eq('book_id', match.id);
+          if (copies) {
+            const isSale = c => /^S-/i.test(c.copy_code);
+            const isBorrow = c => /^B-/i.test(c.copy_code);
+            match.saleCount = copies.filter(isSale).length;
+            match.borrowCount = copies.filter(isBorrow).length;
+            match.saleAvail = copies.filter(c => isSale(c) && c.status === 'available').length;
+            match.borrowAvail = copies.filter(c => isBorrow(c) && c.status === 'available').length;
+          }
+        } catch {}
+      }
       if (!cancelled) setDupMatch(match);
     }, 350);
 
     return () => { cancelled = true; clearTimeout(handle); };
     // eslint-disable-next-line
   }, [showAddForm, editingId, formData.isbn, formData.title, formData.author]);
+
+  // When the Add form opens, line the borrow/sale counts up with the
+  // remembered copy-type toggle.
+  useEffect(() => {
+    if (showAddForm && !editingId) setFormData(prev => applyCopyMode(copyMode, prev));
+    // eslint-disable-next-line
+  }, [showAddForm]);
 
   // Run probe + categories only once on mount
   useEffect(() => {
@@ -841,6 +882,11 @@ export default function Books() {
                     {dupMatch.quantity_total} {dupMatch.quantity_total === 1 ? 'copy' : 'copies'}
                   </span>
                   <span style={{ fontSize: '10px', color: '#ad6800' }}>{dupMatch.quantity_available} available</span>
+                  {(dupMatch.saleCount > 0 || dupMatch.borrowCount > 0) && (
+                    <span style={{ fontSize: '10px', color: '#ad6800', fontWeight: 600, marginTop: '2px' }}>
+                      📚 {dupMatch.borrowCount || 0} borrow · 🛒 {dupMatch.saleCount || 0} sale
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -1158,14 +1204,33 @@ export default function Books() {
                 </>)}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: editingId ? '15px' : '6px' }}>
-                {(editingId ? [
-                  { label: 'Total Copies', name: 'quantity_total', min: 1 },
-                  { label: 'Available Copies', name: 'quantity_available', min: 0 },
-                ] : [
-                  { label: '📚 Borrow copies (B-)', name: 'borrow_copies', min: 0 },
-                  { label: '🛒 Sale copies (S-)', name: 'sale_copies', min: 0 },
-                ]).map(({ label, name, min }) => (
+              {!editingId && (
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: isMobile ? '13px' : 'inherit' }}>Copies to add</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[
+                      { key: 'borrow', label: '📚 Borrow' },
+                      { key: 'sale', label: '🛒 Sale' },
+                      { key: 'both', label: '📚🛒 Both' },
+                    ].map(opt => (
+                      <button key={opt.key} type="button" onClick={() => changeCopyMode(opt.key)}
+                        style={{ flex: 1, padding: '9px 4px', borderRadius: '6px', border: `2px solid ${copyMode === opt.key ? '#667eea' : '#e5e7eb'}`, background: copyMode === opt.key ? '#eef2ff' : '#fff', color: copyMode === opt.key ? '#4f46e5' : '#6b7280', fontWeight: 700, cursor: 'pointer', fontSize: '13px', minHeight: '42px' }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: (editingId || copyMode === 'both') ? '1fr 1fr' : '1fr', gap: '10px', marginBottom: editingId ? '15px' : '6px' }}>
+                {(editingId
+                  ? [{ label: 'Total Copies', name: 'quantity_total', min: 1 }, { label: 'Available Copies', name: 'quantity_available', min: 0 }]
+                  : copyMode === 'borrow'
+                  ? [{ label: '📚 Borrow copies (B-)', name: 'borrow_copies', min: 1 }]
+                  : copyMode === 'sale'
+                  ? [{ label: '🛒 Sale copies (S-)', name: 'sale_copies', min: 1 }]
+                  : [{ label: '📚 Borrow (B-)', name: 'borrow_copies', min: 0 }, { label: '🛒 Sale (S-)', name: 'sale_copies', min: 0 }]
+                ).map(({ label, name, min }) => (
                   <div key={name} style={{ minWidth: 0 }}>
                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: isMobile ? '13px' : 'inherit' }}>{label}</label>
                     <div style={{ display: 'flex', alignItems: 'stretch', gap: '4px' }}>
@@ -1194,7 +1259,11 @@ export default function Books() {
 
               {!editingId && (
                 <p style={{ fontSize: '11px', color: '#888', marginBottom: '15px' }}>
-                  Borrow copies print <strong style={{ color: '#667eea', fontFamily: 'monospace' }}>B-{getCategoryPrefix(formData.category || 'GEN')}-0001</strong> · sale copies print <strong style={{ color: '#c0392b', fontFamily: 'monospace' }}>S-{getCategoryPrefix(formData.category || 'GEN')}-0001</strong>. Each is its own scannable label.
+                  {copyMode === 'both'
+                    ? <>Borrow copies print <strong style={{ color: '#667eea', fontFamily: 'monospace' }}>B-{getCategoryPrefix(formData.category || 'GEN')}-0001</strong> · sale copies print <strong style={{ color: '#c0392b', fontFamily: 'monospace' }}>S-{getCategoryPrefix(formData.category || 'GEN')}-0001</strong>.</>
+                    : copyMode === 'sale'
+                    ? <>Creates sale copies: <strong style={{ color: '#c0392b', fontFamily: 'monospace' }}>S-{getCategoryPrefix(formData.category || 'GEN')}-0001…</strong> — scanned at POS to sell.</>
+                    : <>Creates lending copies: <strong style={{ color: '#667eea', fontFamily: 'monospace' }}>B-{getCategoryPrefix(formData.category || 'GEN')}-0001…</strong> — members can borrow these.</>}
                 </p>
               )}
 
