@@ -2,7 +2,7 @@
 // don't leak. Design tokens mirror the other pages for visual parity.
 
 const CONTACT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .contact-root {
   --ct-lime:   #caf27e;
@@ -14,9 +14,9 @@ const CONTACT_CSS = `
   --ct-muted:  #6e6e6e;
   --ct-rule:   #ececea;
   --ct-bg:     #faf8f4;
-  --ct-f-display: "DM Serif Display", Georgia, serif;
-  --ct-f-ui:      "Inter", system-ui, sans-serif;
-  --ct-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --ct-f-display: "Poppins", system-ui, sans-serif;
+  --ct-f-ui:      "Poppins", system-ui, sans-serif;
+  --ct-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--ct-f-ui);
   color: var(--ct-ink);
@@ -69,7 +69,7 @@ const CONTACT_CSS = `
 }
 .contact-hero-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -143,7 +143,7 @@ const CONTACT_CSS = `
 }
 .contact-hours-value {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 19px;
   margin-top: 8px;
   color: var(--ct-ink);
@@ -253,7 +253,7 @@ const CONTACT_CSS = `
 }
 .contact-info-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -320,7 +320,7 @@ const CONTACT_CSS = `
 }
 .contact-form-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -452,7 +452,7 @@ const CONTACT_CSS = `
 }
 .contact-faq-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -485,7 +485,7 @@ const CONTACT_CSS = `
 }
 .contact-faq summary {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--ct-ink);
   cursor: pointer;

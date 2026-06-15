@@ -1,5 +1,5 @@
 const CART_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .ct-root {
   --ct-lime:   #caf27e;
@@ -11,9 +11,9 @@ const CART_CSS = `
   --ct-muted:  #6e6e6e;
   --ct-rule:   #ececea;
   --ct-bg:     #faf8f4;
-  --ct-f-display: "DM Serif Display", Georgia, serif;
-  --ct-f-ui:      "Inter", system-ui, sans-serif;
-  --ct-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --ct-f-display: "Poppins", system-ui, sans-serif;
+  --ct-f-ui:      "Poppins", system-ui, sans-serif;
+  --ct-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--ct-f-ui);
   color: var(--ct-ink);
@@ -62,17 +62,17 @@ const CART_CSS = `
 }
 .ct-hero-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
   color: var(--ct-ink);
   margin: 0;
 }
 .ct-hero-title em {
   color: var(--ct-purple);
   font-style: italic;
-  font-weight: 500;
+  font-weight: 700;
   display: block;
 }
 .ct-hero-lede {
@@ -157,12 +157,16 @@ const CART_CSS = `
   flex-direction: column;
   justify-content: space-between;
   color: #fff;
+  overflow: hidden;
+  flex-shrink: 0;
 }
+.ct-item-cover-photo { padding: 0; background: var(--ct-rule); }
+.ct-item-cover-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ct-item-cover.is-lime,
 .ct-item-cover.is-cream { color: var(--ct-ink); }
 .ct-item-cover-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 13px;
   line-height: 1.1;
   letter-spacing: -0.005em;
@@ -180,7 +184,7 @@ const CART_CSS = `
 .ct-item-meta { min-width: 0; }
 .ct-item-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   line-height: 1.15;
   color: var(--ct-ink);
@@ -238,7 +242,7 @@ const CART_CSS = `
   min-width: 40px;
   text-align: center;
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--ct-ink);
   font-variant-numeric: tabular-nums;
@@ -257,7 +261,7 @@ const CART_CSS = `
 }
 .ct-price-now {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
   color: var(--ct-ink);
   letter-spacing: -0.01em;
@@ -297,7 +301,7 @@ const CART_CSS = `
 }
 .ct-empty h3 {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 28px;
   letter-spacing: -0.01em;
   margin: 0 0 8px;
@@ -338,7 +342,7 @@ const CART_CSS = `
 .ct-paired { margin-top: 44px; }
 .ct-paired-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   letter-spacing: -0.005em;
   color: var(--ct-ink);
@@ -373,7 +377,7 @@ const CART_CSS = `
 .ct-paired-cover.is-cream { color: var(--ct-ink); }
 .ct-paired-cover-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 14px;
   line-height: 1.1;
 }
@@ -387,7 +391,7 @@ const CART_CSS = `
 .ct-paired-meta b {
   display: block;
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 14px;
   color: var(--ct-ink);
 }
@@ -400,7 +404,7 @@ const CART_CSS = `
 }
 .ct-paired-price {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 15px;
   color: var(--ct-ink);
 }
@@ -439,7 +443,7 @@ const CART_CSS = `
 }
 .ct-summary-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 26px;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -464,7 +468,7 @@ const CART_CSS = `
 }
 .ct-line-value {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 15px;
   color: var(--ct-ink);
   font-variant-numeric: tabular-nums;
@@ -487,7 +491,7 @@ const CART_CSS = `
 }
 .ct-line-total .ct-line-value {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 24px;
   color: var(--ct-ink);
 }
@@ -622,7 +626,7 @@ const CART_CSS = `
 .ct-side-card.is-lime { background: var(--ct-lime); border-color: transparent; }
 .ct-side-card-title {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   letter-spacing: -0.005em;
   margin: 0 0 6px;
@@ -654,7 +658,7 @@ const CART_CSS = `
 }
 .ct-gw-label b {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 16px;
   color: var(--ct-ink);
   display: block;
@@ -773,7 +777,7 @@ const CART_CSS = `
 }
 .ct-modal h3 {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   margin: 0 0 8px;
   color: var(--ct-ink);
@@ -836,7 +840,7 @@ const CART_CSS = `
 }
 .ct-checkout-stub h1 {
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(48px, 6vw, 80px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -866,7 +870,7 @@ const CART_CSS = `
   margin-top: 8px;
   border-top: 1px dashed var(--ct-rule);
   font-family: var(--ct-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
 }
 .ct-checkout-stub-back {

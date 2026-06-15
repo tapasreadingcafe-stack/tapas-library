@@ -4,7 +4,7 @@
 // spec) so they don't collide with other pages.
 
 const SHOP_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .shop-root {
   --shop-lime:   #caf27e;
@@ -17,9 +17,9 @@ const SHOP_CSS = `
   --shop-rule:   #ececea;
   --shop-bg:     #faf8f4;
   --shop-card:   #ffffff;
-  --shop-f-display: "DM Serif Display", Georgia, serif;
-  --shop-f-ui:      "Inter", system-ui, sans-serif;
-  --shop-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --shop-f-display: "Poppins", system-ui, sans-serif;
+  --shop-f-ui:      "Poppins", system-ui, sans-serif;
+  --shop-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--shop-f-ui);
   color: var(--shop-ink);
@@ -68,7 +68,7 @@ const SHOP_CSS = `
 }
 .shop-hero-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -125,7 +125,7 @@ const SHOP_CSS = `
 }
 .shop-featured-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 38px;
   line-height: 1.08;
   letter-spacing: -0.015em;
@@ -202,7 +202,7 @@ const SHOP_CSS = `
 }
 .shop-featured-cover-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 36px;
   line-height: 1.05;
   letter-spacing: -0.01em;
@@ -377,7 +377,7 @@ const SHOP_CSS = `
 .shop-empty-emoji { font-size: 40px; margin-bottom: 10px; }
 .shop-empty h3 {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   color: var(--shop-ink);
   margin: 0 0 8px;
@@ -444,7 +444,7 @@ const SHOP_CSS = `
 }
 .shop-cover-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 19px;
   line-height: 1.08;
   letter-spacing: -0.01em;
@@ -474,7 +474,7 @@ const SHOP_CSS = `
 .shop-card-meta { display: flex; flex-direction: column; gap: 2px; }
 .shop-card-title {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 17px;
   line-height: 1.15;
   color: var(--shop-ink);
@@ -497,7 +497,7 @@ const SHOP_CSS = `
 }
 .shop-card-price-now {
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--shop-ink);
 }
@@ -602,7 +602,7 @@ const SHOP_CSS = `
 .shop-drawer-head h3 {
   margin: 0;
   font-family: var(--shop-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
   color: var(--shop-ink);
 }
