@@ -399,6 +399,8 @@ function Members() {
 
     try {
       // Delete related records in dependency order before deleting member
+      await supabase.from('pos_transactions').delete().eq('member_id', memberId);
+      await supabase.from('customer_orders').delete().eq('member_id', memberId);
       await supabase.from('circulation').delete().eq('member_id', memberId);
       await supabase.from('transactions').delete().eq('member_id', memberId);
       await supabase.from('reservations').delete().eq('member_id', memberId);
