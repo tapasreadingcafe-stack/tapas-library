@@ -45,13 +45,15 @@ export default function CustomerDisplay() {
   if (s.status === 'idle' || (!s.items?.length && s.status !== 'paid')) {
     return (
       <div style={shell}>
-        <Header connected={connected} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 'clamp(64px,12vw,120px)' }}>☕</div>
-          <div style={{ fontSize: 'clamp(28px,5vw,60px)', fontWeight: 900, color: '#0f172a' }}>Welcome!</div>
-          <div style={{ fontSize: 'clamp(14px,1.8vw,22px)', color: '#64748b' }}>
-            Happy reading at Tapas Reading Cafe
+        <div style={col}>
+          <Header connected={connected} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 20, textAlign: 'center' }}>
+            <div style={{ fontSize: 'clamp(64px,12vw,120px)' }}>☕</div>
+            <div style={{ fontSize: 'clamp(28px,5vw,60px)', fontWeight: 900, color: '#0f172a' }}>Welcome!</div>
+            <div style={{ fontSize: 'clamp(14px,1.8vw,22px)', color: '#64748b' }}>
+              Happy reading at Tapas Reading Cafe
+            </div>
           </div>
         </div>
       </div>
@@ -61,22 +63,24 @@ export default function CustomerDisplay() {
   // ── PAID ──────────────────────────────────────────────────────────────────
   if (s.status === 'paid') {
     return (
-      <div style={{ ...shell, background: '#f0fdf4' }}>
-        <Header connected={connected} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 'clamp(10px,2vw,22px)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'clamp(64px,12vw,120px)' }}>✅</div>
-          <div style={{ fontSize: 'clamp(24px,4vw,48px)', fontWeight: 900, color: '#0f172a' }}>
-            Payment Received!
-          </div>
-          <div style={{ fontSize: 'clamp(40px,9vw,96px)', fontWeight: 900, color: '#16a34a', letterSpacing: -2 }}>
-            {fmt(s.total)}
-          </div>
-          {s.txnRef && (
-            <div style={{ fontSize: 'clamp(12px,1.4vw,17px)', color: '#64748b' }}>Ref: {s.txnRef}</div>
-          )}
-          <div style={{ fontSize: 'clamp(14px,1.8vw,22px)', color: '#64748b', marginTop: 4 }}>
-            Thank you for visiting TRC!
+      <div style={shell}>
+        <div style={{ ...col, background: '#f0fdf4' }}>
+          <Header connected={connected} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 'clamp(10px,2vw,22px)', textAlign: 'center' }}>
+            <div style={{ fontSize: 'clamp(64px,12vw,120px)' }}>✅</div>
+            <div style={{ fontSize: 'clamp(24px,4vw,48px)', fontWeight: 900, color: '#0f172a' }}>
+              Payment Received!
+            </div>
+            <div style={{ fontSize: 'clamp(40px,9vw,96px)', fontWeight: 900, color: '#16a34a', letterSpacing: -2 }}>
+              {fmt(s.total)}
+            </div>
+            {s.txnRef && (
+              <div style={{ fontSize: 'clamp(12px,1.4vw,17px)', color: '#64748b' }}>Ref: {s.txnRef}</div>
+            )}
+            <div style={{ fontSize: 'clamp(14px,1.8vw,22px)', color: '#64748b', marginTop: 4 }}>
+              Thank you for visiting TRC!
+            </div>
           </div>
         </div>
       </div>
@@ -88,6 +92,7 @@ export default function CustomerDisplay() {
 
   return (
     <div style={shell}>
+      <div style={col}>
       <Header connected={connected} />
 
       {/* Customer + phone */}
@@ -281,6 +286,7 @@ export default function CustomerDisplay() {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
 }
@@ -314,7 +320,14 @@ function Header({ connected }) {
 }
 
 const shell = {
-  position: 'fixed', inset: 0, background: '#ffffff', color: '#0f172a',
+  position: 'fixed', inset: 0, background: '#e2e8f0', color: '#0f172a',
   fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-  display: 'flex', flexDirection: 'column', overflow: 'hidden',
+  display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden',
+};
+
+const col = {
+  width: '100%', maxWidth: 1000,
+  display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden',
+  background: '#ffffff',
+  boxShadow: '0 0 0 1px rgba(0,0,0,0.06), 0 4px 32px rgba(0,0,0,0.08)',
 };
