@@ -114,7 +114,7 @@ export default function POS() {
   const [allBooks, setAllBooks]         = useState([]);
   const [booksLoading, setBooksLoading] = useState(false);
   const [itemSearch, setItemSearch]     = useState('');
-  const [activeCat, setActiveCat]       = useState('All');
+  const [activeCat, setActiveCat]       = useState('Books');
 
   // Member
   const [allMembers, setAllMembers]     = useState([]);
