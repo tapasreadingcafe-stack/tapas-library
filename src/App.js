@@ -9,6 +9,7 @@ import { useDevMode, Editable } from './components/DevMode';
 import { useAuth } from './context/AuthContext';
 import NotificationBell from './components/NotificationBell';
 import CommandPalette from './components/CommandPalette';
+import CustomerDisplay from './pages/CustomerDisplay';
 import { ROUTE_PERMISSION_MAP, STAFF_DEFAULT_PERMISSIONS, getPermissionForPath, getStaffPermission } from './utils/permissions';
 import Login from './pages/Login';
 import './App.css';
@@ -254,8 +255,9 @@ const NAV_CONFIG = [
   {
     icon: '📖', label: 'Library', key: 'library',
     children: [
-      { to: '/books',           icon: '📚', label: 'Books' },
+      { to: '/pos',             icon: '🛒', label: 'POS' },
       { to: '/Borrow',          icon: '🔄', label: 'Borrow' },
+      { to: '/books',           icon: '📚', label: 'Books' },
       { to: '/overdue',         icon: '🔴', label: 'Overdue' },
       { to: '/availability',    icon: '🔍', label: 'Availability' },
       { to: '/statistics',      icon: '📈', label: 'Statistics' },
@@ -263,7 +265,6 @@ const NAV_CONFIG = [
       { to: '/wishlist',        icon: '📋', label: 'Wishlist' },
       { to: '/reviews',         icon: '⭐', label: 'Reviews' },
       { to: '/reservations',    icon: '🔖', label: 'Reservations' },
-      { to: '/pos',             icon: '🛒', label: 'POS' },
       { to: '/barcodes',         icon: '🏷️', label: 'Barcodes' },
     ],
   },
@@ -381,6 +382,11 @@ const NAV_CONFIG = [
 // that's the only safe way to mix conditional returns with stateful children.
 
 function App() {
+  // Customer-facing display: standalone full-screen kiosk route, no staff login
+  // required. Must come before useAuth so the screen renders instantly on a
+  // tablet/TV that is not signed in.
+  if (window.location.pathname === '/display') return <CustomerDisplay />;
+
   const { user, staff, loading: authLoading } = useAuth();
 
   if (authLoading) {

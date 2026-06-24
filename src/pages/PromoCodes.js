@@ -241,6 +241,7 @@ function CreatePromoModal({ staffId, onCreated, onClose }) {
         applies_to: form.applies_to,
         expires_at: form.expires_at || null,
         created_by: staffId,
+        is_active: true,
       });
       if (err) throw err;
       onCreated();

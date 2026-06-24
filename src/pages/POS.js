@@ -125,9 +125,12 @@ export default function POS() {
   const [finesLoading, setFinesLoading] = useState(false);
 
   // Cart
-  const [cart, setCart]                 = useState([]);
-  const [discountType, setDiscountType] = useState('pct');
-  const [discountVal, setDiscountVal]   = useState(0);
+  const [cart, setCart]                   = useState([]);
+  const [discountType, setDiscountType]   = useState('pct');
+  const [discountVal, setDiscountVal]     = useState(0);
+  // Additional manual discount applied ON TOP of a promo code
+  const [addlDiscType, setAddlDiscType]   = useState('pct');
+  const [addlDiscVal, setAddlDiscVal]     = useState(0);
 
   // Promo code
   const [promoInput, setPromoInput]     = useState('');
@@ -245,11 +248,24 @@ export default function POS() {
   const fetchBooks = async () => {
     setBooksLoading(true);
     try {
-      const { data } = await supabase
-        .from('books')
-        .select('id, book_id, title, author, category, price, sales_price, quantity_available, quantity_total, book_image')
-        .order('title').limit(300);
-      setAllBooks(data || []);
+      // Paginate in 1000-row batches to bypass Supabase's default
+      // server cap. Stops when a batch returns fewer rows than the
+      // page size, which means we've reached the end of the catalog.
+      const PAGE = 1000;
+      const cols = 'id, book_id, title, author, category, price, sales_price, quantity_available, quantity_total, book_image';
+      const all = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from('books')
+          .select(cols)
+          .order('title')
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+      }
+      setAllBooks(all);
     } catch (e) { console.error(e); }
     finally { setBooksLoading(false); }
   };
@@ -521,28 +537,55 @@ export default function POS() {
 
   const resetCart = () => {
     setCart([]); setSelectedMember(null); setMemberSearch('');
-    setMemberFines([]); setDiscountVal(0); setCashReceived(''); setPayMethod('cash');
+    setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
   };
 
   // ── Promo code ────────────────────────────────────────────────────────────────
+  // Checks both `promo_codes` (Marketing) and `store_promo_codes` (Online Store)
+  // so staff can use either type at the POS counter.
   const applyPromo = async () => {
     const code = promoInput.trim().toUpperCase();
     if (!code) return;
     setPromoError(''); setPromoLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Try the marketing promo_codes table first
+      const { data: mData, error: mErr } = await supabase
         .from('promo_codes')
         .select('*')
         .ilike('code', code)
         .eq('is_active', true)
         .maybeSingle();
-      if (error) throw error;
+      if (mErr) throw mErr;
+
+      // 2. If not found, try the store_promo_codes table and normalise columns
+      let data = mData;
+      if (!data) {
+        const { data: sData, error: sErr } = await supabase
+          .from('store_promo_codes')
+          .select('*')
+          .ilike('code', code)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (sErr) throw sErr;
+        if (sData) {
+          // Normalise store_promo_codes shape to match promo_codes shape
+          data = {
+            ...sData,
+            discount_type:  sData.kind === 'percent' ? 'percentage' : 'fixed',
+            discount_value: sData.value,
+            min_order:      sData.min_total ?? 0,
+            used_count:     sData.used_count ?? 0,
+            _source:        'store',
+          };
+        }
+      }
+
       if (!data) { setPromoError('Invalid promo code'); setAppliedPromo(null); return; }
       if (data.expires_at && new Date(data.expires_at) < new Date()) { setPromoError('Code expired'); setAppliedPromo(null); return; }
       if (data.max_uses && data.used_count >= data.max_uses) { setPromoError('Code usage limit reached'); setAppliedPromo(null); return; }
       if (data.min_order && subtotal < parseFloat(data.min_order)) { setPromoError(`Min order ₹${data.min_order}`); setAppliedPromo(null); return; }
-      // Apply the promo discount
+
       setAppliedPromo(data);
       setDiscountType(data.discount_type === 'percentage' ? 'pct' : 'fixed');
       setDiscountVal(parseFloat(data.discount_value));
@@ -557,14 +600,21 @@ export default function POS() {
 
   const clearPromo = () => {
     setAppliedPromo(null); setPromoInput(''); setPromoError('');
-    setDiscountVal(0);
+    setDiscountVal(0); setAddlDiscVal(0);
   };
 
   // ── Computed values ───────────────────────────────────────────────────────────
-  const subtotal       = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const discountAmount = discountType === 'pct'
-    ? subtotal * (discountVal / 100)
-    : Math.min(discountVal, subtotal);
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  // Promo discount (locked once applied)
+  const promoDiscountAmount = appliedPromo
+    ? (discountType === 'pct' ? subtotal * (discountVal / 100) : Math.min(discountVal, subtotal))
+    : 0;
+  // Additional manual discount on top of promo (or the only discount when no promo)
+  const afterPromo = subtotal - promoDiscountAmount;
+  const addlDiscountAmount = appliedPromo
+    ? (addlDiscType === 'pct' ? afterPromo * (addlDiscVal / 100) : Math.min(addlDiscVal, afterPromo))
+    : (discountType === 'pct' ? subtotal * (discountVal / 100) : Math.min(discountVal, subtotal));
+  const discountAmount = promoDiscountAmount + addlDiscountAmount;
   const total          = Math.max(0, subtotal - discountAmount);
   const cashNum        = parseFloat(cashReceived) || 0;
   const change         = Math.max(0, cashNum - total);
@@ -660,9 +710,10 @@ export default function POS() {
         } catch (e) { console.error('Promo usage tracking:', e); }
       }
 
+      const txnRef = `TXN${Date.now().toString().slice(-6)}`;
       setLastTxn({
         id: txnId,
-        txnRef: `TXN${Date.now().toString().slice(-6)}`,
+        txnRef,
         date: new Date(),
         member: selectedMember,
         items: [...cart],
@@ -671,6 +722,8 @@ export default function POS() {
         payMethod, cashReceived: cashNum || total, change,
       });
       setShowReceipt(true);
+      // Flash the "Payment Received" screen on the customer display.
+      sendDisplay({ status: 'paid', txnRef });
       showToast('Transaction complete!');
       fetchTodayStats();
       if (showHistory) fetchTodayTransactions();
@@ -685,6 +738,113 @@ export default function POS() {
 
   // ── Print ─────────────────────────────────────────────────────────────────────
   const handlePrint = useReactToPrint({ content: () => receiptRef.current });
+
+  // ── WhatsApp receipt (free click-to-send via wa.me) ───────────────────────────
+  // Normalise an Indian mobile number to wa.me format (countrycode + number, digits only).
+  const waNumber = (raw) => {
+    let d = (raw || '').replace(/\D/g, '');     // keep digits only
+    if (!d) return null;
+    if (d.length === 10) d = '91' + d;          // bare 10-digit -> add India code
+    else if (d.length === 11 && d.startsWith('0')) d = '91' + d.slice(1); // leading 0
+    else if (d.length === 12 && d.startsWith('91')) { /* already full */ }
+    else if (d.length === 13 && d.startsWith('091')) d = d.slice(1);
+    return d.length >= 11 ? d : null;
+  };
+
+  const buildReceiptText = (txn) => {
+    const W = 30;  // monospace column width for the itemised block
+    // Right-align a value against a label within the fixed width; truncate long names.
+    const row = (label, value) => {
+      const v = String(value);
+      const maxLabel = W - v.length - 1;
+      const l = label.length > maxLabel ? label.slice(0, Math.max(1, maxLabel - 1)) + '.' : label;
+      return l + ' '.repeat(Math.max(1, W - l.length - v.length)) + v;
+    };
+
+    // Itemised block (rendered in monospace so columns line up)
+    const block = [];
+    txn.items.forEach(it => {
+      const name = it.name + (it.qty > 1 ? ` x${it.qty}` : '');
+      block.push(row(name, fmt(it.price * it.qty)));
+    });
+    block.push('-'.repeat(W));
+    if (txn.discount > 0) {
+      block.push(row('Subtotal', fmt(txn.subtotal)));
+      block.push(row('Discount', '-' + fmt(txn.discount)));
+    }
+    block.push(row('TOTAL', fmt(txn.total)));
+
+    const L = [];
+    L.push('*TAPAS READING CAFE*');
+    L.push('_Point of Sale Receipt_');
+    L.push('');
+    L.push('Ref: ' + txn.txnRef);
+    L.push('Date: ' + txn.date.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
+    if (txn.member) L.push('Customer: ' + txn.member.name);
+    L.push('```' + '\n' + block.join('\n') + '\n' + '```');
+    L.push('*Payment:* ' + txn.payMethod.toUpperCase());
+    if (txn.payMethod === 'cash') {
+      L.push('Cash Received: ' + fmt(txn.cashReceived));
+      L.push('Change: ' + fmt(txn.change));
+    }
+    L.push('');
+    L.push('Thank you for visiting TRC!');
+    L.push('Happy Reading!');
+    return L.join('\n');
+  };
+
+  const handleWhatsApp = (txn) => {
+    const num = waNumber(txn.member?.phone);
+    const text = encodeURIComponent(buildReceiptText(txn));
+    // With a number -> opens chat with that customer; without -> opens picker.
+    const url = num ? `https://wa.me/${num}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+    if (!num && txn.member) showToast('No valid phone for this customer — pick a chat manually', 'error');
+  };
+
+  // ── Customer display (live cart mirror over Supabase Realtime) ────────────────
+  // A separate device at <app-url>/display subscribes to this channel and shows
+  // the cart to the customer. Change the name per till if you run more than one.
+  const DISPLAY_CHANNEL = 'trc-pos-display';
+  const displayChanRef = useRef(null);
+  const displayPayloadRef = useRef({ status: 'idle', items: [], subtotal: 0, discount: 0, total: 0, customer: null });
+
+  const sendDisplay = useCallback((extra = {}) => {
+    const payload = {
+      status: cart.length ? 'active' : 'idle',
+      items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+      subtotal,
+      discount: discountAmount,
+      total,
+      customer: selectedMember?.name || null,
+      phone: selectedMember?.phone || null,
+      promoCode: appliedPromo?.code || null,
+      promoDiscount: promoDiscountAmount,
+      addlDiscount: addlDiscountAmount,
+      addlDiscLabel: addlDiscountAmount > 0
+        ? (addlDiscType === 'pct' ? `${addlDiscVal}%` : `₹${addlDiscVal}`)
+        : null,
+      ...extra,
+    };
+    displayPayloadRef.current = payload;
+    displayChanRef.current?.send({ type: 'broadcast', event: 'state', payload }).catch(() => {});
+  }, [cart, subtotal, discountAmount, total, selectedMember]);
+  const sendDisplayRef = useRef(sendDisplay);
+  sendDisplayRef.current = sendDisplay;
+
+  // Open the channel once; answer "request" pings from late-joining displays.
+  useEffect(() => {
+    const chan = supabase.channel(DISPLAY_CHANNEL, { config: { broadcast: { self: false } } });
+    chan.on('broadcast', { event: 'request' }, () => {
+      chan.send({ type: 'broadcast', event: 'state', payload: displayPayloadRef.current }).catch(() => {});
+    });
+    chan.subscribe((status) => { if (status === 'SUBSCRIBED') sendDisplayRef.current(); });
+    displayChanRef.current = chan;
+    return () => { supabase.removeChannel(chan); displayChanRef.current = null; };
+  }, []);
+
+  // Push the cart to the display whenever it changes.
+  useEffect(() => { sendDisplay(); }, [sendDisplay]);
 
   // ── Keyboard shortcuts (using refs to avoid stale closures) ───────────────────
   const checkoutRef = useRef(handleCheckout);
@@ -1203,16 +1363,20 @@ export default function POS() {
             {cart.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', whiteSpace: 'nowrap' }}>Discount</span>
-                <select value={discountType} onChange={e => { if (!appliedPromo) setDiscountType(e.target.value); }}
-                  disabled={!!appliedPromo}
-                  style={{ padding: '4px 6px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '12px', background: appliedPromo ? '#f3f4f6' : 'white', fontWeight: '700' }}>
+                <select
+                  value={appliedPromo ? addlDiscType : discountType}
+                  onChange={e => appliedPromo ? setAddlDiscType(e.target.value) : setDiscountType(e.target.value)}
+                  style={{ padding: '4px 6px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '12px', background: 'white', fontWeight: '700' }}>
                   <option value="pct">%</option>
                   <option value="fixed">₹</option>
                 </select>
-                <input type="number" value={discountVal} min="0" placeholder="0"
-                  onChange={e => { if (!appliedPromo) setDiscountVal(parseFloat(e.target.value) || 0); }}
-                  disabled={!!appliedPromo}
-                  style={{ flex: 1, padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '13px', background: appliedPromo ? '#f3f4f6' : 'white' }} />
+                <input type="number"
+                  value={appliedPromo ? addlDiscVal : discountVal}
+                  min="0" placeholder="0"
+                  onChange={e => appliedPromo
+                    ? setAddlDiscVal(parseFloat(e.target.value) || 0)
+                    : setDiscountVal(parseFloat(e.target.value) || 0)}
+                  style={{ flex: 1, padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '13px', background: 'white' }} />
               </div>
             )}
 
@@ -1224,9 +1388,31 @@ export default function POS() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#9ca3af', marginBottom: '3px' }}>
                       <span>Subtotal</span><span>{fmt(subtotal)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
-                      <span>Discount</span><span>−{fmt(discountAmount)}</span>
-                    </div>
+                    {/* Promo code discount row */}
+                    {promoDiscountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ background: '#fef9c3', color: '#854d0e', border: '1px solid #fde68a', borderRadius: '4px', padding: '0px 5px', fontSize: '10px', fontWeight: '700', letterSpacing: '0.5px' }}>
+                            {appliedPromo?.code}
+                          </span>
+                          Promo
+                        </span>
+                        <span>−{fmt(promoDiscountAmount)}</span>
+                      </div>
+                    )}
+                    {/* Additional manual discount row — only when a promo is also active */}
+                    {appliedPromo && addlDiscountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
+                        <span>Extra Discount ({addlDiscType === 'pct' ? `${addlDiscVal}%` : `₹${addlDiscVal}`})</span>
+                        <span>−{fmt(addlDiscountAmount)}</span>
+                      </div>
+                    )}
+                    {/* Single discount row when no promo */}
+                    {!appliedPromo && discountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
+                        <span>Discount</span><span>−{fmt(discountAmount)}</span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: discountAmount > 0 ? '1px solid #e5e7eb' : 'none' }}>
@@ -1404,7 +1590,7 @@ export default function POS() {
             <div ref={receiptRef} style={{ padding: '24px', fontFamily: '"Courier New", monospace', overflowY: 'auto' }}>
               {/* Receipt header */}
               <div style={{ textAlign: 'center', marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px dashed #ccc' }}>
-                <div style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '3px' }}>TAPAS LIBRARY</div>
+                <div style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '3px' }}>TAPAS READING CAFE</div>
                 <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Point of Sale Receipt</div>
                 <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>
                   {lastTxn.date.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -1468,20 +1654,26 @@ export default function POS() {
 
               {/* Footer */}
               <div style={{ textAlign: 'center', borderTop: '2px dashed #ccc', paddingTop: '14px', fontSize: '11px', color: '#888' }}>
-                <div style={{ fontWeight: '700', marginBottom: '4px' }}>Thank you for visiting Tapas Library!</div>
+                <div style={{ fontWeight: '700', marginBottom: '4px' }}>Thank you for visiting TRC!</div>
                 <div>Happy Reading 📚</div>
               </div>
             </div>
 
             {/* Action buttons */}
-            <div style={{ padding: '14px 20px 18px', display: 'flex', gap: '10px', borderTop: '1px solid #f0f0f0', background: '#fafafa', flexShrink: 0 }}>
-              <button onClick={handlePrint} style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
-                🖨️ Print Receipt
+            <div style={{ padding: '14px 20px 18px', borderTop: '1px solid #f0f0f0', background: '#fafafa', flexShrink: 0 }}>
+              <button onClick={() => handleWhatsApp(lastTxn)}
+                style={{ width: '100%', padding: '11px', background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', marginBottom: '10px' }}>
+                💬 Send Bill on WhatsApp{lastTxn.member ? ` → ${lastTxn.member.name}` : ''}
               </button>
-              <button onClick={() => { setShowReceipt(false); resetCart(); }}
-                style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
-                + New Sale
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={handlePrint} style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+                  🖨️ Print Receipt
+                </button>
+                <button onClick={() => { setShowReceipt(false); resetCart(); }}
+                  style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+                  + New Sale
+                </button>
+              </div>
             </div>
           </div>
         </div>
