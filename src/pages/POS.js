@@ -116,6 +116,9 @@ export default function POS() {
   const [itemSearch, setItemSearch]     = useState('');
   const [activeCat, setActiveCat]       = useState('Books');
 
+  // Restore cart state persisted across navigation
+  const _saved = (() => { try { return JSON.parse(sessionStorage.getItem('pos_cart') || '{}'); } catch { return {}; } })();
+
   // Member
   const [allMembers, setAllMembers]     = useState([]);
   const [memberSearch, setMemberSearch] = useState('');
@@ -125,7 +128,6 @@ export default function POS() {
   const [finesLoading, setFinesLoading] = useState(false);
 
   // Cart — restored from sessionStorage so navigation doesn't wipe the order
-  const _saved = (() => { try { return JSON.parse(sessionStorage.getItem('pos_cart') || '{}'); } catch { return {}; } })();
   const [cart, setCart]                   = useState(_saved.cart || []);
   const [discountType, setDiscountType]   = useState(_saved.discountType || 'pct');
   const [discountVal, setDiscountVal]     = useState(_saved.discountVal || 0);
