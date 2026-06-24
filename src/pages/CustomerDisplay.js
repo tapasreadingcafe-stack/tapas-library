@@ -212,43 +212,74 @@ export default function CustomerDisplay() {
           </div>
         )}
 
-        {/* UPI QR section — shown prominently when cashier selects UPI */}
+        {/* UPI QR section */}
         {s.payMethod === 'upi' && s.upiQrUrl && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: 'clamp(20px,4vw,52px)',
-            padding: 'clamp(16px,2.5vw,32px) clamp(24px,3.5vw,52px)',
-            background: '#faf5ff', borderTop: '2px solid #ddd6fe' }}>
-            <img src={s.upiQrUrl} alt="UPI QR"
-              style={{ width: 'clamp(110px,20vw,240px)', height: 'clamp(110px,20vw,240px)',
-                borderRadius: 10, border: '3px solid #ddd6fe', objectFit: 'contain',
-                background: '#fff' }} />
-            <div>
-              <div style={{ fontSize: 'clamp(13px,1.6vw,20px)', fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>
-                📱 Scan to Pay
+            gap: 'clamp(24px,5vw,64px)',
+            padding: 'clamp(20px,3vw,40px) clamp(24px,3.5vw,52px)',
+            background: '#f5f3ff', borderTop: '2px solid #ede9fe' }}>
+
+            {/* QR side */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
+              <div style={{ fontSize: 'clamp(10px,1vw,13px)', fontWeight: 700,
+                letterSpacing: '3px', color: '#7c3aed', textTransform: 'uppercase' }}>
+                Scan to Pay
               </div>
-              <div style={{ fontSize: 'clamp(30px,6vw,68px)', fontWeight: 900,
-                color: '#4f46e5', letterSpacing: -2, lineHeight: 1 }}>
+              <div style={{ background: '#fff', borderRadius: 'clamp(10px,1.5vw,16px)',
+                border: '2px solid #ddd6fe', padding: 'clamp(8px,1.2vw,14px)',
+                outline: '6px solid #ede9fe' }}>
+                <img src={s.upiQrUrl} alt="UPI QR"
+                  style={{ width: 'clamp(120px,21vw,260px)', height: 'clamp(120px,21vw,260px)',
+                    display: 'block', objectFit: 'contain' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 'clamp(6px,1vw,14px)', alignItems: 'center' }}>
+                {['GPay','PhonePe','Paytm','Any UPI'].map((app, i) => (
+                  <span key={app} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px,1vw,14px)' }}>
+                    {i > 0 && <span style={{ color: '#c4b5fd', fontSize: 'clamp(10px,1vw,14px)' }}>·</span>}
+                    <span style={{ fontSize: 'clamp(11px,1.1vw,15px)', color: '#7c3aed', fontWeight: 600 }}>{app}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ width: 1, alignSelf: 'stretch', background: '#ddd6fe', flexShrink: 0 }} />
+
+            {/* Amount side */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(4px,.6vw,8px)' }}>
+              <div style={{ fontSize: 'clamp(10px,1vw,13px)', fontWeight: 700,
+                letterSpacing: '3px', color: '#7c3aed', textTransform: 'uppercase' }}>
+                Total
+              </div>
+              <div style={{ fontSize: 'clamp(36px,7vw,84px)', fontWeight: 900,
+                color: '#4f46e5', letterSpacing: -3, lineHeight: 1 }}>
                 {fmt(s.total)}
               </div>
-              <div style={{ fontSize: 'clamp(11px,1.1vw,14px)', color: '#a78bfa', marginTop: 6 }}>
-                GPay · PhonePe · Paytm · Any UPI
+              <div style={{ background: '#ede9fe', borderRadius: 8,
+                padding: 'clamp(3px,.5vw,6px) clamp(8px,1.2vw,14px)',
+                display: 'inline-block', width: 'fit-content' }}>
+                <span style={{ fontSize: 'clamp(10px,1vw,13px)', fontWeight: 600, color: '#7c3aed' }}>
+                  UPI payment
+                </span>
               </div>
             </div>
           </div>
         )}
 
-        {/* TOTAL row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: 'clamp(14px,2vw,26px) clamp(24px,3.5vw,52px)',
-          background: '#f8fafc' }}>
-          <span style={{ fontSize: 'clamp(20px,3.5vw,44px)', fontWeight: 900, color: '#64748b' }}>
-            TOTAL
-          </span>
-          <span style={{ fontSize: 'clamp(32px,6.5vw,76px)', fontWeight: 900,
-            color: '#4f46e5', letterSpacing: -2 }}>
-            {fmt(s.total)}
-          </span>
-        </div>
+        {/* TOTAL row — hidden when UPI QR is showing (amount already shown above) */}
+        {!(s.payMethod === 'upi' && s.upiQrUrl) && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: 'clamp(14px,2vw,26px) clamp(24px,3.5vw,52px)',
+            background: '#f8fafc' }}>
+            <span style={{ fontSize: 'clamp(20px,3.5vw,44px)', fontWeight: 900, color: '#64748b' }}>
+              TOTAL
+            </span>
+            <span style={{ fontSize: 'clamp(32px,6.5vw,76px)', fontWeight: 900,
+              color: '#4f46e5', letterSpacing: -2 }}>
+              {fmt(s.total)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
