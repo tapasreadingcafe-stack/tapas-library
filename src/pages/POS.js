@@ -120,26 +120,27 @@ export default function POS() {
   const [allMembers, setAllMembers]     = useState([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [memberDrop, setMemberDrop]     = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(_saved.selectedMember || null);
   const [memberFines, setMemberFines]   = useState([]);
   const [finesLoading, setFinesLoading] = useState(false);
 
-  // Cart
-  const [cart, setCart]                   = useState([]);
-  const [discountType, setDiscountType]   = useState('pct');
-  const [discountVal, setDiscountVal]     = useState(0);
+  // Cart — restored from sessionStorage so navigation doesn't wipe the order
+  const _saved = (() => { try { return JSON.parse(sessionStorage.getItem('pos_cart') || '{}'); } catch { return {}; } })();
+  const [cart, setCart]                   = useState(_saved.cart || []);
+  const [discountType, setDiscountType]   = useState(_saved.discountType || 'pct');
+  const [discountVal, setDiscountVal]     = useState(_saved.discountVal || 0);
   // Additional manual discount applied ON TOP of a promo code
-  const [addlDiscType, setAddlDiscType]   = useState('pct');
-  const [addlDiscVal, setAddlDiscVal]     = useState(0);
+  const [addlDiscType, setAddlDiscType]   = useState(_saved.addlDiscType || 'pct');
+  const [addlDiscVal, setAddlDiscVal]     = useState(_saved.addlDiscVal || 0);
 
   // Promo code
   const [promoInput, setPromoInput]     = useState('');
-  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [appliedPromo, setAppliedPromo] = useState(_saved.appliedPromo || null);
   const [promoError, setPromoError]     = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
 
   // Payment
-  const [payMethod, setPayMethod]       = useState('cash');
+  const [payMethod, setPayMethod]       = useState(_saved.payMethod || 'cash');
   const [cashReceived, setCashReceived] = useState('');
 
   // UPI QR
@@ -543,6 +544,7 @@ export default function POS() {
     setCart([]); setSelectedMember(null); setMemberSearch('');
     setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
+    sessionStorage.removeItem('pos_cart');
   };
 
   // ── Promo code ────────────────────────────────────────────────────────────────
@@ -896,6 +898,14 @@ export default function POS() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [showReceipt]);
+
+  // Persist cart to sessionStorage so navigation doesn't wipe the order.
+  useEffect(() => {
+    sessionStorage.setItem('pos_cart', JSON.stringify({
+      cart, selectedMember, discountType, discountVal,
+      addlDiscType, addlDiscVal, appliedPromo, payMethod,
+    }));
+  }, [cart, selectedMember, discountType, discountVal, addlDiscType, addlDiscVal, appliedPromo, payMethod]);
 
   // ── Filtered catalog ──────────────────────────────────────────────────────────
   const sl = itemSearch.toLowerCase();
