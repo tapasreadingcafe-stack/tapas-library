@@ -142,6 +142,10 @@ export default function POS() {
   const [payMethod, setPayMethod]       = useState('cash');
   const [cashReceived, setCashReceived] = useState('');
 
+  // UPI QR
+  const [upiQrUrl, setUpiQrUrl]         = useState(null);
+  const [showQrSetup, setShowQrSetup]   = useState(false);
+
   // DB
   const [hasPosTable, setHasPosTable]   = useState(null);
   const [showSetup, setShowSetup]       = useState(false);
@@ -824,11 +828,13 @@ export default function POS() {
       addlDiscLabel: addlDiscountAmount > 0
         ? (addlDiscType === 'pct' ? `${addlDiscVal}%` : `₹${addlDiscVal}`)
         : null,
+      payMethod,
+      upiQrUrl: payMethod === 'upi' ? upiQrUrl : null,
       ...extra,
     };
     displayPayloadRef.current = payload;
     displayChanRef.current?.send({ type: 'broadcast', event: 'state', payload }).catch(() => {});
-  }, [cart, subtotal, discountAmount, total, selectedMember]);
+  }, [cart, subtotal, discountAmount, total, selectedMember, payMethod, upiQrUrl]);
   const sendDisplayRef = useRef(sendDisplay);
   sendDisplayRef.current = sendDisplay;
 
@@ -855,6 +861,25 @@ export default function POS() {
   confirmRef.current = confirm;
   resetCartRef.current = resetCart;
   cartRef.current = cart;
+
+  // Load UPI QR from settings on mount
+  useEffect(() => {
+    supabase.from('app_settings').select('value').eq('key', 'upi_qr').single()
+      .then(({ data }) => { if (data) setUpiQrUrl(data.value); });
+  }, []);
+
+  const handleQrUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      await supabase.from('app_settings').upsert({ key: 'upi_qr', value: base64 });
+      setUpiQrUrl(base64);
+      setShowQrSetup(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const handler = async (e) => {
@@ -1487,9 +1512,20 @@ export default function POS() {
             {/* UPI hint */}
             {cart.length > 0 && payMethod === 'upi' && (
               <div style={{ marginBottom: '10px', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '32px', marginBottom: '4px' }}>📱</div>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#7c3aed' }}>Ask customer to scan UPI QR</div>
-                <div style={{ fontSize: '11px', color: '#a78bfa', marginTop: '2px' }}>Click CHECKOUT once payment is confirmed</div>
+                {upiQrUrl ? (
+                  <>
+                    <img src={upiQrUrl} alt="UPI QR" style={{ width: 72, height: 72, borderRadius: 6, border: '1px solid #ddd6fe', marginBottom: 4 }} />
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#7c3aed' }}>QR shown on customer display</div>
+                    <button onClick={() => setShowQrSetup(true)} style={{ marginTop: 4, fontSize: '10px', color: '#a78bfa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Change QR</button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '28px', marginBottom: '4px' }}>📱</div>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#7c3aed' }}>No UPI QR set</div>
+                    <div style={{ fontSize: '11px', color: '#a78bfa', marginTop: '2px' }}>Click CHECKOUT once payment is confirmed</div>
+                    <button onClick={() => setShowQrSetup(true)} style={{ marginTop: 6, fontSize: '11px', color: '#7c3aed', background: '#ede9fe', border: '1px solid #ddd6fe', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: '700' }}>Set UPI QR Code</button>
+                  </>
+                )}
               </div>
             )}
 
@@ -1994,6 +2030,35 @@ export default function POS() {
               <button onClick={() => setShowAddMember(false)}
                 style={{ padding: '10px 16px', background: '#e0e0e0', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── UPI QR Setup Modal ─────────────────────────────────────────── */}
+      {showQrSetup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowQrSetup(false)}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 300, textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4, color: '#1e293b' }}>UPI QR Code</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>Shown on customer display when UPI is selected</div>
+            {upiQrUrl && (
+              <img src={upiQrUrl} alt="Current QR" style={{ width: 160, height: 160, borderRadius: 8, marginBottom: 16, border: '1px solid #e2e8f0', objectFit: 'contain' }} />
+            )}
+            <label style={{ display: 'block', background: '#7c3aed', color: '#fff', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+              {upiQrUrl ? '🔄 Replace QR Image' : '📤 Upload QR Image'}
+              <input type="file" accept="image/*" onChange={handleQrUpload} style={{ display: 'none' }} />
+            </label>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>Screenshot your QR from GPay / PhonePe / Paytm</div>
+            {upiQrUrl && (
+              <button onClick={async () => {
+                await supabase.from('app_settings').delete().eq('key', 'upi_qr');
+                setUpiQrUrl(null); setShowQrSetup(false);
+              }} style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginBottom: 8, display: 'block', width: '100%' }}>
+                Remove QR
+              </button>
+            )}
+            <button onClick={() => setShowQrSetup(false)} style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer' }}>Close</button>
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ const supabase = createClient(
 
 const DISPLAY_CHANNEL = 'trc-pos-display';
 const fmt = (n) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-const EMPTY = { status: 'idle', items: [], subtotal: 0, discount: 0, total: 0, customer: null, phone: null, promoCode: null, promoDiscount: 0, addlDiscount: 0, addlDiscLabel: null, txnRef: null };
+const EMPTY = { status: 'idle', items: [], subtotal: 0, discount: 0, total: 0, customer: null, phone: null, promoCode: null, promoDiscount: 0, addlDiscount: 0, addlDiscLabel: null, txnRef: null, payMethod: null, upiQrUrl: null };
 
 export default function CustomerDisplay() {
   const [s, setS]                = useState(EMPTY);
@@ -209,6 +209,31 @@ export default function CustomerDisplay() {
             fontSize: 'clamp(13px,1.6vw,19px)', color: '#dc2626', fontWeight: 600 }}>
             <span>Discount</span>
             <span>−{fmt(s.discount)}</span>
+          </div>
+        )}
+
+        {/* UPI QR section — shown prominently when cashier selects UPI */}
+        {s.payMethod === 'upi' && s.upiQrUrl && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 'clamp(20px,4vw,52px)',
+            padding: 'clamp(16px,2.5vw,32px) clamp(24px,3.5vw,52px)',
+            background: '#faf5ff', borderTop: '2px solid #ddd6fe' }}>
+            <img src={s.upiQrUrl} alt="UPI QR"
+              style={{ width: 'clamp(110px,20vw,240px)', height: 'clamp(110px,20vw,240px)',
+                borderRadius: 10, border: '3px solid #ddd6fe', objectFit: 'contain',
+                background: '#fff' }} />
+            <div>
+              <div style={{ fontSize: 'clamp(13px,1.6vw,20px)', fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>
+                📱 Scan to Pay
+              </div>
+              <div style={{ fontSize: 'clamp(30px,6vw,68px)', fontWeight: 900,
+                color: '#4f46e5', letterSpacing: -2, lineHeight: 1 }}>
+                {fmt(s.total)}
+              </div>
+              <div style={{ fontSize: 'clamp(11px,1.1vw,14px)', color: '#a78bfa', marginTop: 6 }}>
+                GPay · PhonePe · Paytm · Any UPI
+              </div>
+            </div>
           </div>
         )}
 
