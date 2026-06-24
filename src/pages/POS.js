@@ -886,6 +886,9 @@ export default function POS() {
       if (e.key === 'F1')  { e.preventDefault(); memberSearchRef.current?.focus(); }
       if (e.key === 'F2')  { e.preventDefault(); itemSearchRef.current?.focus(); }
       if (e.key === 'F12') { e.preventDefault(); checkoutRef.current(); }
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault(); setShowPosScanner(s => !s);
+      }
       if (e.key === 'Escape' && !showReceipt) {
         if (cartRef.current.length > 0 && await confirmRef.current({ title: 'Clear Cart', message: 'Clear cart and start over?', variant: 'warning' })) resetCartRef.current();
       }
@@ -947,7 +950,7 @@ export default function POS() {
         ))}
         {!isMobile && (
           <div style={{ marginLeft: 'auto', fontSize: '10px', color: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>
-            F1=Member · F2=Search · F12=Checkout · Esc=Clear
+            F1=Member · F2=Search · /=Scanner · F12=Checkout · Esc=Clear
           </div>
         )}
       </div>
