@@ -380,11 +380,34 @@ function Members() {
   };
 
   const handleDeleteMember = async (memberId) => {
-    if (!await confirm({ title: 'Delete Member', message: 'Are you sure you want to delete this member?', variant: 'danger' })) {
+    // Check for active (checked-out) borrows first
+    const { data: activeCirc } = await supabase
+      .from('circulation')
+      .select('id')
+      .eq('member_id', memberId)
+      .eq('status', 'checked_out')
+      .limit(1);
+
+    if (activeCirc && activeCirc.length > 0) {
+      toast.error('Cannot delete — member has books currently borrowed. Return all books first.');
+      return;
+    }
+
+    if (!await confirm({ title: 'Delete Member', message: 'This will permanently delete the member and all their history. Continue?', variant: 'danger' })) {
       return;
     }
 
     try {
+      // Delete related records in dependency order before deleting member
+      await supabase.from('circulation').delete().eq('member_id', memberId);
+      await supabase.from('transactions').delete().eq('member_id', memberId);
+      await supabase.from('reservations').delete().eq('member_id', memberId);
+      await supabase.from('event_attendance').delete().eq('member_id', memberId);
+      await supabase.from('review_requests').delete().eq('member_id', memberId);
+      await supabase.from('referral_codes').delete().eq('member_id', memberId);
+      await supabase.from('welcome_journey').delete().eq('member_id', memberId);
+      await supabase.from('family_members').delete().eq('parent_member_id', memberId);
+
       const { error } = await supabase
         .from('members')
         .delete()
