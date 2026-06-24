@@ -122,11 +122,16 @@ export default function Borrow() {
     else toast.success(msg);
   };
 
-  // Keyboard shortcuts: Ctrl+B = checkout, Ctrl+R = active
+  // Keyboard shortcuts: Ctrl+B = checkout, Ctrl+R = active, / = scanner
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setActiveTab('checkout'); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); setActiveTab('active'); }
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setScannerMode('book');
+        setShowScanner(s => !s);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -598,7 +603,7 @@ export default function Borrow() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>📚 Borrow Management</h1>
-          <p style={{ color: '#aaa', fontSize: '12px' }}>Ctrl+B = New Checkout &nbsp;·&nbsp; Ctrl+R = Active Borrows</p>
+          <p style={{ color: '#aaa', fontSize: '12px' }}>Ctrl+B = New Checkout &nbsp;·&nbsp; Ctrl+R = Active Borrows &nbsp;·&nbsp; / = Scanner</p>
         </div>
         <button onClick={fetchData} disabled={loading} style={{ ...btnPrimary, padding: '8px 16px' }}>
           {loading ? '⏳' : '🔄 Refresh'}
