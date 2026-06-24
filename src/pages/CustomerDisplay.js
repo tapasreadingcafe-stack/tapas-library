@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { supabase } from '../utils/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Dedicated no-auth client so Realtime connects instantly without waiting
+// for session restore or token refresh that the shared client does.
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+);
 
 const DISPLAY_CHANNEL = 'trc-pos-display';
 const fmt = (n) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
