@@ -86,6 +86,11 @@ export default function Books() {
   const [editingId, setEditingId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [showImport, setShowImport] = useState(false);
+  const [showMrpImport, setShowMrpImport] = useState(false);
+  const [mrpImportStep, setMrpImportStep] = useState('upload');
+  const [mrpImportRows, setMrpImportRows] = useState([]);
+  const [mrpImportResults, setMrpImportResults] = useState(null);
+  const [mrpImportProgress, setMrpImportProgress] = useState(0);
   const [imagePreview, setImagePreview] = useState('');
   const [coverLoaded, setCoverLoaded] = useState(false);
   const [coverError, setCoverError] = useState(false);
@@ -756,6 +761,83 @@ export default function Books() {
     }
   };
 
+  const handleMrpExport = () => {
+    const missing = books.filter(b => !b.mrp);
+    if (missing.length === 0) return toast.success('All books already have MRP set!');
+    exportToCSV(
+      missing.map(b => ({ 'Book ID': b.book_id, Title: b.title, Author: b.author, ISBN: b.isbn || '', MRP: '' })),
+      'mrp_lookup'
+    );
+    setShowImportExport(false);
+  };
+
+  const parseMrpCsv = (text) => {
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const rawHeaders = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+    const bookIdCol = rawHeaders.findIndex(h => h === 'book id' || h === 'book_id');
+    const isbnCol = rawHeaders.findIndex(h => h === 'isbn');
+    const titleCol = rawHeaders.findIndex(h => h === 'title');
+    const mrpCol = rawHeaders.findIndex(h => h === 'mrp');
+    if (mrpCol === -1) return null;
+    return lines.slice(1).map(line => {
+      const cols = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g) || line.split(',');
+      const clean = cols.map(c => c?.replace(/^"|"$/g, '').trim() ?? '');
+      return {
+        bookId: bookIdCol >= 0 ? clean[bookIdCol] : '',
+        isbn: isbnCol >= 0 ? clean[isbnCol] : '',
+        title: titleCol >= 0 ? clean[titleCol] : '',
+        mrp: mrpCol >= 0 ? clean[mrpCol] : '',
+      };
+    }).filter(r => r.bookId || r.isbn);
+  };
+
+  const handleMrpFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const rows = parseMrpCsv(ev.target.result);
+      if (rows === null) return toast.error('CSV must have an "MRP" column');
+      if (!rows.length) return toast.error('No valid rows found');
+      setMrpImportRows(rows);
+      setMrpImportStep('preview');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleMrpImport = async () => {
+    setMrpImportStep('importing');
+    setMrpImportProgress(0);
+    let updated = 0, notFound = 0, skipped = 0;
+    const total = mrpImportRows.length;
+    for (let i = 0; i < total; i++) {
+      const row = mrpImportRows[i];
+      if (!row.mrp || isNaN(Number(row.mrp))) { skipped++; } else {
+        const mrpVal = Number(row.mrp);
+        let query = supabase.from('books').update({ mrp: mrpVal });
+        if (row.bookId) {
+          query = query.eq('book_id', row.bookId);
+        } else if (row.isbn) {
+          query = query.eq('isbn', row.isbn);
+        } else { skipped++; setMrpImportProgress(Math.round(((i + 1) / total) * 100)); continue; }
+        const { data, error } = await query.select('id');
+        if (error || !data?.length) { notFound++; } else { updated++; }
+      }
+      setMrpImportProgress(Math.round(((i + 1) / total) * 100));
+    }
+    setMrpImportResults({ updated, notFound, skipped });
+    setMrpImportStep('done');
+    if (updated > 0) fetchBooks();
+  };
+
+  const closeMrpImport = () => {
+    setShowMrpImport(false);
+    setMrpImportStep('upload');
+    setMrpImportRows([]);
+    setMrpImportResults(null);
+  };
+
   const filteredBooks = books.filter(book => {
     const term = searchTerm.toLowerCase();
     const matchSearch = (
@@ -812,6 +894,10 @@ export default function Books() {
                     style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>📊</span> Import from Excel (.xls/.xlsx)
                   </button>
+                  <button onClick={() => { setShowImportExport(false); setShowMrpImport(true); }}
+                    style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🏷️</span> Import MRP Prices
+                  </button>
                   <div style={{ padding: '8px 12px', fontSize: '11px', color: '#999', fontWeight: '600', borderBottom: '1px solid #f0f0f0' }}>EXPORT</div>
                   <button onClick={() => {
                     setShowImportExport(false);
@@ -830,8 +916,12 @@ export default function Books() {
                     const blob = new Blob([tsv], { type: 'application/vnd.ms-excel' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a'); a.href = url; a.download = `books_catalog_${new Date().toISOString().split('T')[0]}.xls`; a.click(); URL.revokeObjectURL(url);
-                  }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>📊</span> Export as Excel (.xls)
+                  </button>
+                  <button onClick={handleMrpExport}
+                    style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🏷️</span> Export for MRP Lookup
                   </button>
                 </div>
               </>
@@ -1534,6 +1624,111 @@ export default function Books() {
           onSuccess={fetchBooks}
           onClose={() => setShowImport(false)}
         />
+      )}
+
+      {showMrpImport && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={closeMrpImport}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '500px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px' }}>🏷️ Import MRP Prices</h3>
+              <button onClick={closeMrpImport} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>×</button>
+            </div>
+
+            {mrpImportStep === 'upload' && (
+              <div>
+                <p style={{ margin: '0 0 16px', color: '#555', fontSize: '14px', lineHeight: '1.6' }}>
+                  Upload a CSV with your MRP prices filled in. The file must have a <strong>Book ID</strong> (or ISBN) column and an <strong>MRP</strong> column.
+                </p>
+                <div style={{ background: '#f8f9fa', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#666' }}>
+                  <strong>Step 1:</strong> Click <em>"Export for MRP Lookup"</em> from Import/Export menu<br />
+                  <strong>Step 2:</strong> Fill in the MRP column (send the file to us for lookup)<br />
+                  <strong>Step 3:</strong> Upload the completed file here
+                </div>
+                <label style={{ display: 'block', padding: '16px', border: '2px dashed #667eea', borderRadius: '8px', textAlign: 'center', cursor: 'pointer', color: '#667eea', fontWeight: '600', fontSize: '14px' }}>
+                  📂 Choose CSV File
+                  <input type="file" accept=".csv" onChange={handleMrpFileSelect} style={{ display: 'none' }} />
+                </label>
+              </div>
+            )}
+
+            {mrpImportStep === 'preview' && (
+              <div>
+                <div style={{ background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '14px' }}>
+                  <strong>{mrpImportRows.filter(r => r.mrp && !isNaN(Number(r.mrp))).length}</strong> books have MRP filled in &nbsp;·&nbsp;
+                  <strong>{mrpImportRows.filter(r => !r.mrp || isNaN(Number(r.mrp))).length}</strong> will be skipped (no MRP)
+                </div>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '8px', marginBottom: '16px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8f9fa', position: 'sticky', top: 0 }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Book</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', borderBottom: '1px solid #e0e0e0' }}>MRP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mrpImportRows.slice(0, 50).map((r, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', opacity: r.mrp && !isNaN(Number(r.mrp)) ? 1 : 0.4 }}>
+                          <td style={{ padding: '7px 12px' }}>{r.title || r.bookId || r.isbn}</td>
+                          <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: '600', color: r.mrp ? '#2e7d32' : '#999' }}>
+                            {r.mrp ? `₹${r.mrp}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setMrpImportStep('upload')} style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '6px', background: 'white', cursor: 'pointer', fontSize: '14px' }}>
+                    ← Back
+                  </button>
+                  <button onClick={handleMrpImport} style={{ flex: 2, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                    Update MRP Prices
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {mrpImportStep === 'importing' && (
+              <div style={{ padding: '20px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#555' }}>
+                  <span>Updating MRP prices…</span>
+                  <span style={{ fontWeight: '600' }}>{mrpImportProgress}%</span>
+                </div>
+                <div style={{ background: '#e0e0e0', borderRadius: '999px', height: '12px', overflow: 'hidden' }}>
+                  <div style={{ background: '#CFF389', width: `${mrpImportProgress}%`, height: '100%', borderRadius: '999px', transition: 'width 0.2s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '13px', color: '#888' }}>
+                  <span>{Math.round((mrpImportProgress / 100) * mrpImportRows.length)} done</span>
+                  <span>{mrpImportRows.length - Math.round((mrpImportProgress / 100) * mrpImportRows.length)} remaining</span>
+                </div>
+              </div>
+            )}
+
+            {mrpImportStep === 'done' && mrpImportResults && (
+              <div>
+                <div style={{ textAlign: 'center', fontSize: '40px', marginBottom: '16px' }}>✅</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                  <div style={{ background: '#e8f5e9', borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#2e7d32' }}>{mrpImportResults.updated}</div>
+                    <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>Updated</div>
+                  </div>
+                  <div style={{ background: '#fff3e0', borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#e65100' }}>{mrpImportResults.notFound}</div>
+                    <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>Not Found</div>
+                  </div>
+                  <div style={{ background: '#f5f5f5', borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#757575' }}>{mrpImportResults.skipped}</div>
+                    <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>Skipped</div>
+                  </div>
+                </div>
+                <button onClick={closeMrpImport} style={{ width: '100%', padding: '12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ISBN Scanner Modal */}
