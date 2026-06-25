@@ -194,6 +194,9 @@ export default function POS() {
   const [mobileView, setMobileView] = useState('catalog'); // 'catalog' or 'cart'
   const [isMobile, setIsMobile] = useState(false);
 
+  // Held bills (parked carts waiting to be resumed)
+  const [heldBills, setHeldBills] = useState([]);
+
   // Save services to Supabase (synced across all devices)
   const saveServices = async (svcs) => {
     await supabase.from('app_settings').upsert({ key: 'pos_services', value: JSON.stringify(svcs), updated_at: new Date().toISOString() }, { onConflict: 'key' });
@@ -547,6 +550,54 @@ export default function POS() {
     setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
     sessionStorage.removeItem('pos_cart');
+  };
+
+  const holdCurrentBill = () => {
+    if (cart.length === 0) return;
+    setHeldBills(prev => [...prev, {
+      id: Date.now(),
+      cart, selectedMember, memberSearch,
+      discountType, discountVal,
+      addlDiscType, addlDiscVal,
+      appliedPromo, promoInput,
+      payMethod, memberFines, familyMembers,
+    }]);
+    resetCart();
+  };
+
+  const resumeHeldBill = (idx) => {
+    const held = heldBills[idx];
+    if (!held) return;
+    const currentSnap = cart.length > 0 ? {
+      id: Date.now(),
+      cart, selectedMember, memberSearch,
+      discountType, discountVal,
+      addlDiscType, addlDiscVal,
+      appliedPromo, promoInput,
+      payMethod, memberFines, familyMembers,
+    } : null;
+    setHeldBills(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      return currentSnap ? [...next, currentSnap] : next;
+    });
+    setCart(held.cart);
+    setSelectedMember(held.selectedMember);
+    setMemberSearch(held.memberSearch);
+    setDiscountType(held.discountType);
+    setDiscountVal(held.discountVal);
+    setAddlDiscType(held.addlDiscType);
+    setAddlDiscVal(held.addlDiscVal);
+    setAppliedPromo(held.appliedPromo);
+    setPromoInput(held.promoInput);
+    setPayMethod(held.payMethod);
+    setMemberFines(held.memberFines);
+    setFamilyMembers(held.familyMembers);
+    setCashReceived('');
+  };
+
+  const discardHeldBill = (idx, e) => {
+    e.stopPropagation();
+    setHeldBills(prev => prev.filter((_, i) => i !== idx));
   };
 
   // ── Promo code ────────────────────────────────────────────────────────────────
@@ -1162,6 +1213,38 @@ export default function POS() {
           flexDirection: 'column', overflow: 'hidden',
           marginTop: isMobile ? '8px' : 0,
         }}>
+
+          {/* ── BILL TABS ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0', borderBottom: '2px solid #e5e7eb', background: '#f8f9ff', flexShrink: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+            {/* Active bill tab */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', background: 'white', borderBottom: '2px solid #667eea', marginBottom: '-2px', fontSize: '12px', fontWeight: '700', color: '#667eea', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span>{cart.length > 0 ? (selectedMember?.name?.split(' ')[0] || 'Bill') : 'New Bill'}</span>
+              {cart.length > 0 && <span style={{ background: '#667eea', color: 'white', borderRadius: '10px', padding: '1px 6px', fontSize: '10px' }}>{cart.length}</span>}
+            </div>
+            {/* Held bill tabs */}
+            {heldBills.map((bill, idx) => (
+              <div key={bill.id} onClick={() => resumeHeldBill(idx)}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', background: 'transparent', borderBottom: '2px solid transparent', marginBottom: '-2px', fontSize: '12px', fontWeight: '600', color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#374151'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6b7280'; }}
+                title={`Switch to: ${bill.selectedMember?.name || 'Walk-in'} — ${bill.cart.length} item(s)`}
+              >
+                <span>{bill.selectedMember?.name?.split(' ')[0] || 'Walk-in'}</span>
+                <span style={{ background: '#e5e7eb', color: '#374151', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '700' }}>{bill.cart.length}</span>
+                <button onClick={(e) => discardHeldBill(idx, e)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '13px', padding: 0, lineHeight: 1, marginLeft: '1px' }}
+                  onMouseEnter={e => { e.stopPropagation(); e.currentTarget.style.color = '#ef4444'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af'; }}
+                  title="Close">✕</button>
+              </div>
+            ))}
+            {/* New bill "+" button */}
+            <button onClick={holdCurrentBill} disabled={cart.length === 0}
+              style={{ marginLeft: 'auto', padding: '9px 14px', background: 'none', border: 'none', cursor: cart.length > 0 ? 'pointer' : 'not-allowed', fontSize: '18px', color: cart.length > 0 ? '#667eea' : '#d1d5db', fontWeight: '300', flexShrink: 0, lineHeight: 1, transition: 'color 0.15s' }}
+              onMouseEnter={e => { if (cart.length > 0) e.currentTarget.style.color = '#4f46e5'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = cart.length > 0 ? '#667eea' : '#d1d5db'; }}
+              title="Park current bill and start a new one">+</button>
+          </div>
 
           {/* ── MEMBER SEARCH ── */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>

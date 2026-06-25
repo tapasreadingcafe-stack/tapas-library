@@ -14,6 +14,25 @@
     />
     <title>Staff dashboard</title>
     <script>
+      // Diagnostic: surface any boot-time JS error that would
+      // otherwise leave #root empty with no visible feedback. If the
+      // React tree mounts within 2.5s, this script does nothing.
+      window.__bootErrors = [];
+      window.addEventListener('error', function(e) {
+        window.__bootErrors.push('ERR ' + (e.error && e.error.stack || e.message) + ' @ ' + e.filename + ':' + e.lineno);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        window.__bootErrors.push('REJ ' + (e.reason && e.reason.stack || e.reason));
+      });
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0 && window.__bootErrors.length) {
+          var esc = function(s){return String(s).replace(/[<>&]/g, function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});};
+          root.innerHTML = '<pre style="padding:24px;font-family:ui-monospace,monospace;color:#c0392b;background:#fff;white-space:pre-wrap;word-break:break-word;">React did not mount. Errors:\n\n' + window.__bootErrors.map(esc).join('\n\n---\n\n') + '</pre>';
+        }
+      }, 2500);
+    </script>
+    <script>
       // Apply dev mode custom labels before React renders (prevents text flash)
       try {
         var labels = JSON.parse(localStorage.getItem('dev_custom_labels') || '{}');

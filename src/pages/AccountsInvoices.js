@@ -77,6 +77,20 @@ export default function AccountsInvoices() {
 
   const handleReactToPrint = useReactToPrint({ contentRef: printRef });
 
+  const deleteInvoice = async (inv) => {
+    if (!window.confirm(`Delete invoice for ${inv.members?.name || 'Walk-in'} (${fmt(inv.total_amount)})? This cannot be undone.`)) return;
+    try {
+      await supabase.from('pos_transaction_items').delete().eq('transaction_id', inv.id);
+      const { error } = await supabase.from('pos_transactions').delete().eq('id', inv.id);
+      if (error) throw error;
+      setInvoices(prev => prev.filter(i => i.id !== inv.id));
+      toast.success('Invoice deleted');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete invoice');
+    }
+  };
+
   const openDetail = async (inv) => {
     setSelectedInvoice(inv);
     setDetailLoading(true);
@@ -231,10 +245,14 @@ export default function AccountsInvoices() {
                     <td style={tdStyle}>{inv.members?.name || 'Walk-in'}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(inv.total_amount)}</td>
                     <td style={tdStyle}>{paymentBadge(inv.payment_method)}</td>
-                    <td style={tdStyle}>
+                    <td style={{ ...tdStyle, display: 'flex', gap: '6px' }}>
                       <button onClick={() => openDetail(inv)}
                         style={{ padding: '5px 14px', background: '#667eea', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                         View
+                      </button>
+                      <button onClick={() => deleteInvoice(inv)}
+                        style={{ padding: '5px 14px', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        Delete
                       </button>
                     </td>
                   </tr>

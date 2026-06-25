@@ -2,6 +2,106 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+// =====================================================================
+// Connection diagnostics
+// ---------------------------------------------------------------------
+// "Connection timed out" can mean three very different things, each with
+// a different fix: (1) the user's own internet is down, (2) the database
+// /REST API is unreachable, or (3) the Auth service is down even though
+// everything else works (a Supabase-side outage we hit in practice —
+// REST answered in 23ms while /auth/v1/health hung past 20s). This pings
+// each service independently so we can name the exact failure.
+// =====================================================================
+
+// Fetch a URL with a hard timeout. Returns reachability + latency.
+// Any HTTP response (even 401/404) means the service is UP — we only
+// care that it answered. A thrown error / abort means it's DOWN.
+async function pingService(path, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const t0 = (performance && performance.now) ? performance.now() : Date.now();
+  try {
+    const res = await fetch(`${SUPABASE_URL}${path}`, {
+      method: 'GET',
+      headers: { apikey: SUPABASE_KEY },
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const ms = Math.round(((performance && performance.now) ? performance.now() : Date.now()) - t0);
+    return { up: true, status: res.status, ms };
+  } catch (e) {
+    clearTimeout(timer);
+    const ms = Math.round(((performance && performance.now) ? performance.now() : Date.now()) - t0);
+    return { up: false, status: 0, ms, timedOut: ctrl.signal.aborted };
+  }
+}
+
+const SLOW_MS = 4000; // a reachable-but-sluggish service
+
+// Run all checks and boil them down to one plain-language conclusion the
+// staff member can act on without knowing what "GoTrue" or "REST" means.
+async function runConnectionDiagnostics() {
+  const online = typeof navigator === 'undefined' ? true : navigator.onLine;
+
+  if (!online) {
+    return {
+      online: false,
+      checks: [],
+      tone: 'danger',
+      headline: 'Your device is offline',
+      detail: 'No internet connection detected. Reconnect to Wi-Fi or mobile data, then try again.',
+    };
+  }
+
+  // Run both pings together so the whole check takes ~one timeout, not two.
+  const [rest, auth] = await Promise.all([
+    pingService('/rest/v1/'),       // database / REST API
+    pingService('/auth/v1/health'), // sign-in (Auth) service
+  ]);
+
+  const checks = [
+    { key: 'internet', label: 'Your internet', ...statusOf({ up: true, ms: 0 }, true) },
+    { key: 'database', label: 'Database',       ...statusOf(rest) },
+    { key: 'auth',     label: 'Sign-in service', ...statusOf(auth) },
+  ];
+
+  let tone = 'success';
+  let headline = 'All systems reachable';
+  let detail = 'Servers are responding normally. If sign-in still fails, double-check your email and password.';
+
+  if (!rest.up && !auth.up) {
+    tone = 'danger';
+    headline = "Can't reach the server";
+    detail = 'Both the database and sign-in service are unreachable. This is usually your network/firewall — or a full Supabase outage. Check your connection; if it persists, see status.supabase.com.';
+  } else if (rest.up && !auth.up) {
+    tone = 'danger';
+    headline = 'Sign-in service is down (Supabase-side)';
+    detail = 'The database is healthy but the Auth service is not responding, so logins fail. This is a Supabase-side issue, not your password. Fix: restart the Supabase project (Settings → General → Restart project). If a restart doesn’t bring it back, contact Supabase support.';
+  } else if (!rest.up && auth.up) {
+    tone = 'danger';
+    headline = 'Database is unreachable (Supabase-side)';
+    detail = 'Sign-in works but the database is not responding. Restart the Supabase project (Settings → General → Restart project).';
+  } else if (rest.ms > SLOW_MS || auth.ms > SLOW_MS) {
+    tone = 'warning';
+    headline = 'Servers are slow but reachable';
+    detail = 'Everything responded, just slowly. Sign-in may be sluggish. If it keeps timing out, restart the Supabase project.';
+  }
+
+  return { online: true, checks, tone, headline, detail };
+}
+
+// Map a ping result to a coloured status row.
+function statusOf(result, forceOk = false) {
+  if (forceOk || (result.up && result.ms <= SLOW_MS)) {
+    return { state: 'ok', text: result.ms ? `OK · ${result.ms}ms` : 'OK' };
+  }
+  if (result.up) return { state: 'slow', text: `Slow · ${result.ms}ms` };
+  return { state: 'down', text: result.timedOut ? 'No response (timed out)' : 'Unreachable' };
+}
+
 // =====================================================================
 // Login — staff-only gate for the dashboard
 // ---------------------------------------------------------------------
@@ -27,6 +127,22 @@ export default function Login({ staffStatus, debugInfo }) {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent]   = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+
+  // Connection diagnostics: null = idle, 'running' = checking, object = result
+  const [diag, setDiag] = useState(null);
+
+  const checkConnection = async () => {
+    setDiag('running');
+    try {
+      setDiag(await runConnectionDiagnostics());
+    } catch {
+      setDiag({
+        online: true, checks: [], tone: 'danger',
+        headline: 'Diagnostics failed to run',
+        detail: 'Could not complete the connection check. Try again in a moment.',
+      });
+    }
+  };
 
   // Translate the staff-status sentinel from AuthContext into a user
   // message. Only shown when present — not on every render.
@@ -73,6 +189,13 @@ export default function Login({ staffStatus, debugInfo }) {
     } catch (err) {
       console.error('[Login] sign-in failed:', err?.status, err?.message);
       setError(messageForError(err));
+      // A timeout/network failure could be the user's internet, the DB, or
+      // the Auth service. Auto-run diagnostics so they see the real cause
+      // instead of a generic "timed out".
+      const m = (err?.message || '').toLowerCase();
+      if (m.includes('timed out') || m.includes('failed to fetch') || m.includes('network')) {
+        checkConnection();
+      }
     } finally {
       setLoading(false);
     }
@@ -161,6 +284,9 @@ export default function Login({ staffStatus, debugInfo }) {
 
           {/* Login error */}
           {error && <Banner tone="danger">{error}</Banner>}
+
+          {/* Connection diagnostics */}
+          {diag && <DiagnosticsPanel diag={diag} onRetry={checkConnection} />}
 
           {/* ── FORGOT PASSWORD MODE ─────────────────────────────── */}
           {forgotMode ? (
@@ -306,6 +432,21 @@ export default function Login({ staffStatus, debugInfo }) {
           color: '#64748b',
         }}>
           🔒 Staff access only · Tapas Reading Cafe
+          <span style={{ display: 'block', marginTop: '8px' }}>
+            <button
+              type="button"
+              onClick={checkConnection}
+              disabled={diag === 'running'}
+              style={{
+                background: 'none', border: 'none', padding: 0,
+                color: '#64748b', fontSize: '12px', fontWeight: '600',
+                cursor: diag === 'running' ? 'default' : 'pointer',
+                textDecoration: 'underline', textUnderlineOffset: '2px',
+              }}
+            >
+              {diag === 'running' ? 'Checking connection…' : 'Having trouble? Check connection'}
+            </button>
+          </span>
           {debugInfo && (
             <span style={{ display: 'block', marginTop: '8px', fontSize: '10px', color: '#64748b', fontFamily: 'ui-monospace, monospace' }}>
               {debugInfo}
@@ -375,6 +516,89 @@ function Field({ label, children }) {
       {children}
     </div>
   );
+}
+
+function DiagnosticsPanel({ diag, onRetry }) {
+  // Still running — show a lightweight checking state.
+  if (diag === 'running') {
+    return (
+      <div style={diagBoxStyle('warning')}>
+        <div style={{ fontWeight: '700', fontSize: '13px' }}>⏳ Checking connection…</div>
+      </div>
+    );
+  }
+
+  const dotColors = {
+    ok:   '#22c55e',
+    slow: '#f59e0b',
+    down: '#ef4444',
+  };
+  const headlineColors = {
+    success: '#86efac',
+    warning: '#fcd34d',
+    danger:  '#fca5a5',
+  };
+
+  return (
+    <div style={diagBoxStyle(diag.tone)}>
+      <div style={{ fontWeight: '800', fontSize: '13.5px', marginBottom: diag.checks.length ? '10px' : '6px', color: headlineColors[diag.tone] || headlineColors.danger }}>
+        {diag.tone === 'success' ? '✅ ' : diag.tone === 'warning' ? '⚠️ ' : '🚫 '}
+        {diag.headline}
+      </div>
+
+      {diag.checks.length > 0 && (
+        <div style={{ marginBottom: '10px' }}>
+          {diag.checks.map((c) => (
+            <div key={c.key} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              fontSize: '12.5px', padding: '3px 0',
+            }}>
+              <span style={{
+                width: '9px', height: '9px', borderRadius: '50%', flexShrink: 0,
+                background: dotColors[c.state] || dotColors.down,
+                boxShadow: `0 0 6px ${dotColors[c.state] || dotColors.down}`,
+              }} />
+              <span style={{ color: '#cbd5e1', minWidth: '110px' }}>{c.label}</span>
+              <span style={{ color: '#94a3b8', marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{c.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ fontSize: '12.5px', lineHeight: 1.6, color: '#e2e8f0', opacity: 0.92 }}>
+        {diag.detail}
+      </div>
+
+      <button
+        type="button"
+        onClick={onRetry}
+        style={{
+          marginTop: '12px', background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.14)', borderRadius: '8px',
+          padding: '7px 12px', color: '#e2e8f0', fontSize: '12px',
+          fontWeight: '700', cursor: 'pointer',
+        }}
+      >
+        ↻ Run check again
+      </button>
+    </div>
+  );
+}
+
+function diagBoxStyle(tone) {
+  const tones = {
+    danger:  { bg: 'rgba(220, 38, 38, 0.12)',  border: 'rgba(220, 38, 38, 0.35)' },
+    warning: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.35)' },
+    success: { bg: 'rgba(22, 163, 74, 0.12)',  border: 'rgba(22, 163, 74, 0.35)' },
+  };
+  const t = tones[tone] || tones.danger;
+  return {
+    background: t.bg,
+    border: `1px solid ${t.border}`,
+    borderRadius: '12px',
+    padding: '14px 16px',
+    marginBottom: '18px',
+  };
 }
 
 function Banner({ tone, children }) {
