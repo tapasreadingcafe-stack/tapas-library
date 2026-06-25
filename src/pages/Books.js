@@ -771,23 +771,47 @@ export default function Books() {
     setShowImportExport(false);
   };
 
+  const parseCSVLine = (line) => {
+    const fields = [];
+    let i = 0;
+    while (i <= line.length) {
+      if (i === line.length) { fields.push(''); break; }
+      if (line[i] === '"') {
+        let field = '';
+        i++;
+        while (i < line.length) {
+          if (line[i] === '"' && line[i + 1] === '"') { field += '"'; i += 2; }
+          else if (line[i] === '"') { i++; break; }
+          else { field += line[i++]; }
+        }
+        fields.push(field.trim());
+        if (line[i] === ',') i++;
+      } else {
+        const end = line.indexOf(',', i);
+        if (end === -1) { fields.push(line.slice(i).trim()); break; }
+        fields.push(line.slice(i, end).trim());
+        i = end + 1;
+      }
+    }
+    return fields;
+  };
+
   const parseMrpCsv = (text) => {
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) return [];
-    const rawHeaders = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+    const rawHeaders = parseCSVLine(lines[0]).map(h => h.toLowerCase());
     const bookIdCol = rawHeaders.findIndex(h => h === 'book id' || h === 'book_id');
     const isbnCol = rawHeaders.findIndex(h => h === 'isbn');
     const titleCol = rawHeaders.findIndex(h => h === 'title');
     const mrpCol = rawHeaders.findIndex(h => h === 'mrp');
     if (mrpCol === -1) return null;
     return lines.slice(1).map(line => {
-      const cols = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g) || line.split(',');
-      const clean = cols.map(c => c?.replace(/^"|"$/g, '').trim() ?? '');
+      const cols = parseCSVLine(line);
       return {
-        bookId: bookIdCol >= 0 ? clean[bookIdCol] : '',
-        isbn: isbnCol >= 0 ? clean[isbnCol] : '',
-        title: titleCol >= 0 ? clean[titleCol] : '',
-        mrp: mrpCol >= 0 ? clean[mrpCol] : '',
+        bookId: bookIdCol >= 0 ? (cols[bookIdCol] || '') : '',
+        isbn: isbnCol >= 0 ? (cols[isbnCol] || '') : '',
+        title: titleCol >= 0 ? (cols[titleCol] || '') : '',
+        mrp: mrpCol >= 0 ? (cols[mrpCol] || '') : '',
       };
     }).filter(r => r.bookId || r.isbn);
   };
