@@ -7,7 +7,7 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { getFineSettings, calculateFine } from '../utils/fineUtils';
 import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
-import { sendWhatsApp, reservationReadyWhatsAppMsg } from '../utils/whatsappUtils';
+import { sendWhatsApp, reservationReadyWhatsAppMsg, checkoutWhatsAppMsg } from '../utils/whatsappUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 
@@ -1144,6 +1144,18 @@ export default function Borrow() {
               <button onClick={() => window.print()} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
                 🖨️ Print
               </button>
+              {receiptModal.member?.phone && (
+                <button onClick={() => sendWhatsApp(receiptModal.member.phone, checkoutWhatsAppMsg({
+                  memberName: receiptModal.member.name,
+                  bookTitle: receiptModal.book.title,
+                  copyCode: receiptModal.copy?.copy_code || '-',
+                  checkoutDate: new Date().toLocaleDateString('en-IN'),
+                  dueDate: new Date(receiptModal.dueDate).toLocaleDateString('en-IN'),
+                  finePerDay: fineSettings.ratePerDay
+                }))} style={{ flex: 1, padding: '10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+                  💬 WhatsApp
+                </button>
+              )}
               <button onClick={() => setReceiptModal(null)} style={{ flex: 1, padding: '10px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                 Close
               </button>
