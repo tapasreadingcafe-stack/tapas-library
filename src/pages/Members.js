@@ -43,7 +43,7 @@ function Members() {
   const [currentFilters, setCurrentFilters] = useState({
     search: '',
     membershipStatus: ['active', 'expiring', 'expired', 'guest'],
-    membershipPlan: ['day_pass', 'basic', 'premium', 'family', 'student', 'teen', 'no_plan'],
+    membershipPlan: ['individual_monthly', 'individual_annual', 'no_plan'],
     sortBy: 'expiry_date',
     sortOrder: 'asc'
   });
@@ -156,7 +156,7 @@ function Members() {
       duration_days: member.plan_duration_days || 30,
       borrow_limit: member.borrow_limit || 3,
       discount_percent: member.discount_percent || 0,
-      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'basic']?.price || 100,
+      price: member.plan_price || PLAN_DEFAULTS[member.plan || 'individual_monthly']?.price || 600,
       profile_photo: member.profile_photo || ''
     });
     setShowModal(true);

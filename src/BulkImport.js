@@ -68,7 +68,7 @@ export default function BulkImport({ type, onSuccess, onClose }) {
             name: row.name,
             phone: row.phone,
             email: row.email,
-            plan: row.plan || 'basic',
+            plan: row.plan || 'individual_monthly',
             borrow_limit: parseInt(row.borrow_limit) || 2,
             customer_id: row.customer_id || '',
             status: 'active',

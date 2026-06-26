@@ -31,10 +31,10 @@ function FilterBar({ onFilterChange, onClose }) {
 
     if (filters.membershipCategory === 'all') {
       membershipStatus = ['active', 'expiring', 'expired', 'guest'];
-      membershipPlan = ['day_pass', 'basic', 'premium', 'family', 'student', 'teen', 'no_plan'];
+      membershipPlan = ['individual_monthly', 'individual_annual', 'no_plan'];
     } else if (filters.membershipCategory === 'subscription') {
       membershipStatus = ['active', 'expiring', 'expired'];
-      membershipPlan = ['day_pass', 'basic', 'premium', 'family', 'student', 'teen'];
+      membershipPlan = ['individual_monthly', 'individual_annual'];
     } else if (filters.membershipCategory === 'non_subscription') {
       membershipStatus = ['guest'];
       membershipPlan = ['no_plan'];
