@@ -708,18 +708,24 @@ export default function Books() {
           // Generate book_id: S- prefix for sale-only books, B- for borrow or both
           const prefix = getCategoryPrefix(payload.category);
           const idLetter = (nSale > 0 && nBorrow === 0) ? 'S' : 'B';
-          // Fetch ALL existing IDs with this prefix so we take the real max,
-          // not just the last alphabetically (avoids gaps causing duplicates).
           const { data: existingIds } = await supabase.from('books').select('book_id').like('book_id', `${idLetter}-${prefix}-%`);
           let nextNum = 1;
           if (existingIds?.length) {
             const nums = existingIds.map(b => { const m = b.book_id.match(/-(\d+)$/); return m ? parseInt(m[1]) : 0; });
             nextNum = Math.max(...nums) + 1;
           }
-          payload.book_id = `${idLetter}-${prefix}-${String(nextNum).padStart(4, '0')}`;
 
-          const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
-          if (error) throw error;
+          // Retry loop: if another record already claimed this ID (orphan from a
+          // failed previous attempt), increment and try again — never shows an error.
+          let newBook, insertError, attempts = 0;
+          while (attempts < 10) {
+            payload.book_id = `${idLetter}-${prefix}-${String(nextNum).padStart(4, '0')}`;
+            ({ data: newBook, error: insertError } = await supabase.from('books').insert([payload]).select().single());
+            if (!insertError) break;
+            if (insertError.code === '23505') { nextNum++; attempts++; continue; } // duplicate key
+            throw insertError;
+          }
+          if (insertError) throw insertError;
           try {
             if (nBorrow > 0) await createBookCopies(newBook.id, payload.category, nBorrow, 'library');
             if (nSale > 0) await createBookCopies(newBook.id, payload.category, nSale, 'sale');
