@@ -705,14 +705,13 @@ export default function Books() {
           logActivity(ACTIONS.BOOK_ADDED, `Added ${copyCount} copies to: ${payload.title} (total: ${newTotal})`, { book_title: payload.title });
           if (printAfterAdd) navigate(`/books/${existingBook.id}/copies`);
         } else {
-          // Generate book_id with next number
+          // Generate book_id: S- prefix for sale-only books, B- for borrow or both
           const prefix = getCategoryPrefix(payload.category);
-          const nextCopies = await generateCopyIds(null, payload.category, 0);
-          // Get last number from existing copies for this prefix
-          const { data: lastCopy } = await supabase.from('book_copies').select('copy_code').like('copy_code', `B-${prefix}-%`).order('copy_code', { ascending: false }).limit(1);
+          const idLetter = (nSale > 0 && nBorrow === 0) ? 'S' : 'B';
+          const { data: lastBook } = await supabase.from('books').select('book_id').like('book_id', `${idLetter}-${prefix}-%`).order('book_id', { ascending: false }).limit(1);
           let nextNum = 1;
-          if (lastCopy?.length) { const m = lastCopy[0].copy_code.match(/-(\d+)$/); if (m) nextNum = parseInt(m[1]) + 1; }
-          payload.book_id = `B-${prefix}-${String(nextNum).padStart(4, '0')}`;
+          if (lastBook?.length) { const m = lastBook[0].book_id.match(/-(\d+)$/); if (m) nextNum = parseInt(m[1]) + 1; }
+          payload.book_id = `${idLetter}-${prefix}-${String(nextNum).padStart(4, '0')}`;
 
           const { data: newBook, error } = await supabase.from('books').insert([payload]).select().single();
           if (error) throw error;

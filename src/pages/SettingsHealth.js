@@ -158,25 +158,28 @@ export default function SettingsHealth() {
     setExpandedCheck(null);
 
     const results = [];
-    const totalChecks = 15;
+    const totalChecks = 16;
     let done = 0;
     const tick = () => { done++; setBugFinderProgress(Math.round((done / totalChecks) * 100)); };
 
     // Helper: safe query that returns [] on error
     const safeQuery = async (fn) => { try { return await fn(); } catch { return []; } };
 
+    // ─── 1 & 2. Book qty mismatch — fetch all books + all copies in 3 queries total ───
+    const [allBooksForQty, allCopiesForQty] = await Promise.all([
+      safeQuery(async () => { const { data } = await supabase.from('books').select('id, title, quantity_available, quantity_total'); return data || []; }),
+      safeQuery(async () => { const { data } = await supabase.from('book_copies').select('book_id, status'); return data || []; }),
+    ]);
+    const availByBook = {}, totalByBook = {};
+    for (const c of allCopiesForQty) {
+      totalByBook[c.book_id] = (totalByBook[c.book_id] || 0) + 1;
+      if (c.status === 'available') availByBook[c.book_id] = (availByBook[c.book_id] || 0) + 1;
+    }
+
     // ─── 1. Book quantity_available mismatch ───
-    const qtyMismatch = await safeQuery(async () => {
-      const { data: books } = await supabase.from('books').select('id, title, quantity_available');
-      if (!books) return [];
-      const issues = [];
-      for (const b of books) {
-        const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', b.id).eq('status', 'available');
-        const actual = count || 0;
-        if (actual !== b.quantity_available) issues.push({ id: b.id, title: b.title, expected: actual, got: b.quantity_available });
-      }
-      return issues;
-    });
+    const qtyMismatch = allBooksForQty
+      .filter(b => (availByBook[b.id] || 0) !== (b.quantity_available || 0))
+      .map(b => ({ id: b.id, title: b.title, expected: availByBook[b.id] || 0, got: b.quantity_available }));
     tick();
     results.push({ id: 'qty_avail', label: 'Book available qty mismatch', category: 'Sync', icon: '📊', issues: qtyMismatch, fixable: true,
       fix: async () => {
@@ -185,17 +188,9 @@ export default function SettingsHealth() {
       detail: (i) => `"${i.title}" — shows ${i.got}, should be ${i.expected}` });
 
     // ─── 2. Book quantity_total mismatch ───
-    const totalMismatch = await safeQuery(async () => {
-      const { data: books } = await supabase.from('books').select('id, title, quantity_total');
-      if (!books) return [];
-      const issues = [];
-      for (const b of books) {
-        const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', b.id);
-        const actual = count || 0;
-        if (actual > 0 && actual !== (b.quantity_total || 0)) issues.push({ id: b.id, title: b.title, expected: actual, got: b.quantity_total || 0 });
-      }
-      return issues;
-    });
+    const totalMismatch = allBooksForQty
+      .filter(b => { const actual = totalByBook[b.id] || 0; return actual > 0 && actual !== (b.quantity_total || 0); })
+      .map(b => ({ id: b.id, title: b.title, expected: totalByBook[b.id] || 0, got: b.quantity_total || 0 }));
     tick();
     results.push({ id: 'qty_total', label: 'Book total qty mismatch', category: 'Sync', icon: '📦', issues: totalMismatch, fixable: true,
       fix: async () => {
@@ -218,16 +213,17 @@ export default function SettingsHealth() {
 
     // ─── 4. Issued copies without checkout circulation ───
     const issuedNoCirc = await safeQuery(async () => {
-      const { data: issued } = await supabase.from('book_copies').select('id, copy_code, book_id, current_borrower_id').eq('status', 'issued');
+      const [{ data: issued }, { data: activeCirc }] = await Promise.all([
+        supabase.from('book_copies').select('id, copy_code, book_id, current_borrower_id').eq('status', 'issued'),
+        supabase.from('circulation').select('book_id, member_id').eq('status', 'checked_out'),
+      ]);
       if (!issued?.length) return [];
-      const issues = [];
-      for (const c of issued) {
-        let q = supabase.from('circulation').select('id', { count: 'exact', head: true }).eq('book_id', c.book_id).eq('status', 'checked_out');
-        if (c.current_borrower_id) q = q.eq('member_id', c.current_borrower_id);
-        const { count } = await q;
-        if (!count) issues.push({ id: c.id, copy_code: c.copy_code });
-      }
-      return issues;
+      const activeByBook = new Set((activeCirc || []).map(c => c.book_id));
+      const activeByPair = new Set((activeCirc || []).map(c => `${c.book_id}:${c.member_id}`));
+      return issued.filter(c => c.current_borrower_id
+        ? !activeByPair.has(`${c.book_id}:${c.current_borrower_id}`)
+        : !activeByBook.has(c.book_id)
+      ).map(c => ({ id: c.id, copy_code: c.copy_code }));
     });
     tick();
     results.push({ id: 'issued_no_circ', label: 'Issued copies without checkout', category: 'Copy Status', icon: '📤', issues: issuedNoCirc, fixable: true,
@@ -333,16 +329,14 @@ export default function SettingsHealth() {
 
     // ─── 13. Checked-out but book qty 0 with no copies ───
     const checkedOutQty0 = await safeQuery(async () => {
-      const { data: circ } = await supabase.from('circulation').select('id, book_id, member_id, books(title, quantity_available)').eq('status', 'checked_out');
-      if (!circ) return [];
-      const issues = [];
-      for (const c of circ) {
-        if (c.books && c.books.quantity_available <= 0) {
-          const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', c.book_id);
-          if (!count) issues.push({ id: c.id, title: c.books?.title, book_id: c.book_id });
-        }
-      }
-      return issues;
+      const { data: circ } = await supabase.from('circulation').select('id, book_id, books(title, quantity_available)').eq('status', 'checked_out');
+      if (!circ?.length) return [];
+      const lowQty = circ.filter(c => c.books && c.books.quantity_available <= 0);
+      if (!lowQty.length) return [];
+      const bookIds = [...new Set(lowQty.map(c => c.book_id))];
+      const { data: copies } = await supabase.from('book_copies').select('book_id').in('book_id', bookIds);
+      const booksWithCopies = new Set((copies || []).map(c => c.book_id));
+      return lowQty.filter(c => !booksWithCopies.has(c.book_id)).map(c => ({ id: c.id, title: c.books?.title, book_id: c.book_id }));
     });
     tick();
     results.push({ id: 'checkout_qty0', label: 'Checked out but qty=0 (no copies)', category: 'Logic', icon: '⚠️', issues: checkedOutQty0, fixable: false,
@@ -350,14 +344,11 @@ export default function SettingsHealth() {
 
     // ─── 14. Unpaid fines in completed POS transactions ───
     const unpaidFines = await safeQuery(async () => {
-      const { data: fineItems } = await supabase.from('pos_transaction_items').select('id, fine_id').eq('item_type', 'fine').not('fine_id', 'is', null);
+      const { data: fineItems } = await supabase.from('pos_transaction_items').select('fine_id').eq('item_type', 'fine').not('fine_id', 'is', null);
       if (!fineItems?.length) return [];
-      const issues = [];
-      for (const fi of fineItems) {
-        const { data: circ } = await supabase.from('circulation').select('id, fine_paid, books(title)').eq('id', fi.fine_id).single();
-        if (circ && !circ.fine_paid) issues.push({ id: fi.fine_id, title: circ.books?.title || 'Unknown' });
-      }
-      return issues;
+      const fineIds = [...new Set(fineItems.map(f => f.fine_id))];
+      const { data: circs } = await supabase.from('circulation').select('id, fine_paid, books(title)').in('id', fineIds).eq('fine_paid', false);
+      return (circs || []).map(c => ({ id: c.id, title: c.books?.title || 'Unknown' }));
     });
     tick();
     results.push({ id: 'unpaid_fines', label: 'Fines paid in POS but not marked', category: 'Logic', icon: '💸', issues: unpaidFines, fixable: true,
@@ -368,18 +359,52 @@ export default function SettingsHealth() {
 
     // ─── 15. Stale reservations ───
     const staleRes = await safeQuery(async () => {
-      const { data: res } = await supabase.from('reservations').select('id, book_id, member_id, status, books(title)').in('status', ['registered', 'pending']);
+      const { data: res } = await supabase.from('reservations').select('id, book_id, books(title)').in('status', ['registered', 'pending']);
       if (!res?.length) return [];
-      const issues = [];
-      for (const r of res) {
-        const { count } = await supabase.from('book_copies').select('*', { count: 'exact', head: true }).eq('book_id', r.book_id).eq('status', 'available');
-        if ((count || 0) > 0) issues.push({ id: r.id, title: r.books?.title || 'Unknown', available: count });
-      }
-      return issues;
+      const bookIds = [...new Set(res.map(r => r.book_id))];
+      const { data: avail } = await supabase.from('book_copies').select('book_id').in('book_id', bookIds).eq('status', 'available');
+      const availMap = {};
+      for (const c of avail || []) availMap[c.book_id] = (availMap[c.book_id] || 0) + 1;
+      return res.filter(r => (availMap[r.book_id] || 0) > 0).map(r => ({ id: r.id, title: r.books?.title || 'Unknown', available: availMap[r.book_id] }));
     });
     tick();
     results.push({ id: 'stale_res', label: 'Stale reservations (book available)', category: 'Logic', icon: '📅', issues: staleRes, fixable: false,
       detail: (i) => `"${i.title}" — ${i.available} copies available but reservation still pending` });
+
+    // ─── 16. Sale-only books with wrong book_id (B- prefix or out-of-sequence S-) ───
+    // Find all books that have S- copy codes, then check if their book_id needs fixing.
+    const saleWrongPrefix = await safeQuery(async () => {
+      const { data: saleCopies } = await supabase.from('book_copies').select('book_id').like('copy_code', 'S-%');
+      if (!saleCopies?.length) return [];
+      const saleBookIds = [...new Set(saleCopies.map(c => c.book_id).filter(Boolean))];
+      const { data: saleBooks } = await supabase.from('books').select('id, book_id, title, created_at').in('id', saleBookIds).order('created_at', { ascending: true });
+      if (!saleBooks?.length) return [];
+
+      // Group by category prefix, assign sequential S- numbers by created_at order
+      const byPrefix = {};
+      for (const b of saleBooks) {
+        const m = b.book_id.match(/^[BS]-([^-]+)-\d+$/);
+        const cat = m ? m[1] : 'GEN';
+        if (!byPrefix[cat]) byPrefix[cat] = [];
+        byPrefix[cat].push(b);
+      }
+      const issues = [];
+      for (const [cat, books] of Object.entries(byPrefix)) {
+        books.forEach((b, i) => {
+          const correct = `S-${cat}-${String(i + 1).padStart(4, '0')}`;
+          if (b.book_id !== correct) issues.push({ id: b.id, book_id: b.book_id, title: b.title, newId: correct });
+        });
+      }
+      return issues;
+    });
+    tick();
+    results.push({ id: 'sale_wrong_prefix', label: 'Sale-only books with wrong book ID', category: 'Data Quality', icon: '🏷️', issues: saleWrongPrefix, fixable: true,
+      fix: async () => {
+        for (const b of saleWrongPrefix) {
+          await supabase.from('books').update({ book_id: b.newId }).eq('id', b.id);
+        }
+      },
+      detail: (i) => `"${i.title}" — ${i.book_id} → ${i.newId}` });
 
     setBugFinderResults(results);
     setBugFinderRunning(false);

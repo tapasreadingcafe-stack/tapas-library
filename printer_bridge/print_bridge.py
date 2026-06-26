@@ -37,7 +37,18 @@ CORS(app)
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify(ok=True, printer=PRINTER_NAME, port=PORT)
+    # Check if the CUPS printer is actually online, not just that the bridge is running.
+    try:
+        result = subprocess.run(
+            ["lpstat", "-p", PRINTER_NAME],
+            capture_output=True, text=True, timeout=5,
+        )
+        output = result.stdout.lower()
+        # lpstat prints "is idle" or "is ready" when online; "disabled" or nothing when unplugged.
+        printer_ready = result.returncode == 0 and ("idle" in output or "ready" in output or "printing" in output)
+    except Exception:
+        printer_ready = False
+    return jsonify(ok=printer_ready, printer=PRINTER_NAME, port=PORT)
 
 
 @app.route("/api/print", methods=["POST", "OPTIONS"])

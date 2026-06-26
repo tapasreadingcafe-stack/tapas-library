@@ -127,6 +127,29 @@ export default function BarcodeManager() {
     setTimeout(() => setHighlightCopyId(null), 2500);
   }, [copies, toast]);
 
+  // Global USB scanner listener — works without opening the modal.
+  // USB scanners type very fast (< 50ms between chars) then send Enter.
+  useEffect(() => {
+    let buffer = '';
+    let lastKey = 0;
+    const SPEED_THRESHOLD = 80;
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const now = Date.now();
+      if (now - lastKey > SPEED_THRESHOLD) buffer = '';
+      lastKey = now;
+      if (e.key === 'Enter') {
+        if (buffer.length > 2) handleScan(buffer);
+        buffer = '';
+      } else if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleScan]); // eslint-disable-line
+
   const openScanner = () => {
     setScanSessionCount(0);
     setRecentScans([]);

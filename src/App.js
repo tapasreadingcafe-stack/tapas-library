@@ -710,7 +710,7 @@ function DashboardShell() {
           <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle sidebar">
             ☰
           </button>
-          <h1 className="app-title"><Editable id="app_title">📚 Tapas Reading Cafe</Editable></h1>
+          <h1 className="app-title"><Editable id="app_title">Tapas Reading Cafe</Editable></h1>
         </div>
         <div className="navbar-right">
           <NotificationBell staffId={staff?.id} />
