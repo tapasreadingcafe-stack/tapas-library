@@ -91,6 +91,11 @@ export default function Books() {
   const [mrpImportRows, setMrpImportRows] = useState([]);
   const [mrpImportResults, setMrpImportResults] = useState(null);
   const [mrpImportProgress, setMrpImportProgress] = useState(0);
+  const [bookSets, setBookSets] = useState([]);
+  const [showSetsPanel, setShowSetsPanel] = useState(false);
+  const [newSetForm, setNewSetForm] = useState({ name: '', set_price: '', set_mrp: '', notes: '' });
+  const [setsLoading, setSetsLoading] = useState(false);
+  const [selectedSetId, setSelectedSetId] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [coverLoaded, setCoverLoaded] = useState(false);
   const [coverError, setCoverError] = useState(false);
@@ -258,10 +263,18 @@ export default function Books() {
     // eslint-disable-next-line
   }, [showAddForm]);
 
+  const fetchSets = async () => {
+    setSetsLoading(true);
+    const { data } = await supabase.from('book_sets').select('*').order('created_at', { ascending: false });
+    setBookSets(data || []);
+    setSetsLoading(false);
+  };
+
   // Run probe + categories only once on mount
   useEffect(() => {
     probeCondition();
     fetchCategories();
+    fetchSets();
   }, []);
 
   // Re-fetch books whenever filter changes
@@ -302,7 +315,7 @@ export default function Books() {
       // round trip instead of waiting for the whole catalog to download.
       // A small first page paints almost immediately; the rest fill in behind
       // it. Each batch is appended to state as it arrives.
-      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status';
+      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status, set_id';
       const FIRST_PAGE = 50;
       const PAGE = 1000;
       let offset = 0;
@@ -345,6 +358,35 @@ export default function Books() {
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
+  };
+
+  const handleCreateSet = async () => {
+    if (!newSetForm.name.trim()) return toast.error('Set name is required');
+    const { error } = await supabase.from('book_sets').insert([{
+      name: newSetForm.name.trim(),
+      set_price: parseFloat(newSetForm.set_price) || 0,
+      set_mrp: parseFloat(newSetForm.set_mrp) || 0,
+      notes: newSetForm.notes.trim() || null,
+    }]);
+    if (error) return toast.error('Failed to create set');
+    setNewSetForm({ name: '', set_price: '', set_mrp: '', notes: '' });
+    fetchSets();
+    toast.success('Set created!');
+  };
+
+  const handleAssignToSet = async (bookId, setId) => {
+    const { error } = await supabase.from('books').update({ set_id: setId || null }).eq('id', bookId);
+    if (error) return toast.error('Failed to update');
+    fetchBooks();
+    fetchSets();
+  };
+
+  const handleDeleteSet = async (setId) => {
+    await supabase.from('books').update({ set_id: null }).eq('set_id', setId);
+    await supabase.from('book_sets').delete().eq('id', setId);
+    fetchSets();
+    fetchBooks();
+    toast.success('Set deleted');
   };
 
   const handleInputChange = (e) => {
@@ -910,6 +952,12 @@ export default function Books() {
           >
             📊 Bulk Edit
           </button>}
+          {!isReadOnly && <button
+            onClick={() => { setShowSetsPanel(true); fetchSets(); }}
+            style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}
+          >
+            📦 Sets
+          </button>}
           {!isReadOnly && canExportData && <div style={{ position: 'relative' }} data-tour="import-export">
             <button onClick={() => setShowImportExport(!showImportExport)}
               style={{ padding: isMobile ? '10px 14px' : '8px 16px', background: '#1dd1a1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '14px' : 'inherit' }}>
@@ -1143,6 +1191,20 @@ export default function Books() {
                   <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>{editingId ? 'You can edit the ID prefix (e.g. B → S)' : `Auto-generated. Each copy gets: B-${getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...`}</p>
                 </div>
               </div>
+
+              {editingId && (
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>📦 Book Set</label>
+                  <select
+                    value={formData.set_id || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, set_id: e.target.value || null }))}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: isMobile ? '44px' : 'auto' }}
+                  >
+                    <option value="">— Not part of a set —</option>
+                    {bookSets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
@@ -1577,6 +1639,11 @@ export default function Books() {
                       {hasCondition && book.condition && (
                         <span style={{ background: cStyle.bg, color: cStyle.text, padding: '2px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>{book.condition}</span>
                       )}
+                      {book.set_id && bookSets.find(s => s.id === book.set_id) && (
+                        <span style={{ background: '#fef3cd', color: '#856404', padding: '2px 6px', borderRadius: '10px', fontSize: '11px' }}>
+                          📦 {bookSets.find(s => s.id === book.set_id)?.name}
+                        </span>
+                      )}
                       <span style={{ fontSize: '12px', fontWeight: '600' }}>₹{book.sales_price || book.price}</span>
                       <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '11px', background: book.quantity_available > 0 ? '#d4edda' : '#f8d7da', color: book.quantity_available > 0 ? '#155724' : '#721c24' }}>
                         {book.quantity_available}/{book.quantity_total}
@@ -1613,7 +1680,14 @@ export default function Books() {
                   const cStyle = hasCondition && book.condition ? CONDITION_STYLE[book.condition] || {} : {};
                   return (
                     <tr key={book.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '12px' }}>{book.title}</td>
+                      <td style={{ padding: '12px' }}>
+                        {book.title}
+                        {book.set_id && bookSets.find(s => s.id === book.set_id) && (
+                          <div><span style={{ background: '#fef3cd', color: '#856404', padding: '1px 6px', borderRadius: '10px', fontSize: '11px' }}>
+                            📦 {bookSets.find(s => s.id === book.set_id)?.name}
+                          </span></div>
+                        )}
+                      </td>
                       <td style={{ padding: '12px' }}>{book.author}</td>
                       <td style={{ padding: '12px' }}>
                         {book.category ? (
@@ -1801,6 +1875,101 @@ export default function Books() {
               style={{ width: '100%', marginTop: '12px', padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Book Sets Panel Modal */}
+      {showSetsPanel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '800px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '20px' }}>📦 Book Sets</h2>
+              <button onClick={() => setShowSetsPanel(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
+            </div>
+            {/* Body: two-column layout */}
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              {/* Left: sets list + create form */}
+              <div style={{ width: '320px', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+                  {setsLoading ? <p>Loading…</p> : bookSets.length === 0 ? <p style={{ color: '#999', fontSize: '14px' }}>No sets yet. Create one below.</p> : bookSets.map(set => {
+                    const setBooks = books.filter(b => b.set_id === set.id);
+                    const isSelected = selectedSetId === set.id;
+                    return (
+                      <div key={set.id} onClick={() => setSelectedSetId(isSelected ? null : set.id)}
+                        style={{ padding: '12px', borderRadius: '8px', marginBottom: '8px', border: `2px solid ${isSelected ? '#f39c12' : '#e0e0e0'}`, cursor: 'pointer', background: isSelected ? '#fff8f0' : 'white' }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px' }}>{set.name}</div>
+                        <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{setBooks.length} books · MRP ₹{set.set_mrp} · Price ₹{set.set_price}</div>
+                        <button onClick={e => { e.stopPropagation(); handleDeleteSet(set.id); }}
+                          style={{ marginTop: '6px', fontSize: '11px', color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          🗑 Delete set
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Create set form */}
+                <div style={{ padding: '16px', borderTop: '1px solid #e0e0e0', background: '#fafafa' }}>
+                  <div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '10px' }}>Create New Set</div>
+                  <input placeholder="Set name *" value={newSetForm.name} onChange={e => setNewSetForm(p => ({ ...p, name: e.target.value }))}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                    <input placeholder="Set price ₹" type="number" value={newSetForm.set_price} onChange={e => setNewSetForm(p => ({ ...p, set_price: e.target.value }))}
+                      style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }} />
+                    <input placeholder="Set MRP ₹" type="number" value={newSetForm.set_mrp} onChange={e => setNewSetForm(p => ({ ...p, set_mrp: e.target.value }))}
+                      style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }} />
+                  </div>
+                  <button onClick={handleCreateSet}
+                    style={{ width: '100%', padding: '9px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                    + Create Set
+                  </button>
+                </div>
+              </div>
+              {/* Right: books in selected set */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+                {!selectedSetId ? (
+                  <p style={{ color: '#999', fontSize: '14px', marginTop: '8px' }}>← Select a set to see its books</p>
+                ) : (() => {
+                  const setBooks = books.filter(b => b.set_id === selectedSetId);
+                  const set = bookSets.find(s => s.id === selectedSetId);
+                  const unassigned = books.filter(b => !b.set_id);
+                  return (
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '16px', marginBottom: '12px' }}>{set?.name}</div>
+                      {setBooks.length === 0 ? <p style={{ color: '#999', fontSize: '14px' }}>No books in this set yet.</p> : setBooks.map(b => (
+                        <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: '600', fontSize: '13px' }}>{b.title}</div>
+                            <div style={{ fontSize: '11px', color: '#999' }}>{b.book_id} · ₹{b.sales_price || b.price}</div>
+                          </div>
+                          <button onClick={() => handleAssignToSet(b.id, null)}
+                            style={{ fontSize: '12px', color: '#e74c3c', background: '#fff0f0', border: '1px solid #f5c6c6', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer' }}>
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      {unassigned.length > 0 && (
+                        <div style={{ marginTop: '16px' }}>
+                          <div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '8px', color: '#555' }}>Add books to this set:</div>
+                          <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '6px' }}>
+                            {unassigned.map(b => (
+                              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: '1px solid #f5f5f5' }}>
+                                <div style={{ flex: 1, fontSize: '13px' }}>{b.title} <span style={{ color: '#999', fontSize: '11px' }}>{b.book_id}</span></div>
+                                <button onClick={() => handleAssignToSet(b.id, selectedSetId)}
+                                  style={{ fontSize: '12px', color: '#f39c12', background: '#fff8f0', border: '1px solid #f5d5a0', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer' }}>
+                                  + Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         </div>
       )}
