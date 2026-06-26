@@ -164,8 +164,7 @@ export function createMembership(plan, customValues = {}) {
     discount_percent: customValues.discount_percent ?? defaults.discount_percent,
     subscription_start: today,
     subscription_end: endDate,
-    status_color: 'gold',
-    is_active: true
+    status_color: 'gold'
   };
 }
 
@@ -190,8 +189,7 @@ export function renewMembership(member, customValues = {}) {
     discount_percent: customValues.discount_percent ?? (member.discount_percent || defaults.discount_percent),
     subscription_start: today,
     subscription_end: endDate,
-    status_color: 'gold',
-    is_active: true
+    status_color: 'gold'
   };
 }
 
