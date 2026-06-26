@@ -43,7 +43,6 @@ export const PLAN_DEFAULTS = {
   individual_monthly: {
     name: 'Individual Monthly',
     price: 600,
-    early_bird_price: 500,
     duration_days: 30,
     borrow_limit: 2,
     discount_percent: 10
@@ -51,7 +50,6 @@ export const PLAN_DEFAULTS = {
   individual_annual: {
     name: 'Individual Annual',
     price: 6500,
-    early_bird_price: 5000,
     duration_days: 365,
     borrow_limit: 2,
     discount_percent: 10
