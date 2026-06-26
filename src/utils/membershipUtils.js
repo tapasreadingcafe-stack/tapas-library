@@ -35,49 +35,26 @@ export const getCustomerIDPrefix = (dateOfBirth) => {
   return isMinor(dateOfBirth) ? 'MIN' : 'CUST';
 };
 
+// Refundable deposit (collected once, not a subscription plan)
+export const DEPOSIT_AMOUNT = 1000;
+
 // Default plan values
 export const PLAN_DEFAULTS = {
-  day_pass: {
-    name: 'Day Pass',
-    price: 50,
-    duration_days: 1,
+  individual_monthly: {
+    name: 'Individual Monthly',
+    price: 600,
+    early_bird_price: 500,
+    duration_days: 30,
     borrow_limit: 2,
-    discount_percent: 0
-  },
-  basic: {
-    name: 'Basic',
-    price: 100,
-    duration_days: 30,
-    borrow_limit: 3,
-    discount_percent: 0
-  },
-  premium: {
-    name: 'Premium',
-    price: 300,
-    duration_days: 30,
-    borrow_limit: 10,
     discount_percent: 10
   },
-  family: {
-    name: 'Family',
-    price: 500,
-    duration_days: 90,
-    borrow_limit: 20,
-    discount_percent: 15
-  },
-  student: {
-    name: 'Student',
-    price: 150,
-    duration_days: 30,
-    borrow_limit: 5,
-    discount_percent: 15
-  },
-  teen: {
-    name: 'Teen',
-    price: 200,
-    duration_days: 30,
-    borrow_limit: 8,
-    discount_percent: 12
+  individual_annual: {
+    name: 'Individual Annual',
+    price: 6500,
+    early_bird_price: 5000,
+    duration_days: 365,
+    borrow_limit: 2,
+    discount_percent: 10
   }
 };
 

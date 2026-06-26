@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 
-const PLANS = ['basic', 'premium', 'gold', 'family', 'student', 'teen', 'day_pass'];
+const PLANS = ['individual_monthly', 'individual_annual'];
 const PLAN_COLORS = {
-  basic: '#667eea', premium: '#9b59b6', gold: '#f39c12', family: '#1dd1a1',
-  student: '#3498db', teen: '#e67e22', day_pass: '#95a5a6',
+  individual_monthly: '#667eea', individual_annual: '#9b59b6',
 };
 const STATUS_STYLES = {
   active: { bg: '#d4edda', color: '#155724', label: 'Active' },
