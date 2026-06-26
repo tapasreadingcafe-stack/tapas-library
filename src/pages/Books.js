@@ -1127,7 +1127,7 @@ export default function Books() {
                     name="book_id"
                     value={formData.book_id || (formData.category ? `B-${getCategoryPrefix(formData.category)}-XXXX` : 'Select category first')}
                     readOnly={!editingId}
-                    onChange={editingId ? handleChange : undefined}
+                    onChange={editingId ? handleInputChange : undefined}
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: editingId ? '#fff' : '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
                   <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>{editingId ? 'You can edit the ID prefix (e.g. B → S)' : `Auto-generated. Each copy gets: B-${getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...`}</p>
