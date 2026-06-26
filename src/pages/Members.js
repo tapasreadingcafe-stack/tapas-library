@@ -343,6 +343,7 @@ function Members() {
           date_of_birth: formData.date_of_birth || null,
           age: formData.age !== '' && formData.age !== null && formData.age !== undefined ? Number(formData.age) : null,
           customer_type: formData.age < 18 ? 'minor' : 'adult',
+          status: 'active',
           ...(formData.profile_photo && { profile_photo: formData.profile_photo }),
         };
 
@@ -375,7 +376,7 @@ function Members() {
       fetchMembers();
     } catch (error) {
       console.error('Error saving member:', error);
-      toast.error('Failed to save member');
+      toast.error(`Failed to save member: ${error?.message || JSON.stringify(error)}`);
     }
   };
 

@@ -12,9 +12,9 @@ import { useNavigate } from 'react-router-dom';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
-  { id: 'svc_mem_new',    emoji: '📚', name: 'New Membership',     price: 500,  cat: 'Membership' },
-  { id: 'svc_mem_renew',  emoji: '🔄', name: 'Membership Renewal', price: 300,  cat: 'Membership' },
-  { id: 'svc_mem_gold',   emoji: '🥇', name: 'Gold Membership',    price: 800,  cat: 'Membership' },
+  { id: 'svc_mem_deposit', emoji: '🔐', name: 'Deposit (Refundable)', price: 1000, cat: 'Membership' },
+  { id: 'svc_mem_monthly', emoji: '📚', name: 'Individual Monthly',  price: 600,  cat: 'Membership' },
+  { id: 'svc_mem_annual',  emoji: '🥇', name: 'Individual Annual',   price: 6500, cat: 'Membership' },
   { id: 'svc_late_fine',  emoji: '⚠️', name: 'Late Fine / day',    price: 5,    cat: 'Fines' },
   { id: 'svc_damage',     emoji: '📦', name: 'Book Damage Fee',     price: 100,  cat: 'Fines' },
   { id: 'svc_print_bw',   emoji: '📄', name: 'Printing B&W /page', price: 2,    cat: 'Printing' },
