@@ -135,9 +135,9 @@ function Members() {
       age: '',
       plan: '',
       duration_days: 30,
-      borrow_limit: 3,
+      borrow_limit: 2,
       discount_percent: 0,
-      price: 100,
+      price: 600,
       profile_photo: ''
     });
     setShowModal(true);
@@ -298,9 +298,9 @@ function Members() {
         const updateData = {
           name: formData.name,
           phone: formData.phone,
-          email: formData.email,
-          date_of_birth: formData.date_of_birth,
-          age: formData.age,
+          email: formData.email || null,
+          date_of_birth: formData.date_of_birth || null,
+          age: formData.age !== '' && formData.age !== null && formData.age !== undefined ? Number(formData.age) : null,
           customer_type: formData.age < 18 ? 'minor' : 'adult',
           ...(formData.profile_photo !== undefined && { profile_photo: formData.profile_photo || null }),
         };
@@ -339,9 +339,9 @@ function Members() {
         const newData = {
           name: formData.name,
           phone: formData.phone,
-          email: formData.email,
-          date_of_birth: formData.date_of_birth,
-          age: formData.age,
+          email: formData.email || null,
+          date_of_birth: formData.date_of_birth || null,
+          age: formData.age !== '' && formData.age !== null && formData.age !== undefined ? Number(formData.age) : null,
           customer_type: formData.age < 18 ? 'minor' : 'adult',
           ...(formData.profile_photo && { profile_photo: formData.profile_photo }),
         };
