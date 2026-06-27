@@ -12,9 +12,11 @@ import { useNavigate } from 'react-router-dom';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
-  { id: 'svc_mem_deposit', emoji: '🔐', name: 'Deposit (Refundable)', price: 1000, cat: 'Membership' },
-  { id: 'svc_mem_monthly', emoji: '📚', name: 'Individual Monthly',  price: 600,  cat: 'Membership' },
-  { id: 'svc_mem_annual',  emoji: '🥇', name: 'Individual Annual',   price: 6500, cat: 'Membership' },
+  { id: 'svc_mem_deposit',        emoji: '🔐', name: 'Deposit (Refundable)', price: 1000, cat: 'Membership' },
+  { id: 'svc_mem_new_monthly',    emoji: '📚', name: 'New Monthly',          price: 600,  cat: 'Membership' },
+  { id: 'svc_mem_renew_monthly',  emoji: '🔄', name: 'Renew Monthly',        price: 600,  cat: 'Membership' },
+  { id: 'svc_mem_new_annual',     emoji: '🥇', name: 'New Yearly',           price: 6500, cat: 'Membership' },
+  { id: 'svc_mem_renew_annual',   emoji: '♻️', name: 'Renew Yearly',         price: 6500, cat: 'Membership' },
   { id: 'svc_late_fine',  emoji: '⚠️', name: 'Late Fine / day',    price: 5,    cat: 'Fines' },
   { id: 'svc_damage',     emoji: '📦', name: 'Book Damage Fee',     price: 100,  cat: 'Fines' },
   { id: 'svc_print_bw',   emoji: '📄', name: 'Printing B&W /page', price: 2,    cat: 'Printing' },
@@ -231,15 +233,10 @@ export default function POS() {
     fetchMembers();
     probeTables();
     getFineSettings().then(setFineSettings);
-    // Load POS services from Supabase
+    // Load POS services — always sync with DEFAULT_SERVICES
     (async () => {
-      const { data } = await supabase.from('app_settings').select('value').eq('key', 'pos_services').single();
-      if (data?.value) {
-        try { setSERVICES(JSON.parse(data.value)); } catch {}
-      } else {
-        // Seed defaults to Supabase on first use
-        await supabase.from('app_settings').upsert({ key: 'pos_services', value: JSON.stringify(DEFAULT_SERVICES), updated_at: new Date().toISOString() }, { onConflict: 'key' });
-      }
+      await supabase.from('app_settings').upsert({ key: 'pos_services', value: JSON.stringify(DEFAULT_SERVICES), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      setSERVICES(DEFAULT_SERVICES);
       setServicesLoaded(true);
     })();
   }, []);
