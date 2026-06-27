@@ -1267,6 +1267,15 @@ export default function POS() {
                   if (!e.target.value) { setSelectedMember(null); setMemberFines([]); }
                 }}
                 onFocus={() => setMemberDrop(true)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && memberSearch.trim() && memberMatches.length === 0) {
+                    const val = memberSearch.trim();
+                    const isPhone = /^\d+$/.test(val);
+                    setShowAddMember(true);
+                    setNewMemberForm({ name: isPhone ? '' : val, phone: isPhone ? val : '', email: '', date_of_birth: '', plan: '', age: '' });
+                    setMemberDrop(false);
+                  }
+                }}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e0e0e0', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s' }}
                 onBlur={e => e.target.style.borderColor = '#e0e0e0'}
               />
@@ -1285,7 +1294,20 @@ export default function POS() {
                       🚶 Walk-in Customer (no account)
                     </div>
                     {memberMatches.length === 0 && (
-                      <div style={{ padding: '10px 14px', fontSize: '12px', color: '#bbb' }}>No members found</div>
+                      <div
+                        onClick={() => {
+                          const val = memberSearch.trim();
+                          const isPhone = /^\d+$/.test(val);
+                          setShowAddMember(true);
+                          setNewMemberForm({ name: isPhone ? '' : val, phone: isPhone ? val : '', email: '', date_of_birth: '', plan: '', age: '' });
+                          setMemberDrop(false);
+                        }}
+                        style={{ padding: '10px 14px', fontSize: '12px', color: '#667eea', cursor: 'pointer', fontWeight: '600' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f5f0ff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                      >
+                        + No match — press Enter or click to add new member
+                      </div>
                     )}
                     {memberMatches.map(m => (
                       <div key={m.id}
