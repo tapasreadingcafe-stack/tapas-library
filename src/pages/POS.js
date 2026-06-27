@@ -9,6 +9,7 @@ import BarcodeScanner from '../BarcodeScanner';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useNavigate } from 'react-router-dom';
+import { PLAN_DEFAULTS, calculateEndDate } from '../utils/membershipUtils';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -764,6 +765,40 @@ export default function POS() {
             discount_applied: discountAmount,
           }).select();
         } catch (e) { console.error('Promo usage tracking:', e); }
+      }
+
+      // Activate or extend membership when a membership item is in the cart
+      if (selectedMember) {
+        const memItem = cart.find(c =>
+          ['svc_mem_new_monthly', 'svc_mem_renew_monthly', 'svc_mem_new_annual', 'svc_mem_renew_annual'].includes(c.id)
+        );
+        if (memItem) {
+          const isAnnual = memItem.id.includes('annual');
+          const isRenew  = memItem.id.includes('renew');
+          const planKey  = isAnnual ? 'individual_annual' : 'individual_monthly';
+          const defaults = PLAN_DEFAULTS[planKey];
+          const today    = new Date().toISOString().split('T')[0];
+          let startDate  = today;
+          if (isRenew && selectedMember.subscription_end) {
+            const currentEnd = new Date(selectedMember.subscription_end);
+            if (currentEnd > new Date()) startDate = selectedMember.subscription_end.split('T')[0];
+          }
+          const endDate = calculateEndDate(startDate, defaults.duration_days);
+          try {
+            await supabase.from('members').update({
+              plan: planKey,
+              plan_price: defaults.price,
+              plan_duration_days: defaults.duration_days,
+              borrow_limit: defaults.borrow_limit,
+              discount_percent: defaults.discount_percent,
+              subscription_start: startDate,
+              subscription_end: endDate,
+              membership_type: 'standard',
+              status: 'active',
+            }).eq('id', selectedMember.id);
+            setSelectedMember(prev => prev ? { ...prev, plan: planKey, subscription_end: endDate } : prev);
+          } catch (e) { console.error('Membership update failed:', e); }
+        }
       }
 
       const txnRef = `TXN${Date.now().toString().slice(-6)}`;
