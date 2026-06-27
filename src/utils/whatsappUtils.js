@@ -132,7 +132,7 @@ Great news! "${bookTitle}" is now available for pickup.
 — ${libraryName || 'Tapas Reading Cafe'}`;
 }
 
-export function checkoutWhatsAppMsg({ memberName, bookTitle, copyCode, checkoutDate, dueDate, finePerDay, libraryName }) {
+export function checkoutWhatsAppMsg({ memberName, bookTitle, copyCode, checkoutDate, membershipEnd, libraryName }) {
   return `📚 *Book Checked Out — ${libraryName || 'Tapas Reading Cafe'}*
 
 Hi ${memberName}!
@@ -141,9 +141,7 @@ You've borrowed *"${bookTitle}"*
 Copy: ${copyCode}
 
 📅 Checkout: ${checkoutDate}
-⏰ Due Date: *${dueDate}*
-
-Late fine: ₹${finePerDay}/day after due date.
+🎫 Return by: *${membershipEnd}* (when your membership ends)
 
 Enjoy your read! 😊`;
 }

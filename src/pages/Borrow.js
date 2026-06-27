@@ -301,9 +301,7 @@ export default function Borrow() {
     setMemberResults([]);
     setSelectedChild(null);
     setChildrenOfMember([]);
-    const d = new Date();
-    d.setDate(d.getDate() + getLoanDays(m));
-    setDueDate(d.toISOString().split('T')[0]);
+    setDueDate(m.subscription_end ? m.subscription_end.split('T')[0] : '');
     fetchChildrenForMember(m.id);
   };
 
@@ -325,8 +323,12 @@ export default function Borrow() {
       .reduce((sum, c) => sum + calculateFine(c.due_date, fineSettings).fineAmount, 0);
 
   const handleCheckout = async () => {
-    if (!selectedMember || !selectedBook || !dueDate) {
-      showToast('Please select a member, book, and due date', 'error');
+    if (!selectedMember || !selectedBook) {
+      showToast('Please select a member and book', 'error');
+      return;
+    }
+    if (!dueDate) {
+      showToast('Member has no active membership — cannot check out', 'error');
       return;
     }
     // If copies exist for this book, require a copy selection
@@ -709,7 +711,7 @@ export default function Borrow() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '700', fontSize: '16px' }}>{selectedMember.name}</div>
                       <div style={{ fontSize: '12px', color: '#666' }}>
-                        {selectedMember.phone} · {getTier(selectedMember).toUpperCase()} · {getLoanDays(selectedMember)}-day loan
+                        {selectedMember.phone} · {selectedMember.plan === 'individual_monthly' ? 'Monthly' : selectedMember.plan === 'individual_annual' ? 'Annual' : (selectedMember.plan || 'No Plan').replace('_', ' ')}
                       </div>
                     </div>
                     <button onClick={() => { setSelectedMember(null); setMemberSearch(''); setDueDate(''); }}
@@ -895,16 +897,14 @@ export default function Borrow() {
             </div>
           )}
 
-          {/* Due date + checkout — full width */}
+          {/* Checkout — full width */}
           <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '14px' : '18px 20px', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '12px' : '20px', flexDirection: isMobile ? 'column' : 'row' }}>
-            <div style={{ width: isMobile ? '100%' : 'auto' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '6px', letterSpacing: '0.5px' }}>DUE DATE</label>
-              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                style={{ padding: '9px 14px', border: '2px solid #e0e0e0', borderRadius: '6px', fontSize: isMobile ? '16px' : '14px', minHeight: '44px', width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }} />
-            </div>
             {selectedMember && (
               <div style={{ fontSize: '12px', color: '#667eea', background: '#f0f3ff', padding: '6px 12px', borderRadius: '6px' }}>
-                Auto-set to <strong>{getLoanDays(selectedMember)} days</strong> ({getTier(selectedMember)} tier)
+                {dueDate
+                  ? <>Book can be kept until membership expires: <strong>{new Date(dueDate).toLocaleDateString('en-IN')}</strong></>
+                  : <span style={{ color: '#e74c3c' }}>⚠️ No active membership — member must have a plan to borrow</span>
+                }
               </div>
             )}
             <div style={{ marginLeft: isMobile ? '0' : 'auto', display: 'flex', alignItems: 'center', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -921,7 +921,6 @@ export default function Borrow() {
                   background: (isReadOnly || !selectedMember || !selectedBook || !dueDate) ? '#ccc' : '#667eea',
                   color: 'white', border: 'none', borderRadius: '6px',
                   cursor: (isReadOnly || !selectedMember || !selectedBook || !dueDate) ? 'not-allowed' : 'pointer',
-                  opacity: isReadOnly ? 0.5 : 1,
                   width: isMobile ? '100%' : 'auto',
                 }}>
                 ✓ Checkout Book
@@ -984,22 +983,10 @@ export default function Borrow() {
                         </div>
                         <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>{item.books?.title}</div>
                         <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: '#999' }}>
-                          <span>Due: {new Date(item.due_date).toLocaleDateString('en-IN')}</span>
-                          <span>Renewals: {item.renewal_count || 0}/3</span>
+                          <span>Membership ends: {new Date(item.due_date).toLocaleDateString('en-IN')}</span>
                           {fine > 0 && <span style={{ color: '#e74c3c', fontWeight: '700' }}>Fine: ₹{fine}</span>}
                         </div>
                         <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                          <button
-                            onClick={() => openRenewal(item)}
-                            disabled={isReadOnly || (item.renewal_count || 0) >= 3}
-                            style={{
-                              padding: '8px 14px', border: 'none', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: (isReadOnly || (item.renewal_count || 0) >= 3) ? 'not-allowed' : 'pointer',
-                              background: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#f5f5f5' : '#e8f0ff',
-                              color: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#ccc' : '#667eea',
-                              opacity: isReadOnly ? 0.5 : 1,
-                            }}>
-                            ♻️ Renew
-                          </button>
                           <button onClick={() => openReturn(item)} disabled={isReadOnly} style={{ padding: '8px 14px', background: isReadOnly ? '#f5f5f5' : '#e8faf0', color: isReadOnly ? '#ccc' : '#27ae60', border: 'none', borderRadius: '5px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                             ✓ Return
                           </button>
@@ -1012,7 +999,7 @@ export default function Borrow() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #e8e8e8' }}>
-                    {['Member', 'Book', 'Checked Out', 'Due Date', 'Status', 'Renewals', 'Actions'].map(h => (
+                    {['Member', 'Book', 'Checked Out', 'Membership Ends', 'Status', 'Actions'].map(h => (
                       <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
                     ))}
                   </tr>
@@ -1044,24 +1031,8 @@ export default function Borrow() {
                             {badge.label}
                           </span>
                         </td>
-                        <td style={{ padding: '11px 14px', textAlign: 'center' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: (item.renewal_count || 0) >= 3 ? '#e74c3c' : '#667eea' }}>
-                            {item.renewal_count || 0}/3
-                          </span>
-                        </td>
                         <td style={{ padding: '11px 14px' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                              onClick={() => openRenewal(item)}
-                              disabled={isReadOnly || (item.renewal_count || 0) >= 3}
-                              style={{
-                                padding: '5px 10px', border: 'none', borderRadius: '5px', fontSize: '12px', fontWeight: '600', cursor: (isReadOnly || (item.renewal_count || 0) >= 3) ? 'not-allowed' : 'pointer',
-                                background: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#f5f5f5' : '#e8f0ff',
-                                color: (isReadOnly || (item.renewal_count || 0) >= 3) ? '#ccc' : '#667eea',
-                                opacity: isReadOnly ? 0.5 : 1,
-                              }}>
-                              ♻️ Renew
-                            </button>
                             <button onClick={() => openReturn(item)} disabled={isReadOnly} style={{ padding: '5px 10px', background: isReadOnly ? '#f5f5f5' : '#e8faf0', color: isReadOnly ? '#ccc' : '#27ae60', border: 'none', borderRadius: '5px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                               ✓ Return
                             </button>
@@ -1133,12 +1104,9 @@ export default function Borrow() {
                 <span>{new Date().toLocaleDateString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#888' }}>Due Date:</span>
-                <span style={{ fontWeight: '700', color: '#e74c3c' }}>{new Date(receiptModal.dueDate).toLocaleDateString('en-IN')}</span>
+                <span style={{ color: '#888' }}>Return by:</span>
+                <span style={{ fontWeight: '700', color: '#667eea' }}>{new Date(receiptModal.dueDate).toLocaleDateString('en-IN')} (membership ends)</span>
               </div>
-            </div>
-            <div style={{ borderTop: '2px dashed #ddd', marginTop: '16px', paddingTop: '14px', textAlign: 'center', fontSize: '12px', color: '#888' }}>
-              Late fine: ₹{fineSettings.ratePerDay}/day after due date{fineSettings.gracePeriod > 0 ? ` (${fineSettings.gracePeriod}-day grace)` : ''}
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: '10px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
@@ -1150,8 +1118,7 @@ export default function Borrow() {
                   bookTitle: receiptModal.book.title,
                   copyCode: receiptModal.copy?.copy_code || '-',
                   checkoutDate: new Date().toLocaleDateString('en-IN'),
-                  dueDate: new Date(receiptModal.dueDate).toLocaleDateString('en-IN'),
-                  finePerDay: fineSettings.ratePerDay
+                  membershipEnd: new Date(receiptModal.dueDate).toLocaleDateString('en-IN'),
                 }))} style={{ flex: 1, padding: '10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
                   💬 WhatsApp
                 </button>
@@ -1174,7 +1141,7 @@ export default function Borrow() {
             <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '14px', marginBottom: '16px', fontSize: '13px', lineHeight: '1.9' }}>
               <div><strong>Member:</strong> {returnModal.members?.name}</div>
               <div><strong>Book:</strong> {returnModal.books?.title}</div>
-              <div><strong>Due Date:</strong> {new Date(returnModal.due_date).toLocaleDateString('en-IN')}</div>
+              <div><strong>Membership Ends:</strong> {new Date(returnModal.due_date).toLocaleDateString('en-IN')}</div>
               {isOverdue(returnModal.due_date) ? (
                 <div style={{ marginTop: '8px', background: '#f8d7da', borderRadius: '6px', padding: '8px 12px', color: '#721c24', fontWeight: '700' }}>
                   ⚠️ {daysOverdue(returnModal.due_date)} days overdue &nbsp;·&nbsp; Fine: ₹{calculateFine(returnModal.due_date, fineSettings).fineAmount}
