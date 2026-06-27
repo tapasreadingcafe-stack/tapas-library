@@ -2112,6 +2112,7 @@ export default function POS() {
                     age: newMemberForm.age || null,
                     customer_type: newMemberForm.age && newMemberForm.age < 18 ? 'minor' : 'adult',
                     status: 'active',
+                    plan: null,
                   };
                   const { error } = await supabase.from('members').insert([payload]);
                   if (error) throw error;
