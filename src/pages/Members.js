@@ -292,6 +292,10 @@ function Members() {
       toast.warning('Name and phone are required');
       return;
     }
+    if (!/^\d{10}$/.test(formData.phone)) {
+      toast.warning('Phone number must be exactly 10 digits');
+      return;
+    }
 
     try {
       if (editingMember) {
@@ -694,9 +698,13 @@ function Members() {
                     <input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Phone number"
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      placeholder="10-digit phone number"
+                      style={formData.phone && formData.phone.length !== 10 ? { borderColor: '#ef4444' } : {}}
                     />
+                    {formData.phone && formData.phone.length !== 10 && (
+                      <small style={{ color: '#ef4444', fontSize: '11px' }}>{formData.phone.length}/10 digits</small>
+                    )}
                   </div>
 
                   <div className="form-group">

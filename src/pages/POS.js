@@ -2094,8 +2094,13 @@ export default function POS() {
               </div>
               <div>
                 <label style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Phone *</label>
-                <input value={newMemberForm.phone} onChange={e => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
+                <input value={newMemberForm.phone}
+                  onChange={e => setNewMemberForm({ ...newMemberForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                  placeholder="10-digit number"
+                  style={{ width: '100%', padding: '8px', border: `1px solid ${newMemberForm.phone && newMemberForm.phone.length !== 10 ? '#ef4444' : '#e0e0e0'}`, borderRadius: '6px', fontSize: '14px' }} />
+                {newMemberForm.phone && newMemberForm.phone.length !== 10 && (
+                  <span style={{ fontSize: '10px', color: '#ef4444' }}>{newMemberForm.phone.length}/10 digits</span>
+                )}
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -2126,6 +2131,7 @@ export default function POS() {
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={async () => {
                 if (!newMemberForm.name || !newMemberForm.phone) { showToast('Name and phone required', 'error'); return; }
+                if (!/^\d{10}$/.test(newMemberForm.phone)) { showToast('Phone number must be exactly 10 digits', 'error'); return; }
                 try {
                   const payload = {
                     name: newMemberForm.name, phone: newMemberForm.phone,
