@@ -770,7 +770,7 @@ export default function POS() {
       // Activate or extend membership when a membership item is in the cart
       if (selectedMember) {
         const memItem = cart.find(c =>
-          ['svc_mem_new_monthly', 'svc_mem_renew_monthly', 'svc_mem_new_annual', 'svc_mem_renew_annual'].includes(c.id)
+          ['svc_mem_new_monthly', 'svc_mem_renew_monthly', 'svc_mem_new_annual', 'svc_mem_renew_annual'].includes(c.cartId)
         );
         if (memItem) {
           const isAnnual = memItem.id.includes('annual');
