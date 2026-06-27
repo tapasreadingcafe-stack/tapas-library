@@ -146,21 +146,23 @@ Copy: ${copyCode}
 Enjoy your read! 😊`;
 }
 
-export function membershipDetailsWhatsAppMsg({ memberName, plan, expiryDate, borrowLimit, discount, libraryName }) {
+export function membershipDetailsWhatsAppMsg({ memberName, memberId, plan, expiryDate, borrowLimit, discount, libraryName }) {
   const planLabel = plan === 'individual_monthly' ? 'Monthly' : plan === 'individual_annual' ? 'Annual' : plan || 'Standard';
-  return `🎉 *Membership Activated — ${libraryName || 'Tapas Reading Cafe'}*
+  return `🎉 *Welcome to ${libraryName || 'Tapas Reading Cafe'}!*
 
-Hi ${memberName}!
+Hi *${memberName}*!
 
-Your membership details:
+Your membership is now active. Here are your details:
 
+🪪 Member ID: *${memberId || '—'}*
 📋 Plan: *${planLabel}*
 📅 Valid until: *${expiryDate}*
-📚 Books you can borrow: *${borrowLimit}*
-🏷️ Discount: *${discount}%*
+📚 Books you can borrow at a time: *${borrowLimit}*
+🏷️ Book discount: *${discount}%*
 
-Visit us anytime to borrow books. Enjoy reading! 📖
+You can borrow books anytime during your membership. Just walk in with your phone number! 😊
 
+Happy reading! 📖
 — ${libraryName || 'Tapas Reading Cafe'}`;
 }
 

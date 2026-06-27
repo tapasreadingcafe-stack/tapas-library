@@ -9,7 +9,7 @@ import BarcodeScanner from '../BarcodeScanner';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useNavigate } from 'react-router-dom';
-import { PLAN_DEFAULTS, calculateEndDate } from '../utils/membershipUtils';
+import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID } from '../utils/membershipUtils';
 import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 
 // ── Default service items ─────────────────────────────────────────────────────
@@ -283,7 +283,7 @@ export default function POS() {
   const fetchMembers = async () => {
     const { data } = await supabase
       .from('members')
-      .select('id, name, phone, email, plan, borrow_limit')
+      .select('id, sequential_id, customer_type, name, phone, email, plan, borrow_limit, discount_percent, subscription_end')
       .eq('status', 'active').order('name').limit(500);
     setAllMembers(data || []);
   };
@@ -1861,7 +1861,7 @@ export default function POS() {
               {activatedMembership && lastTxn?.member?.phone && (
                 <button onClick={() => {
                   const { planKey, endDate, defaults } = activatedMembership;
-                  const msg = membershipDetailsWhatsAppMsg({ memberName: lastTxn.member.name, plan: planKey, expiryDate: new Date(endDate).toLocaleDateString('en-IN'), borrowLimit: defaults.borrow_limit, discount: defaults.discount_percent });
+                  const msg = membershipDetailsWhatsAppMsg({ memberName: lastTxn.member.name, memberId: generateCustomerID(lastTxn.member), plan: planKey, expiryDate: new Date(endDate).toLocaleDateString('en-IN'), borrowLimit: defaults.borrow_limit, discount: defaults.discount_percent });
                   const num = (() => { let d = lastTxn.member.phone.replace(/\D/g, ''); if (d.length === 10) d = '91' + d; return d; })();
                   window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
                 }} style={{ width: '100%', padding: '11px', background: '#128C7E', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>

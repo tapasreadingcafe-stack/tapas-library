@@ -593,7 +593,7 @@ function Members() {
                     {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew"><ActionIcon name="renew" /></button>}
                     {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Email Renewal Reminder"><ActionIcon name="email" /></button>}
                     {member.phone && member.plan && <button className="btn-icon" onClick={async () => {
-                      const result = await sendWhatsApp(member.phone, membershipDetailsWhatsAppMsg({ memberName: member.name, plan: member.plan, expiryDate: formatDate(member.subscription_end), borrowLimit: member.borrow_limit || 2, discount: member.discount_percent || 0 }));
+                      const result = await sendWhatsApp(member.phone, membershipDetailsWhatsAppMsg({ memberName: member.name, memberId: generateCustomerID(member), plan: member.plan, expiryDate: formatDate(member.subscription_end), borrowLimit: member.borrow_limit || 2, discount: member.discount_percent || 0 }));
                       if (result.success) toast.success(result.mode === 'link' ? 'Membership details sent!' : 'WhatsApp sent!');
                       else toast.error(result.error || 'Failed');
                     }} title="WhatsApp Membership Details"><ActionIcon name="phone" /></button>}
