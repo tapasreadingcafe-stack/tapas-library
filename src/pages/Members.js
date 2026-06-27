@@ -434,7 +434,9 @@ function Members() {
 
   const getPlanBadge = (member) => {
     if (!member.plan) return 'NO PLAN';
-    const planName = member.plan.replace('_', ' ').toUpperCase();
+    if (member.plan === 'individual_monthly') return 'Monthly';
+    if (member.plan === 'individual_annual') return 'Annual';
+    const planName = member.plan.replace(/_/g, ' ').toUpperCase();
     return planName;
   };
 
