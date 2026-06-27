@@ -109,14 +109,12 @@ Please return it at your earliest convenience to avoid additional fines.
 }
 
 export function membershipExpiryWhatsAppMsg({ memberName, plan, expiryDate, libraryName }) {
-  return `🔔 *Membership Expiring Soon*
-
-Dear ${memberName},
-
-Your ${plan || 'library'} membership expires on *${expiryDate}*.
-
-Please visit us to renew and continue enjoying our services.
-
+  const planLabel = plan === 'individual_monthly' ? 'Monthly' : plan === 'individual_annual' ? 'Annual' : plan || 'library';
+  return `*Membership Expiring Soon*
+Hi *${memberName}*!
+Your *${planLabel}* membership expires on *${expiryDate}*.
+Renew now to keep borrowing books without interruption.
+Visit us or call to renew!
 — ${libraryName || 'Tapas Reading Cafe'}`;
 }
 
