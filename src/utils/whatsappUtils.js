@@ -146,17 +146,17 @@ Enjoy your read! 😊`;
 
 export function membershipDetailsWhatsAppMsg({ memberName, memberId, plan, expiryDate, borrowLimit, discount, libraryName }) {
   const planLabel = plan === 'individual_monthly' ? 'Monthly' : plan === 'individual_annual' ? 'Annual' : plan || 'Standard';
-  return `Welcome to ${libraryName || 'Tapas Reading Cafe'}!
+  return `*Welcome to ${libraryName || 'Tapas Reading Cafe'}!*
 
-Hi ${memberName}!
+Hi *${memberName}*!
 
 Your membership is now active.
 
-Member ID: ${memberId || '—'}
-Plan: ${planLabel}
-Valid until: ${expiryDate}
-Books you can borrow at a time: ${borrowLimit}
-Book discount: ${discount}%
+Member ID: *${memberId || '—'}*
+Plan: *${planLabel}*
+Valid until: *${expiryDate}*
+Books you can borrow at a time: *${borrowLimit}*
+Book discount: *${discount}%*
 
 Visit us anytime to borrow books. Happy reading!
 — ${libraryName || 'Tapas Reading Cafe'}`;
