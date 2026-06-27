@@ -2141,6 +2141,8 @@ export default function POS() {
                     customer_type: newMemberForm.age && newMemberForm.age < 18 ? 'minor' : 'adult',
                     status: 'active',
                     plan: null,
+                    borrow_limit: 0,
+                    discount_percent: 0,
                   };
                   const { error } = await supabase.from('members').insert([payload]);
                   if (error) throw error;
