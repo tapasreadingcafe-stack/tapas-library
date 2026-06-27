@@ -436,9 +436,9 @@ function ProfileDropdown() {
         onClick={() => setOpen(!open)}
         style={{
           display: 'flex', alignItems: 'center', gap: '8px',
-          background: 'rgba(255,255,255,0.1)', border: 'none',
+          background: 'rgba(0,0,0,0.08)', border: 'none',
           borderRadius: '20px', padding: '4px 12px 4px 4px',
-          cursor: 'pointer', color: 'white', fontSize: '13px', fontWeight: '600',
+          cursor: 'pointer', color: '#000000', fontSize: '13px', fontWeight: '600',
         }}
       >
         <span style={{
