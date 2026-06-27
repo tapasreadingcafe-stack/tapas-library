@@ -1320,7 +1320,7 @@ export default function POS() {
                         onMouseLeave={e => e.currentTarget.style.background = 'white'}
                       >
                         <div style={{ fontWeight: '600', color: '#333' }}>{m.name}</div>
-                        <div style={{ fontSize: '11px', color: '#999', marginTop: '1px' }}>{m.phone}{m.plan ? ` · ${m.plan.replace('_', ' ')}` : ''}</div>
+                        <div style={{ fontSize: '11px', color: '#999', marginTop: '1px' }}>{m.phone}{m.plan ? ` · ${m.plan === 'individual_monthly' ? 'Monthly' : m.plan === 'individual_annual' ? 'Annual' : m.plan.replace('_', ' ')}` : ''}</div>
                       </div>
                     ))}
                   </div>
@@ -1334,7 +1334,7 @@ export default function POS() {
                 <div>
                   <div style={{ fontWeight: '700', fontSize: '13px', color: '#5b21b6' }}>{selectedMember.name}</div>
                   <div style={{ fontSize: '11px', color: '#8b5cf6', marginTop: '2px' }}>
-                    {(selectedMember.plan || 'Guest').replace('_', ' ')} · {selectedMember.phone}
+                    {selectedMember.plan === 'individual_monthly' ? 'Monthly' : selectedMember.plan === 'individual_annual' ? 'Annual' : (selectedMember.plan || 'Guest').replace('_', ' ')} · {selectedMember.phone}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
