@@ -796,6 +796,11 @@ export default function POS() {
               membership_type: 'standard',
               status: 'active',
             }).eq('id', selectedMember.id);
+            // Also extend due_date on all active borrows to match new subscription end
+            await supabase.from('circulation')
+              .update({ due_date: endDate })
+              .eq('member_id', selectedMember.id)
+              .is('return_date', null);
             setSelectedMember(prev => prev ? { ...prev, plan: planKey, subscription_end: endDate } : prev);
           } catch (e) { console.error('Membership update failed:', e); }
         }
