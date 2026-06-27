@@ -773,8 +773,8 @@ export default function POS() {
           ['svc_mem_new_monthly', 'svc_mem_renew_monthly', 'svc_mem_new_annual', 'svc_mem_renew_annual'].includes(c.cartId)
         );
         if (memItem) {
-          const isAnnual = memItem.id.includes('annual');
-          const isRenew  = memItem.id.includes('renew');
+          const isAnnual = memItem.cartId.includes('annual');
+          const isRenew  = memItem.cartId.includes('renew');
           const planKey  = isAnnual ? 'individual_annual' : 'individual_monthly';
           const defaults = PLAN_DEFAULTS[planKey];
           const today    = new Date().toISOString().split('T')[0];
