@@ -146,6 +146,43 @@ Copy: ${copyCode}
 Enjoy your read! 😊`;
 }
 
+export function membershipDetailsWhatsAppMsg({ memberName, plan, expiryDate, borrowLimit, discount, libraryName }) {
+  const planLabel = plan === 'individual_monthly' ? 'Monthly' : plan === 'individual_annual' ? 'Annual' : plan || 'Standard';
+  return `🎉 *Membership Activated — ${libraryName || 'Tapas Reading Cafe'}*
+
+Hi ${memberName}!
+
+Your membership details:
+
+📋 Plan: *${planLabel}*
+📅 Valid until: *${expiryDate}*
+📚 Books you can borrow: *${borrowLimit}*
+🏷️ Discount: *${discount}%*
+
+Visit us anytime to borrow books. Enjoy reading! 📖
+
+— ${libraryName || 'Tapas Reading Cafe'}`;
+}
+
+export function membershipBillWhatsAppMsg({ memberName, items, total, paymentMethod, txnRef, date, libraryName }) {
+  const itemLines = items.map(i => `  • ${i.name} × ${i.qty} — ₹${i.price * i.qty}`).join('\n');
+  return `🧾 *Payment Receipt — ${libraryName || 'Tapas Reading Cafe'}*
+
+Hi ${memberName},
+
+Date: ${date}
+Receipt #: ${txnRef}
+
+${itemLines}
+
+💰 *Total: ₹${total}*
+Payment: ${paymentMethod?.toUpperCase() || 'CASH'}
+
+Thank you! 🙏
+
+— ${libraryName || 'Tapas Reading Cafe'}`;
+}
+
 export function fineAlertWhatsAppMsg({ memberName, bookTitle, fineAmount, libraryName }) {
   return `💰 *Fine Applied*
 

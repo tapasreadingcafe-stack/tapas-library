@@ -8,7 +8,7 @@ import { logActivity, ACTIONS } from '../utils/activityLog';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { sendEmail, membershipExpiryEmailHtml } from '../utils/emailUtils';
-import { sendWhatsApp, membershipExpiryWhatsAppMsg } from '../utils/whatsappUtils';
+import { sendWhatsApp, membershipExpiryWhatsAppMsg, membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 
 import {
   calculateStatusColor,
@@ -592,6 +592,11 @@ function Members() {
                     <button className="btn-icon" onClick={() => navigate(`/member/${member.id}`)} title="View Profile"><ActionIcon name="view" /></button>
                     {member.plan && !isReadOnly && canManageMembers && <button className="btn-icon" onClick={() => handleRenewMembership(member)} title="Renew"><ActionIcon name="renew" /></button>}
                     {member.email && member.subscription_end && <button className="btn-icon" onClick={() => handleSendRenewalReminder(member)} title="Email Renewal Reminder"><ActionIcon name="email" /></button>}
+                    {member.phone && member.plan && <button className="btn-icon" onClick={async () => {
+                      const result = await sendWhatsApp(member.phone, membershipDetailsWhatsAppMsg({ memberName: member.name, plan: member.plan, expiryDate: formatDate(member.subscription_end), borrowLimit: member.borrow_limit || 2, discount: member.discount_percent || 0 }));
+                      if (result.success) toast.success(result.mode === 'link' ? 'Membership details sent!' : 'WhatsApp sent!');
+                      else toast.error(result.error || 'Failed');
+                    }} title="WhatsApp Membership Details"><ActionIcon name="phone" /></button>}
                     {member.phone && member.subscription_end && <button className="btn-icon" onClick={async () => {
                       const result = await sendWhatsApp(member.phone, membershipExpiryWhatsAppMsg({ memberName: member.name, plan: member.plan || 'Standard', expiryDate: formatDate(member.subscription_end) }));
                       if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');

@@ -10,6 +10,7 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useNavigate } from 'react-router-dom';
 import { PLAN_DEFAULTS, calculateEndDate } from '../utils/membershipUtils';
+import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -160,6 +161,7 @@ export default function POS() {
   // Receipt
   const [lastTxn, setLastTxn]           = useState(null);
   const [showReceipt, setShowReceipt]   = useState(false);
+  const [activatedMembership, setActivatedMembership] = useState(null);
   const receiptRef = useRef();
 
   // History
@@ -547,6 +549,7 @@ export default function POS() {
     setCart([]); setSelectedMember(null); setMemberSearch('');
     setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
+    setActivatedMembership(null);
     sessionStorage.removeItem('pos_cart');
   };
 
@@ -802,6 +805,7 @@ export default function POS() {
               .eq('member_id', selectedMember.id)
               .is('return_date', null);
             setSelectedMember(prev => prev ? { ...prev, plan: planKey, subscription_end: endDate } : prev);
+            setActivatedMembership({ planKey, endDate, defaults });
           } catch (e) { console.error('Membership update failed:', e); }
         }
       }
@@ -1854,6 +1858,16 @@ export default function POS() {
 
             {/* Action buttons */}
             <div style={{ padding: '14px 20px 18px', borderTop: '1px solid #f0f0f0', background: '#fafafa', flexShrink: 0 }}>
+              {activatedMembership && lastTxn?.member?.phone && (
+                <button onClick={() => {
+                  const { planKey, endDate, defaults } = activatedMembership;
+                  const msg = membershipDetailsWhatsAppMsg({ memberName: lastTxn.member.name, plan: planKey, expiryDate: new Date(endDate).toLocaleDateString('en-IN'), borrowLimit: defaults.borrow_limit, discount: defaults.discount_percent });
+                  const num = (() => { let d = lastTxn.member.phone.replace(/\D/g, ''); if (d.length === 10) d = '91' + d; return d; })();
+                  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+                }} style={{ width: '100%', padding: '11px', background: '#128C7E', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', marginBottom: '8px' }}>
+                  💬 Send Membership Details → {lastTxn.member.name}
+                </button>
+              )}
               <button onClick={() => handleWhatsApp(lastTxn)}
                 style={{ width: '100%', padding: '11px', background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', marginBottom: '10px' }}>
                 💬 Send Bill on WhatsApp{lastTxn.member ? ` → ${lastTxn.member.name}` : ''}
