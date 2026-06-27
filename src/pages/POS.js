@@ -457,7 +457,18 @@ export default function POS() {
       }
     } catch {}
 
-    // 5. Not found — put in search
+    // 5. Try book set barcode (SET001, SET002, ...)
+    try {
+      const { data: sets } = await supabase.from('book_sets').select('*').eq('barcode', trimmed.toUpperCase()).limit(1);
+      if (sets?.length) {
+        const s = sets[0];
+        addToCart({ id: `set_${s.id}`, name: `📦 ${s.name}`, price: s.set_price || 0, cartType: 'service' });
+        showToast(`Added set: ${s.name} · ₹${s.set_price}`);
+        return;
+      }
+    } catch {}
+
+    // 6. Not found — put in search
     setItemSearch(trimmed);
     setActiveCat('Books');
     showToast(`"${trimmed}" not found in catalog`, 'error');

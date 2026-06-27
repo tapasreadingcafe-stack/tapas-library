@@ -362,16 +362,20 @@ export default function Books() {
 
   const handleCreateSet = async () => {
     if (!newSetForm.name.trim()) return toast.error('Set name is required');
+    // Auto-generate barcode: SET001, SET002, ...
+    const { count } = await supabase.from('book_sets').select('*', { count: 'exact', head: true });
+    const barcode = `SET${String((count || 0) + 1).padStart(3, '0')}`;
     const { error } = await supabase.from('book_sets').insert([{
       name: newSetForm.name.trim(),
       set_price: parseFloat(newSetForm.set_price) || 0,
       set_mrp: parseFloat(newSetForm.set_mrp) || 0,
       notes: newSetForm.notes.trim() || null,
+      barcode,
     }]);
     if (error) return toast.error('Failed to create set');
     setNewSetForm({ name: '', set_price: '', set_mrp: '', notes: '' });
     fetchSets();
-    toast.success('Set created!');
+    toast.success(`Set created! Barcode: ${barcode}`);
   };
 
   const handleAssignToSet = async (bookId, setId) => {
@@ -1901,6 +1905,7 @@ export default function Books() {
                         style={{ padding: '12px', borderRadius: '8px', marginBottom: '8px', border: `2px solid ${isSelected ? '#f39c12' : '#e0e0e0'}`, cursor: 'pointer', background: isSelected ? '#fff8f0' : 'white' }}>
                         <div style={{ fontWeight: '700', fontSize: '14px' }}>{set.name}</div>
                         <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{setBooks.length} books · MRP ₹{set.set_mrp} · Price ₹{set.set_price}</div>
+                        {set.barcode && <div style={{ fontSize: '11px', color: '#f39c12', fontWeight: '700', fontFamily: 'monospace', marginTop: '2px' }}>Barcode: {set.barcode}</div>}
                         <button onClick={e => { e.stopPropagation(); handleDeleteSet(set.id); }}
                           style={{ marginTop: '6px', fontSize: '11px', color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                           🗑 Delete set
