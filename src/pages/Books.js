@@ -5,6 +5,7 @@ import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
 import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
+import { generateBarcodeSVGString } from '../utils/barcodeUtils';
 import { exportToCSV } from '../utils/exportCSV';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
@@ -93,9 +94,11 @@ export default function Books() {
   const [mrpImportProgress, setMrpImportProgress] = useState(0);
   const [bookSets, setBookSets] = useState([]);
   const [showSetsPanel, setShowSetsPanel] = useState(false);
+  const [showAddSetModal, setShowAddSetModal] = useState(false);
   const [newSetForm, setNewSetForm] = useState({ name: '', set_price: '', set_mrp: '', notes: '' });
   const [setsLoading, setSetsLoading] = useState(false);
   const [selectedSetId, setSelectedSetId] = useState(null);
+  const [pendingSetBooks, setPendingSetBooks] = useState([]);
   const [imagePreview, setImagePreview] = useState('');
   const [coverLoaded, setCoverLoaded] = useState(false);
   const [coverError, setCoverError] = useState(false);
@@ -361,21 +364,28 @@ export default function Books() {
   };
 
   const handleCreateSet = async () => {
-    if (!newSetForm.name.trim()) return toast.error('Set name is required');
-    // Auto-generate barcode: SET001, SET002, ...
-    const { count } = await supabase.from('book_sets').select('*', { count: 'exact', head: true });
-    const barcode = `SET${String((count || 0) + 1).padStart(3, '0')}`;
-    const { error } = await supabase.from('book_sets').insert([{
-      name: newSetForm.name.trim(),
-      set_price: parseFloat(newSetForm.set_price) || 0,
-      set_mrp: parseFloat(newSetForm.set_mrp) || 0,
-      notes: newSetForm.notes.trim() || null,
-      barcode,
-    }]);
-    if (error) return toast.error('Failed to create set');
+    if (!newSetForm.name.trim()) { toast.error('Set name is required'); return false; }
+    const { data: existingBarcodes } = await supabase.from('book_sets').select('barcode').like('barcode', 'SET%');
+    const nums = (existingBarcodes || []).map(s => { const m = s.barcode?.match(/^SET(\d+)$/); return m ? parseInt(m[1]) : 0; });
+    let nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
+    let newSet, insertError, attempts = 0;
+    while (attempts < 100) {
+      const barcode = `SET${String(nextNum).padStart(3, '0')}`;
+      ({ data: newSet, error: insertError } = await supabase.from('book_sets').insert([{
+        name: newSetForm.name.trim(),
+        set_price: parseFloat(newSetForm.set_price) || 0,
+        set_mrp: parseFloat(newSetForm.set_mrp) || 0,
+        notes: newSetForm.notes.trim() || null,
+        barcode,
+      }]).select().single());
+      if (!insertError) { toast.success(`Set created! Barcode: ${barcode}`); break; }
+      if (insertError.code === '23505') { nextNum++; attempts++; continue; }
+      toast.error('Failed: ' + insertError.message); return false;
+    }
+    if (insertError) { toast.error('Failed: ' + insertError.message); return false; }
     setNewSetForm({ name: '', set_price: '', set_mrp: '', notes: '' });
     fetchSets();
-    toast.success(`Set created! Barcode: ${barcode}`);
+    return true;
   };
 
   const handleAssignToSet = async (bookId, setId) => {
@@ -764,7 +774,7 @@ export default function Books() {
           // Retry loop: if another record already claimed this ID (orphan from a
           // failed previous attempt), increment and try again — never shows an error.
           let newBook, insertError, attempts = 0;
-          while (attempts < 10) {
+          while (attempts < 9999) {
             payload.book_id = `${idLetter}-${prefix}-${String(nextNum).padStart(4, '0')}`;
             ({ data: newBook, error: insertError } = await supabase.from('books').insert([payload]).select().single());
             if (!insertError) break;
@@ -1901,33 +1911,35 @@ export default function Books() {
                     const setBooks = books.filter(b => b.set_id === set.id);
                     const isSelected = selectedSetId === set.id;
                     return (
-                      <div key={set.id} onClick={() => setSelectedSetId(isSelected ? null : set.id)}
+                      <div key={set.id} onClick={() => { setSelectedSetId(isSelected ? null : set.id); setPendingSetBooks([]); }}
                         style={{ padding: '12px', borderRadius: '8px', marginBottom: '8px', border: `2px solid ${isSelected ? '#f39c12' : '#e0e0e0'}`, cursor: 'pointer', background: isSelected ? '#fff8f0' : 'white' }}>
                         <div style={{ fontWeight: '700', fontSize: '14px' }}>{set.name}</div>
                         <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{setBooks.length} books · MRP ₹{set.set_mrp} · Price ₹{set.set_price}</div>
                         {set.barcode && <div style={{ fontSize: '11px', color: '#f39c12', fontWeight: '700', fontFamily: 'monospace', marginTop: '2px' }}>Barcode: {set.barcode}</div>}
-                        <button onClick={e => { e.stopPropagation(); handleDeleteSet(set.id); }}
-                          style={{ marginTop: '6px', fontSize: '11px', color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                          🗑 Delete set
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                          {set.barcode && <button onClick={e => {
+                            e.stopPropagation();
+                            const svg = generateBarcodeSVGString(set.barcode, { width: 260, height: 80, fontSize: 13 });
+                            const win = window.open('', '_blank');
+                            win.document.write(`<html><head><title>Barcode: ${set.barcode}</title><style>body{margin:20px;font-family:sans-serif;} .label{display:inline-block;border:1px solid #ddd;padding:12px;border-radius:6px;text-align:center;} .name{font-size:13px;font-weight:700;margin-bottom:6px;} @media print{button{display:none}}</style></head><body><div class="label"><div class="name">${set.name}</div>${svg}</div><br><br><button onclick="window.print()">Print</button></body></html>`);
+                            win.document.close();
+                          }} style={{ fontSize: '11px', color: '#2980b9', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            🖨 Print barcode
+                          </button>}
+                          <button onClick={e => { e.stopPropagation(); handleDeleteSet(set.id); }}
+                            style={{ fontSize: '11px', color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            🗑 Delete set
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-                {/* Create set form */}
-                <div style={{ padding: '16px', borderTop: '1px solid #e0e0e0', background: '#fafafa' }}>
-                  <div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '10px' }}>Create New Set</div>
-                  <input placeholder="Set name *" value={newSetForm.name} onChange={e => setNewSetForm(p => ({ ...p, name: e.target.value }))}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                    <input placeholder="Set price ₹" type="number" value={newSetForm.set_price} onChange={e => setNewSetForm(p => ({ ...p, set_price: e.target.value }))}
-                      style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }} />
-                    <input placeholder="Set MRP ₹" type="number" value={newSetForm.set_mrp} onChange={e => setNewSetForm(p => ({ ...p, set_mrp: e.target.value }))}
-                      style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }} />
-                  </div>
-                  <button onClick={handleCreateSet}
-                    style={{ width: '100%', padding: '9px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-                    + Create Set
+                {/* Add set button */}
+                <div style={{ padding: '12px 16px', borderTop: '1px solid #e0e0e0' }}>
+                  <button onClick={() => { setNewSetForm({ name: '', set_price: '', set_mrp: '', notes: '' }); setShowAddSetModal(true); }}
+                    style={{ width: '100%', padding: '10px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                    + Add New Set
                   </button>
                 </div>
               </div>
@@ -1939,6 +1951,14 @@ export default function Books() {
                   const setBooks = books.filter(b => b.set_id === selectedSetId);
                   const set = bookSets.find(s => s.id === selectedSetId);
                   const unassigned = books.filter(b => !b.set_id);
+                  const handleSavePending = async () => {
+                    if (!pendingSetBooks.length) return;
+                    await Promise.all(pendingSetBooks.map(id => supabase.from('books').update({ set_id: selectedSetId }).eq('id', id)));
+                    setPendingSetBooks([]);
+                    fetchBooks();
+                    fetchSets();
+                    toast.success(`${pendingSetBooks.length} book${pendingSetBooks.length > 1 ? 's' : ''} added to set`);
+                  };
                   return (
                     <div>
                       <div style={{ fontWeight: '700', fontSize: '16px', marginBottom: '12px' }}>{set?.name}</div>
@@ -1956,17 +1976,26 @@ export default function Books() {
                       ))}
                       {unassigned.length > 0 && (
                         <div style={{ marginTop: '16px' }}>
-                          <div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '8px', color: '#555' }}>Add books to this set:</div>
-                          <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '6px' }}>
-                            {unassigned.map(b => (
-                              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: '1px solid #f5f5f5' }}>
-                                <div style={{ flex: 1, fontSize: '13px' }}>{b.title} <span style={{ color: '#999', fontSize: '11px' }}>{b.book_id}</span></div>
-                                <button onClick={() => handleAssignToSet(b.id, selectedSetId)}
-                                  style={{ fontSize: '12px', color: '#f39c12', background: '#fff8f0', border: '1px solid #f5d5a0', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer' }}>
-                                  + Add
-                                </button>
-                              </div>
-                            ))}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div style={{ fontWeight: '600', fontSize: '13px', color: '#555' }}>Add books to this set:</div>
+                            {pendingSetBooks.length > 0 && (
+                              <button onClick={handleSavePending}
+                                style={{ padding: '6px 14px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}>
+                                Save {pendingSetBooks.length} book{pendingSetBooks.length > 1 ? 's' : ''}
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '6px' }}>
+                            {unassigned.map(b => {
+                              const isPending = pendingSetBooks.includes(b.id);
+                              return (
+                                <div key={b.id} onClick={() => setPendingSetBooks(prev => isPending ? prev.filter(id => id !== b.id) : [...prev, b.id])}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderBottom: '1px solid #f5f5f5', cursor: 'pointer', background: isPending ? '#f0fff4' : 'white' }}>
+                                  <input type="checkbox" checked={isPending} onChange={() => {}} style={{ width: '16px', height: '16px', accentColor: '#27ae60', cursor: 'pointer', flexShrink: 0 }} />
+                                  <div style={{ flex: 1, fontSize: '13px' }}>{b.title} <span style={{ color: '#999', fontSize: '11px' }}>{b.book_id}</span></div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1974,6 +2003,70 @@ export default function Books() {
                   );
                 })()}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Set Modal */}
+      {showAddSetModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2100 }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '500px', width: '90%', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0 }}>Add New Set</h2>
+              <button onClick={() => setShowAddSetModal(false)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#666' }}>✕</button>
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px' }}>Set Name *</label>
+              <input
+                placeholder="e.g. Harry Potter Series"
+                value={newSetForm.name}
+                onChange={e => setNewSetForm(p => ({ ...p, name: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px' }}>Set Price ₹</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={newSetForm.set_price}
+                  onChange={e => setNewSetForm(p => ({ ...p, set_price: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px' }}>Set MRP ₹</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={newSetForm.set_mrp}
+                  onChange={e => setNewSetForm(p => ({ ...p, set_mrp: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px' }}>Notes</label>
+              <textarea
+                placeholder="Optional notes about this set"
+                value={newSetForm.notes}
+                onChange={e => setNewSetForm(p => ({ ...p, notes: e.target.value }))}
+                rows={3}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setShowAddSetModal(false)}
+                style={{ flex: 1, padding: '11px', background: 'white', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', color: '#555' }}>
+                Cancel
+              </button>
+              <button onClick={async () => { const ok = await handleCreateSet(); if (ok) setShowAddSetModal(false); }}
+                style={{ flex: 2, padding: '11px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                Create Set
+              </button>
             </div>
           </div>
         </div>

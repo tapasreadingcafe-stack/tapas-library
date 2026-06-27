@@ -62,6 +62,9 @@ export default function BarcodeManager() {
   // at the top), regardless of when each copy was originally added
   // to book_copies.
   const [selectionOrder, setSelectionOrder] = useState([]);
+  const [bookSets, setBookSets] = useState([]);
+  const [selectedSetIds, setSelectedSetIds] = useState(new Set());
+  const [setsExpanded, setSetsExpanded] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
@@ -82,6 +85,16 @@ export default function BarcodeManager() {
   }, []);
 
   useEffect(() => { fetchCopies(); }, [fetchCopies]);
+
+  const fetchSets = useCallback(async () => {
+    const { data } = await supabase
+      .from('book_sets')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setBookSets(data || []);
+  }, []);
+
+  useEffect(() => { fetchSets(); }, [fetchSets]);
 
   // Handle a scan from the camera scanner OR a handheld scanner that
   // typed into the modal's input. Detects:
@@ -292,23 +305,23 @@ export default function BarcodeManager() {
     }
   };
 
-  const clearSelection = () => { setSelectedIds(new Set()); setSelectionOrder([]); };
+  const clearSelection = () => { setSelectedIds(new Set()); setSelectionOrder([]); setSelectedSetIds(new Set()); };
 
   // --- Print ---
   const getSelectedForPrint = () => {
-    const selected = copies.filter(c => selectedIds.has(c.id));
-    if (selected.length === 0) { toast.warning('No copies selected'); return null; }
-    // Print in the order rows were selected/scanned, so the physical
-    // stack of labels matches the table top→bottom and the order the
-    // user picked up books off the shelf. Falls back to created_at
-    // for anything that's selected but isn't in the order map
-    // (shouldn't happen but defensive).
+    const selectedCopies = copies.filter(c => selectedIds.has(c.id));
+    const selectedSets = bookSets.filter(s => selectedSetIds.has(s.id));
+    if (selectedCopies.length === 0 && selectedSets.length === 0) {
+      toast.warning('No copies or sets selected');
+      return null;
+    }
     const orderIndex = new Map(selectionOrder.map((id, i) => [id, i]));
-    return [...selected].sort((a, b) => {
+    const sortedCopies = [...selectedCopies].sort((a, b) => {
       const ai = orderIndex.has(a.id) ? orderIndex.get(a.id) : Number.MAX_SAFE_INTEGER;
       const bi = orderIndex.has(b.id) ? orderIndex.get(b.id) : Number.MAX_SAFE_INTEGER;
       return ai - bi;
     });
+    return { copies: sortedCopies, sets: selectedSets };
   };
 
   const setShowPriceBulk = async (visible) => {
@@ -328,19 +341,20 @@ export default function BarcodeManager() {
   };
 
   const handlePrintSelected = () => {
-    const selected = getSelectedForPrint();
-    if (!selected) return;
+    const result = getSelectedForPrint();
+    if (!result) return;
+    const { copies: selected, sets: selectedSets } = result;
 
     const win = window.open('', '_blank');
-    const labels = selected.map(c => {
+
+    const copyLabels = selected.map(c => {
       const barcode = generateBarcodeSVGString(c.copy_code, { height: 50, width: '44mm' });
       const title = c.books?.title || 'Unknown';
       const mrp = Number(c.books?.mrp) || 0;
       const selling = Number(c.books?.sales_price) || 0;
       const displayPrice = selling > 0 ? selling : mrp;
       const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
-      const showPrice = c.show_price !== false; // default true
-
+      const showPrice = c.show_price !== false;
       let priceHtml = '';
       if (showPrice && displayPrice > 0) {
         if (hasDiscount) {
@@ -349,7 +363,6 @@ export default function BarcodeManager() {
           priceHtml = `<span class="sell-price">Rs.${displayPrice}</span>`;
         }
       }
-
       return `
         <div class="label">
           <div class="brand">TAPAS READING CAFE</div>
@@ -361,7 +374,36 @@ export default function BarcodeManager() {
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    const setLabels = selectedSets.map(s => {
+      const barcode = generateBarcodeSVGString(s.barcode, { height: 50, width: '44mm' });
+      const price = Number(s.set_price) || 0;
+      const mrp = Number(s.set_mrp) || 0;
+      const displayPrice = price > 0 ? price : mrp;
+      const hasDiscount = mrp > 0 && price > 0 && mrp > price;
+      let priceHtml = '';
+      if (displayPrice > 0) {
+        if (hasDiscount) {
+          priceHtml = `<span class="sell-price">Rs.${price}</span> <span class="mrp-strike">Rs.${mrp}</span>`;
+        } else {
+          priceHtml = `<span class="sell-price">Rs.${displayPrice}</span>`;
+        }
+      }
+      return `
+        <div class="label">
+          <div class="brand">TAPAS READING CAFE</div>
+          <div class="barcode-area">${barcode}</div>
+          <div class="copy-code">${s.barcode}</div>
+          <div class="label-bottom">
+            <div class="book-title">${s.name}</div>
+            <div class="price">${priceHtml}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    const labels = [...copyLabels, ...setLabels].join('');
 
     win.document.write(`
       <html><head><title>Print Barcodes</title>
@@ -394,11 +436,12 @@ export default function BarcodeManager() {
   const [directPrinting, setDirectPrinting] = useState(false);
 
   const handleDirectPrint = async () => {
-    const selected = getSelectedForPrint();
-    if (!selected) return;
+    const result = getSelectedForPrint();
+    if (!result) return;
+    const { copies: selected, sets: selectedSets } = result;
     setDirectPrinting(true);
     try {
-      const labels = selected.map(c => {
+      const copyLabels = selected.map(c => {
         const mrp = Number(c.books?.mrp) || 0;
         const selling = Number(c.books?.sales_price) || 0;
         const displayPrice = selling > 0 ? selling : mrp;
@@ -412,6 +455,20 @@ export default function BarcodeManager() {
           mrpStrike: showPrice && hasDiscount ? `Rs.${mrp}` : '',
         };
       });
+      const setZplLabels = selectedSets.map(s => {
+        const price = Number(s.set_price) || 0;
+        const mrp = Number(s.set_mrp) || 0;
+        const displayPrice = price > 0 ? price : mrp;
+        const hasDiscount = mrp > 0 && price > 0 && mrp > price;
+        return {
+          brand: 'TAPAS READING CAFE',
+          copyCode: s.barcode,
+          title: s.name,
+          price: displayPrice > 0 ? `Rs.${displayPrice}` : '',
+          mrpStrike: hasDiscount ? `Rs.${mrp}` : '',
+        };
+      });
+      const labels = [...copyLabels, ...setZplLabels];
 
       // Load selected template or use default
       let template = null;
@@ -431,7 +488,7 @@ export default function BarcodeManager() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Printed ${selected.length} label(s)!`);
+        toast.success(`Printed ${selected.length + selectedSets.length} label(s)!`);
       } else {
         toast.error('Print failed: ' + (data.message || data.error || 'Unknown error'));
       }
@@ -511,7 +568,7 @@ export default function BarcodeManager() {
             </>
           )}
           <button data-tour="direct-print" onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
-            {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : `Direct Print${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+            {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : `Direct Print${(selectedIds.size + selectedSetIds.size) > 0 ? ` (${selectedIds.size + selectedSetIds.size})` : ''}`}
           </button>
           <Link to="/barcodes/editor" style={buttonStyle}>
             Template Editor
@@ -613,7 +670,7 @@ export default function BarcodeManager() {
       </div>
 
       {/* Bulk Bar */}
-      {selectedIds.size > 0 && (
+      {(selectedIds.size > 0 || selectedSetIds.size > 0) && (
         <div style={{
           ...containerStyle,
           marginBottom: '16px',
@@ -621,7 +678,9 @@ export default function BarcodeManager() {
           background: '#f0f4ff',
         }}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: '#333' }}>
-            {selectedIds.size} selected
+            {selectedIds.size + selectedSetIds.size} selected
+            {selectedSetIds.size > 0 && selectedIds.size > 0 && <span style={{ color: '#667eea', fontWeight: 400 }}> ({selectedIds.size} copies + {selectedSetIds.size} sets)</span>}
+            {selectedSetIds.size > 0 && selectedIds.size === 0 && <span style={{ color: '#667eea', fontWeight: 400 }}> (sets)</span>}
           </span>
           <button onClick={handleDirectPrint} disabled={directPrinting} style={{ ...buttonStyle, background: '#38a169', opacity: directPrinting ? 0.6 : 1 }}>
             {'\uD83D\uDDA8\uFE0F'} {directPrinting ? 'Printing...' : 'Direct Print'}
@@ -629,28 +688,114 @@ export default function BarcodeManager() {
           <button onClick={handlePrintSelected} style={buttonStyle}>
             Print Preview
           </button>
-          <button onClick={async () => {
-            if (!window.confirm(`Mark ${selectedIds.size} copies as LOST?`)) return;
-            for (const id of selectedIds) { await supabase.from('book_copies').update({ status: 'lost' }).eq('id', id); }
-            toast.success(`${selectedIds.size} copies marked as lost`);
-            setSelectedIds(new Set()); fetchCopies();
-          }} style={{ ...buttonStyle, background: '#e74c3c' }}>
-            Mark Lost
-          </button>
-          <button onClick={async () => {
-            if (!window.confirm(`Mark ${selectedIds.size} copies as DAMAGED?`)) return;
-            for (const id of selectedIds) { await supabase.from('book_copies').update({ status: 'damaged' }).eq('id', id); }
-            toast.success(`${selectedIds.size} copies marked as damaged`);
-            setSelectedIds(new Set()); fetchCopies();
-          }} style={{ ...buttonStyle, background: '#f39c12' }}>
-            Mark Damaged
-          </button>
+          {selectedIds.size > 0 && <>
+            <button onClick={async () => {
+              if (!window.confirm(`Mark ${selectedIds.size} copies as LOST?`)) return;
+              for (const id of selectedIds) { await supabase.from('book_copies').update({ status: 'lost' }).eq('id', id); }
+              toast.success(`${selectedIds.size} copies marked as lost`);
+              setSelectedIds(new Set()); fetchCopies();
+            }} style={{ ...buttonStyle, background: '#e74c3c' }}>
+              Mark Lost
+            </button>
+            <button onClick={async () => {
+              if (!window.confirm(`Mark ${selectedIds.size} copies as DAMAGED?`)) return;
+              for (const id of selectedIds) { await supabase.from('book_copies').update({ status: 'damaged' }).eq('id', id); }
+              toast.success(`${selectedIds.size} copies marked as damaged`);
+              setSelectedIds(new Set()); fetchCopies();
+            }} style={{ ...buttonStyle, background: '#f39c12' }}>
+              Mark Damaged
+            </button>
+          </>}
           <button
             onClick={clearSelection}
             style={{ ...buttonStyle, background: '#999' }}
           >
             Clear
           </button>
+        </div>
+      )}
+
+      {/* Book Sets Section */}
+      {bookSets.length > 0 && (
+        <div style={{ ...containerStyle, marginBottom: '16px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: setsExpanded ? '10px' : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setSetsExpanded(v => !v)}
+                style={{ background: 'none', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', padding: '2px 7px', fontSize: '12px', color: '#555', lineHeight: 1.4 }}
+                title={setsExpanded ? 'Collapse' : 'Expand'}
+              >
+                {setsExpanded ? '▲' : '▼'}
+              </button>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#333' }}>
+                📦 Book Sets ({bookSets.length})
+              </h3>
+            </div>
+            {selectedSetIds.size > 0 && (
+              <span style={{ fontSize: '12px', color: '#667eea', fontWeight: 600 }}>
+                {selectedSetIds.size} set{selectedSetIds.size !== 1 ? 's' : ''} selected
+              </span>
+            )}
+          </div>
+          {setsExpanded && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+                <th style={{ padding: '8px', width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    checked={bookSets.length > 0 && bookSets.every(s => selectedSetIds.has(s.id))}
+                    onChange={() => {
+                      if (bookSets.every(s => selectedSetIds.has(s.id))) {
+                        setSelectedSetIds(new Set());
+                      } else {
+                        setSelectedSetIds(new Set(bookSets.map(s => s.id)));
+                      }
+                    }}
+                  />
+                </th>
+                <th style={{ padding: '8px' }}>Barcode</th>
+                <th style={{ padding: '8px' }}>Set Code</th>
+                <th style={{ padding: '8px' }}>Set Name</th>
+                <th style={{ padding: '8px' }}>Price</th>
+                <th style={{ padding: '8px' }}>MRP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bookSets.map(set => (
+                <tr key={set.id} style={{ borderBottom: '1px solid #f0f0f0', background: selectedSetIds.has(set.id) ? '#f0f4ff' : undefined }}>
+                  <td style={{ padding: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSetIds.has(set.id)}
+                      onChange={() => {
+                        setSelectedSetIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(set.id)) next.delete(set.id);
+                          else next.add(set.id);
+                          return next;
+                        });
+                      }}
+                    />
+                  </td>
+                  <td style={{ padding: '8px', width: '150px' }}>
+                    {set.barcode && generateBarcodeSVG(set.barcode, { height: 35, width: '140px' })}
+                  </td>
+                  <td style={{ padding: '8px', fontFamily: 'monospace', color: '#667eea', fontWeight: '600' }}>
+                    {set.barcode || '—'}
+                  </td>
+                  <td style={{ padding: '8px', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {set.name}
+                  </td>
+                  <td style={{ padding: '8px', color: '#333' }}>
+                    {set.set_price ? `₹${set.set_price}` : '—'}
+                  </td>
+                  <td style={{ padding: '8px', color: '#666' }}>
+                    {set.set_mrp ? `₹${set.set_mrp}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>}
         </div>
       )}
 
