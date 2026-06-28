@@ -68,13 +68,16 @@ export default function BarcodeManager() {
   const [currentPage, setCurrentPage] = useState(1);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
+  const [editingCopy, setEditingCopy] = useState(null);
+  const [editCopyForm, setEditCopyForm] = useState({ copy_mrp: '', copy_price: '' });
+  const [editCopySaving, setEditCopySaving] = useState(false);
 
   const fetchCopies = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('book_copies')
-        .select('*, books(id, title, category, price, mrp, sales_price, author, isbn)')
+        .select('*, books(id, title, category, price, mrp, sales_price, author, isbn), copy_mrp, copy_price')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setCopies(data || []);
@@ -350,8 +353,8 @@ export default function BarcodeManager() {
     const copyLabels = selected.map(c => {
       const barcode = generateBarcodeSVGString(c.copy_code, { height: 50, width: '44mm' });
       const title = c.books?.title || 'Unknown';
-      const mrp = Number(c.books?.mrp) || 0;
-      const selling = Number(c.books?.sales_price) || 0;
+      const mrp = Number(c.copy_mrp ?? c.books?.mrp) || 0;
+      const selling = Number(c.copy_price ?? c.books?.sales_price) || 0;
       const displayPrice = selling > 0 ? selling : mrp;
       const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
       const showPrice = c.show_price !== false;
@@ -442,8 +445,8 @@ export default function BarcodeManager() {
     setDirectPrinting(true);
     try {
       const copyLabels = selected.map(c => {
-        const mrp = Number(c.books?.mrp) || 0;
-        const selling = Number(c.books?.sales_price) || 0;
+        const mrp = Number(c.copy_mrp ?? c.books?.mrp) || 0;
+        const selling = Number(c.copy_price ?? c.books?.sales_price) || 0;
         const displayPrice = selling > 0 ? selling : mrp;
         const hasDiscount = mrp > 0 && selling > 0 && mrp > selling;
         const showPrice = c.show_price !== false;
@@ -851,16 +854,16 @@ export default function BarcodeManager() {
                   <td style={{ padding: '10px 8px', maxWidth: '240px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{copy.books?.title || '—'}</span>
-                      <Link
-                        to={`/books?edit=${copy.book_id || copy.books?.id || ''}`}
-                        title="Edit this book"
-                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', textDecoration: 'none', color: '#667eea' }}
+                      <button
+                        onClick={() => { setEditingCopy(copy); setEditCopyForm({ copy_mrp: copy.copy_mrp ?? '', copy_price: copy.copy_price ?? '' }); }}
+                        title="Edit price for this copy"
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', cursor: 'pointer', color: '#667eea' }}
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
-                      </Link>
+                      </button>
                     </div>
                   </td>
                   <td style={{ padding: '10px 8px', color: '#666' }}>
@@ -1010,6 +1013,88 @@ export default function BarcodeManager() {
                 onClick={closeScanner}
                 style={{ flex: 2, padding: '10px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
               >Done ({selectedIds.size})</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Copy Price Edit Modal */}
+      {editingCopy && (
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setEditingCopy(null)}
+        >
+          <div
+            style={{ background: 'white', borderRadius: '14px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: '700', color: '#111' }}>Edit Copy Price</h3>
+            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#888', fontFamily: 'monospace' }}>{editingCopy.copy_code}</p>
+
+            <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px 14px', marginBottom: '18px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {editingCopy.books?.title || '—'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888' }}>
+                Book MRP: {editingCopy.books?.mrp ? `₹${editingCopy.books.mrp}` : '—'} &nbsp;·&nbsp; Book Price: {editingCopy.books?.sales_price ? `₹${editingCopy.books.sales_price}` : '—'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#555', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                MRP for this copy only
+              </label>
+              <input
+                type="number"
+                value={editCopyForm.copy_mrp}
+                onChange={e => setEditCopyForm(f => ({ ...f, copy_mrp: e.target.value }))}
+                placeholder={`Book MRP: ${editingCopy.books?.mrp || '—'}`}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#555', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                Selling price for this copy only
+              </label>
+              <input
+                type="number"
+                value={editCopyForm.copy_price}
+                onChange={e => setEditCopyForm(f => ({ ...f, copy_price: e.target.value }))}
+                placeholder={`Book price: ${editingCopy.books?.sales_price || '—'}`}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+              />
+              <p style={{ margin: '5px 0 0', fontSize: '11px', color: '#aaa' }}>Leave blank to use the book's price</p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setEditingCopy(null)}
+                style={{ flex: 1, padding: '10px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#555' }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={editCopySaving}
+                onClick={async () => {
+                  setEditCopySaving(true);
+                  const updates = {
+                    copy_mrp: editCopyForm.copy_mrp !== '' ? parseFloat(editCopyForm.copy_mrp) : null,
+                    copy_price: editCopyForm.copy_price !== '' ? parseFloat(editCopyForm.copy_price) : null,
+                  };
+                  const { error } = await supabase.from('book_copies').update(updates).eq('id', editingCopy.id);
+                  if (error) { toast.error('Failed: ' + error.message); }
+                  else {
+                    setCopies(prev => prev.map(c => c.id === editingCopy.id ? { ...c, ...updates } : c));
+                    toast.success('Price updated for ' + editingCopy.copy_code);
+                    setEditingCopy(null);
+                  }
+                  setEditCopySaving(false);
+                }}
+                style={{ flex: 2, padding: '10px', background: '#667eea', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: 'white', opacity: editCopySaving ? 0.6 : 1 }}
+              >
+                {editCopySaving ? 'Saving…' : 'Save Price'}
+              </button>
             </div>
           </div>
         </div>
