@@ -787,9 +787,9 @@ export default function BarcodeManager() {
                     {set.name}
                   </td>
                   <td style={{ padding: '8px', color: '#333' }}>
-                    {set.set_price ? `₹${set.set_price}` : '—'}
+                    {set.set_price ? `₹${set.set_price}` : set.set_mrp ? `₹${set.set_mrp}` : '—'}
                   </td>
-                  <td style={{ padding: '8px', color: '#666' }}>
+                  <td style={{ padding: '8px', color: '#888' }}>
                     {set.set_mrp ? `₹${set.set_mrp}` : '—'}
                   </td>
                 </tr>
@@ -851,18 +851,16 @@ export default function BarcodeManager() {
                   <td style={{ padding: '10px 8px', maxWidth: '240px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{copy.books?.title || '—'}</span>
-                      {(copy.book_id || copy.books?.id) && (
-                        <Link
-                          to={`/books?edit=${copy.book_id || copy.books?.id}`}
-                          title="Edit this book"
-                          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', textDecoration: 'none', color: '#667eea' }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
-                        </Link>
-                      )}
+                      <Link
+                        to={`/books?edit=${copy.book_id || copy.books?.id || ''}`}
+                        title="Edit this book"
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', textDecoration: 'none', color: '#667eea' }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </Link>
                     </div>
                   </td>
                   <td style={{ padding: '10px 8px', color: '#666' }}>
