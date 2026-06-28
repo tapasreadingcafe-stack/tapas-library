@@ -74,7 +74,7 @@ export default function BarcodeManager() {
     try {
       const { data, error } = await supabase
         .from('book_copies')
-        .select('*, books(title, category, price, mrp, sales_price, author, isbn)')
+        .select('*, books(id, title, category, price, mrp, sales_price, author, isbn)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setCopies(data || []);
@@ -851,9 +851,9 @@ export default function BarcodeManager() {
                   <td style={{ padding: '10px 8px', maxWidth: '240px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{copy.books?.title || '—'}</span>
-                      {copy.book_id && (
+                      {(copy.book_id || copy.books?.id) && (
                         <Link
-                          to={`/books?edit=${copy.book_id}`}
+                          to={`/books?edit=${copy.book_id || copy.books?.id}`}
                           title="Edit this book"
                           style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', textDecoration: 'none', color: '#667eea' }}
                         >
