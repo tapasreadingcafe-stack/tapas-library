@@ -852,7 +852,18 @@ export default function BarcodeManager() {
                     padding: '10px 8px', maxWidth: '200px',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
-                    {copy.books?.title || '—'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{copy.books?.title || '—'}</span>
+                      {copy.book_id && (
+                        <Link
+                          to={`/books?edit=${copy.book_id}`}
+                          title="Edit this book"
+                          style={{ flexShrink: 0, fontSize: '11px', color: '#667eea', textDecoration: 'none', padding: '1px 6px', border: '1px solid #c7d2fe', borderRadius: '4px', lineHeight: '18px', whiteSpace: 'nowrap' }}
+                        >
+                          ✏ Edit
+                        </Link>
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: '10px 8px', color: '#666' }}>
                     {copy.books?.category || '—'}
