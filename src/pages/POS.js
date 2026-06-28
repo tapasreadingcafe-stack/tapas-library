@@ -262,7 +262,7 @@ export default function POS() {
       // server cap. Stops when a batch returns fewer rows than the
       // page size, which means we've reached the end of the catalog.
       const PAGE = 1000;
-      const cols = 'id, book_id, title, author, category, price, sales_price, quantity_available, quantity_total, book_image';
+      const cols = 'id, book_id, title, author, category, price, mrp, sales_price, quantity_available, quantity_total, book_image';
       const all = [];
       for (let offset = 0; ; offset += PAGE) {
         const { data, error } = await supabase
@@ -360,7 +360,7 @@ export default function POS() {
           cartId,
           name:     item.title || item.name,
           type:     'book',
-          price:    item.sales_price || item.price || 0,
+          price:    item.sales_price || item.price || item.mrp || 0,
           qty:      1,
           bookId:   item.id,
           copyCode: item.copyCode,
@@ -378,7 +378,7 @@ export default function POS() {
         cartId,
         name:   item.title || item.name,
         type:   item.cartType || 'service',
-        price:  item.sales_price || item.price || 0,
+        price:  item.sales_price || item.price || item.mrp || 0,
         qty:    1,
         bookId: item.cartType === 'book' ? item.id : null,
       }];
