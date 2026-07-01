@@ -144,16 +144,14 @@ export default function Borrow() {
     getFineSettings().then(setFineSettings);
   }, []);
 
-  // Pre-select parent + child if navigated from ChildProfile
+  // Pre-select parent + child if navigated from ChildProfile — fetch by ID directly
   useEffect(() => {
-    if (location.state?.parentId && members.length > 0) {
-      const parent = members.find(m => m.id === location.state.parentId);
-      if (parent) {
-        selectMember(parent);
-        // Child will be pre-selected after children load via selectMember's fetchChildren
-      }
-    }
-  }, [location.state, members]);
+    if (!location.state?.parentId) return;
+    supabase.from('members')
+      .select('id, name, phone, plan, borrow_limit, email, status, subscription_end')
+      .eq('id', location.state.parentId).single()
+      .then(({ data }) => { if (data) selectMember(data); });
+  }, [location.state?.parentId]);
 
   // Pre-select child after children load (from ChildProfile navigation)
   useEffect(() => {
@@ -163,16 +161,15 @@ export default function Borrow() {
     }
   }, [location.state, childrenOfMember]);
 
-  // Pre-select the book when handed off from POS "↔ Borrow" (customer wants to
-  // borrow a book they'd otherwise buy). Runs once.
+  // Pre-select the book when handed off from POS "↔ Borrow" — fetch by ID directly
   useEffect(() => {
-    if (!location.state?.bookId || borrowHandoffRef.current || books.length === 0) return;
-    const b = books.find(bk => bk.id === location.state.bookId);
-    if (b) {
-      borrowHandoffRef.current = true;
-      selectBook(b);
-    }
-  }, [location.state, books]);
+    if (!location.state?.bookId || borrowHandoffRef.current) return;
+    borrowHandoffRef.current = true;
+    supabase.from('books')
+      .select('id, title, author, book_id, book_image, quantity_available, is_borrowable, isbn')
+      .eq('id', location.state.bookId).single()
+      .then(({ data }) => { if (data) selectBook(data); });
+  }, [location.state?.bookId]);
 
   // After copies load, pre-select the exact copy that was scanned at POS.
   useEffect(() => {
@@ -218,30 +215,23 @@ export default function Borrow() {
     try {
       const today = new Date().toISOString().split('T')[0];
       const [
-        { data: membersData },
-        { data: booksData },
         { data: circData },
         { count: returnedToday },
       ] = await Promise.all([
-        supabase.from('members').select('*').order('name'),
-        supabase.from('books').select('*').order('title'),
         supabase
           .from('circulation')
-          .select('*, members(name, plan, borrow_limit, phone), books(title, book_image, author)')
+          .select('id, member_id, book_id, due_date, checkout_date, return_date, status, fine_paid, child_id, members(name, plan, borrow_limit, phone), books(title, book_image, author)')
           .eq('status', 'checked_out')
-          .order('due_date', { ascending: true }),
+          .order('due_date', { ascending: true })
+          .limit(500),
         supabase
           .from('circulation')
-          .select('*', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('status', 'returned')
           .eq('return_date', today),
       ]);
 
-      setMembers(membersData || []);
-      setBooks(booksData || []);
       setCirculationData(circData || []);
-      console.log('[Borrow] Fetched:', { members: (membersData||[]).length, books: (booksData||[]).length, circulation: (circData||[]).length, returnedToday });
-
       const cd = circData || [];
       setStats({
         totalOut: cd.length,
@@ -256,31 +246,37 @@ export default function Borrow() {
     }
   };
 
-  // Member search
+  // Member search — server-side, debounced
   useEffect(() => {
     if (!memberSearch.trim()) { setMemberResults([]); return; }
-    const q = memberSearch.toLowerCase();
-    setMemberResults(
-      members.filter(m =>
-        m.name?.toLowerCase().includes(q) ||
-        m.phone?.includes(q) ||
-        String(m.id).toLowerCase().includes(q)
-      ).slice(0, 6)
-    );
-  }, [memberSearch, members]);
+    const q = memberSearch.trim();
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('members')
+        .select('id, name, phone, plan, borrow_limit, email, status, subscription_end')
+        .or(`name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
+        .limit(6);
+      setMemberResults(data || []);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [memberSearch]);
 
-  // Book search
+  // Book search — server-side, debounced
   useEffect(() => {
     if (!bookSearch.trim()) { setBookResults([]); return; }
-    const q = bookSearch.toLowerCase();
-    setBookResults(
-      books.filter(b =>
-        b.title?.toLowerCase().includes(q) ||
-        b.author?.toLowerCase().includes(q) ||
-        b.isbn?.toLowerCase?.().includes(q)
-      ).slice(0, 6)
-    );
-  }, [bookSearch, books]);
+    const q = bookSearch.trim();
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('books')
+        .select('id, title, author, book_id, book_image, quantity_available, is_borrowable, isbn')
+        .or(`title.ilike.%${q}%,author.ilike.%${q}%,book_id.ilike.%${q}%,isbn.ilike.%${q}%`)
+        .eq('is_borrowable', true)
+        .limit(6);
+      setBookResults(data || []);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [bookSearch]);
+
 
   const fetchChildrenForMember = async (memberId) => {
     try {

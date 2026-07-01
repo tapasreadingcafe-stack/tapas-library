@@ -183,7 +183,7 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'qty_avail', label: 'Book available qty mismatch', category: 'Sync', icon: '📊', issues: qtyMismatch, fixable: true,
       fix: async () => {
-        for (const i of qtyMismatch) await supabase.from('books').update({ quantity_available: i.expected }).eq('id', i.id);
+        await supabase.from('books').upsert(qtyMismatch.map(i => ({ id: i.id, quantity_available: i.expected })));
       },
       detail: (i) => `"${i.title}" — shows ${i.got}, should be ${i.expected}` });
 
@@ -194,7 +194,7 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'qty_total', label: 'Book total qty mismatch', category: 'Sync', icon: '📦', issues: totalMismatch, fixable: true,
       fix: async () => {
-        for (const i of totalMismatch) await supabase.from('books').update({ quantity_total: i.expected }).eq('id', i.id);
+        await supabase.from('books').upsert(totalMismatch.map(i => ({ id: i.id, quantity_total: i.expected })));
       },
       detail: (i) => `"${i.title}" — shows ${i.got} total, actual copies: ${i.expected}` });
 
@@ -207,7 +207,8 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'expired_active', label: 'Expired plans still active', category: 'Sync', icon: '👤', issues: expiredActive, fixable: true,
       fix: async () => {
-        for (const i of expiredActive) await supabase.from('members').update({ status: 'expired', status_color: 'red' }).eq('id', i.id);
+        const ids = expiredActive.map(i => i.id);
+        await supabase.from('members').update({ status: 'expired', status_color: 'red' }).in('id', ids);
       },
       detail: (i) => `${i.name} — ${i.plan} expired ${i.expired}` });
 
@@ -228,7 +229,8 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'issued_no_circ', label: 'Issued copies without checkout', category: 'Copy Status', icon: '📤', issues: issuedNoCirc, fixable: true,
       fix: async () => {
-        for (const i of issuedNoCirc) await supabase.from('book_copies').update({ status: 'available', current_borrower_id: null }).eq('id', i.id);
+        const ids = issuedNoCirc.map(i => i.id);
+        await supabase.from('book_copies').update({ status: 'available', current_borrower_id: null }).in('id', ids);
       },
       detail: (i) => `${i.copy_code} — marked issued but no active checkout found` });
 
@@ -240,7 +242,8 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'stale_borrower', label: 'Stale borrower IDs on copies', category: 'Copy Status', icon: '👻', issues: staleBorrower, fixable: true,
       fix: async () => {
-        for (const i of staleBorrower) await supabase.from('book_copies').update({ current_borrower_id: null }).eq('id', i.id);
+        const ids = staleBorrower.map(i => i.id);
+        await supabase.from('book_copies').update({ current_borrower_id: null }).in('id', ids);
       },
       detail: (i) => `${i.copy_code} — has borrower but status is not "issued"` });
 
@@ -279,7 +282,8 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'orphan_copies', label: 'Orphaned book copies', category: 'Orphans', icon: '📄', issues: orphanCopies, fixable: true,
       fix: async () => {
-        for (const i of orphanCopies) await supabase.from('book_copies').delete().eq('id', i.id);
+        const ids = orphanCopies.map(i => i.id);
+        await supabase.from('book_copies').delete().in('id', ids);
       },
       detail: (i) => `${i.copy_code} — book no longer exists` });
 
@@ -353,7 +357,8 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'unpaid_fines', label: 'Fines paid in POS but not marked', category: 'Logic', icon: '💸', issues: unpaidFines, fixable: true,
       fix: async () => {
-        for (const i of unpaidFines) await supabase.from('circulation').update({ fine_paid: true }).eq('id', i.id);
+        const ids = unpaidFines.map(i => i.id);
+        await supabase.from('circulation').update({ fine_paid: true }).in('id', ids);
       },
       detail: (i) => `"${i.title}" — POS collected fine but circulation.fine_paid is still false` });
 
@@ -400,9 +405,7 @@ export default function SettingsHealth() {
     tick();
     results.push({ id: 'sale_wrong_prefix', label: 'Sale-only books with wrong book ID', category: 'Data Quality', icon: '🏷️', issues: saleWrongPrefix, fixable: true,
       fix: async () => {
-        for (const b of saleWrongPrefix) {
-          await supabase.from('books').update({ book_id: b.newId }).eq('id', b.id);
-        }
+        await supabase.from('books').upsert(saleWrongPrefix.map(b => ({ id: b.id, book_id: b.newId })));
       },
       detail: (i) => `"${i.title}" — ${i.book_id} → ${i.newId}` });
 
@@ -430,25 +433,20 @@ export default function SettingsHealth() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      // Get all books
-      const { data: books } = await supabase.from('books').select('id, quantity_available');
+      // Fetch books and all available copies in 2 queries instead of N+1
+      const [{ data: books }, { data: availCopies }] = await Promise.all([
+        supabase.from('books').select('id, quantity_available'),
+        supabase.from('book_copies').select('book_id').eq('status', 'available'),
+      ]);
       if (!books) throw new Error('Failed to fetch books');
 
-      let fixed = 0;
-      for (const book of books) {
-        const { count } = await supabase
-          .from('book_copies')
-          .select('*', { count: 'exact', head: true })
-          .eq('book_id', book.id)
-          .eq('status', 'available');
+      const countByBook = {};
+      (availCopies || []).forEach(c => { countByBook[c.book_id] = (countByBook[c.book_id] || 0) + 1; });
 
-        const availableCount = count || 0;
-        if (availableCount !== book.quantity_available) {
-          await supabase.from('books')
-            .update({ quantity_available: availableCount })
-            .eq('id', book.id);
-          fixed++;
-        }
+      const toFix = books.filter(b => (countByBook[b.id] || 0) !== (b.quantity_available || 0));
+      let fixed = toFix.length;
+      if (toFix.length > 0) {
+        await supabase.from('books').upsert(toFix.map(b => ({ id: b.id, quantity_available: countByBook[b.id] || 0 })));
       }
 
       setSyncResult({ success: true, fixed, total: books.length });

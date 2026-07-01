@@ -85,6 +85,7 @@ export default function Books() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [originalEditCategory, setOriginalEditCategory] = useState(null);
   const [categories, setCategories] = useState([]);
   const [showImport, setShowImport] = useState(false);
   const [showMrpImport, setShowMrpImport] = useState(false);
@@ -720,6 +721,11 @@ export default function Books() {
       if (editingId) {
         const { error } = await supabase.from('books').update(payload).eq('id', editingId);
         if (error) throw error;
+        // If category changed, rename all copy codes + book_id to match new prefix
+        if (originalEditCategory && originalEditCategory !== payload.category) {
+          await renameCopiesForCategoryChange(editingId, originalEditCategory, payload.category);
+        }
+        setOriginalEditCategory(null);
         setEditingId(null);
         setFormData(emptyForm);
         setImagePreview('');
@@ -761,26 +767,19 @@ export default function Books() {
           logActivity(ACTIONS.BOOK_ADDED, `Added ${copyCount} copies to: ${payload.title} (total: ${newTotal})`, { book_title: payload.title });
           if (printAfterAdd) navigate(`/books/${existingBook.id}/copies`);
         } else {
-          // Generate book_id: S- prefix for sale-only books, B- for borrow or both
+          // Generate book_id atomically via DB — no race condition possible
           const prefix = getCategoryPrefix(payload.category);
           const idLetter = (nSale > 0 && nBorrow === 0) ? 'S' : 'B';
-          const { data: existingIds } = await supabase.from('books').select('book_id').like('book_id', `${idLetter}-${prefix}-%`);
-          let nextNum = 1;
-          if (existingIds?.length) {
-            const nums = existingIds.map(b => { const m = b.book_id.match(/-(\d+)$/); return m ? parseInt(m[1]) : 0; });
-            nextNum = Math.max(...nums) + 1;
+          const { data: newId, error: idError } = await supabase
+            .rpc('next_book_id', { p_prefix: `${idLetter}-${prefix}` });
+          if (idError) {
+            toast.error('Cannot generate book ID — database error: ' + idError.message);
+            return;
           }
+          payload.book_id = newId;
 
-          // Retry loop: if another record already claimed this ID (orphan from a
-          // failed previous attempt), increment and try again — never shows an error.
-          let newBook, insertError, attempts = 0;
-          while (attempts < 9999) {
-            payload.book_id = `${idLetter}-${prefix}-${String(nextNum).padStart(4, '0')}`;
-            ({ data: newBook, error: insertError } = await supabase.from('books').insert([payload]).select().single());
-            if (!insertError) break;
-            if (insertError.code === '23505') { nextNum++; attempts++; continue; } // duplicate key
-            throw insertError;
-          }
+          const { data: newBook, error: insertError } = await supabase
+            .from('books').insert([payload]).select().single();
           if (insertError) throw insertError;
           try {
             if (nBorrow > 0) await createBookCopies(newBook.id, payload.category, nBorrow, 'library');
@@ -808,6 +807,49 @@ export default function Books() {
     setEditingId(book.id);
     setShowAddForm(true);
     setNotForSale(!book.mrp && !book.sales_price);
+    setOriginalEditCategory(book.category || null);
+  };
+
+  // When a book's category changes, rename its copy codes + book_id to match.
+  // e.g. S-GEN-0001 → S-FIC-0001 (same letter + number, new category prefix).
+  const renameCopiesForCategoryChange = async (bookId, oldCategory, newCategory) => {
+    const oldPrefix = getCategoryPrefix(oldCategory);
+    const newPrefix = getCategoryPrefix(newCategory);
+    if (oldPrefix === newPrefix) return;
+
+    const { data: copies } = await supabase
+      .from('book_copies').select('id, copy_code').eq('book_id', bookId);
+    if (!copies?.length) return;
+
+    for (const copy of copies) {
+      const m = copy.copy_code.match(/^([BS])-([A-Z]+)-(\d+)$/);
+      if (!m || m[2] !== oldPrefix) continue;
+      const [, letter, , num] = m;
+      let newCode = `${letter}-${newPrefix}-${num}`;
+
+      // If that code is already taken by another copy, find the next free number
+      const { data: conflict } = await supabase
+        .from('book_copies').select('id').eq('copy_code', newCode).neq('id', copy.id).limit(1);
+      if (conflict?.length) {
+        const { data: highest } = await supabase
+          .from('book_copies').select('copy_code')
+          .like('copy_code', `${letter}-${newPrefix}-%`)
+          .order('copy_code', { ascending: false }).limit(1);
+        const lastNum = parseInt(highest?.[0]?.copy_code.match(/-(\d+)$/)?.[1] || '0') ;
+        newCode = `${letter}-${newPrefix}-${String(lastNum + 1).padStart(4, '0')}`;
+      }
+      await supabase.from('book_copies').update({ copy_code: newCode }).eq('id', copy.id);
+    }
+
+    // Also rename books.book_id if it carries the old prefix
+    const { data: bk } = await supabase.from('books').select('book_id').eq('id', bookId).single();
+    if (bk?.book_id) {
+      const bm = bk.book_id.match(/^([BS])-([A-Z]+)-(\d+)$/);
+      if (bm && bm[2] === oldPrefix) {
+        await supabase.from('books')
+          .update({ book_id: `${bm[1]}-${newPrefix}-${bm[3]}` }).eq('id', bookId);
+      }
+    }
   };
 
   const handleDeleteBook = async (id) => {

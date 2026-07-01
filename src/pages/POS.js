@@ -396,14 +396,14 @@ export default function POS() {
     if (upper.startsWith('B') || upper.startsWith('S')) {
       try {
         // Try exact match first
-        let { data: copy } = await supabase.from('book_copies').select('id, copy_code, status, book_id, books(*)').eq('copy_code', upper).limit(1);
+        let { data: copy } = await supabase.from('book_copies').select('id, copy_code, status, book_id, copy_mrp, copy_price, books(*)').eq('copy_code', upper).limit(1);
         // Try adding dashes: BCHI0001 → B-CHI-0001, SFIC0001 → S-FIC-0001
         if (!copy?.length && !upper.includes('-')) {
           // Try splitting: B/S + letters + digits → X-XXX-0000
           const m = upper.match(/^([BS])([A-Z]{2,4})(\d{3,4})$/);
           if (m) {
             const withDashes = `${m[1]}-${m[2]}-${m[3].padStart(4, '0')}`;
-            const r = await supabase.from('book_copies').select('id, copy_code, status, book_id, books(*)').eq('copy_code', withDashes).limit(1);
+            const r = await supabase.from('book_copies').select('id, copy_code, status, book_id, copy_mrp, copy_price, books(*)').eq('copy_code', withDashes).limit(1);
             copy = r.data;
           }
         }
@@ -417,7 +417,11 @@ export default function POS() {
             showToast(`Copy ${c.copy_code} is currently issued to a member`, 'error');
             return;
           }
-          addToCart({ ...c.books, copyCode: c.copy_code, copyId: c.id });
+          // Use copy-level pricing if set, fall back to book-level
+          const bookData = { ...c.books };
+          if (c.copy_mrp != null) bookData.mrp = c.copy_mrp;
+          if (c.copy_price != null) { bookData.sales_price = c.copy_price; bookData.price = c.copy_price; }
+          addToCart({ ...bookData, copyCode: c.copy_code, copyId: c.id });
           showToast(`Added: ${c.books.title} (${c.copy_code})`);
           return;
         }
@@ -479,7 +483,7 @@ export default function POS() {
     try {
       const { data: allCopies } = await supabase
         .from('book_copies')
-        .select('id, copy_code, status, condition')
+        .select('id, copy_code, status, condition, copy_mrp, copy_price')
         .eq('book_id', book.id)
         .order('copy_code');
 
@@ -496,7 +500,11 @@ export default function POS() {
           return;
         }
 
-        addToCart({ ...book, copyCode: nextAvailable.copy_code, copyId: nextAvailable.id });
+        // Use copy-level pricing if set, fall back to book-level
+        const bookData = { ...book };
+        if (nextAvailable.copy_mrp != null) bookData.mrp = nextAvailable.copy_mrp;
+        if (nextAvailable.copy_price != null) { bookData.sales_price = nextAvailable.copy_price; bookData.price = nextAvailable.copy_price; }
+        addToCart({ ...bookData, copyCode: nextAvailable.copy_code, copyId: nextAvailable.id });
         showToast(`Added: ${book.title} (${nextAvailable.copy_code})`);
         return;
       }
