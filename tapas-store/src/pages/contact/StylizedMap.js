@@ -8,7 +8,7 @@ const DIRECTIONS_URL = 'https://maps.app.goo.gl/i24rAtukZxwuL1Uk9';
 
 export default function StylizedMap() {
   return (
-    <section style={{ background: '#F6F8F7', padding: '0 0 80px' }}>
+    <section style={{ background: '#F6F8F7', padding: 0 }}>
       <div>
         <div
           style={{
