@@ -60,9 +60,9 @@ export default function Home() {
         /* The hero photo now fits within the hero (100vh), so the first
            section only needs a little breathing room above it. */
         .home-wrap .hs-section:first-of-type { padding-top: 40px; }
-        /* Trim the last section's bottom padding so it doesn't leave a big
-           empty lime band before the footer. */
-        .home-wrap .hs-section:last-of-type { padding-bottom: 24px; }
+        /* Give the last section room to breathe above the black footer
+           strip — not so much it reads as an empty lime band. */
+        .home-wrap .hs-section:last-of-type { padding-bottom: 48px; }
 
         @media (max-width: 1023px) {
           .home-composite { width: 78%; }
@@ -74,6 +74,9 @@ export default function Home() {
              strip above the hero reads as lime, not a white bar. The photo
              banner sits at the top of .home-wrap, just below that strip. */
           .home-wrap .hs-section:first-of-type { padding-top: 64px; }
+          /* Extra breathing room on mobile between the pricing cards and
+             the black newsletter/footer strip. */
+          .home-wrap .hs-section:last-of-type { padding-bottom: 64px; }
           .home-mobile-hero {
             display: block;
             width: 100%;
