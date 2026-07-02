@@ -1,9 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import { SHOP_BOOKS } from '../data/shopBooks';
-import { UPCOMING_EVENTS } from '../data/eventsData';
-import { JOURNAL_ARCHIVE, titleText } from '../data/journalPosts';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 // Primary site nav. Sticky, green, matches the Figma redesign.
 // Lives outside the v2 tree so active-state styling can react to the
@@ -17,7 +13,6 @@ const INK = '#1a1a1a';
 
 const NAV_LINKS = [
   { to: '/about',   label: 'About Us' },
-  { to: '/shop',    label: 'Shop' },
   { to: '/events',  label: 'Events' },
   { to: '/blog',    label: 'Blogs' },
   { to: '/contact', label: 'Contact Us' },
@@ -27,21 +22,6 @@ function isActive(pathname, to) {
   if (to === '/') return pathname === '/';
   return pathname === to || pathname.startsWith(to + '/');
 }
-
-const SearchIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
-const BagIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 01-8 0" />
-  </svg>
-);
 
 const MenuIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -60,66 +40,7 @@ const CloseIcon = () => (
 
 export default function TapasStickyNav() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef(null);
-  const { items } = useCart();
-  const itemCount = items.length;
-
-  useEffect(() => {
-    if (searchOpen) {
-      const t = setTimeout(() => searchInputRef.current?.focus(), 280);
-      const onKey = (e) => { if (e.key === 'Escape') setSearchOpen(false); };
-      const onDocClick = (e) => {
-        const form = searchInputRef.current?.closest('.tapas-snav-search-inline');
-        if (form && !form.contains(e.target)) setSearchOpen(false);
-      };
-      window.addEventListener('keydown', onKey);
-      document.addEventListener('mousedown', onDocClick);
-      return () => {
-        clearTimeout(t);
-        window.removeEventListener('keydown', onKey);
-        document.removeEventListener('mousedown', onDocClick);
-      };
-    }
-  }, [searchOpen]);
-
-  const submitSearch = (e) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (!q) return;
-    setSearchOpen(false);
-
-    const ql = q.toLowerCase();
-    const enc = encodeURIComponent(q);
-
-    // Stay on contextual pages — let the page filter against ?q.
-    if (pathname.startsWith('/shop'))   { navigate(`/shop?q=${enc}`);   return; }
-    if (pathname.startsWith('/events')) { navigate(`/events?q=${enc}`); return; }
-    if (pathname.startsWith('/blog'))   { navigate(`/blog?q=${enc}`);   return; }
-
-    // Otherwise route to whichever section has the first match.
-    const matchesBook = SHOP_BOOKS.some((b) =>
-      [b.title, b.author, b.category].some((s) => (s || '').toLowerCase().includes(ql))
-    );
-    if (matchesBook) { navigate(`/shop?q=${enc}`); return; }
-
-    const matchesPost = JOURNAL_ARCHIVE.some((p) =>
-      [titleText(p.title), p.excerpt, p.category, p.author?.name].some((s) => (s || '').toLowerCase().includes(ql))
-    );
-    if (matchesPost) { navigate(`/blog?q=${enc}`); return; }
-
-    const matchesEvent = UPCOMING_EVENTS.some((ev) =>
-      [ev.title, ev.italic, ev.description, ev.category].some((s) => (s || '').toLowerCase().includes(ql))
-    );
-    if (matchesEvent) { navigate(`/events?q=${enc}`); return; }
-
-    // No match — fall back to shop with the query so the user sees an
-    // empty-state on the most common page.
-    navigate(`/shop?q=${enc}`);
-  };
 
   // Transparent at the top, lime + soft shadow once the user has
   // scrolled past a short threshold. 50px mirrors the usual "leave
@@ -160,16 +81,16 @@ export default function TapasStickyNav() {
            keeps its pink pill either way. */
         .tapas-snav.is-top .tapas-snav-signin,
         .tapas-snav.is-top .tapas-snav-icon {
-          color: #fff;
+          color: ${INK};
         }
         .tapas-snav.is-top .tapas-snav-signin {
-          text-decoration-color: rgba(255,255,255,0.6);
+          text-decoration-color: rgba(0,0,0,0.4);
         }
         .tapas-snav.is-top .tapas-snav-icon:hover {
-          background: rgba(255,255,255,0.15);
+          background: rgba(0,0,0,0.08);
         }
         .tapas-snav.is-top .tapas-snav-badge {
-          border-color: rgba(255,255,255,0.9);
+          border-color: rgba(0,0,0,0.25);
         }
         .tapas-snav-inner {
           max-width: 1320px; margin: 0 auto;
@@ -382,50 +303,6 @@ export default function TapasStickyNav() {
           </div>
 
           <div className="tapas-snav-right">
-            <form
-              className={`tapas-snav-search-inline${searchOpen ? ' is-open' : ''}`}
-              onSubmit={submitSearch}
-              role="search"
-            >
-              <input
-                ref={searchInputRef}
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                aria-label="Search"
-                aria-hidden={!searchOpen}
-                tabIndex={searchOpen ? 0 : -1}
-              />
-              <button
-                type="button"
-                className="tapas-snav-search-toggle"
-                aria-label={searchOpen ? 'Submit search' : 'Open search'}
-                aria-expanded={searchOpen}
-                onClick={(e) => {
-                  if (!searchOpen) {
-                    e.preventDefault();
-                    setSearchOpen(true);
-                  } else {
-                    submitSearch(e);
-                  }
-                }}
-              >
-                <SearchIcon />
-              </button>
-            </form>
-            <Link
-              to="/cart"
-              className="tapas-snav-icon"
-              aria-label={itemCount > 0 ? `Shopping bag (${itemCount})` : 'Shopping bag'}
-            >
-              <BagIcon />
-              {itemCount > 0 && (
-                <span className="tapas-snav-badge" aria-hidden="true">
-                  {itemCount > 99 ? '99+' : itemCount}
-                </span>
-              )}
-            </Link>
             <Link to="/sign-in" className="tapas-snav-signin">Sign In</Link>
             <Link to="/sign-up" className="tapas-snav-signup">Sign Up</Link>
           </div>

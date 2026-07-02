@@ -17,7 +17,6 @@ import { usePage } from '../cms/hooks';
 // under the nav with a negative margin so the photo + lime curve
 // start at viewport Y=0 and the nav floats on top.
 
-const LIME = '#caf27e';
 const PINK = '#E0004F';
 const PINK_DARK = '#b80042';
 const ORANGE = '#FF934A';
@@ -27,11 +26,15 @@ const INK_2 = '#3a3a3a';
 const NAV_H = 87; // Keep in sync with TapasStickyNav's measured height.
 
 export default function LandingHero() {
-  const photoSrc = `${process.env.PUBLIC_URL || ''}/HERO-LIBRARY.png`;
   const { data: page } = usePage('home');
-  const headingHtml = page?.hero_heading_html || 'Where Stories Begin &amp; Families Connect';
-  const lede = page?.hero_lede ||
-    'A cozy reading space for kids and parents — discover books, enjoy simple treats, and build a love for reading together.';
+  const rawHeading = page?.hero_heading_html || 'Where Stories Begin &amp; Families Connect';
+  // Bind "&" to the word after it (non-breaking space) so it never dangles at
+  // a line end — when the heading wraps, "&" moves down with the next word.
+  const headingHtml = rawHeading.replace(/&(amp;)?\s+/i, (m, amp) => `&${amp || ''} `);
+  const rawLede = page?.hero_lede ||
+    'A cozy reading space for kids and parents, discover books, enjoy simple treats, and build a love for reading together.';
+  // Drop any em dash from the lede copy.
+  const lede = rawLede.replace(/\s*—\s*/g, ', ');
 
   return (
     <>
@@ -40,8 +43,8 @@ export default function LandingHero() {
           position: relative;
           overflow-x: hidden;
           overflow-y: visible;
-          background: ${LIME};
-          min-height: 100vh;
+          background: transparent;
+          min-height: 68vh;
           isolation: isolate;
           /* Full-bleed: root spans the full viewport width. margin-
              left:0 anchors to body's left edge (x=0); width:100vw
@@ -57,36 +60,9 @@ export default function LandingHero() {
            root extending into the scrollbar gutter. */
         html, body { overflow-x: hidden; }
 
-        /* Image displayed in full, no crop, fitted inside the wrap.
-           The PNG has organic curves baked into two corners; those
-           curves show against the lime hero background as part of
-           the design. */
-        .lh-photo-wrap {
-          position: absolute;
-          top: 0; right: 0; bottom: 0;
-          width: 70%;
-          z-index: 3;
-        }
-        .lh-photo {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          object-position: right top;
-          display: block;
-        }
-
-        /* Single lazy S-curve lime overlay. Anchored top-left, sweeps
-           through the middle, exits bottom-left; the wavy right edge
-           overlaps the photo's left edge as the organic divider. */
-        .lh-lime {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          display: block;
-          pointer-events: none;
-          z-index: 2;
-        }
+        /* SVG composite (white decorative shape + clipped photo) is
+           now rendered by Home.js so it can span the hero + Our
+           Services section seamlessly. */
 
         /* Content frame: full-viewport tall, flex-centered so the
            block sits in the vertical middle regardless of hero size.
@@ -100,8 +76,8 @@ export default function LandingHero() {
           /* top padding clears the pulled-up nav area and pushes
              the text block into the upper-middle of the hero
              (~35-40% from top). */
-          padding: ${NAV_H + 140}px 64px 0;
-          min-height: 100vh;
+          padding: ${NAV_H + 78}px 64px 44px;
+          min-height: 68vh;
           display: flex;
           align-items: flex-start;
         }
@@ -135,6 +111,9 @@ export default function LandingHero() {
           color: #000;
           margin: 0;
         }
+
+        /* Forced break before "&" — enabled on mobile only (see @767). */
+        .lh-break { display: none; }
 
         .lh-lede {
           font-family: "Poppins", system-ui, sans-serif;
@@ -183,19 +162,22 @@ export default function LandingHero() {
         }
 
         @media (max-width: 1023px) {
-          .lh-content { padding-left: 40px; padding-right: 40px; }
-          .lh-block { max-width: 440px; }
-          .lh-title { font-size: clamp(40px, 5.5vw, 56px); }
+          .lh-content {
+            padding: ${NAV_H + 20}px 40px 0;
+            min-height: auto;
+          }
+          .lh-block { max-width: 320px; }
+          .lh-title {
+            font-size: 40px;
+            line-height: 1.12;
+            letter-spacing: -1px;
+          }
+          .lh-lede { margin-top: 14px; max-width: 32ch; font-size: 14px; }
+          .lh-ctas { margin-top: 22px; }
+          .lh-btn { padding: 11px 24px; font-size: 13.5px; }
         }
         @media (max-width: 767px) {
           .lh-root { min-height: auto; }
-          .lh-photo-wrap {
-            position: relative;
-            width: 100%;
-            height: 320px;
-            top: auto; right: auto; bottom: auto;
-          }
-          .lh-lime { display: none; }
           .lh-content {
             position: relative;
             padding: ${NAV_H}px 24px 48px;
@@ -206,27 +188,30 @@ export default function LandingHero() {
           .lh-block { max-width: none; }
           .lh-kicker { justify-content: center; }
           .lh-ctas { justify-content: center; }
-          .lh-title { font-size: 38px; }
+          .lh-title {
+            font-size: clamp(28px, 8vw, 34px);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+          }
+          .lh-break { display: inline; }
+          .lh-lede {
+            font-size: 14.5px;
+            line-height: 1.55;
+            max-width: 46ch;
+            margin-left: auto;
+            margin-right: auto;
+          }
         }
       `}</style>
 
       <section className="lh-root" aria-label="Welcome to Tapas Reading Cafe">
-        <div className="lh-photo-wrap">
-          <img
-            src={photoSrc}
-            alt=""
-            role="presentation"
-            className="lh-photo"
-          />
-        </div>
-
         <div className="lh-content">
           <div className="lh-block">
             <h1 className="lh-title" dangerouslySetInnerHTML={{ __html: headingHtml }} />
             <p className="lh-lede">{lede}</p>
             <div className="lh-ctas">
               <Link to="/sign-up" className="lh-btn is-pink">Join now!</Link>
-              <Link to="/shop"    className="lh-btn is-orange">Explore books</Link>
+              <Link to="/contact" className="lh-btn is-orange">Visit us</Link>
             </div>
           </div>
         </div>

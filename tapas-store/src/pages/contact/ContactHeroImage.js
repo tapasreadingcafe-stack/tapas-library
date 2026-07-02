@@ -2,21 +2,19 @@ import React from 'react';
 
 const CSS = `
   .contact-hero-image {
-    padding: 24px 0 0;
+    padding: 4px 0 0;
     background: #F6F8F7;
     font-family: 'Poppins', system-ui, sans-serif;
   }
   .contact-hero-image-wrap {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 64px;
+    margin: 0;
   }
   .contact-hero-image-frame {
     position: relative;
     width: 100%;
     aspect-ratio: 16 / 4;
     background: #d8d8d0;
-    border-radius: 6px;
+    border-radius: 0;
     overflow: hidden;
   }
   .contact-hero-image-frame img {
@@ -46,14 +44,8 @@ const CSS = `
     font-size: 13px;
     font-weight: 500;
   }
-  @media (max-width: 1023px) {
-    .contact-hero-image-wrap { padding: 0 40px; }
-  }
   @media (max-width: 639px) {
-    .contact-hero-image-wrap { padding: 0 20px; }
-    .contact-hero-image-frame { aspect-ratio: 16 / 9; border-radius: 4px; }
-    .contact-hero-chips { top: 14px; left: 14px; gap: 6px; }
-    .contact-hero-chip { padding: 6px 12px; font-size: 12px; }
+    .contact-hero-image-frame { aspect-ratio: 16 / 9; border-radius: 0; }
   }
 `;
 

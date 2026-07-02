@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageBreadcrumb from '../components/PageBreadcrumb';
 import { UPCOMING_EVENTS, actionMessage } from '../data/eventsData';
@@ -133,6 +133,45 @@ const CSS = `
     border-radius: 12px;
   }
 
+  .ev-tabs {
+    display: inline-flex;
+    gap: 4px;
+    background: #ECEFEC;
+    padding: 4px;
+    border-radius: 10px;
+    margin: 4px 0 28px;
+  }
+  .ev-tab {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #5a5a5a;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 9px 18px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 150ms, color 150ms, box-shadow 150ms;
+  }
+  .ev-tab:hover { color: ${INK}; }
+  .ev-tab.is-active {
+    background: #fff;
+    color: ${INK};
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .ev-tab-count {
+    margin-left: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a8a8a;
+  }
+  .ev-tab.is-active .ev-tab-count { color: ${PINK}; }
+
+  .ev-card.is-past .ev-card-image { filter: saturate(0.55) brightness(0.95); }
+  .ev-card.is-past .ev-card-cta { color: #6e6e6e; cursor: default; }
+  .ev-card.is-past .ev-card-cta:hover { color: #6e6e6e; gap: 8px; }
+
   @media (max-width: 1023px) {
     .ev-wrap { padding: 36px 40px 72px; }
     .ev-grid { grid-template-columns: repeat(2, 1fr); gap: 22px; }
@@ -151,9 +190,10 @@ function ArrowIcon() {
   );
 }
 
-function EventCard({ event }) {
+function EventCard({ event, isPast }) {
   const bg = CATEGORY_GRADIENT[event.category] || CATEGORY_GRADIENT['book-club'];
   const onAct = () => {
+    if (isPast) return;
     // eslint-disable-next-line no-console
     console.log('[events] action', { slug: event.slug, action: event.cta.action });
     // eslint-disable-next-line no-alert
@@ -161,7 +201,7 @@ function EventCard({ event }) {
   };
   const fullTitle = `${event.title}${event.italic ? ' ' + event.italic : ''}`;
   return (
-    <article className="ev-card">
+    <article className={`ev-card${isPast ? ' is-past' : ''}`}>
       <div className="ev-card-image" style={{ background: bg }}>
         <div className="ev-card-date">
           <span className="day">{event.dateDay}</span>
@@ -171,8 +211,8 @@ function EventCard({ event }) {
       <div className="ev-card-body">
         <h3 className="ev-card-title">{fullTitle}</h3>
         <p className="ev-card-desc">{event.description}</p>
-        <button type="button" className="ev-card-cta" onClick={onAct}>
-          Read More <ArrowIcon />
+        <button type="button" className="ev-card-cta" onClick={onAct} disabled={isPast} aria-disabled={isPast}>
+          {isPast ? 'Event ended' : 'Read More'} {!isPast && <ArrowIcon />}
         </button>
       </div>
     </article>
@@ -195,27 +235,67 @@ function EventsLegacy() {
   const [searchParams] = useSearchParams();
   const query = (searchParams.get('q') || '').trim().toLowerCase();
   const { data: rows } = useEvents();
-  const upcoming = splitEvents(rows || []).upcoming;
-  const list = upcoming.length > 0 ? upcoming : UPCOMING_EVENTS;
+  const upcomingFromCms = splitEvents(rows || []).upcoming;
+  const list = upcomingFromCms.length > 0 ? upcomingFromCms : UPCOMING_EVENTS;
 
-  const filtered = useMemo(() => list.filter((e) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const [tab, setTab] = useState('upcoming');
+
+  const { upcoming, past } = useMemo(() => {
+    const u = [];
+    const p = [];
+    list.forEach((e) => {
+      if (e.iso && e.iso < today) p.push(e);
+      else u.push(e);
+    });
+    p.sort((a, b) => (b.iso || '').localeCompare(a.iso || ''));
+    u.sort((a, b) => (a.iso || '').localeCompare(b.iso || ''));
+    return { upcoming: u, past: p };
+  }, [list, today]);
+
+  const active = tab === 'past' ? past : upcoming;
+  const filtered = useMemo(() => active.filter((e) => {
     if (!query) return true;
     return [e.title, e.italic, e.description, e.category]
       .some((s) => (s || '').toLowerCase().includes(query));
-  }), [list, query]);
+  }), [active, query]);
+
+  const emptyText = tab === 'past'
+    ? 'Past events will appear here once they wrap.'
+    : 'Nothing on the books just yet.';
 
   return (
     <div className="ev-page">
       <style>{CSS}</style>
       <PageBreadcrumb name="Events" />
       <div className="ev-wrap">
+        <div className="ev-tabs" role="tablist" aria-label="Events filter">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'upcoming'}
+            className={`ev-tab${tab === 'upcoming' ? ' is-active' : ''}`}
+            onClick={() => setTab('upcoming')}
+          >
+            Upcoming<span className="ev-tab-count">{upcoming.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'past'}
+            className={`ev-tab${tab === 'past' ? ' is-active' : ''}`}
+            onClick={() => setTab('past')}
+          >
+            Past Events
+          </button>
+        </div>
         <div className="ev-grid">
           {filtered.length === 0 ? (
             <div className="ev-empty">
-              <p style={{ margin: 0 }}>Nothing on the books just yet.</p>
+              <p style={{ margin: 0 }}>{emptyText}</p>
             </div>
           ) : (
-            filtered.map((e) => <EventCard key={e.slug} event={e} />)
+            filtered.map((e) => <EventCard key={e.slug} event={e} isPast={tab === 'past'} />)
           )}
         </div>
       </div>

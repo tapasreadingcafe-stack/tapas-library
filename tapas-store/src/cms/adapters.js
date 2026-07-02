@@ -42,6 +42,7 @@ export function adaptShopBook(row) {
     format: 'paperback',
     clubs: [],
     inStock: (row.quantity_available || 0) > 0,
+    stock: Number(row.quantity_available) || 0,
     signed: false,
     newThisWeek: false,
     description: row.staff_pick_blurb || null,

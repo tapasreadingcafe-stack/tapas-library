@@ -54,20 +54,15 @@ function lazyWithRetry(importFn) {
 }
 
 const Home            = lazyWithRetry(() => import('./pages/Home'));
-const BookDetail      = lazyWithRetry(() => import('./pages/BookDetail'));
 const Offers          = lazyWithRetry(() => import('./pages/Offers'));
 const About           = lazyWithRetry(() => import('./pages/About'));
 const CustomerLogin   = lazyWithRetry(() => import('./pages/CustomerLogin'));
 const Profile         = lazyWithRetry(() => import('./pages/Profile'));
-const Cart            = lazyWithRetry(() => import('./pages/Cart'));
-const Checkout        = lazyWithRetry(() => import('./pages/Checkout'));
-const OrderSuccess    = lazyWithRetry(() => import('./pages/OrderSuccess'));
-const OrderTracking   = lazyWithRetry(() => import('./pages/OrderTracking'));
 const Blog            = lazyWithRetry(() => import('./pages/Blog'));
 const BlogPost        = lazyWithRetry(() => import('./pages/BlogPost'));
 const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
-const SearchPage      = lazyWithRetry(() => import('./pages/Search'));
-const Shop            = lazyWithRetry(() => import('./pages/Shop'));
+// Shop temporarily shows the "Coming Soon" page (see /shop route below).
+// const Shop            = lazyWithRetry(() => import('./pages/Shop'));
 const Contact         = lazyWithRetry(() => import('./pages/Contact'));
 const Events          = lazyWithRetry(() => import('./pages/Events'));
 const SignIn          = lazyWithRetry(() => import('./pages/SignIn'));
@@ -118,12 +113,12 @@ function AppShell() {
         body, html { font-family: 'Poppins', system-ui, sans-serif; }
       `}</style>
       <StoreEditorSync />
-      <div style={{ minHeight:'100vh', background:'#F6F8F7', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 86, transition:'background 200ms, color 200ms' }}>
+      <div style={{ minHeight:'100vh', background: pathname === '/' ? '#caf27e' : '#F6F8F7', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 86, transition:'background 200ms, color 200ms' }}>
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/"              element={<Home />} />
-            <Route path="/books/:id"     element={<BookDetail />} />
+            <Route path="/books/:id"     element={<Navigate to="/" replace />} />
             <Route path="/offers"        element={<Offers />} />
             <Route path="/about"         element={<About />} />
             <Route path="/blog"          element={<Blog />} />
@@ -132,12 +127,12 @@ function AppShell() {
             <Route path="/profile"       element={<Profile />} />
             {/* Backward-compat: /member now redirects to /profile */}
             <Route path="/member"        element={<Navigate to="/profile" replace />} />
-            <Route path="/cart"          element={<Cart />} />
-            <Route path="/checkout"      element={<Checkout />} />
-            <Route path="/order/:id"     element={<OrderSuccess />} />
-            <Route path="/order/:id/track" element={<OrderTracking />} />
-            <Route path="/search"        element={<SearchPage />} />
-            <Route path="/shop"          element={<Shop />} />
+            <Route path="/cart"          element={<Navigate to="/" replace />} />
+            <Route path="/checkout"      element={<Navigate to="/" replace />} />
+            <Route path="/order/:id"     element={<Navigate to="/" replace />} />
+            <Route path="/order/:id/track" element={<Navigate to="/" replace />} />
+            <Route path="/search"        element={<Navigate to="/" replace />} />
+            <Route path="/shop"          element={<Navigate to="/" replace />} />
             <Route path="/contact"       element={<Contact />} />
             <Route path="/events"        element={<Events />} />
             <Route path="/sign-in"       element={<SignIn />} />
@@ -146,13 +141,13 @@ function AppShell() {
             <Route path="/welcome"       element={<Welcome />} />
             <Route path="/code-of-the-room" element={<CodeOfTheRoom />} />
             <Route path="/privacy"       element={<Privacy />} />
-            <Route path="/orders"        element={<ComingSoon />} />
-            <Route path="/wishlist"      element={<ComingSoon />} />
+            <Route path="/orders"        element={<Navigate to="/" replace />} />
+            <Route path="/wishlist"      element={<Navigate to="/" replace />} />
             <Route path="/faq"           element={<ComingSoon />} />
             <Route path="/faqs"          element={<ComingSoon />} />
             <Route path="/terms"         element={<ComingSoon />} />
-            <Route path="/products"      element={<ComingSoon />} />
-            <Route path="/track-order"   element={<ComingSoon />} />
+            <Route path="/products"      element={<Navigate to="/" replace />} />
+            <Route path="/track-order"   element={<Navigate to="/" replace />} />
             {/* Catch-all: resolve against custom pages in SiteContent,
                 or render a 404 card. Must be last. */}
             <Route path="*"              element={<CustomPage />} />

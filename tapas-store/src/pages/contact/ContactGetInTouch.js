@@ -173,8 +173,7 @@ export default function ContactGetInTouch() {
         <div className="contact-git-head">
           <h2 id="contact-git-h">Get In Touch With Us</h2>
           <p>
-            For more information about our product &amp; services, please feel free to drop us
-            <br />an email. Our staff always be there to help you out. Do not hesitate!
+            Questions about membership, events, or visiting? Drop us a message and we&rsquo;ll get back to you soon.
           </p>
         </div>
 
@@ -184,21 +183,21 @@ export default function ContactGetInTouch() {
               <span className="contact-git-info-icon"><PinIcon /></span>
               <div>
                 <h4>Address</h4>
-                <p>236 5th SE Avenue, New York NY10000, United States</p>
+                <p>2nd Floor, 2628, 27th Main Rd, above Juice Junction, 1st Sector, HSR Layout, Bengaluru, Karnataka 560102</p>
               </div>
             </div>
             <div className="contact-git-info-row">
               <span className="contact-git-info-icon"><PhoneIcon /></span>
               <div>
                 <h4>Phone</h4>
-                <p>Mobile: +(84) 546-6789<br />Hotline: +(84) 456-6789</p>
+                <p><a href="tel:+918792470576" style={{ color: 'inherit', textDecoration: 'none' }}>+91 87924 70576</a></p>
               </div>
             </div>
             <div className="contact-git-info-row">
               <span className="contact-git-info-icon"><ClockIcon /></span>
               <div>
                 <h4>Working Time</h4>
-                <p>Monday-Friday: 9:00 - 22:00<br />Saturday-Sunday: 9:00 - 21:00</p>
+                <p>Tuesday – Sunday: 10 AM – 8 PM<br />Monday: Closed</p>
               </div>
             </div>
           </div>
@@ -206,15 +205,15 @@ export default function ContactGetInTouch() {
           <form className="contact-git-form" onSubmit={onSubmit} noValidate>
             <div className="contact-git-field">
               <label htmlFor="cgit-name">Your name</label>
-              <input id="cgit-name" type="text" placeholder="Abc" value={form.name} onChange={setField('name')} required />
+              <input id="cgit-name" type="text" placeholder="Priya Sharma" value={form.name} onChange={setField('name')} required />
             </div>
             <div className="contact-git-field">
               <label htmlFor="cgit-email">Email address</label>
-              <input id="cgit-email" type="email" placeholder="Abc@def.com" value={form.email} onChange={setField('email')} required />
+              <input id="cgit-email" type="email" placeholder="priya@gmail.com" value={form.email} onChange={setField('email')} required />
             </div>
             <div className="contact-git-field">
               <label htmlFor="cgit-subject">Subject</label>
-              <input id="cgit-subject" type="text" placeholder="This is an optional" value={form.subject} onChange={setField('subject')} />
+              <input id="cgit-subject" type="text" placeholder="What's this about? (optional)" value={form.subject} onChange={setField('subject')} />
             </div>
             <div className="contact-git-field">
               <label htmlFor="cgit-message">Message</label>

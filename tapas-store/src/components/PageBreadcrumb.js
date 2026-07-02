@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const CSS = `
   .page-breadcrumb {
     background: #F6F8F7;
-    padding: 40px 0 32px;
+    padding: 40px 0 16px;
     font-family: 'Poppins', system-ui, sans-serif;
   }
   .page-breadcrumb.no-title { padding: 24px 0; }
@@ -46,12 +46,12 @@ const CSS = `
     color: #8A58DB;
   }
   @media (max-width: 1023px) {
-    .page-breadcrumb { padding: 44px 0 48px; }
+    .page-breadcrumb { padding: 44px 0 24px; }
     .page-breadcrumb.no-title { padding: 20px 0; }
     .page-breadcrumb-wrap { padding: 0 40px; }
   }
   @media (max-width: 639px) {
-    .page-breadcrumb { padding: 32px 0 36px; }
+    .page-breadcrumb { padding: 28px 0 14px; }
     .page-breadcrumb.no-title { padding: 16px 0; }
     .page-breadcrumb-wrap { padding: 0 20px; }
     .page-breadcrumb-trail { font-size: 13px; margin-bottom: 12px; }
