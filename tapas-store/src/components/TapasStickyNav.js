@@ -283,6 +283,8 @@ export default function TapasStickyNav() {
               src={`${process.env.PUBLIC_URL || ''}/logo.png`}
               alt="Tapas Reading Cafe"
               className="tapas-snav-logo-img"
+              width={423}
+              height={228}
             />
           </Link>
 

@@ -113,7 +113,7 @@ function AppShell() {
         body, html { font-family: 'Poppins', system-ui, sans-serif; }
       `}</style>
       <StoreEditorSync />
-      <div style={{ minHeight:'100vh', background: pathname === '/' ? '#caf27e' : '#F6F8F7', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 86, transition:'background 200ms, color 200ms' }}>
+      <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', background: pathname === '/' ? '#caf27e' : '#F6F8F7', color:'var(--text)', paddingTop: HIDE_NAV_ROUTES.has(pathname) ? 0 : 86, transition:'background 200ms, color 200ms' }}>
         <GlobalHeader />
         <Suspense fallback={<PageLoader />}>
           <Routes>
