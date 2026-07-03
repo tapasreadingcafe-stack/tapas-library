@@ -27,6 +27,7 @@ const NAV_H = 87; // Keep in sync with TapasStickyNav's measured height.
 
 export default function LandingHero() {
   const { data: page } = usePage('home');
+  const pub = process.env.PUBLIC_URL || '';
   const rawHeading = page?.hero_heading_html || 'Where Stories Begin &amp; Families Connect';
   // Bind "&" to the word after it (non-breaking space) so it never dangles at
   // a line end — when the heading wraps, "&" moves down with the next word.
@@ -43,8 +44,14 @@ export default function LandingHero() {
           position: relative;
           overflow-x: hidden;
           overflow-y: visible;
-          background: transparent;
-          min-height: 68vh;
+          /* Desktop/tablet: full-bleed library photo as the hero background,
+             with a left-weighted dark scrim so the white heading stays
+             readable. Reset to transparent on mobile (uses .home-mobile-hero). */
+          background:
+            linear-gradient(100deg, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.44) 33%, rgba(0,0,0,0.16) 57%, rgba(0,0,0,0) 80%),
+            linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.42) 100%),
+            url(${pub}/HERO-LIBRARY.png) center center / cover no-repeat;
+          min-height: 100vh;
           isolation: isolate;
           /* Full-bleed: root spans the full viewport width. margin-
              left:0 anchors to body's left edge (x=0); width:100vw
@@ -73,13 +80,12 @@ export default function LandingHero() {
           z-index: 4;
           max-width: 1280px;
           margin: 0 auto;
-          /* top padding clears the pulled-up nav area and pushes
-             the text block into the upper-middle of the hero
-             (~35-40% from top). */
-          padding: ${NAV_H + 78}px 64px 44px;
-          min-height: 68vh;
+          /* Full-height hero: clear the nav, then vertically center the
+             heading block over the photo. */
+          padding: ${NAV_H}px 64px 64px;
+          min-height: 100vh;
           display: flex;
-          align-items: flex-start;
+          align-items: center;
         }
         .lh-block { max-width: 560px; }
 
@@ -88,7 +94,7 @@ export default function LandingHero() {
           font-size: 12px;
           letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: ${INK};
+          color: #fff;
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -108,7 +114,8 @@ export default function LandingHero() {
           font-size: 52px;
           line-height: 65px;
           letter-spacing: -2px;
-          color: #000;
+          color: #fff;
+          text-shadow: 0 2px 28px rgba(0,0,0,0.45);
           margin: 0;
         }
 
@@ -119,7 +126,8 @@ export default function LandingHero() {
           font-family: "Poppins", system-ui, sans-serif;
           font-size: 15px;
           line-height: 1.6;
-          color: ${INK_2};
+          color: rgba(255,255,255,0.92);
+          text-shadow: 0 1px 12px rgba(0,0,0,0.4);
           margin: 20px 0 0;
           max-width: 44ch;
         }
@@ -163,10 +171,11 @@ export default function LandingHero() {
 
         @media (max-width: 1023px) {
           .lh-content {
-            padding: ${NAV_H + 20}px 40px 0;
-            min-height: auto;
+            padding: ${NAV_H}px 40px 56px;
+            min-height: 100vh;
+            align-items: center;
           }
-          .lh-block { max-width: 320px; }
+          .lh-block { max-width: 420px; }
           .lh-title {
             font-size: 40px;
             line-height: 1.12;
@@ -177,24 +186,31 @@ export default function LandingHero() {
           .lh-btn { padding: 11px 24px; font-size: 13.5px; }
         }
         @media (max-width: 767px) {
-          .lh-root { min-height: auto; }
+          /* Mobile keeps the lime hero + .home-mobile-hero banner: drop the
+             photo background and return the text to dark ink. */
+          .lh-root { min-height: auto; background: transparent; }
           .lh-content {
             position: relative;
             padding: ${NAV_H}px 24px 48px;
             min-height: auto;
+            align-items: flex-start;
             text-align: center;
             justify-content: center;
           }
           .lh-block { max-width: none; }
-          .lh-kicker { justify-content: center; }
+          .lh-kicker { justify-content: center; color: ${INK}; }
           .lh-ctas { justify-content: center; }
           .lh-title {
+            color: #000;
+            text-shadow: none;
             font-size: clamp(28px, 8vw, 34px);
             line-height: 1.15;
             letter-spacing: -0.02em;
           }
           .lh-break { display: inline; }
           .lh-lede {
+            color: ${INK_2};
+            text-shadow: none;
             font-size: 14.5px;
             line-height: 1.55;
             max-width: 46ch;

@@ -27,6 +27,13 @@ const CSS = `
     aspect-ratio: 4 / 5;
     background: #d9d9d9;
     border-radius: 4px;
+    overflow: hidden;
+  }
+  .about-intro-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
   @media (max-width: 1023px) {
     .about-intro { padding: 48px 0 72px; }
@@ -56,7 +63,9 @@ export default function AboutIntro() {
           <p>For parents, it's a chance to be part of the journey — to read together, create together, and simply spend quality time with their children.</p>
           <p>Whether it's turning pages, making something new, or sharing a quiet moment over a cup of coffee, this is a place to connect, unwind, and grow — together.</p>
         </div>
-        <div className="about-intro-image" role="img" aria-label="About us image placeholder" />
+        <div className="about-intro-image">
+          <img src={`${process.env.PUBLIC_URL || ''}/TRC-84.jpg`} alt="At Tapas Reading Cafe" />
+        </div>
       </div>
     </section>
   );

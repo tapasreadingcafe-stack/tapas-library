@@ -12,7 +12,6 @@ import { useSiteContent } from '../context/SiteContent';
 export default function Home() {
   const content = useSiteContent();
   const useBlocks = !!content?.pages?.home?.use_blocks;
-  const photoSrc = `${process.env.PUBLIC_URL || ''}/hero-library-curved.png`;
   const photoMobileSrc = `${process.env.PUBLIC_URL || ''}/hero-library-mobile.jpg`;
 
   if (useBlocks) {
@@ -30,31 +29,19 @@ export default function Home() {
           position: relative;
           background: #caf27e;
           min-height: 100vh;
-          overflow-x: hidden;
+          /* NOTE: no overflow-x here. Setting overflow-x:hidden forces
+             overflow-y to compute to auto, which clips the hero's pulled-up
+             top (margin-top:-87) and lets the nav's lime reserve strip show
+             above the full-bleed photo. Horizontal bleed is already clipped
+             by the html/body overflow-x:hidden rule in LandingHero. */
         }
         .tapas-landing { --landing-bg: #caf27e !important; background: transparent !important; }
 
-        /* Old-design hero image: the library photo with the organic curve
-           baked into the PNG, shown in full (object-fit: contain) pinned to
-           the upper-right, its transparent curve blending into the lime. */
-        .home-composite {
-          position: absolute;
-          top: 0; right: 0;
-          width: 70%;
-          height: 68vh;
-          max-width: 1512px;
-          pointer-events: none;
-          z-index: 2;
-        }
-        .home-composite img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          object-position: right top;
-          display: block;
-        }
+        /* Desktop hero: the library photo is now a full-bleed background on
+           the hero section itself (.lh-root, see LandingHero) with the heading
+           overlaid. Mobile still uses the .home-mobile-hero banner below. */
 
-        /* Mobile-only clean photo banner (desktop uses the SVG composite). */
+        /* Mobile-only clean photo banner (desktop uses the full-bleed hero). */
         .home-mobile-hero { display: none; }
 
         /* The hero photo now fits within the hero (100vh), so the first
@@ -65,11 +52,9 @@ export default function Home() {
         .home-wrap .hs-section:last-of-type { padding-bottom: 48px; }
 
         @media (max-width: 1023px) {
-          .home-composite { width: 78%; }
           .home-wrap .hs-section:first-of-type { padding-top: 40px; }
         }
         @media (max-width: 767px) {
-          .home-composite { display: none; }
           /* The app wrapper is lime on the home route, so the nav's reserved
              strip above the hero reads as lime, not a white bar. The photo
              banner sits at the top of .home-wrap, just below that strip. */
@@ -92,10 +77,6 @@ export default function Home() {
           .lh-content { padding-top: 32px !important; }
         }
       `}</style>
-
-      <div className="home-composite" aria-hidden="true">
-        <img src={photoSrc} alt="" />
-      </div>
 
       <div className="home-mobile-hero" aria-hidden="true">
         <img src={photoMobileSrc} alt="" />

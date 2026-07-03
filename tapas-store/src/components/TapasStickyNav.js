@@ -73,24 +73,30 @@ export default function TapasStickyNav() {
         .tapas-snav.is-scrolled {
           background: ${LIME};
         }
-        /* When the nav is transparent at the top, only the right-side
-           items (search, cart, Sign In) sit over the library photo
-           and need to be white. The center links (About Us \u2192
-           Contact Us) sit over the lime curve / lime bg and stay
-           dark ink. Logo is also on lime and stays dark. Sign Up
-           keeps its pink pill either way. */
+        /* At the top of the home page the nav sits over the full-bleed
+           library photo (dark), so ALL nav items go white: logo (inverted
+           to a white silhouette), center links, and Sign In. Sign Up keeps
+           its pink pill. Once the user scrolls (is-scrolled \u2192 lime bg) they
+           revert to dark ink. On mobile the nav sits over lime, not the
+           photo \u2014 the logo filter is reset in the \u2264900 block below. */
+        .tapas-snav.is-top .tapas-snav-logo-img {
+          filter: brightness(0) invert(1);
+        }
+        .tapas-snav.is-top .tapas-snav-links a,
         .tapas-snav.is-top .tapas-snav-signin,
         .tapas-snav.is-top .tapas-snav-icon {
-          color: ${INK};
+          color: #fff;
+        }
+        .tapas-snav.is-top .tapas-snav-links a:hover,
+        .tapas-snav.is-top .tapas-snav-signin:hover {
+          color: #fff;
+          opacity: 0.75;
         }
         .tapas-snav.is-top .tapas-snav-signin {
-          text-decoration-color: rgba(0,0,0,0.4);
+          text-decoration-color: rgba(255,255,255,0.6);
         }
         .tapas-snav.is-top .tapas-snav-icon:hover {
-          background: rgba(0,0,0,0.08);
-        }
-        .tapas-snav.is-top .tapas-snav-badge {
-          border-color: rgba(0,0,0,0.25);
+          background: rgba(255,255,255,0.14);
         }
         .tapas-snav-inner {
           max-width: 1320px; margin: 0 auto;
@@ -263,6 +269,8 @@ export default function TapasStickyNav() {
           .tapas-snav-mobile { display: block; }
           .tapas-snav-inner { padding: 12px 20px; }
           .tapas-snav-logo-img { height: 48px; }
+          /* Mobile nav sits over lime (not the photo) — keep the logo dark. */
+          .tapas-snav.is-top .tapas-snav-logo-img { filter: none; }
         }
       `}</style>
       <nav
