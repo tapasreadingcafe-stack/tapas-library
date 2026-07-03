@@ -44,12 +44,13 @@ export default function BorrowStatistics() {
       // Fetch circulation data
       const { data: circData } = await supabase
         .from('circulation')
-        .select('*, members(name, plan), books(title, category)')
+        .select('id, member_id, book_id, status, checkout_date, due_date, return_date, members(name, plan), books(title, category)')
         .gte('checkout_date', startDate)
-        .order('checkout_date', { ascending: false });
+        .order('checkout_date', { ascending: false })
+        .limit(2000);
 
       // Only need plan field for distribution stats
-      const { data: memData } = await supabase.from('members').select('plan');
+      const { data: memData } = await supabase.from('members').select('plan').limit(1000);
 
       setCirculationData(circData || []);
       setMemberData(memData || []);
