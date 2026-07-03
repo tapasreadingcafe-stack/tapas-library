@@ -72,7 +72,7 @@ const HOME_SECTIONS_CSS = `
   .hs-lede { font-size: 18px; line-height: 1.55; color: var(--hs-ink-2); max-width: 44ch; }
   .hs-head-centered {
     grid-template-columns: 1fr; gap: 14px; text-align: center;
-    justify-items: center; max-width: 880px; margin: 0 auto 28px;
+    justify-items: center; max-width: 880px; margin: 0 auto 46px;
   }
   .hs-head-centered .hs-kicker {
     font-size: 24px; font-weight: 600; letter-spacing: 1.63px;
