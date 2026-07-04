@@ -470,7 +470,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
       <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} full style={{
         position: 'relative',
         background: p.background_image
-          ? `linear-gradient(rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay})), url("${p.background_image}") center/cover`
+          ? `linear-gradient(rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay})), url("${p.background_image}") ${p.image_position || 'right center'}/cover`
           : '#037171',
         color: '#fff',
         minHeight: '85vh',
@@ -681,7 +681,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
   return (
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: p.background_image
-        ? `linear-gradient(rgba(0,0,0,${p.overlay_opacity ?? 0.4}), rgba(0,0,0,${p.overlay_opacity ?? 0.4})), url("${p.background_image}") center/cover`
+        ? `linear-gradient(rgba(0,0,0,${p.overlay_opacity ?? 0.4}), rgba(0,0,0,${p.overlay_opacity ?? 0.4})), url("${p.background_image}") ${p.image_position || 'right center'}/cover`
         : 'var(--tapas-primary, #037171)',
       color: '#fff',
       minHeight: '60vh',
