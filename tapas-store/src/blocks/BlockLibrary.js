@@ -682,7 +682,7 @@ export function Hero({ id, pageKey, props, blockIndex, totalBlocks }) {
     <BlockFrame id={id} pageKey={pageKey} blockIndex={blockIndex} totalBlocks={totalBlocks} style={{
       background: p.background_image
         ? `linear-gradient(rgba(0,0,0,${p.overlay_opacity ?? 0.4}), rgba(0,0,0,${p.overlay_opacity ?? 0.4})), url("${p.background_image}") ${p.image_position || 'right center'}/cover`
-        : 'var(--tapas-primary, #037171)',
+        : `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url("/library-hero.png") right center/cover`,
       color: '#fff',
       minHeight: '60vh',
       display: 'flex', alignItems: 'center',
