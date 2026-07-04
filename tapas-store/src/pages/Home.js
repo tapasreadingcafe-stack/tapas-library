@@ -44,9 +44,9 @@ export default function Home() {
         /* Mobile-only clean photo banner (desktop uses the full-bleed hero). */
         .home-mobile-hero { display: none; }
 
-        /* The hero photo now fits within the hero (100vh), so the first
-           section only needs a little breathing room above it. */
-        .home-wrap .hs-section:first-of-type { padding-top: 40px; }
+        /* Breathing room between the full-bleed hero photo and the first
+           section (Our Services) on desktop. */
+        .home-wrap .hs-section:first-of-type { padding-top: 80px; }
         /* Give the last section room to breathe above the black footer
            strip — not so much it reads as an empty lime band. */
         .home-wrap .hs-section:last-of-type { padding-bottom: 48px; }

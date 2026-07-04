@@ -312,11 +312,6 @@ export default function TapasStickyNav() {
             })}
           </div>
 
-          <div className="tapas-snav-right">
-            <Link to="/sign-in" className="tapas-snav-signin">Sign In</Link>
-            <Link to="/sign-up" className="tapas-snav-signup">Sign Up</Link>
-          </div>
-
           <button
             type="button"
             className="tapas-snav-hamburger"
@@ -344,14 +339,6 @@ export default function TapasStickyNav() {
                 </Link>
               );
             })}
-            <div className="tapas-snav-mobile-actions">
-              <Link to="/sign-in" className="tapas-snav-signin" onClick={() => setMenuOpen(false)}>
-                Sign In
-              </Link>
-              <Link to="/sign-up" className="tapas-snav-signup" onClick={() => setMenuOpen(false)}>
-                Sign Up
-              </Link>
-            </div>
           </div>
         )}
       </nav>

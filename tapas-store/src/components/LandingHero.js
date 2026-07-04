@@ -50,7 +50,7 @@ export default function LandingHero() {
           background:
             linear-gradient(100deg, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.44) 33%, rgba(0,0,0,0.16) 57%, rgba(0,0,0,0) 80%),
             linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.42) 100%),
-            url(${pub}/HERO-LIBRARY.png) center center / cover no-repeat;
+            url(${pub}/hero-library-crop.png) center center / cover no-repeat;
           min-height: 100vh;
           isolation: isolate;
           /* Full-bleed: root spans the full viewport width. margin-
