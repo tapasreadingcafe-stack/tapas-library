@@ -70,7 +70,7 @@ export default function BarcodeManager() {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
   const [editingCopy, setEditingCopy] = useState(null);
-  const [editCopyForm, setEditCopyForm] = useState({ copy_mrp: '', copy_price: '' });
+  const [editCopyForm, setEditCopyForm] = useState({ copy_mrp: '', copy_price: '', condition: 'New', notes: '' });
   const [editCopySaving, setEditCopySaving] = useState(false);
 
   const fetchCopies = useCallback(async () => {
@@ -878,7 +878,7 @@ export default function BarcodeManager() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{copy.books?.title || '—'}</span>
                       <button
-                        onClick={() => { setEditingCopy(copy); setEditCopyForm({ copy_mrp: copy.copy_mrp ?? '', copy_price: copy.copy_price ?? '' }); }}
+                        onClick={() => { setEditingCopy(copy); setEditCopyForm({ copy_mrp: copy.copy_mrp ?? '', copy_price: copy.copy_price ?? '', condition: copy.condition || 'New', notes: copy.notes || '' }); }}
                         title="Edit price for this copy"
                         style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', cursor: 'pointer', color: '#667eea' }}
                       >
@@ -1072,7 +1072,7 @@ export default function BarcodeManager() {
             style={{ background: 'white', borderRadius: '14px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: '700', color: '#111' }}>Edit Copy Price</h3>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: '700', color: '#111' }}>Edit Copy</h3>
             <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#888', fontFamily: 'monospace' }}>{editingCopy.copy_code}</p>
 
             <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px 14px', marginBottom: '18px' }}>
@@ -1111,6 +1111,34 @@ export default function BarcodeManager() {
               <p style={{ margin: '5px 0 0', fontSize: '11px', color: '#aaa' }}>Leave blank to use the book's price</p>
             </div>
 
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#555', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                Condition
+              </label>
+              <select
+                value={editCopyForm.condition}
+                onChange={e => setEditCopyForm(f => ({ ...f, condition: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', background: 'white', cursor: 'pointer' }}
+              >
+                {[...new Set(['New', 'Like New', 'Good', 'Fair', 'Poor', editCopyForm.condition].filter(Boolean))].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#555', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                Notes
+              </label>
+              <textarea
+                value={editCopyForm.notes}
+                onChange={e => setEditCopyForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="e.g. torn cover, signed copy, shelf B3…"
+                rows={2}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => setEditingCopy(null)}
@@ -1125,19 +1153,21 @@ export default function BarcodeManager() {
                   const updates = {
                     copy_mrp: editCopyForm.copy_mrp !== '' ? parseFloat(editCopyForm.copy_mrp) : null,
                     copy_price: editCopyForm.copy_price !== '' ? parseFloat(editCopyForm.copy_price) : null,
+                    condition: editCopyForm.condition || 'New',
+                    notes: editCopyForm.notes.trim() || null,
                   };
                   const { error } = await supabase.from('book_copies').update(updates).eq('id', editingCopy.id);
                   if (error) { toast.error('Failed: ' + error.message); }
                   else {
                     setCopies(prev => prev.map(c => c.id === editingCopy.id ? { ...c, ...updates } : c));
-                    toast.success('Price updated for ' + editingCopy.copy_code);
+                    toast.success('Copy updated: ' + editingCopy.copy_code);
                     setEditingCopy(null);
                   }
                   setEditCopySaving(false);
                 }}
                 style={{ flex: 2, padding: '10px', background: '#667eea', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: 'white', opacity: editCopySaving ? 0.6 : 1 }}
               >
-                {editCopySaving ? 'Saving…' : 'Save Price'}
+                {editCopySaving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
