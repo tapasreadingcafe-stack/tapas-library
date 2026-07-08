@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import jsQR from 'jsqr';
 
-export default function BarcodeScanner({ onScan, onClose, continuous = false }) {
+export default function BarcodeScanner({ onScan, onClose, continuous = false, embedded = false }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [error, setError] = useState(null);
@@ -112,6 +112,41 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false }) 
 
     return () => clearInterval(interval);
   }, [found, onScan, onClose, hasBarcodeDetector, lastScanned, continuous]);
+
+  // Embedded mode: render the camera inline (no full-screen overlay) so it can
+  // sit inside a small floating panel instead of covering the whole screen.
+  if (embedded) {
+    return (
+      <div>
+        {error ? (
+          <div style={{ color: '#e74c3c', padding: '10px', textAlign: 'center', fontSize: '13px' }}>❌ {error}</div>
+        ) : (
+          <>
+            <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
+              <video ref={videoRef} style={{ width: '100%', display: 'block', borderRadius: '8px' }} autoPlay playsInline muted />
+              <div style={{
+                position: 'absolute', top: '50%', left: '10%', right: '10%',
+                height: '3px', background: found ? '#1dd1a1' : '#667eea',
+                transform: 'translateY(-50%)', borderRadius: '2px',
+                boxShadow: `0 0 10px ${found ? '#1dd1a1' : '#667eea'}`,
+                animation: found ? 'none' : 'scanLine 2s ease-in-out infinite',
+              }} />
+              <style>{`@keyframes scanLine { 0%,100% { top: 30%; } 50% { top: 70%; } }`}</style>
+            </div>
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+            <p style={{ textAlign: 'center', color: found ? '#1dd1a1' : '#999', fontSize: '11px', margin: '6px 0 0' }}>
+              {found ? `✅ ${lastScanned}` : 'Point camera at the barcode'}
+            </p>
+            {!hasBarcodeDetector && (
+              <p style={{ textAlign: 'center', color: '#f39c12', fontSize: '10px', margin: '4px 0 0', background: '#fff3cd', padding: '4px', borderRadius: '4px' }}>
+                ⚠️ This browser reads QR only. For ISBN barcodes use Chrome/Android or type the code instead.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{

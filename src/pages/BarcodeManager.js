@@ -53,6 +53,7 @@ export default function BarcodeManager() {
   const [customTo, setCustomTo] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showScanner, setShowScanner] = useState(false);
+  const [useCamera, setUseCamera] = useState(false); // camera is opt-in; USB/handheld scanner is the default
   const [highlightCopyId, setHighlightCopyId] = useState(null);
   const [scanSessionCount, setScanSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState([]); // {ok, code, title} for last few scans
@@ -120,7 +121,7 @@ export default function BarcodeManager() {
     }
 
     if (!match) {
-      setRecentScans(prev => [{ ok: false, code, title: 'No match' }, ...prev].slice(0, 6));
+      setRecentScans(prev => [{ ok: false, code, title: 'No match' }, ...prev].slice(0, 60));
       toast.warning(`No copy found for "${code}"`);
       return;
     }
@@ -128,7 +129,7 @@ export default function BarcodeManager() {
       // If already selected, treat the re-scan as a duplicate — surface
       // it so the user knows they've already counted this book.
       if (prev.has(match.id)) {
-        setRecentScans(rs => [{ ok: 'dup', code: match.copy_code, title: match.books?.title }, ...rs].slice(0, 6));
+        setRecentScans(rs => [{ ok: 'dup', code: match.copy_code, title: match.books?.title }, ...rs].slice(0, 60));
         toast.info?.(`Already selected: ${match.copy_code}`);
         return prev;
       }
@@ -138,7 +139,7 @@ export default function BarcodeManager() {
       return new Set([...prev, match.id]);
     });
     setScanSessionCount(n => n + 1);
-    setRecentScans(prev => [{ ok: true, code: match.copy_code, title: match.books?.title }, ...prev].slice(0, 6));
+    setRecentScans(prev => [{ ok: true, code: match.copy_code, title: match.books?.title }, ...prev].slice(0, 60));
     setHighlightCopyId(match.id);
     setTimeout(() => setHighlightCopyId(null), 2500);
   }, [copies, toast]);
@@ -169,6 +170,7 @@ export default function BarcodeManager() {
   const openScanner = () => {
     setScanSessionCount(0);
     setRecentScans([]);
+    setUseCamera(false);
     setShowScanner(true);
   };
 
@@ -946,74 +948,95 @@ export default function BarcodeManager() {
         </div>
       )}
 
-      {/* Multi-scan session: stays open after each scan so you can blast
-          through 10+ books and accumulate selections. Close with Done. */}
+      {/* Multi-scan session: a small floating panel (no full-screen cover) that
+          stays open while you scan book-after-book. The main table stays
+          visible behind it so you watch rows tick live. Close with Done. */}
       {showScanner && (
-        <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
-          onClick={closeScanner}
-        >
-          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', maxWidth: '460px', width: '94%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '17px' }}>📷 Multi-scan</h3>
-              <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 700 }}>
-                ✓ {scanSessionCount} scanned · {selectedIds.size} total selected
-              </span>
+        <div style={{
+          position: 'fixed', right: '20px', bottom: '20px', width: '360px', maxWidth: 'calc(100vw - 40px)',
+          maxHeight: '78vh', background: 'white', borderRadius: '12px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.28)', border: '1px solid #e5e7eb',
+          display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden',
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#10b981', color: 'white' }}>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 700 }}>📷 Multi-scan</div>
+              <div style={{ fontSize: '11px', opacity: 0.9 }}>✓ {scanSessionCount} scanned · {selectedIds.size} selected</div>
             </div>
-            <p style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
-              Scan book after book — each one stays ticked. Hit <strong>Done</strong> when finished, then print or set price all at once.
+            <button onClick={closeScanner} title="Close"
+              style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', fontSize: '15px', lineHeight: 1 }}>✕</button>
+          </div>
+
+          {/* Body (scrollable) */}
+          <div style={{ padding: '12px 14px', overflowY: 'auto', flex: 1 }}>
+            <p style={{ fontSize: '11px', color: '#666', margin: '0 0 10px' }}>
+              Scan book after book with your handheld scanner — each one ticks in below and stays selected.
             </p>
 
-            <BarcodeScanner onScan={handleScan} onClose={closeScanner} continuous={true} />
+            {/* USB / handheld scanner input (default) */}
+            <input
+              type="text"
+              autoFocus
+              placeholder="Scan or type code, then Enter"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = e.target.value.trim();
+                  if (val) handleScan(val);
+                  e.target.value = '';
+                }
+              }}
+              style={{ width: '100%', padding: '9px', border: '2px solid #667eea', borderRadius: '6px', fontSize: '15px', textAlign: 'center', fontFamily: 'monospace', boxSizing: 'border-box' }}
+            />
 
-            <div style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: 600 }}>
-                Or use a USB/Bluetooth scanner — focus stays here:
-              </p>
-              <input
-                type="text"
-                autoFocus
-                placeholder="ISBN or B-XXX-XXXX, then Enter"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const val = e.target.value.trim();
-                    if (val) handleScan(val);
-                    e.target.value = '';
-                  }
-                }}
-                style={{ width: '100%', padding: '10px', border: '2px solid #667eea', borderRadius: '6px', fontSize: '16px', textAlign: 'center', fontFamily: 'monospace', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            {recentScans.length > 0 && (
-              <div style={{ marginTop: '12px', maxHeight: '180px', overflowY: 'auto', background: '#f9fafb', borderRadius: '6px', padding: '8px' }}>
-                <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Recent scans
-                </p>
-                {recentScans.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', fontSize: '12px' }}>
-                    <span style={{
-                      display: 'inline-block', width: '18px', textAlign: 'center',
-                      color: s.ok === true ? '#10b981' : s.ok === 'dup' ? '#f59e0b' : '#ef4444',
-                      fontWeight: 700,
-                    }}>{s.ok === true ? '✓' : s.ok === 'dup' ? '↻' : '✗'}</span>
-                    <span style={{ fontFamily: 'monospace', color: '#374151' }}>{s.code}</span>
-                    <span style={{ color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.title}</span>
-                  </div>
-                ))}
+            {/* Optional inline camera — off by default so nothing covers the screen */}
+            <button onClick={() => setUseCamera(v => !v)}
+              style={{ width: '100%', marginTop: '8px', padding: '7px', background: useCamera ? '#eef2ff' : '#f3f4f6', color: '#4f46e5', border: '1px solid #e0e7ff', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+              {useCamera ? '📷 Hide camera' : '📷 Use camera instead'}
+            </button>
+            {useCamera && (
+              <div style={{ marginTop: '8px' }}>
+                <BarcodeScanner onScan={handleScan} onClose={() => setUseCamera(false)} continuous={true} embedded={true} />
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-              <button
-                onClick={() => { setSelectedIds(new Set()); setSelectionOrder([]); setScanSessionCount(0); setRecentScans([]); }}
-                style={{ flex: 1, padding: '10px 12px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
-              >Clear all</button>
-              <button
-                onClick={closeScanner}
-                style={{ flex: 2, padding: '10px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
-              >Done ({selectedIds.size})</button>
+            {/* Live scan list — grows as you scan */}
+            <div style={{ marginTop: '12px' }}>
+              <p style={{ fontSize: '10px', color: '#6b7280', fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Live scans{recentScans.length ? ` (${recentScans.length})` : ''}
+              </p>
+              {recentScans.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '14px 0', margin: 0, background: '#f9fafb', borderRadius: '6px' }}>
+                  Waiting for first scan…
+                </p>
+              ) : (
+                <div style={{ background: '#f9fafb', borderRadius: '6px', padding: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                  {recentScans.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 2px', fontSize: '12px', borderBottom: i < recentScans.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <span style={{
+                        display: 'inline-block', width: '16px', textAlign: 'center',
+                        color: s.ok === true ? '#10b981' : s.ok === 'dup' ? '#f59e0b' : '#ef4444',
+                        fontWeight: 700,
+                      }}>{s.ok === true ? '✓' : s.ok === 'dup' ? '↻' : '✗'}</span>
+                      <span style={{ fontFamily: 'monospace', color: '#374151' }}>{s.code}</span>
+                      <span style={{ color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Footer actions */}
+          <div style={{ display: 'flex', gap: '8px', padding: '10px 14px', borderTop: '1px solid #eee' }}>
+            <button
+              onClick={() => { setSelectedIds(new Set()); setSelectionOrder([]); setScanSessionCount(0); setRecentScans([]); }}
+              style={{ flex: 1, padding: '9px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, fontSize: '13px' }}
+            >Clear all</button>
+            <button
+              onClick={closeScanner}
+              style={{ flex: 2, padding: '9px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}
+            >Done ({selectedIds.size})</button>
           </div>
         </div>
       )}
