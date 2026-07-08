@@ -131,6 +131,57 @@ export async function createBookCopies(bookId, category, count, kind = 'library'
   return data || [];
 }
 
+// Change a book's category: persist books.category, then rename every copy's
+// copy_code (and the book's book_id) to the new category prefix so
+// B-GEN-0016 becomes B-CHI-####. Numbers are preserved unless the target code
+// is already taken, in which case the next free number for the new prefix is
+// used. Mirrors the rename logic on the Books edit page.
+// Returns { renamed: [{ id, from, to }] }.
+export async function changeBookCategory(bookId, oldCategory, newCategory) {
+  await supabase.from('books').update({ category: newCategory }).eq('id', bookId);
+
+  const oldPrefix = getCategoryPrefix(oldCategory);
+  const newPrefix = getCategoryPrefix(newCategory);
+  const renamed = [];
+  if (oldPrefix === newPrefix) return { renamed };
+
+  const { data: copies } = await supabase
+    .from('book_copies').select('id, copy_code').eq('book_id', bookId);
+
+  for (const copy of copies || []) {
+    const m = copy.copy_code.match(/^([BS])-([A-Z]+)-(\d+)$/);
+    if (!m || m[2] !== oldPrefix) continue;
+    const [, letter, , num] = m;
+    let newCode = `${letter}-${newPrefix}-${num}`;
+
+    // If another copy already holds that code, take the next free number.
+    const { data: conflict } = await supabase
+      .from('book_copies').select('id').eq('copy_code', newCode).neq('id', copy.id).limit(1);
+    if (conflict?.length) {
+      const { data: highest } = await supabase
+        .from('book_copies').select('copy_code')
+        .like('copy_code', `${letter}-${newPrefix}-%`)
+        .order('copy_code', { ascending: false }).limit(1);
+      const lastNum = parseInt(highest?.[0]?.copy_code.match(/-(\d+)$/)?.[1] || '0');
+      newCode = `${letter}-${newPrefix}-${String(lastNum + 1).padStart(4, '0')}`;
+    }
+    await supabase.from('book_copies').update({ copy_code: newCode }).eq('id', copy.id);
+    renamed.push({ id: copy.id, from: copy.copy_code, to: newCode });
+  }
+
+  // Rename the book's own book_id prefix too (e.g. B-GEN-0016 → B-CHI-0016).
+  const { data: bk } = await supabase.from('books').select('book_id').eq('id', bookId).single();
+  if (bk?.book_id) {
+    const bm = bk.book_id.match(/^([BS])-([A-Z]+)-(\d+)$/);
+    if (bm && bm[2] === oldPrefix) {
+      await supabase.from('books')
+        .update({ book_id: `${bm[1]}-${newPrefix}-${bm[3]}` }).eq('id', bookId);
+    }
+  }
+
+  return { renamed };
+}
+
 // Get all copies for a book
 export async function getBookCopies(bookId) {
   const { data } = await supabase

@@ -6,8 +6,17 @@ import { generateBarcodeSVG, generateBarcodeSVGString, encodeCode128B, generateZ
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import BarcodeScanner from '../BarcodeScanner';
+import { changeBookCategory } from '../utils/bookCopies';
 
 const PER_PAGE = 25;
+
+// Same curated category list as the Books page, so prefixes stay consistent.
+const PRESET_CATEGORIES = [
+  'Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery',
+  'Fantasy', 'Romance', 'Thriller', 'Self-Help', 'Business', 'Technology',
+  'Children', 'Young Adult', 'Poetry', 'Drama', 'Philosophy', 'Religion',
+  'Travel', 'Cooking', 'Art', 'Sports', 'Politics', 'Economics', 'Health',
+];
 
 const STATUS_COLORS = {
   available: { bg: '#10b981', color: '#ffffff', border: '#059669' },
@@ -54,6 +63,8 @@ export default function BarcodeManager() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showScanner, setShowScanner] = useState(false);
   const [useCamera, setUseCamera] = useState(false); // camera is opt-in; USB/handheld scanner is the default
+  const [panelPos, setPanelPos] = useState(null); // {left, top} once the multi-scan panel is dragged; null = default corner
+  const scanPanelRef = useRef(null);
   const [highlightCopyId, setHighlightCopyId] = useState(null);
   const [scanSessionCount, setScanSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState([]); // {ok, code, title} for last few scans
@@ -70,7 +81,7 @@ export default function BarcodeManager() {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
   const [editingCopy, setEditingCopy] = useState(null);
-  const [editCopyForm, setEditCopyForm] = useState({ copy_mrp: '', copy_price: '', condition: 'New', notes: '' });
+  const [editCopyForm, setEditCopyForm] = useState({ copy_mrp: '', copy_price: '', condition: 'New', notes: '', category: '' });
   const [editCopySaving, setEditCopySaving] = useState(false);
 
   const fetchCopies = useCallback(async () => {
@@ -192,7 +203,42 @@ export default function BarcodeManager() {
     setScanSessionCount(0);
     setRecentScans([]);
     setUseCamera(false);
+    setPanelPos(null); // reopen at the default corner
     setShowScanner(true);
+  };
+
+  // Drag the multi-scan panel by its header. Switches from the default
+  // bottom-right corner to explicit left/top, clamped inside the viewport.
+  const onPanelDragStart = (e) => {
+    if (e.target.closest('button')) return; // don't start a drag from the ✕ / action buttons
+    const rect = scanPanelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const start = e.touches ? e.touches[0] : e;
+    const startX = start.clientX, startY = start.clientY;
+    const origLeft = rect.left, origTop = rect.top;
+    setPanelPos({ left: origLeft, top: origTop });
+
+    const onMove = (ev) => {
+      const p = ev.touches ? ev.touches[0] : ev;
+      const w = scanPanelRef.current?.offsetWidth || 360;
+      const h = scanPanelRef.current?.offsetHeight || 300;
+      let left = origLeft + (p.clientX - startX);
+      let top = origTop + (p.clientY - startY);
+      left = Math.max(4, Math.min(left, window.innerWidth - w - 4));
+      top = Math.max(4, Math.min(top, window.innerHeight - h - 4));
+      setPanelPos({ left, top });
+      if (ev.cancelable) ev.preventDefault();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
   };
 
   const closeScanner = () => setShowScanner(false);
@@ -878,7 +924,7 @@ export default function BarcodeManager() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{copy.books?.title || '—'}</span>
                       <button
-                        onClick={() => { setEditingCopy(copy); setEditCopyForm({ copy_mrp: copy.copy_mrp ?? '', copy_price: copy.copy_price ?? '', condition: copy.condition || 'New', notes: copy.notes || '' }); }}
+                        onClick={() => { setEditingCopy(copy); setEditCopyForm({ copy_mrp: copy.copy_mrp ?? '', copy_price: copy.copy_price ?? '', condition: copy.condition || 'New', notes: copy.notes || '', category: copy.books?.category || '' }); }}
                         title="Edit price for this copy"
                         style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: '6px', background: '#f0f4ff', border: '1px solid #c7d2fe', cursor: 'pointer', color: '#667eea' }}
                       >
@@ -973,16 +1019,23 @@ export default function BarcodeManager() {
           stays open while you scan book-after-book. The main table stays
           visible behind it so you watch rows tick live. Close with Done. */}
       {showScanner && (
-        <div style={{
-          position: 'fixed', right: '20px', bottom: '20px', width: '360px', maxWidth: 'calc(100vw - 40px)',
+        <div ref={scanPanelRef} style={{
+          position: 'fixed',
+          ...(panelPos ? { left: `${panelPos.left}px`, top: `${panelPos.top}px`, right: 'auto', bottom: 'auto' } : { right: '20px', bottom: '20px' }),
+          width: '360px', maxWidth: 'calc(100vw - 40px)',
           maxHeight: '78vh', background: 'white', borderRadius: '12px',
           boxShadow: '0 12px 40px rgba(0,0,0,0.28)', border: '1px solid #e5e7eb',
           display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden',
         }}>
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#10b981', color: 'white' }}>
+          <div
+            onMouseDown={onPanelDragStart}
+            onTouchStart={onPanelDragStart}
+            title="Drag to move"
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#10b981', color: 'white', cursor: 'move', userSelect: 'none', touchAction: 'none' }}
+          >
             <div>
-              <div style={{ fontSize: '15px', fontWeight: 700 }}>📷 Multi-scan</div>
+              <div style={{ fontSize: '15px', fontWeight: 700 }}>⠿&nbsp; 📷 Multi-scan</div>
               <div style={{ fontSize: '11px', opacity: 0.9 }}>✓ {scanSessionCount} scanned · {selectedIds.size} selected</div>
             </div>
             <button onClick={closeScanner} title="Close"
@@ -1069,7 +1122,7 @@ export default function BarcodeManager() {
           onClick={() => setEditingCopy(null)}
         >
           <div
-            style={{ background: 'white', borderRadius: '14px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            style={{ background: 'white', borderRadius: '14px', padding: '24px', width: '360px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: '700', color: '#111' }}>Edit Copy</h3>
@@ -1139,6 +1192,25 @@ export default function BarcodeManager() {
               />
             </div>
 
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#555', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                Category
+              </label>
+              <select
+                value={editCopyForm.category}
+                onChange={e => setEditCopyForm(f => ({ ...f, category: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', background: 'white', cursor: 'pointer' }}
+              >
+                <option value="">— Select category —</option>
+                {[...new Set([editCopyForm.category, ...PRESET_CATEGORIES].filter(Boolean))].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <p style={{ margin: '5px 0 0', fontSize: '11px', color: '#c05621' }}>
+                ⚠️ Applies to the whole book and renames its barcode(s) to the new prefix — reprint after changing.
+              </p>
+            </div>
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => setEditingCopy(null)}
@@ -1157,12 +1229,31 @@ export default function BarcodeManager() {
                     notes: editCopyForm.notes.trim() || null,
                   };
                   const { error } = await supabase.from('book_copies').update(updates).eq('id', editingCopy.id);
-                  if (error) { toast.error('Failed: ' + error.message); }
-                  else {
-                    setCopies(prev => prev.map(c => c.id === editingCopy.id ? { ...c, ...updates } : c));
-                    toast.success('Copy updated: ' + editingCopy.copy_code);
-                    setEditingCopy(null);
+                  if (error) { toast.error('Failed: ' + error.message); setEditCopySaving(false); return; }
+
+                  // Book-level category change → also renames copy codes to the new prefix.
+                  const oldCat = editingCopy.books?.category || '';
+                  const newCat = editCopyForm.category || '';
+                  let categoryRenamed = false;
+                  if (newCat && newCat !== oldCat) {
+                    try {
+                      const { renamed } = await changeBookCategory(editingCopy.book_id, oldCat, newCat);
+                      categoryRenamed = renamed.length > 0;
+                    } catch (e) {
+                      toast.error('Copy saved, but category change failed: ' + (e.message || e));
+                    }
                   }
+
+                  if (categoryRenamed) {
+                    await fetchCopies(); // codes were renamed → reload to show the new B-XXX codes
+                    toast.success(`Category → ${newCat}. Barcodes renamed — reprint the label(s).`);
+                  } else {
+                    setCopies(prev => prev.map(c => c.id === editingCopy.id
+                      ? { ...c, ...updates, books: { ...c.books, category: newCat || c.books?.category } }
+                      : c));
+                    toast.success('Copy updated: ' + editingCopy.copy_code);
+                  }
+                  setEditingCopy(null);
                   setEditCopySaving(false);
                 }}
                 style={{ flex: 2, padding: '10px', background: '#667eea', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: 'white', opacity: editCopySaving ? 0.6 : 1 }}
