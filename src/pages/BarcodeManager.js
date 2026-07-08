@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
@@ -100,47 +100,68 @@ export default function BarcodeManager() {
 
   useEffect(() => { fetchSets(); }, [fetchSets]);
 
-  // Handle a scan from the camera scanner OR a handheld scanner that
-  // typed into the modal's input. Detects:
-  //   • Our copy code (B-XXX-NNNN borrow / S-XXX-NNNN sale)  → jump to that copy
-  //   • Anything else (ISBN, etc.)  → match against books.isbn / title
-  // Modal stays OPEN after each scan so you can scan book-after-book
-  // and accumulate selections — close manually with the Done button.
+  // Keep a live ref of the current selection so a scan can pick the NEXT
+  // un-selected copy immediately, without waiting for a state re-render
+  // (handles fast book-after-book scanning of the same shared ISBN).
+  const selectedIdsRef = useRef(selectedIds);
+  useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
+
+  // Handle a scan from the camera scanner OR a handheld scanner that typed
+  // into the panel's input. Detects:
+  //   • Our copy code (B-XXX-NNNN borrow / S-XXX-NNNN sale) → that exact copy
+  //   • Anything else (publisher ISBN, etc.) → match against books.isbn
+  // A copy code is UNIQUE (one copy). A publisher ISBN is SHARED by every
+  // physical copy of that book, so we select the next un-selected copy on each
+  // scan — scanning the two identical books walks B-FIC-0606 → 0607 instead of
+  // re-hitting the first copy forever. Panel stays open so you scan book after
+  // book and accumulate selections; close with Done.
   const handleScan = useCallback((rawCode) => {
     if (!rawCode) return;
     const code = rawCode.trim();
     if (!code) return;
 
     const isCopyCode = /^[BS]-[A-Z0-9]+-\d+$/i.test(code);
-    let match;
+    let candidates;
     if (isCopyCode) {
-      match = copies.find(c => c.copy_code?.toLowerCase() === code.toLowerCase());
+      candidates = copies.filter(c => c.copy_code?.toLowerCase() === code.toLowerCase());
     } else {
       const digits = code.replace(/[-\s]/g, '');
-      match = copies.find(c => (c.books?.isbn || '').replace(/[-\s]/g, '') === digits);
+      candidates = copies.filter(c => (c.books?.isbn || '').replace(/[-\s]/g, '') === digits);
     }
 
-    if (!match) {
+    if (candidates.length === 0) {
       setRecentScans(prev => [{ ok: false, code, title: 'No match' }, ...prev].slice(0, 60));
       toast.warning(`No copy found for "${code}"`);
       return;
     }
-    setSelectedIds(prev => {
-      // If already selected, treat the re-scan as a duplicate — surface
-      // it so the user knows they've already counted this book.
-      if (prev.has(match.id)) {
-        setRecentScans(rs => [{ ok: 'dup', code: match.copy_code, title: match.books?.title }, ...rs].slice(0, 60));
-        toast.info?.(`Already selected: ${match.copy_code}`);
-        return prev;
-      }
-      // Track scan order so "Selected only" lists them in the same
-      // order you scanned (1st scan at top).
-      setSelectionOrder(o => o.includes(match.id) ? o : [...o, match.id]);
-      return new Set([...prev, match.id]);
-    });
+
+    const selected = selectedIdsRef.current;
+    const next = candidates.find(c => !selected.has(c.id));
+
+    if (!next) {
+      // Every copy this scan refers to is already selected.
+      const first = candidates[0];
+      setRecentScans(rs => [{ ok: 'dup', code: first.copy_code, title: first.books?.title }, ...rs].slice(0, 60));
+      toast.info?.(candidates.length > 1
+        ? `All ${candidates.length} copies of "${first.books?.title || code}" already selected`
+        : `Already selected: ${first.copy_code}`);
+      return;
+    }
+
+    // Which copy of this book we're selecting (1-based), for the live list.
+    const pos = candidates.filter(c => selected.has(c.id)).length + 1;
+
+    selectedIdsRef.current = new Set([...selected, next.id]); // advance the ref ahead of the async state for rapid scans
+    setSelectedIds(prev => new Set([...prev, next.id]));
+    // Track scan order so "Selected only" lists them in scan order (1st at top).
+    setSelectionOrder(o => o.includes(next.id) ? o : [...o, next.id]);
     setScanSessionCount(n => n + 1);
-    setRecentScans(prev => [{ ok: true, code: match.copy_code, title: match.books?.title }, ...prev].slice(0, 60));
-    setHighlightCopyId(match.id);
+    setRecentScans(prev => [{
+      ok: true,
+      code: next.copy_code,
+      title: (next.books?.title || '') + (candidates.length > 1 ? ` · copy ${pos}/${candidates.length}` : ''),
+    }, ...prev].slice(0, 60));
+    setHighlightCopyId(next.id);
     setTimeout(() => setHighlightCopyId(null), 2500);
   }, [copies, toast]);
 
