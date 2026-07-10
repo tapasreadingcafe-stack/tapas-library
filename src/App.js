@@ -271,7 +271,8 @@ const NAV_CONFIG = [
   {
     icon: '☕', label: 'Cafe', key: 'cafe',
     children: [
-      { to: '/cafe/menu',    icon: '🍰', label: 'Menu & POS' },
+      // Cafe billing now happens on the Book POS (Library → POS → Cafe tab),
+      // so the standalone "Menu & POS" item was removed. The route still exists.
       { to: '/cafe/manage',  icon: '📝', label: 'Manage Menu' },
       { to: '/cafe/orders',  icon: '📋', label: 'Orders' },
       { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },

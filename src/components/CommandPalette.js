@@ -26,8 +26,7 @@ const COMMANDS = [
   { label: 'Reservations',           path: '/reservations',         icon: '🔖' },
   { label: 'Library POS',            path: '/pos',                  icon: '🛒', keywords: 'sell books checkout' },
   { label: 'Barcodes',               path: '/barcodes',             icon: '🏷️' },
-  // Cafe
-  { label: 'Cafe menu & POS',        path: '/cafe/menu',            icon: '🍰', keywords: 'coffee food order' },
+  // Cafe (standalone Menu & POS removed — cafe billing is on the Book POS now)
   { label: 'Cafe — manage menu',     path: '/cafe/manage',          icon: '📝' },
   { label: 'Cafe orders',            path: '/cafe/orders',          icon: '📋' },
   { label: 'Cafe reports',           path: '/cafe/reports',         icon: '📊' },
