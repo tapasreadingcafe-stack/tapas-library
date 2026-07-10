@@ -16,13 +16,24 @@ export default function BookAvailability() {
   const fetchBooksAndCirculation = async () => {
     setLoading(true);
     try {
-      // Fetch all books
-      const { data: booksData, error: booksError } = await supabase
-        .from('books')
-        .select('*')
-        .order('title', { ascending: true });
-
-      if (booksError) throw booksError;
+      // Fetch all books — lightweight columns only. Selecting '*' pulled the
+      // base64 book_image blobs (~52MB across the catalog), which made this page
+      // take several seconds. Also paginate past Supabase's 1000-row cap so the
+      // full catalog (1200+ books) is counted, not just the first 1000.
+      const PAGE = 1000;
+      const cols = 'id, title, author, category, isbn, book_id, quantity_available, quantity_total';
+      const booksData = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from('books')
+          .select(cols)
+          .order('title', { ascending: true })
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        booksData.push(...data);
+        if (data.length < PAGE) break;
+      }
 
       // Fetch all checked-out books
       const { data: circulationData, error: circulationError } = await supabase
@@ -32,7 +43,7 @@ export default function BookAvailability() {
 
       if (circulationError) throw circulationError;
 
-      setBooks(booksData || []);
+      setBooks(booksData);
       setCirculation(circulationData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
