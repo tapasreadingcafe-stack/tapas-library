@@ -693,7 +693,7 @@ function Members() {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value.replace(/\b\w/g, (c) => c.toUpperCase()) })}
                       placeholder="Member name"
                     />
                   </div>

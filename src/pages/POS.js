@@ -10,6 +10,7 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useNavigate } from 'react-router-dom';
 import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID } from '../utils/membershipUtils';
+import { readCachedBooks, writeCachedBooks, CATALOG_COLS } from '../utils/catalogCache';
 import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 
 // ── Default service items ─────────────────────────────────────────────────────
@@ -259,18 +260,22 @@ export default function POS() {
 
   // ── Data fetching ─────────────────────────────────────────────────────────────
   const fetchBooks = async () => {
-    setBooksLoading(true);
+    // 1) Instant paint from the local catalog cache (offline-mode brick #1).
+    const cached = readCachedBooks();
+    if (cached && cached.length) { setAllBooks(cached); setBooksLoading(false); }
+    else { setBooksLoading(true); }
+
+    // 2) Background refresh from Supabase. book_image is intentionally omitted:
+    // ~531 rows hold large base64 covers (~52 MB total) that made the catalog
+    // take seconds to load. A lightweight catalog fetches in well under a second.
+    // Paginate in 1000-row batches to bypass Supabase's default server cap.
     try {
-      // Paginate in 1000-row batches to bypass Supabase's default
-      // server cap. Stops when a batch returns fewer rows than the
-      // page size, which means we've reached the end of the catalog.
       const PAGE = 1000;
-      const cols = 'id, book_id, title, author, category, price, mrp, sales_price, quantity_available, quantity_total, book_image';
       const all = [];
       for (let offset = 0; ; offset += PAGE) {
         const { data, error } = await supabase
           .from('books')
-          .select(cols)
+          .select(CATALOG_COLS)
           .order('title')
           .range(offset, offset + PAGE - 1);
         if (error) throw error;
@@ -279,6 +284,7 @@ export default function POS() {
         if (data.length < PAGE) break;
       }
       setAllBooks(all);
+      writeCachedBooks(all);
     } catch (e) { console.error(e); }
     finally { setBooksLoading(false); }
   };
@@ -2228,7 +2234,7 @@ export default function POS() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
               <div>
                 <label style={{ fontSize: '11px', color: '#666', fontWeight: '600' }}>Name *</label>
-                <input value={newMemberForm.name} onChange={e => setNewMemberForm({ ...newMemberForm, name: e.target.value })}
+                <input value={newMemberForm.name} onChange={e => setNewMemberForm({ ...newMemberForm, name: e.target.value.replace(/\b\w/g, c => c.toUpperCase()) })}
                   autoFocus style={{ width: '100%', padding: '8px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px' }} />
               </div>
               <div>
