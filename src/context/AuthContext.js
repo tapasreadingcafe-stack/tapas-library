@@ -33,6 +33,30 @@ async function fetchStaffRow(email) {
   return data;
 }
 
+// ── Offline auth cache ─────────────────────────────────────────────────
+// The staff row is cached after a successful online sign-in so that, on a
+// trusted single counter device (see docs/offline-first-plan.md), an already
+// signed-in user can keep working when the network drops — instead of being
+// stranded at the login screen because the staff lookup can't reach Supabase.
+const STAFF_CACHE_KEY = 'tapas_staff_cache';
+
+function cacheStaff(row) {
+  try { if (row && row.is_active) localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(row)); } catch {}
+}
+function readCachedStaff(email) {
+  try {
+    const raw = localStorage.getItem(STAFF_CACHE_KEY);
+    if (!raw) return null;
+    const row = JSON.parse(raw);
+    if (!row || !row.is_active) return null;
+    if (email && row.email !== email) return null;
+    return row;
+  } catch { return null; }
+}
+function clearStaffCache() {
+  try { localStorage.removeItem(STAFF_CACHE_KEY); } catch {}
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser]               = useState(null);
   const [staff, setStaff]             = useState(null);
@@ -44,6 +68,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async (reason) => {
     clearTimeout(inactivityTimer.current);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
+    clearStaffCache();
     try { await supabase.auth.signOut(); } catch {}
     setUser(null);
     setStaff(null);
@@ -99,26 +124,58 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-          if (!cancelled) setLoading(false);
+        const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
+        let session = null;
+        try {
+          ({ data: { session } } = await supabase.auth.getSession());
+        } catch {
+          session = null;
+        }
+
+        if (session?.user) {
+          // Session found. Fetch the staff row; if that network call fails
+          // (offline), fall back to the cached staff so an already-signed-in
+          // user keeps working with no connection.
+          let staffRow;
+          try {
+            staffRow = await fetchStaffRow(session.user.email);
+            if (staffRow && staffRow.is_active) cacheStaff(staffRow);
+          } catch (netErr) {
+            const cached = readCachedStaff(session.user.email);
+            if (cached) {
+              if (!cancelled) { setUser(session.user); setStaff(cached); setLoading(false); }
+              return;
+            }
+            throw netErr; // no cache → surface as before (falls to login)
+          }
+          if (!cancelled) {
+            if (staffRow && staffRow.is_active) {
+              setUser(session.user);
+              setStaff(staffRow);
+              updateHeartbeat(staffRow.id); // heartbeat
+            } else {
+              await supabase.auth.signOut();
+              setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
+            }
+            setLoading(false);
+          }
           return;
         }
 
-        const staffRow = await fetchStaffRow(session.user.email);
-        if (!cancelled) {
-          if (staffRow && staffRow.is_active) {
-            setUser(session.user);
-            setStaff(staffRow);
-            // Update last_login on session init (heartbeat)
-            updateHeartbeat(staffRow.id);
-          } else {
-            // Valid session but not staff — sign out
-            await supabase.auth.signOut();
-            setStaff(staffRow ? { _deactivated: true } : { _not_staff: true });
+        // No active session. If offline but this device signed in before,
+        // grant offline access from the cached staff (trusted single counter
+        // device). It re-validates automatically once back online.
+        if (offline) {
+          const cached = readCachedStaff();
+          if (cached) {
+            if (!cancelled) { setUser({ email: cached.email, _offline: true }); setStaff(cached); setLoading(false); }
+            return;
           }
-          setLoading(false);
         }
+
+        if (!cancelled) setLoading(false);
+        return;
       } catch (e) {
         console.error('[Auth] init error:', e);
         if (!cancelled) setLoading(false);
@@ -192,6 +249,7 @@ export function AuthProvider({ children }) {
 
     const staffRow = await withTimeout(fetchStaffRow(data.user.email), 15000, 'Staff lookup');
     if (staffRow && staffRow.is_active) {
+      cacheStaff(staffRow); // enable offline access next time the network drops
       setUser(data.user);
       setStaff(staffRow);
       setSessionExpired(false);
