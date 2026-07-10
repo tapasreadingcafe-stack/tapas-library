@@ -83,6 +83,7 @@ export default function Borrow() {
   // Copy selection state
   const [availableCopies, setAvailableCopies] = useState([]);
   const [selectedCopy, setSelectedCopy] = useState(null);
+  const [bookCart, setBookCart] = useState([]); // extra books queued for this checkout: [{ book, copy }]
   const borrowHandoffRef = useRef(false); // consumed once when arriving from POS "↔ Borrow"
   const pendingScanCopyRef = useRef(null); // copy_code to auto-select after a scanned copy label loads its copies
   const [copiesLoading, setCopiesLoading] = useState(false);
@@ -364,80 +365,94 @@ export default function Borrow() {
       .filter(c => c.member_id === memberId && isOverdue(c.due_date))
       .reduce((sum, c) => sum + calculateFine(c.due_date, fineSettings).fineAmount, 0);
 
+  // ── Multi-book checkout ────────────────────────────────────────────
+  // A member may borrow up to their limit. Books are queued in `bookCart`
+  // plus the currently-selected book, and all are issued together.
+  const borrowLimit = selectedMember?.borrow_limit || 2;
+  const currentBorrows = selectedMember ? getMemberBorrows(selectedMember.id) : 0;
+  const maxAddable = Math.max(0, borrowLimit - currentBorrows); // how many this session can issue
+  const pendingReady = !!selectedBook && !!dueDate && (!hasCopiesTable || availableCopies.length === 0 || !!selectedCopy);
+  const queuedBooks = [...bookCart, ...(pendingReady ? [{ book: selectedBook, copy: selectedCopy || null }] : [])];
+
+  const addToCheckout = () => {
+    if (!selectedBook) { showToast('Select a book first', 'error'); return; }
+    if (hasCopiesTable && availableCopies.length > 0 && !selectedCopy) { showToast('Select which copy to add', 'error'); return; }
+    if (!dueDate) { showToast('Member has no active membership', 'error'); return; }
+    if (currentBorrows + bookCart.length + 1 > borrowLimit) { showToast(`This member can borrow ${maxAddable} book(s) at a time`, 'error'); return; }
+    if (selectedCopy && bookCart.some(e => e.copy && e.copy.id === selectedCopy.id)) { showToast('That copy is already added', 'error'); return; }
+    setBookCart(prev => [...prev, { book: selectedBook, copy: selectedCopy || null }]);
+    setSelectedBook(null); setSelectedCopy(null); setAvailableCopies([]); setBookSearch('');
+  };
+  const removeFromCheckout = (idx) => setBookCart(prev => prev.filter((_, i) => i !== idx));
+
   const handleCheckout = async () => {
-    if (!selectedMember || !selectedBook) {
-      showToast('Please select a member and book', 'error');
-      return;
-    }
-    if (!dueDate) {
-      showToast('Member has no active membership — cannot check out', 'error');
-      return;
-    }
-    // If copies exist for this book, require a copy selection
-    if (hasCopiesTable && availableCopies.length > 0 && !selectedCopy) {
-      showToast('Please select which copy to check out', 'error');
-      return;
-    }
-    const currentBorrows = getMemberBorrows(selectedMember.id);
-    if (currentBorrows >= (selectedMember.borrow_limit || 2)) {
-      showToast(`Member has reached their borrow limit (${selectedMember.borrow_limit})`, 'error');
-      return;
-    }
-    if (selectedBook.quantity_available <= 0) {
-      showToast('Book is not available', 'error');
+    if (!selectedMember) { showToast('Please select a member', 'error'); return; }
+    if (!dueDate) { showToast('Member has no active membership — cannot check out', 'error'); return; }
+    const items = queuedBooks;
+    if (items.length === 0) { showToast('Please select at least one book', 'error'); return; }
+    if (currentBorrows + items.length > borrowLimit) {
+      showToast(`Member can borrow ${maxAddable} more book(s) (limit ${borrowLimit})`, 'error');
       return;
     }
     try {
-      const circRecord = {
-        member_id: selectedMember.id,
-        book_id: selectedBook.id,
-        checkout_date: new Date().toISOString().split('T')[0],
-        due_date: dueDate,
-        status: 'checked_out',
-      };
+      const today = new Date().toISOString().split('T')[0];
 
-      // Include child_id if borrowing on behalf of a child
-      if (selectedChild && hasChildIdCol) {
-        circRecord.child_id = selectedChild.id;
-      }
+      for (const e of items) {
+        const circRecord = {
+          member_id: selectedMember.id,
+          book_id: e.book.id,
+          checkout_date: today,
+          due_date: dueDate,
+          status: 'checked_out',
+        };
+        if (selectedChild && hasChildIdCol) circRecord.child_id = selectedChild.id;
 
-      // Try insert — if columns like renewal_count or child_id don't exist, retry without them
-      let { error } = await supabase.from('circulation').insert([circRecord]);
-      if (error) {
-        delete circRecord.child_id;
-        const { error: e2 } = await supabase.from('circulation').insert([circRecord]);
-        if (e2) throw e2;
-      }
+        // Retry without child_id if that column doesn't exist.
+        let { error } = await supabase.from('circulation').insert([circRecord]);
+        if (error) {
+          delete circRecord.child_id;
+          const { error: e2 } = await supabase.from('circulation').insert([circRecord]);
+          if (e2) throw e2;
+        }
 
-      await supabase
-        .from('books')
-        .update({ quantity_available: selectedBook.quantity_available - 1 })
-        .eq('id', selectedBook.id);
+        // Mark the specific copy as issued.
+        if (e.copy) {
+          await supabase
+            .from('book_copies')
+            .update({ status: 'issued', current_borrower_id: selectedMember.id })
+            .eq('id', e.copy.id);
 
-      // Mark the specific copy as issued
-      if (selectedCopy) {
-        await supabase
-          .from('book_copies')
-          .update({ status: 'issued', current_borrower_id: selectedMember.id })
-          .eq('id', selectedCopy.id);
-
-        // If a sale copy (S- barcode) is being borrowed, move it into library
-        // stock so it stays a lending copy after it's returned.
-        if (/^S-/i.test(selectedCopy.copy_code || '')) {
-          try {
-            await supabase.from('book_copies').update({ copy_kind: 'library' }).eq('id', selectedCopy.id);
-            if (selectedBook.is_borrowable === false) {
-              await supabase.from('books').update({ is_borrowable: true }).eq('id', selectedBook.id);
-            }
-          } catch (e) { console.warn('Sale→library convert:', e.message); }
+          // A sale copy (S- barcode) being borrowed becomes a lending copy.
+          if (/^S-/i.test(e.copy.copy_code || '')) {
+            try {
+              await supabase.from('book_copies').update({ copy_kind: 'library' }).eq('id', e.copy.id);
+              if (e.book.is_borrowable === false) {
+                await supabase.from('books').update({ is_borrowable: true }).eq('id', e.book.id);
+              }
+            } catch (err) { console.warn('Sale→library convert:', err.message); }
+          }
         }
       }
 
-      setReceiptModal({ member: selectedMember, book: selectedBook, dueDate, child: selectedChild, copy: selectedCopy });
+      // Decrement each book's available quantity by how many of its copies went out.
+      const byBook = {};
+      for (const e of items) {
+        if (!byBook[e.book.id]) byBook[e.book.id] = { book: e.book, n: 0 };
+        byBook[e.book.id].n++;
+      }
+      for (const id of Object.keys(byBook)) {
+        const { book, n } = byBook[id];
+        await supabase.from('books')
+          .update({ quantity_available: Math.max(0, (book.quantity_available || 0) - n) })
+          .eq('id', id);
+      }
+
+      setReceiptModal({ member: selectedMember, books: items, dueDate, child: selectedChild });
       setSelectedMember(null);
       setSelectedBook(null);
       setSelectedChild(null);
       setSelectedCopy(null);
+      setBookCart([]);
       setAvailableCopies([]);
       setChildrenOfMember([]);
       setMemberSearch('');
@@ -903,6 +918,38 @@ export default function Borrow() {
             )}
           </div>
 
+          {/* Multi-book checkout — queued list + "add another" */}
+          {selectedMember && dueDate && (bookCart.length > 0 || (pendingReady && maxAddable > 1)) && (
+            <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '12px' : '14px 20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#667eea', marginBottom: '8px' }}>
+                📚 Books to check out — {queuedBooks.length} of {maxAddable} slot{maxAddable === 1 ? '' : 's'} used
+              </div>
+              {bookCart.map((e, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ color: '#059669' }}>✓</span>
+                  <span style={{ flex: 1, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.book.title}</span>
+                  {e.copy && <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '12px' }}>{e.copy.copy_code}</span>}
+                  <button onClick={() => removeFromCheckout(i)} title="Remove"
+                    style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '0 4px' }}>×</button>
+                </div>
+              ))}
+              {pendingReady && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', padding: '4px 0', color: '#4f46e5' }}>
+                  <span>•</span>
+                  <span style={{ flex: 1, fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedBook.title}</span>
+                  {selectedCopy && <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{selectedCopy.copy_code}</span>}
+                  <span style={{ fontSize: '11px', color: '#999' }}>(current)</span>
+                </div>
+              )}
+              {pendingReady && bookCart.length + 1 < maxAddable && (
+                <button onClick={addToCheckout}
+                  style={{ marginTop: '8px', width: '100%', padding: '9px', background: '#eef2ff', color: '#4f46e5', border: '1px dashed #c7d2fe', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}>
+                  ➕ Add this book &amp; pick another
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Borrowing for child — full width, shown when member has children */}
           {selectedMember && childrenOfMember.length > 0 && (
             <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '12px' : '16px 20px', display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '10px' : '16px', border: '2px solid #e8f4fd', flexWrap: 'wrap' }}>
@@ -962,22 +1009,22 @@ export default function Borrow() {
               </div>
             )}
             <div style={{ marginLeft: isMobile ? '0' : 'auto', display: 'flex', alignItems: 'center', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
-              {selectedMember && selectedBook && !isMobile && (
+              {selectedMember && queuedBooks.length > 0 && !isMobile && (
                 <div style={{ fontSize: '13px', color: '#555' }}>
-                  <strong>{selectedMember.name}</strong> ← <strong>{selectedBook.title}</strong>
+                  <strong>{selectedMember.name}</strong> ← <strong>{queuedBooks.length === 1 ? queuedBooks[0].book.title : `${queuedBooks.length} books`}</strong>
                 </div>
               )}
               <button
                 onClick={handleCheckout}
-                disabled={isReadOnly || !selectedMember || !selectedBook || !dueDate}
+                disabled={isReadOnly || !selectedMember || !dueDate || queuedBooks.length === 0}
                 style={{
                   padding: '11px 32px', fontWeight: '700', fontSize: '15px',
-                  background: (isReadOnly || !selectedMember || !selectedBook || !dueDate) ? '#ccc' : '#667eea',
+                  background: (isReadOnly || !selectedMember || !dueDate || queuedBooks.length === 0) ? '#ccc' : '#667eea',
                   color: 'white', border: 'none', borderRadius: '6px',
-                  cursor: (isReadOnly || !selectedMember || !selectedBook || !dueDate) ? 'not-allowed' : 'pointer',
+                  cursor: (isReadOnly || !selectedMember || !dueDate || queuedBooks.length === 0) ? 'not-allowed' : 'pointer',
                   width: isMobile ? '100%' : 'auto',
                 }}>
-                ✓ Checkout Book
+                ✓ Checkout {queuedBooks.length > 1 ? `${queuedBooks.length} Books` : 'Book'}
               </button>
             </div>
           </div>
@@ -1143,16 +1190,15 @@ export default function Borrow() {
                   <span style={{ fontWeight: '700', color: '#667eea' }}>👦 {receiptModal.child.name}</span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#888' }}>Book:</span>
-                <span style={{ fontWeight: '700', maxWidth: '200px', textAlign: 'right' }}>{receiptModal.book.title}</span>
+              <div>
+                <div style={{ color: '#888', marginBottom: '2px' }}>{receiptModal.books.length > 1 ? `Books (${receiptModal.books.length}):` : 'Book:'}</div>
+                {receiptModal.books.map((e, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                    <span style={{ fontWeight: '700', maxWidth: '210px' }}>{e.book.title}</span>
+                    {e.copy && <span style={{ fontWeight: '700', fontFamily: 'monospace', color: '#059669', whiteSpace: 'nowrap' }}>{e.copy.copy_code}</span>}
+                  </div>
+                ))}
               </div>
-              {receiptModal.copy && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#888' }}>Copy:</span>
-                  <span style={{ fontWeight: '700', fontFamily: 'monospace', color: '#059669' }}>{receiptModal.copy.copy_code}</span>
-                </div>
-              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#888' }}>Checkout:</span>
                 <span>{new Date().toLocaleDateString('en-IN')}</span>
@@ -1169,8 +1215,8 @@ export default function Borrow() {
               {receiptModal.member?.phone && (
                 <button onClick={() => sendWhatsApp(receiptModal.member.phone, checkoutWhatsAppMsg({
                   memberName: receiptModal.member.name,
-                  bookTitle: receiptModal.book.title,
-                  copyCode: receiptModal.copy?.copy_code || '-',
+                  bookTitle: receiptModal.books.map(e => e.book.title).join(', '),
+                  copyCode: receiptModal.books.map(e => e.copy?.copy_code).filter(Boolean).join(', ') || '-',
                   checkoutDate: new Date().toLocaleDateString('en-IN'),
                   membershipEnd: new Date(receiptModal.dueDate).toLocaleDateString('en-IN'),
                 }))} style={{ flex: 1, padding: '10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
