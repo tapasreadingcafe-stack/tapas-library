@@ -836,10 +836,15 @@ export default function POS() {
       if (cafeItems.length > 0) {
         try {
           const cafeTotal = cafeItems.reduce((s, c) => s + c.price * c.qty, 0);
+          // Allocate the bill's discount to the cafe portion proportionally so the
+          // cafe order + Cafe Reports reflect what was actually charged.
+          const cafeDiscount = subtotal > 0 ? Math.round(discountAmount * (cafeTotal / subtotal)) : 0;
+          const cafeNet = Math.max(0, cafeTotal - cafeDiscount);
           const { data: cafeOrder, error: coErr } = await supabase.from('cafe_orders').insert([{
             member_id: selectedMember?.id || null,
             customer_name: selectedMember?.name || 'Book POS',
-            total_amount: cafeTotal,
+            total_amount: cafeNet,
+            discount_amount: cafeDiscount,
             payment_method: payMethod,
             status: 'completed',
             notes: 'Billed via Book POS',

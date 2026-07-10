@@ -51,6 +51,15 @@ export default function CafeOrders() {
     if (selectedOrder?.id === id) setSelectedOrder(null);
   };
 
+  const deleteOrder = async (id) => {
+    if (!await confirm({ title: 'Delete Order', message: 'Permanently delete this order? This cannot be undone.', variant: 'danger' })) return;
+    const { error } = await supabase.from('cafe_orders').delete().eq('id', id);
+    if (error) { toast.error('Delete failed: ' + error.message); return; }
+    toast.success('Order deleted');
+    fetchOrders();
+    if (selectedOrder?.id === id) setSelectedOrder(null);
+  };
+
   const statusColor = (s) => {
     if (s === 'completed') return { bg: '#d4edda', color: '#155724' };
     if (s === 'cancelled') return { bg: '#f8d7da', color: '#721c24' };
@@ -155,6 +164,9 @@ export default function CafeOrders() {
                         <button onClick={() => viewOrder(order)} style={{ padding: '4px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>View</button>
                         {order.status === 'completed' && (
                           <button onClick={() => cancelOrder(order.id)} disabled={isReadOnly} style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Cancel</button>
+                        )}
+                        {order.status !== 'completed' && (
+                          <button onClick={() => deleteOrder(order.id)} disabled={isReadOnly} style={{ padding: '4px 8px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Delete</button>
                         )}
                       </div>
                     </td>
