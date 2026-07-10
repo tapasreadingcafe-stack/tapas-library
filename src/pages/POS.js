@@ -131,6 +131,8 @@ export default function POS() {
   const [allMembers, setAllMembers]     = useState([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [memberDrop, setMemberDrop]     = useState(false);
+  const [showMemberPicker, setShowMemberPicker] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState(_saved.selectedMember || null);
   const [memberFines, setMemberFines]   = useState([]);
   const [finesLoading, setFinesLoading] = useState(false);
@@ -1423,11 +1425,58 @@ export default function POS() {
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px' }}>CUSTOMER (F1)</div>
-              <button onClick={() => { setShowAddMember(true); setNewMemberForm({ name: '', phone: '', email: '' }); }} title="Add new member"
-                style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
-                + New
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => { setPickerSearch(''); setShowMemberPicker(true); }} title="Select an existing member"
+                  style={{ padding: '2px 8px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
+                  🔍 Select
+                </button>
+                <button onClick={() => { setShowAddMember(true); setNewMemberForm({ name: '', phone: '', email: '' }); }} title="Add new member"
+                  style={{ padding: '2px 8px', background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}>
+                  + New
+                </button>
+              </div>
             </div>
+
+            {/* Quick member picker — search + set as this bill's customer */}
+            {showMemberPicker && (
+              <div onClick={() => setShowMemberPicker(false)}
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '8vh', zIndex: 3000 }}>
+                <div onClick={e => e.stopPropagation()}
+                  style={{ background: 'white', borderRadius: '12px', width: '420px', maxWidth: '94%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #eee' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px' }}>🔍 Select a member</h3>
+                    <button onClick={() => setShowMemberPicker(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+                  </div>
+                  <div style={{ padding: '12px 16px' }}>
+                    <input autoFocus value={pickerSearch} onChange={e => setPickerSearch(e.target.value)}
+                      placeholder="Search name or phone…"
+                      style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
+                  </div>
+                  <div style={{ overflowY: 'auto', padding: '0 8px 12px' }}>
+                    {(() => {
+                      const q = pickerSearch.trim().toLowerCase();
+                      const list = allMembers.filter(m => !q || (m.name || '').toLowerCase().includes(q) || (m.phone || '').includes(q)).slice(0, 50);
+                      if (list.length === 0) return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>No members found</div>;
+                      return list.map(m => (
+                        <button key={m.id}
+                          onClick={() => { setSelectedMember(m); setMemberSearch(m.name); setMemberDrop(false); fetchMemberFines(m.id); setShowMemberPicker(false); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '10px 12px', background: 'none', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          <span style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#667eea', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '13px', flexShrink: 0 }}>
+                            {(m.name || '?').charAt(0).toUpperCase()}
+                          </span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ fontWeight: '600', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                            <span style={{ fontSize: '12px', color: '#888' }}>{m.phone || '—'}{m.plan ? ` · ${m.plan}` : ''}</span>
+                          </span>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{ position: 'relative' }}>
               <input
                 ref={memberSearchRef}
