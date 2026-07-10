@@ -61,9 +61,20 @@ export default function CafeMenu() {
   };
 
   const deleteItem = async (id) => {
-    if (!await confirm({ title: 'Delete Menu Item', message: 'Delete this menu item?', variant: 'danger' })) return;
-    await supabase.from('cafe_menu_items').delete().eq('id', id);
-    fetchItems();
+    if (!await confirm({ title: 'Delete Menu Item', message: 'Delete this menu item? Past orders keep their record.', variant: 'danger' })) return;
+    try {
+      // Detach any past cafe-order lines from this item first — their name and
+      // price are already stored on the order line, so sales history stays
+      // intact, and this clears the foreign key that would otherwise block the
+      // delete (FK cafe_order_items_menu_item_id_fkey).
+      await supabase.from('cafe_order_items').update({ menu_item_id: null }).eq('menu_item_id', id);
+      const { error } = await supabase.from('cafe_menu_items').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Menu item deleted');
+      fetchItems();
+    } catch (e) {
+      toast.error('Could not delete: ' + (e.message || e));
+    }
   };
 
   const toggleAvail = async (item) => {
