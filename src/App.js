@@ -8,6 +8,7 @@ import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
 import { useAuth } from './context/AuthContext';
 import NotificationBell from './components/NotificationBell';
+import SyncStatus from './components/SyncStatus';
 import CommandPalette from './components/CommandPalette';
 import CustomerDisplay from './pages/CustomerDisplay';
 import { ROUTE_PERMISSION_MAP, STAFF_DEFAULT_PERMISSIONS, getPermissionForPath, getStaffPermission } from './utils/permissions';
@@ -714,6 +715,7 @@ function DashboardShell() {
           <h1 className="app-title"><Editable id="app_title">Tapas Reading Cafe</Editable></h1>
         </div>
         <div className="navbar-right">
+          <SyncStatus />
           <NotificationBell staffId={staff?.id} />
           <button onClick={toggleTheme} className="menu-toggle" title={dark ? 'Light mode' : 'Dark mode'} style={{ fontSize: '18px' }}>
             {dark ? '☀️' : '🌙'}

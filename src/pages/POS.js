@@ -11,6 +11,7 @@ import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useNavigate } from 'react-router-dom';
 import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID } from '../utils/membershipUtils';
 import { readCachedBooks, writeCachedBooks, CATALOG_COLS } from '../utils/catalogCache';
+import { saveBillOffline } from '../offline/billing';
 import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 
 // ── Default service items ─────────────────────────────────────────────────────
@@ -726,6 +727,38 @@ export default function POS() {
     }
     setCheckingOut(true);
     try {
+      // ── Offline branch (safe additive): no network → save the bill locally +
+      // queue it, show a receipt, and let the sync module replay it later. The
+      // online path below is left completely unchanged. ─────────────────────────
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        const { txnId: offlineId, receiptNo } = await saveBillOffline({
+          hasPosTable,
+          member: selectedMember,
+          cart,
+          total,
+          discountAmount,
+          appliedPromo,
+          payMethod,
+          cashReceived: cashNum,
+          change,
+        });
+        setLastTxn({
+          id: offlineId,
+          txnRef: receiptNo,
+          date: new Date(),
+          member: selectedMember,
+          items: [...cart],
+          subtotal, discount: discountAmount, total,
+          promoCode: appliedPromo?.code || null,
+          payMethod, cashReceived: cashNum || total, change,
+          offline: true,
+        });
+        setShowReceipt(true);
+        sendDisplay({ status: 'paid', txnRef: receiptNo });
+        showToast('Saved offline — will sync when back online');
+        return; // finally{} resets checkingOut
+      }
+
       let txnId = null;
 
       if (hasPosTable) {
