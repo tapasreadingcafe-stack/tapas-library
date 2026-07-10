@@ -32,7 +32,9 @@ const DEFAULT_SERVICES = [
 
 // Services are loaded from Supabase app_settings (synced across all devices)
 
-const CATS = ['All', 'Books', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
+const CATS = ['All', 'Books', 'Cafe', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
+// Cafe menu items are billable on the Book POS too; map category → tile emoji.
+const CAFE_EMOJI = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🥐', snacks: '🍟', other: '🍽️' };
 // Fine rate loaded dynamically from settings
 
 const SQL_SETUP = `-- Run in Supabase SQL Editor to enable full POS features:
@@ -190,6 +192,7 @@ export default function POS() {
 
   // Editable services
   const [SERVICES, setSERVICES]         = useState(DEFAULT_SERVICES);
+  const [cafeMenu, setCafeMenu]         = useState([]); // cafe menu items, billable on the Book POS
   const [servicesLoaded, setServicesLoaded] = useState(false);
   const [editSvcModal, setEditSvcModal] = useState(null);
   const [editSvcForm, setEditSvcForm]   = useState({ emoji: '', name: '', price: '', cat: '' });
@@ -381,8 +384,19 @@ export default function POS() {
         price:  item.sales_price || item.price || item.mrp || 0,
         qty:    1,
         bookId: item.cartType === 'book' ? item.id : null,
+        menuItemId: item.cartType === 'cafe' ? item.id : null, // cafe_menu_items.id for the cafe order
       }];
     });
+  }, []);
+
+  // Load cafe menu so cafe items can be billed on the Book POS (one cart).
+  useEffect(() => {
+    supabase
+      .from('cafe_menu_items')
+      .select('id, name, price, category, image_url')
+      .eq('is_available', true)
+      .order('display_order')
+      .then(({ data }) => setCafeMenu(data || []));
   }, []);
 
   // Handle barcode scan — find book by copy code, book_id, or ISBN and auto-add to cart
@@ -777,6 +791,52 @@ export default function POS() {
         }
       }
 
+      // Cafe items → also create a cafe order so the kitchen Orders screen,
+      // cafe inventory, and Cafe Reports stay in sync (mirrors CafePOS.placeOrder).
+      const cafeItems = cart.filter(c => c.type === 'cafe');
+      if (cafeItems.length > 0) {
+        try {
+          const cafeTotal = cafeItems.reduce((s, c) => s + c.price * c.qty, 0);
+          const { data: cafeOrder, error: coErr } = await supabase.from('cafe_orders').insert([{
+            member_id: selectedMember?.id || null,
+            customer_name: selectedMember?.name || 'Book POS',
+            total_amount: cafeTotal,
+            payment_method: payMethod,
+            status: 'completed',
+            notes: 'Billed via Book POS',
+          }]).select().single();
+          if (coErr) throw coErr;
+          const { error: ciErr } = await supabase.from('cafe_order_items').insert(
+            cafeItems.map(c => ({
+              order_id: cafeOrder.id,
+              menu_item_id: c.menuItemId || null,
+              item_name: c.name,
+              unit_price: c.price,
+              quantity: c.qty,
+              total_price: c.price * c.qty,
+            }))
+          );
+          if (ciErr) { await supabase.from('cafe_orders').delete().eq('id', cafeOrder.id); throw ciErr; }
+          // Best-effort cafe inventory deduction (cafe_inventory may not exist).
+          for (const c of cafeItems) {
+            try {
+              const { data: inv, error: invErr } = await supabase.from('cafe_inventory')
+                .select('id, current_stock').ilike('item_name', c.name).limit(1);
+              if (invErr) break;
+              const it = inv?.[0];
+              if (!it) continue;
+              await supabase.from('cafe_inventory').update({
+                current_stock: (Number(it.current_stock) || 0) - c.qty,
+                updated_at: new Date().toISOString(),
+              }).eq('id', it.id);
+            } catch { /* non-fatal */ }
+          }
+        } catch (e) {
+          console.error('Cafe order from POS failed:', e);
+          showToast('Bill saved, but cafe order/inventory sync failed.', 'error');
+        }
+      }
+
       // Record promo code usage
       if (appliedPromo) {
         try {
@@ -1022,7 +1082,16 @@ export default function POS() {
 
   // ── Filtered catalog ──────────────────────────────────────────────────────────
   const sl = itemSearch.toLowerCase();
-  const visibleServices = SERVICES.filter(s => {
+  // Cafe menu items rendered as tappable tiles alongside services.
+  const cafeTiles = cafeMenu.map(m => ({
+    id: m.id,
+    name: m.name,
+    price: Number(m.price) || 0,
+    emoji: CAFE_EMOJI[(m.category || '').toLowerCase()] || '🍽️',
+    cat: 'Cafe',
+    isCafe: true,
+  }));
+  const visibleServices = [...SERVICES, ...cafeTiles].filter(s => {
     if (activeCat === 'Books') return false;
     if (activeCat !== 'All' && s.cat !== activeCat) return false;
     if (sl) return s.name.toLowerCase().includes(sl);
@@ -1171,14 +1240,14 @@ export default function POS() {
                 <div data-tour="pos-services" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(148px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
                   {visibleServices.map(svc => (
                     <ServiceCard key={svc.id} svc={svc} fmt={fmt}
-                      onEdit={devMode ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
+                      onEdit={devMode && !svc.isCafe ? (s) => { setEditSvcForm({ emoji: s.emoji, name: s.name, price: String(s.price), cat: s.cat, custom: s.custom || false }); setEditSvcModal(s); } : null}
                       onClick={() => {
                         if (isReadOnly || !canProcessOrders) return;
                         if (svc.custom) {
                           setCustomAmtModal(svc);
                           setCustomAmtVal('');
                         } else {
-                          addToCart({ ...svc, cartType: 'service' });
+                          addToCart({ ...svc, cartType: svc.isCafe ? 'cafe' : 'service' });
                           showToast(`${svc.name} added to cart`);
                         }
                       }} />
