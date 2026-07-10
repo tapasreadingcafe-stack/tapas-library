@@ -84,6 +84,7 @@ export default function Borrow() {
   const [availableCopies, setAvailableCopies] = useState([]);
   const [selectedCopy, setSelectedCopy] = useState(null);
   const borrowHandoffRef = useRef(false); // consumed once when arriving from POS "↔ Borrow"
+  const pendingScanCopyRef = useRef(null); // copy_code to auto-select after a scanned copy label loads its copies
   const [copiesLoading, setCopiesLoading] = useState(false);
   const [hasCopiesTable, setHasCopiesTable] = useState(false);
 
@@ -179,6 +180,14 @@ export default function Borrow() {
     const c = availableCopies.find(cp => cp.id === copyId || cp.copy_code === copyCode);
     if (c) setSelectedCopy(c);
   }, [availableCopies, location.state, selectedCopy]);
+
+  // After copies load from a scanned copy label, pre-select that exact copy.
+  useEffect(() => {
+    if (!pendingScanCopyRef.current || availableCopies.length === 0) return;
+    const c = availableCopies.find(cp => cp.copy_code === pendingScanCopyRef.current);
+    if (c) setSelectedCopy(c);
+    pendingScanCopyRef.current = null;
+  }, [availableCopies]);
 
   const probeChildIdColumn = async () => {
     const { error } = await supabase.from('circulation').select('child_id').limit(0);
@@ -308,6 +317,43 @@ export default function Borrow() {
     setSelectedCopy(null);
     setAvailableCopies([]);
     fetchCopiesForBook(b.id);
+  };
+
+  // Resolve a scanned/typed code to a book. Handles our custom copy labels
+  // (B-XXX-NNNN / S-XXX-NNNN → pre-selects that exact copy), the book's own
+  // book_id, and the publisher ISBN. Returns true if a book was selected.
+  const resolveBookScan = async (rawCode) => {
+    const code = (rawCode || '').trim();
+    if (!code) return false;
+    const upper = code.toUpperCase();
+
+    // 1) Custom copy label → look up the copy, select its book, pre-select the copy.
+    if (/^[BS]-[A-Z0-9]+-\d+$/i.test(code)) {
+      const { data: rows } = await supabase
+        .from('book_copies')
+        .select('id, copy_code, status, book_id, books(id, title, author, book_id, book_image, quantity_available, is_borrowable, isbn)')
+        .ilike('copy_code', upper).limit(1);
+      const copy = rows?.[0];
+      if (copy?.books) {
+        if (copy.status !== 'available') { showToast(`${copy.copy_code} is ${copy.status} — not available`, 'error'); return true; }
+        if (copy.books.is_borrowable === false) { showToast('This book is not marked borrowable', 'error'); return true; }
+        pendingScanCopyRef.current = copy.copy_code;
+        selectBook(copy.books);
+        return true;
+      }
+    }
+
+    // 2) Book by book_id / id / ISBN — try already-loaded books, then the DB.
+    let b = books.find(x => x.book_id === code || x.book_id === upper || x.id === code || x.isbn === code);
+    if (!b) {
+      const { data } = await supabase
+        .from('books')
+        .select('id, title, author, book_id, book_image, quantity_available, is_borrowable, isbn')
+        .or(`book_id.eq.${upper},isbn.eq.${code}`).limit(1);
+      b = data?.[0];
+    }
+    if (b) { selectBook(b); return true; }
+    return false;
   };
 
   const getMemberBorrows = (memberId) =>
@@ -738,9 +784,21 @@ export default function Borrow() {
             <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700' }}>📖 Select Book</h3>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
               <input
-                placeholder="Search by title, author, or ISBN..."
+                placeholder="Search by title, author, ISBN, or scan a barcode..."
                 value={bookSearch}
                 onChange={e => { setBookSearch(e.target.value); if (selectedBook) setSelectedBook(null); }}
+                onKeyDown={async (e) => {
+                  if (e.key !== 'Enter') return;
+                  const val = e.target.value.trim();
+                  if (!val) return;
+                  // A scanned copy label or ISBN → resolve directly (handheld scanners send Enter).
+                  const looksLikeCode = /^[BS]-[A-Z0-9]+-\d+$/i.test(val) || /^\d{10,13}$/.test(val.replace(/[-\s]/g, ''));
+                  if (looksLikeCode) {
+                    e.preventDefault();
+                    const ok = await resolveBookScan(val);
+                    if (!ok) showToast('No book or copy found for: ' + val, 'error');
+                  }
+                }}
                 style={{ ...inputStyle }}
               />
               <button onClick={() => { setScannerMode('book'); setShowScanner(true); }}
@@ -1048,15 +1106,15 @@ export default function Borrow() {
       {/* ─── BARCODE SCANNER ─── */}
       {showScanner && (
         <BarcodeScanner
-          onScan={(data) => {
+          onScan={async (data) => {
             if (scannerMode === 'member') {
               const m = members.find(x => x.phone === data || x.id === data);
               if (m) { selectMember(m); setShowScanner(false); }
               else showToast('Member not found', 'error');
             } else {
-              const b = books.find(x => x.book_id === data || x.id === data);
-              if (b) { selectBook(b); setShowScanner(false); }
-              else showToast('Book not found', 'error');
+              const ok = await resolveBookScan(data);
+              if (ok) setShowScanner(false);
+              else showToast('No book or copy found for: ' + data, 'error');
             }
           }}
           onClose={() => setShowScanner(false)}
