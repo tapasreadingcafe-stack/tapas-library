@@ -76,7 +76,7 @@ export default function BarcodeManager() {
   const [selectionOrder, setSelectionOrder] = useState([]);
   const [bookSets, setBookSets] = useState([]);
   const [selectedSetIds, setSelectedSetIds] = useState(new Set());
-  const [setsExpanded, setSetsExpanded] = useState(true);
+  const [setsExpanded, setSetsExpanded] = useState(false); // Book Sets starts collapsed; click to expand
   const [currentPage, setCurrentPage] = useState(1);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem('barcode_template_key') || '');
