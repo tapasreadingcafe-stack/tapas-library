@@ -4,7 +4,7 @@ import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
-import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
+import { getCategoryPrefix, createBookCopies, generateCopyIds, changeBookKind } from '../utils/bookCopies';
 import { generateBarcodeSVGString } from '../utils/barcodeUtils';
 import { exportToCSV } from '../utils/exportCSV';
 import { useToast } from '../components/Toast';
@@ -86,6 +86,8 @@ export default function Books() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [originalEditCategory, setOriginalEditCategory] = useState(null);
+  const [editKind, setEditKind] = useState('borrow');        // 'borrow' (B-) | 'sale' (S-)
+  const [originalEditKind, setOriginalEditKind] = useState('borrow');
   const [categories, setCategories] = useState([]);
   const [showImport, setShowImport] = useState(false);
   const [showMrpImport, setShowMrpImport] = useState(false);
@@ -725,6 +727,10 @@ export default function Books() {
         if (originalEditCategory && originalEditCategory !== payload.category) {
           await renameCopiesForCategoryChange(editingId, originalEditCategory, payload.category);
         }
+        // If borrow↔sell was toggled, rename copies + flip kind + book flags.
+        if (editKind && editKind !== originalEditKind) {
+          await changeBookKind(editingId, editKind);
+        }
         setOriginalEditCategory(null);
         setEditingId(null);
         setFormData(emptyForm);
@@ -808,6 +814,9 @@ export default function Books() {
     setShowAddForm(true);
     setNotForSale(!book.mrp && !book.sales_price);
     setOriginalEditCategory(book.category || null);
+    const kind = (book.book_id || '').startsWith('S') ? 'sale' : 'borrow';
+    setEditKind(kind);
+    setOriginalEditKind(kind);
   };
 
   // When a book's category changes, rename its copy codes + book_id to match.
@@ -1244,7 +1253,28 @@ export default function Books() {
                     onChange={editingId ? handleInputChange : undefined}
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: editingId ? '#fff' : '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
-                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>{editingId ? 'You can edit the ID prefix (e.g. B → S)' : `Auto-generated. Each copy gets: B-${getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...`}</p>
+                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>{editingId ? 'Auto-generated. Use the toggle below to switch borrow ↔ sell.' : `Auto-generated. Each copy gets: B-${getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...`}</p>
+                  {editingId && (
+                    <div style={{ marginTop: '10px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px' }}>This book is for</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {[{ k: 'borrow', label: '📚 Borrowing (B-)' }, { k: 'sale', label: '🏷️ Selling (S-)' }].map(opt => (
+                          <button type="button" key={opt.k} onClick={() => setEditKind(opt.k)}
+                            style={{ flex: 1, padding: '9px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
+                              border: `2px solid ${editKind === opt.k ? '#667eea' : '#ddd'}`,
+                              background: editKind === opt.k ? '#eef2ff' : 'white',
+                              color: editKind === opt.k ? '#4f46e5' : '#666' }}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      {editKind !== originalEditKind && (
+                        <p style={{ fontSize: '11px', color: '#c05621', marginTop: '6px' }}>
+                          ⚠️ On save this renames the barcode(s) {originalEditKind === 'borrow' ? 'B → S' : 'S → B'} and switches the book to {editKind === 'sale' ? 'for-sale (no longer borrowable)' : 'library / borrowable'} — reprint the label(s) after.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

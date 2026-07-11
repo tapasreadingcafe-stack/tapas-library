@@ -182,6 +182,51 @@ export async function changeBookCategory(bookId, oldCategory, newCategory) {
   return { renamed };
 }
 
+// Convert a book between borrow (B- / library copies) and sale (S- / sale
+// copies): renames book_id + every copy code to the new letter (next free
+// number on a clash), flips each copy's copy_kind, and sets the book's
+// borrow/sale flags. toKind is 'borrow' or 'sale'.
+export async function changeBookKind(bookId, toKind) {
+  const newLetter = toKind === 'sale' ? 'S' : 'B';
+  const oldLetter = toKind === 'sale' ? 'B' : 'S';
+  const newCopyKind = toKind === 'sale' ? 'sale' : 'library';
+
+  const { data: copies } = await supabase
+    .from('book_copies').select('id, copy_code').eq('book_id', bookId);
+
+  for (const copy of copies || []) {
+    const m = copy.copy_code.match(/^([BS])-([A-Z]+)-(\d+)$/);
+    if (!m) continue;
+    const [, letter, prefix, num] = m;
+    let newCode = copy.copy_code;
+    if (letter === oldLetter) {
+      newCode = `${newLetter}-${prefix}-${num}`;
+      const { data: conflict } = await supabase
+        .from('book_copies').select('id').eq('copy_code', newCode).neq('id', copy.id).limit(1);
+      if (conflict?.length) {
+        const { data: highest } = await supabase
+          .from('book_copies').select('copy_code')
+          .like('copy_code', `${newLetter}-${prefix}-%`)
+          .order('copy_code', { ascending: false }).limit(1);
+        const lastNum = parseInt(highest?.[0]?.copy_code.match(/-(\d+)$/)?.[1] || '0');
+        newCode = `${newLetter}-${prefix}-${String(lastNum + 1).padStart(4, '0')}`;
+      }
+    }
+    await supabase.from('book_copies')
+      .update({ copy_code: newCode, copy_kind: newCopyKind }).eq('id', copy.id);
+  }
+
+  // Flip the book's own book_id letter + borrow/sale flags.
+  const updates = { is_borrowable: toKind === 'borrow' };
+  if (toKind === 'sale') updates.store_visible = true;
+  const { data: bk } = await supabase.from('books').select('book_id').eq('id', bookId).single();
+  if (bk?.book_id) {
+    const bm = bk.book_id.match(/^([BS])-([A-Z]+)-(\d+)$/);
+    if (bm && bm[1] === oldLetter) updates.book_id = `${newLetter}-${bm[2]}-${bm[3]}`;
+  }
+  await supabase.from('books').update(updates).eq('id', bookId);
+}
+
 // Get all copies for a book
 export async function getBookCopies(bookId) {
   const { data } = await supabase
