@@ -69,6 +69,8 @@ export default function BarcodeManager() {
   const [scanSessionCount, setScanSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState([]); // {ok, code, title} for last few scans
   const [selectedOnly, setSelectedOnly] = useState(false);
+  const [unprintedOnly, setUnprintedOnly] = useState(false);
+  const [printConfirm, setPrintConfirm] = useState(null); // {copyIds, count} after a Direct Print
   // Order in which rows were selected. Used to sort the "Selected
   // only" view so the table reads top→bottom in scan order (1st scan
   // at the top), regardless of when each copy was originally added
@@ -147,7 +149,11 @@ export default function BarcodeManager() {
     }
 
     const selected = selectedIdsRef.current;
-    const next = candidates.find(c => !selected.has(c.id));
+    // Prefer a copy that's neither selected this session NOR already label-printed,
+    // so scanning the same ISBN walks to the next UN-printed copy — persistently,
+    // across sessions (a printed copy is skipped even after leaving the page).
+    const next = candidates.find(c => !selected.has(c.id) && !c.label_printed)
+              || candidates.find(c => !selected.has(c.id));
 
     if (!next) {
       // Every copy this scan refers to is already selected.
@@ -328,8 +334,14 @@ export default function BarcodeManager() {
       });
     }
 
+    // Unprinted-only filter: show just the copies whose label isn't printed yet
+    // — the "what's left to label" view across a big catalog.
+    if (unprintedOnly) {
+      result = result.filter(c => !c.label_printed);
+    }
+
     return result;
-  }, [copies, statusFilter, dateFilter, customFrom, customTo, search, selectedOnly, selectedIds, selectionOrder]);
+  }, [copies, statusFilter, dateFilter, customFrom, customTo, search, selectedOnly, unprintedOnly, selectedIds, selectionOrder]);
 
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [statusFilter, dateFilter, customFrom, customTo, search]);
@@ -507,6 +519,28 @@ export default function BarcodeManager() {
   const PRINT_API = 'http://127.0.0.1:5050';
   const [directPrinting, setDirectPrinting] = useState(false);
 
+  // Mark the just-printed copies as label-printed (from the confirm popup).
+  const markPrinted = async () => {
+    if (!printConfirm) return;
+    const ids = printConfirm.copyIds;
+    const { error } = await supabase.from('book_copies').update({ label_printed: true }).in('id', ids);
+    if (error) {
+      toast.error("Couldn't mark printed — add the label_printed column (run the SQL), then retry.");
+    } else {
+      setCopies(prev => prev.map(c => ids.includes(c.id) ? { ...c, label_printed: true } : c));
+      toast.success(`Marked ${ids.length} label(s) as printed`);
+    }
+    setPrintConfirm(null);
+  };
+
+  // Toggle a single copy's printed flag — click the badge to un-mark a misprint.
+  const toggleLabelPrinted = async (copy) => {
+    const newVal = !copy.label_printed;
+    const { error } = await supabase.from('book_copies').update({ label_printed: newVal }).eq('id', copy.id);
+    if (error) { toast.error('Needs the label_printed column (run the SQL).'); return; }
+    setCopies(prev => prev.map(c => c.id === copy.id ? { ...c, label_printed: newVal } : c));
+  };
+
   const handleDirectPrint = async () => {
     const result = getSelectedForPrint();
     if (!result) return;
@@ -560,7 +594,14 @@ export default function BarcodeManager() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Printed ${selected.length + selectedSets.length} label(s)!`);
+        const copyIds = selected.map(c => c.id);
+        if (copyIds.length > 0) {
+          // Ask whether the labels actually printed; on Yes we mark those copies
+          // printed so scanning skips them next time.
+          setPrintConfirm({ copyIds, count: selected.length + selectedSets.length });
+        } else {
+          toast.success(`Printed ${selectedSets.length} label(s)!`);
+        }
       } else {
         toast.error('Print failed: ' + (data.message || data.error || 'Unknown error'));
       }
@@ -692,6 +733,14 @@ export default function BarcodeManager() {
               {selectedOnly ? `✕ Showing selected (${selectedIds.size})` : `☑ Selected only (${selectedIds.size})`}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setUnprintedOnly(v => !v)}
+            title={unprintedOnly ? 'Show all rows again' : 'Show only copies whose label is NOT printed yet'}
+            style={{ ...buttonStyle, background: unprintedOnly ? '#4f46e5' : '#eef2ff', color: unprintedOnly ? 'white' : '#4f46e5' }}
+          >
+            {unprintedOnly ? '✕ Unprinted only' : '🏷️ Unprinted only'}
+          </button>
           {dateFilter === 'custom' && (
             <>
               <input
@@ -919,6 +968,12 @@ export default function BarcodeManager() {
                     color: '#667eea', fontWeight: '600',
                   }}>
                     {copy.copy_code}
+                    {copy.label_printed && (
+                      <button onClick={() => toggleLabelPrinted(copy)} title="Label printed — click to un-mark"
+                        style={{ display: 'block', marginTop: '4px', fontFamily: 'inherit', fontSize: '10px', fontWeight: '700', color: '#065f46', background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: '10px', padding: '1px 8px', cursor: 'pointer' }}>
+                        🏷️ Printed
+                      </button>
+                    )}
                   </td>
                   <td style={{ padding: '10px 8px', maxWidth: '240px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1259,6 +1314,29 @@ export default function BarcodeManager() {
                 style={{ flex: 2, padding: '10px', background: '#667eea', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: 'white', opacity: editCopySaving ? 0.6 : 1 }}
               >
                 {editCopySaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print-confirmation popup — mark copies printed so scanning skips them */}
+      {printConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}
+          onClick={() => setPrintConfirm(null)}>
+          <div style={{ background: 'white', borderRadius: '14px', padding: '24px', width: '360px', maxWidth: '92%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>🖨️ Did the labels print OK?</div>
+            <p style={{ fontSize: '13px', color: '#666', margin: '0 0 18px' }}>
+              {printConfirm.count} label{printConfirm.count === 1 ? '' : 's'} sent to the Zebra. If they came out right, mark them as printed — then scanning those books will skip to the next un-printed copy next time.
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setPrintConfirm(null)}
+                style={{ flex: 1, padding: '11px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                Not yet
+              </button>
+              <button onClick={markPrinted}
+                style={{ flex: 2, padding: '11px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}>
+                ✓ Yes, mark {printConfirm.copyIds.length} as printed
               </button>
             </div>
           </div>
