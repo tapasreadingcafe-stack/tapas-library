@@ -52,13 +52,13 @@ export default function OrderSummary({
       {memberDiscount > 0 && (
         <div className="ct-line">
           <span className="ct-line-label">Member discount (10%)</span>
-          <span className="ct-line-value is-discount">\u2212{rupees(memberDiscount)}</span>
+          <span className="ct-line-value is-discount">{'\u2212'}{rupees(memberDiscount)}</span>
         </div>
       )}
       {promoDiscount > 0 && (
         <div className="ct-line">
           <span className="ct-line-label">Promo · {promoCode?.code}</span>
-          <span className="ct-line-value is-discount">\u2212{rupees(promoDiscount)}</span>
+          <span className="ct-line-value is-discount">{'\u2212'}{rupees(promoDiscount)}</span>
         </div>
       )}
       {giftWrapFee > 0 && (
@@ -87,7 +87,7 @@ export default function OrderSummary({
       <div className="ct-promo">
         {promoCode ? (
           <div className="ct-promo-applied">
-            <span>Promo <b>{promoCode.code}</b> — \u2212{rupees(promoCode.amount)}</span>
+            <span>Promo <b>{promoCode.code}</b> — {"−"}{rupees(promoCode.amount)}</span>
             <button type="button" onClick={() => { clearPromoCode(); setMsg(null); }}>
               Remove
             </button>

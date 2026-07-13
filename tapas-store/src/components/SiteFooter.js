@@ -45,15 +45,12 @@ export default function SiteFooter() {
 
   return (
     <>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      />
+      {/* Poppins is loaded globally in App.js with all weights and italics. */}
       <style>{`
         .site-footer {
           background: ${BG};
           color: ${INK};
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: 'Poppins', system-ui, sans-serif;
           padding: 72px 0 28px;
           margin-top: auto;
         }
@@ -75,7 +72,7 @@ export default function SiteFooter() {
           margin-bottom: 18px;
         }
         .site-footer-brand-headline {
-          font-family: 'DM Serif Display', Georgia, serif;
+          font-family: 'Poppins', system-ui, sans-serif;
           font-weight: 500;
           font-style: italic;
           font-size: 16px;
@@ -92,7 +89,7 @@ export default function SiteFooter() {
           margin: 0;
         }
         .site-footer-col h5 {
-          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-family: 'Poppins', system-ui, sans-serif;
           font-size: 11px;
           font-weight: 500;
           letter-spacing: 0.18em;
@@ -128,7 +125,7 @@ export default function SiteFooter() {
           flex-wrap: wrap;
         }
         .site-footer-copy {
-          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-family: 'Poppins', system-ui, sans-serif;
           font-size: 12px;
           color: ${MUTED};
           letter-spacing: 0.02em;
@@ -145,7 +142,7 @@ export default function SiteFooter() {
           display: inline-grid;
           place-items: center;
           text-decoration: none;
-          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-family: 'Poppins', system-ui, sans-serif;
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.04em;
