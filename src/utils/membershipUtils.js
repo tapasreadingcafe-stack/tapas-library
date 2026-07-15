@@ -49,7 +49,7 @@ export const PLAN_DEFAULTS = {
   },
   individual_annual: {
     name: 'Individual Annual',
-    price: 6500,
+    price: 6000,
     duration_days: 365,
     borrow_limit: 2,
     discount_percent: 10
