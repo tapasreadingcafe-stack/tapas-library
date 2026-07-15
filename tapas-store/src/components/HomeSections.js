@@ -780,7 +780,7 @@ function PricingSection() {
           </div>
           <div className="hs-pricing-card">
             <span className="badge">BEST VALUE</span>
-            <div className="price">₹6,500 <small>/year</small></div>
+            <div className="price">₹6,000 <small>/year</small></div>
             <div className="deposit">+ ₹1,000 one-time deposit</div>
             <h3>Yearly</h3>
             <p>The same membership for a year, at the best rate.</p>
