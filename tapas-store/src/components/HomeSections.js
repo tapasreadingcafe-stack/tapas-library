@@ -680,22 +680,22 @@ function ServicesSection() {
             </div>
             <h3 className="hs-service-cat">MEMBERSHIP</h3>
             <div className="hs-service-name">Become a Member</div>
-            <p>Full library access, borrow 2 books at a time, and 10% off the caf&eacute;.</p>
-            <span className="hs-service-cta">See plans <span className="a">&rarr;</span></span>
+            <p>Enjoy unlimited library access, borrow books, work from our cozy caf&eacute;, and receive exclusive member benefits.</p>
+            <span className="hs-service-cta">View Membership Plans <span className="a">&rarr;</span></span>
           </a>
-          <Link className="hs-service" to="/sign-up">
+          <Link className="hs-service" to="/events">
             <div className="hs-service-icon">
               <svg viewBox="0 14 340 310" fill="currentColor" stroke="currentColor" strokeWidth="6" strokeLinejoin="round" aria-hidden="true">
                 <path d="M189.5 24.65H68.989c-.033 0-.064.009-.1.01s-.063-.007-.095-.006c-.3.015-29.945 1.83-29.945 35.688v104.7c-4.8 5.676-12.848 15.17-19.885 23.423a34.15 34.15 0 0 0-7.939 18.2c-1.3 11.041-2.546 27.705-1.061 44.385a49.141 49.141 0 0 0 .813 5.462A133.423 133.423 0 0 0 18.1 280.3a18.389 18.389 0 0 1 1.38 7.1v23.95a4 4 0 0 0 4 4h74.643a4 4 0 0 0 4-4v-32.567a43.356 43.356 0 0 0 8.919-23.226 4 4 0 0 0-7.98-.572A35.114 35.114 0 0 1 95.2 274.6a4 4 0 0 0-1.079 2.733v30.017h-66.64V287.4a26.349 26.349 0 0 0-1.993-10.175 125.178 125.178 0 0 1-6.87-22.317 40.247 40.247 0 0 1-.682-4.568c-1.426-16-.223-32.071 1.037-42.737a26.165 26.165 0 0 1 6.082-13.952c4.562-5.35 9.543-11.217 13.8-16.235v24.934a30.661 30.661 0 0 0-9.33 20.123L28 245.879a4 4 0 0 0 7.983.521l1.517-23.407a22.683 22.683 0 0 1 6.94-14.923 84.957 84.957 0 0 1 18.211-13.215 4.966 4.966 0 0 1 4.012-.318 4.667 4.667 0 0 1 2.808 2.6c3.337 7.915.424 16.34-8.656 25.043a4.023 4.023 0 0 0 .356 6.08c.618.474 15.059 11.955 8.123 40.332a4 4 0 0 0 2.936 4.836 4.057 4.057 0 0 0 .953.115 4 4 0 0 0 3.887-3.043c3.1-12.664 2.422-22.583.33-30.067h112.1a4 4 0 0 0 .971-7.881c-1.038-.268-10.149-2.942-10.149-13.981s9.111-13.712 10.122-13.973c.117-.029.225-.078.337-.116s.219-.065.322-.111a4.11 4.11 0 0 0 .429-.232c.074-.044.153-.079.224-.127a4 4 0 0 0 1.042-1.042c.051-.074.088-.157.134-.234a4.05 4.05 0 0 0 .225-.415c.041-.093.068-.193.1-.29a4.156 4.156 0 0 0 .132-.428c.023-.1.034-.2.05-.309a4.076 4.076 0 0 0 .046-.459c0-.042.012-.082.012-.124V28.65a4 4 0 0 0-3.997-4zM94.036 196.708a4 4 0 0 0 0 8H176.8a21.436 21.436 0 0 0-4.168 9.86h-16.079a4 4 0 0 0 0 8h16.078a21.454 21.454 0 0 0 4.168 9.862H74.269a36.808 36.808 0 0 0-5.028-7.43c11.579-12.742 10.642-23.764 7.605-30.968a12.739 12.739 0 0 0-7.539-7.049 12.978 12.978 0 0 0-10.482.847 96.574 96.574 0 0 0-11.973 7.719V60.342c0-19.263 11.657-25.149 18.137-26.933V171.53a4 4 0 0 0 8 0V32.65H185.5v164.058zM259.543 178.853H233.29a4 4 0 0 0-4 4v82.172h-11.833a4 4 0 0 0-3.292 6.271l28.959 41.974a4 4 0 0 0 6.584 0l28.959-41.97a4 4 0 0 0-3.292-6.271h-11.832v-82.176a4 4 0 0 0-4-4zm8.213 94.172-21.34 30.93-21.339-30.93h8.213a4 4 0 0 0 4-4v-82.172h18.253v82.172a4 4 0 0 0 4 4zM297.749 99.652a4 4 0 0 0-3.292 1.729L265.5 143.354a4 4 0 0 0 3.292 6.272h11.832V231.8a4 4 0 0 0 4 4h26.254a4 4 0 0 0 4-4v-82.174h11.832a4 4 0 0 0 3.29-6.272l-28.959-41.973a4 4 0 0 0-3.292-1.729zm13.127 41.974a4 4 0 0 0-4 4V227.8h-18.254v-82.174a4 4 0 0 0-4-4h-8.212l21.339-30.93 21.34 30.93z" />
                 <path d="M135.97 222.568h2.23a4 4 0 0 0 0-8h-2.23a4 4 0 0 0 0 8zM85.348 218.568a4 4 0 0 0 4 4h27.48a4 4 0 0 0 0-8h-27.48a4 4 0 0 0-4 4z" />
               </svg>
             </div>
-            <h3 className="hs-service-cat">BORROW BOOKS</h3>
-            <div className="hs-service-name">Library Membership &amp;&nbsp;Book Lending</div>
-            <p>Flexible plans to borrow books and build lasting reading habits.</p>
-            <span className="hs-service-cta">Borrow Now <span className="a">&rarr;</span></span>
+            <h3 className="hs-service-cat">WORKSHOPS &amp; EVENTS</h3>
+            <div className="hs-service-name">Learn, Create &amp;&nbsp;Connect</div>
+            <p>Join storytelling sessions, art workshops, book clubs, hobby classes, and community events for all ages.</p>
+            <span className="hs-service-cta">Explore Events <span className="a">&rarr;</span></span>
           </Link>
-          <Link className="hs-service" to="/events">
+          <Link className="hs-service" to="/contact">
             <div className="hs-service-icon">
               <svg viewBox="5 4 38 40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="7" y="10" width="34" height="32" rx="3" />
@@ -704,10 +704,10 @@ function ServicesSection() {
                 <path d="M24 24l2.4 4.9 5.4.8-3.9 3.8.9 5.4L24 36.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z" />
               </svg>
             </div>
-            <h3 className="hs-service-cat">Events</h3>
-            <div className="hs-service-name">Story time &amp;&nbsp;Community Events</div>
-            <p>Fun reading sessions and weekend activities for kids.</p>
-            <span className="hs-service-cta">Know More <span className="a">&rarr;</span></span>
+            <h3 className="hs-service-cat">RENT OUR SPACE</h3>
+            <div className="hs-service-name">Celebrate &amp;&nbsp;Host with Us</div>
+            <p>A warm, book-filled venue for birthdays, corporate meetups, workshops, book launches, and small private gatherings.</p>
+            <span className="hs-service-cta">Book the Space <span className="a">&rarr;</span></span>
           </Link>
         </div>
       </div>
