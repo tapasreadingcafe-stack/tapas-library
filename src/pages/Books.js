@@ -4,7 +4,7 @@ import BulkImport from '../BulkImport';
 import BarcodeScanner from '../BarcodeScanner';
 import { supabase } from '../utils/supabase';
 import { logActivity, ACTIONS } from '../utils/activityLog';
-import { getCategoryPrefix, createBookCopies, generateCopyIds, changeBookKind } from '../utils/bookCopies';
+import { getCategoryPrefix, createBookCopies, generateCopyIds } from '../utils/bookCopies';
 import { generateBarcodeSVGString } from '../utils/barcodeUtils';
 import { exportToCSV } from '../utils/exportCSV';
 import { useToast } from '../components/Toast';
@@ -71,6 +71,16 @@ const CONDITION_STYLE = {
   Damaged: { bg: '#f8d7da', text: '#721c24' },
 };
 
+// Physical-copy (barcode) statuses, matching the Barcodes manager vocabulary.
+const COPY_STATUSES = ['available', 'issued', 'sold', 'lost', 'damaged'];
+const COPY_STATUS_STYLE = {
+  available: { bg: '#d4edda', text: '#155724' },
+  issued:    { bg: '#cce5ff', text: '#004085' },
+  sold:      { bg: '#fde2e1', text: '#c0392b' },
+  lost:      { bg: '#fff3cd', text: '#856404' },
+  damaged:   { bg: '#f8d7da', text: '#721c24' },
+};
+
 export default function Books() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -78,7 +88,15 @@ export default function Books() {
   const confirm = useConfirm();
   const { isReadOnly, canDeleteBooks, canExportData } = usePermission();
   const [books, setBooks] = useState([]);
+  // Search index: books.id (UUID) -> space-joined lowercased copy_codes for that
+  // book. Lets the Books search match a physical copy code / scanned barcode
+  // (e.g. "S-FIC-0229"), which lives in book_copies, not on the books row.
+  const [copyIndex, setCopyIndex] = useState(() => new Map());
   const [loading, setLoading] = useState(false);
+  // True while the catalog is still streaming in behind the first page. Lets the
+  // UI say "still loading" instead of a false "no match" when a search runs
+  // before every book has arrived.
+  const [streaming, setStreaming] = useState(false);
   // Token to discard stale fetches when the filter changes mid-stream.
   const fetchTokenRef = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,8 +104,6 @@ export default function Books() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [originalEditCategory, setOriginalEditCategory] = useState(null);
-  const [editKind, setEditKind] = useState('borrow');        // 'borrow' (B-) | 'sale' (S-)
-  const [originalEditKind, setOriginalEditKind] = useState('borrow');
   const [categories, setCategories] = useState([]);
   const [showImport, setShowImport] = useState(false);
   const [showMrpImport, setShowMrpImport] = useState(false);
@@ -112,13 +128,22 @@ export default function Books() {
   // action — open it once and it stays open for the next book, and vice versa.
   const [pricingOpen, setPricingOpen] = useState(() => localStorage.getItem('tapas_addbook_pricing_open') !== '0');
   const [storeOpen, setStoreOpen] = useState(() => localStorage.getItem('tapas_addbook_store_open') !== '0');
+  const [copiesOpen, setCopiesOpen] = useState(() => localStorage.getItem('tapas_addbook_copies_open') !== '0');
   const toggleSection = (which) => {
     if (which === 'pricing') {
       setPricingOpen(v => { const n = !v; localStorage.setItem('tapas_addbook_pricing_open', n ? '1' : '0'); return n; });
+    } else if (which === 'copies') {
+      setCopiesOpen(v => { const n = !v; localStorage.setItem('tapas_addbook_copies_open', n ? '1' : '0'); return n; });
     } else {
       setStoreOpen(v => { const n = !v; localStorage.setItem('tapas_addbook_store_open', n ? '1' : '0'); return n; });
     }
   };
+
+  // Copies/barcodes for the book currently open in the edit form. Loaded when a
+  // book's edit form opens; each row carries a `draftCode` so the input can be
+  // edited without committing until Save, and per-row `dirty`/`saving` flags.
+  const [editCopies, setEditCopies] = useState([]);
+  const [copiesLoading, setCopiesLoading] = useState(false);
 
   // Add-book copy type: 'borrow' (B-), 'sale' (S-), or 'both'. Remembered
   // across books like the pricing/store sections above.
@@ -281,6 +306,7 @@ export default function Books() {
     probeCondition();
     fetchCategories();
     fetchSets();
+    fetchCopyIndex();
   }, []);
 
   // Re-fetch books whenever filter changes
@@ -315,6 +341,7 @@ export default function Books() {
     // of overwriting the newer results.
     const token = ++fetchTokenRef.current;
     setLoading(true);
+    setStreaming(true);
     setBooks([]);
     try {
       // Stream the catalog in batches so the top rows render after the first
@@ -349,7 +376,37 @@ export default function Books() {
     } catch (error) {
       console.error('Error fetching books:', error);
     } finally {
-      if (token === fetchTokenRef.current) setLoading(false);
+      if (token === fetchTokenRef.current) { setLoading(false); setStreaming(false); }
+    }
+  };
+
+  // Build the copy-code search index so a scanned/typed physical copy code
+  // resolves to its parent book on the Books page. Paginated to avoid the
+  // 1000-row cap silently dropping copies as the catalog grows.
+  const fetchCopyIndex = async () => {
+    try {
+      const map = new Map();
+      const PAGE = 1000;
+      let offset = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from('book_copies')
+          .select('book_id, copy_code')
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const c of data) {
+          if (!c.book_id || !c.copy_code) continue;
+          const key = String(c.book_id);
+          const code = c.copy_code.toLowerCase();
+          map.set(key, map.has(key) ? `${map.get(key)} ${code}` : code);
+        }
+        if (data.length < PAGE) break;
+        offset += PAGE;
+      }
+      setCopyIndex(map);
+    } catch (error) {
+      console.error('Error fetching copy codes for search:', error);
     }
   };
 
@@ -727,10 +784,6 @@ export default function Books() {
         if (originalEditCategory && originalEditCategory !== payload.category) {
           await renameCopiesForCategoryChange(editingId, originalEditCategory, payload.category);
         }
-        // If borrow↔sell was toggled, rename copies + flip kind + book flags.
-        if (editKind && editKind !== originalEditKind) {
-          await changeBookKind(editingId, editKind);
-        }
         setOriginalEditCategory(null);
         setEditingId(null);
         setFormData(emptyForm);
@@ -814,9 +867,131 @@ export default function Books() {
     setShowAddForm(true);
     setNotForSale(!book.mrp && !book.sales_price);
     setOriginalEditCategory(book.category || null);
-    const kind = (book.book_id || '').startsWith('S') ? 'sale' : 'borrow';
-    setEditKind(kind);
-    setOriginalEditKind(kind);
+    loadEditCopies(book.id);
+  };
+
+  // Load every physical copy (barcode) for the book open in the edit form.
+  const loadEditCopies = async (bookId) => {
+    setEditCopies([]);
+    if (!bookId) return;
+    setCopiesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('book_copies')
+        .select('id, copy_code, copy_kind, status, label_printed, created_at')
+        .eq('book_id', bookId)
+        .order('copy_code', { ascending: true });
+      if (error) throw error;
+      setEditCopies((data || []).map(c => ({ ...c, draftCode: c.copy_code, draftStatus: c.status, saving: false })));
+    } catch (e) {
+      console.error('Error loading copies:', e);
+      setEditCopies([]);
+    } finally {
+      setCopiesLoading(false);
+    }
+  };
+
+  // Fill a copy's barcode with the next free number for its current prefix.
+  // B- and S- are independent sequences, so flipping S→B (or vice-versa) usually
+  // needs a fresh number — this finds the highest existing code for that
+  // letter+category and adds one.
+  const suggestNextCode = async (copy) => {
+    const code = (copy.draftCode || copy.copy_code || '').toUpperCase();
+    const m = code.match(/^([BS])-([A-Z]+)-/);
+    const letter = m ? m[1] : (code.charAt(0) === 'S' ? 'S' : 'B');
+    const prefix = m ? m[2] : getCategoryPrefix(formData.category || 'GEN');
+    setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, suggesting: true } : c));
+    try {
+      const { data } = await supabase
+        .from('book_copies')
+        .select('copy_code')
+        .like('copy_code', `${letter}-${prefix}-%`)
+        .order('copy_code', { ascending: false })
+        .limit(1);
+      const lastNum = parseInt(data?.[0]?.copy_code.match(/-(\d+)$/)?.[1] || '0');
+      const next = `${letter}-${prefix}-${String(lastNum + 1).padStart(4, '0')}`;
+      setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, draftCode: next, suggesting: false } : c));
+    } catch (e) {
+      toast.error('Could not find next number: ' + e.message);
+      setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, suggesting: false } : c));
+    }
+  };
+
+  // Permanently delete a physical copy (barcode) and keep the book's counts in
+  // sync — quantity_total always drops by one, quantity_available only if the
+  // deleted copy was itself available.
+  const deleteCopy = async (copy) => {
+    const ok = await confirm({
+      title: 'Delete this copy?',
+      message: `Barcode ${copy.copy_code} will be permanently removed. This can't be undone.`,
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, saving: true } : c));
+    try {
+      const { error } = await supabase.from('book_copies').delete().eq('id', copy.id);
+      if (error) throw error;
+      const dec = { quantity_total: Math.max(0, (parseInt(formData.quantity_total) || 0) - 1) };
+      if (copy.status === 'available') dec.quantity_available = Math.max(0, (parseInt(formData.quantity_available) || 0) - 1);
+      await supabase.from('books').update(dec).eq('id', editingId);
+      setFormData(prev => ({ ...prev, ...dec }));
+      setEditCopies(prev => prev.filter(c => c.id !== copy.id));
+      fetchCopyIndex();
+      fetchBooks();
+      toast.success('Copy deleted');
+    } catch (e) {
+      toast.error('Delete failed: ' + e.message);
+      setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, saving: false } : c));
+    }
+  };
+
+  // Persist a single copy's edited barcode + status. Validates the code is
+  // non-empty and unique across book_copies before writing.
+  const saveCopy = async (copy) => {
+    const newCode = (copy.draftCode || '').trim().toUpperCase();
+    if (!newCode) { toast.warning('Barcode cannot be empty'); return; }
+    const codeChanged = newCode !== copy.copy_code;
+    const statusChanged = copy.draftStatus !== copy.status;
+    if (!codeChanged && !statusChanged) return;
+    setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, saving: true } : c));
+    try {
+      if (codeChanged) {
+        const { data: conflict } = await supabase
+          .from('book_copies').select('id').eq('copy_code', newCode).neq('id', copy.id).limit(1);
+        if (conflict?.length) {
+          toast.error(`${newCode} is already used by another copy`);
+          setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, saving: false } : c));
+          return;
+        }
+      }
+      // Always keep copy_kind in sync with the barcode's B-/S- prefix so borrow
+      // vs sale classification follows the barcode — a B-… copy is always a
+      // borrow/library copy, an S-… copy is always a sale copy. Deriving it on
+      // every save also self-heals any copy left in a mismatched state. Fall
+      // back gracefully on older DBs that lack the copy_kind column.
+      const newLetter = newCode.charAt(0).toUpperCase();
+      const derivedKind = newLetter === 'S' ? 'sale' : 'library';
+      const kindChanged = derivedKind !== copy.copy_kind;
+      const payload = { copy_code: newCode, status: copy.draftStatus, copy_kind: derivedKind };
+      let { error } = await supabase.from('book_copies').update(payload).eq('id', copy.id);
+      if (error && /copy_kind/i.test(error.message || '')) {
+        const { copy_kind, ...noKind } = payload;
+        ({ error } = await supabase.from('book_copies').update(noKind).eq('id', copy.id));
+      }
+      if (error) throw error;
+      setEditCopies(prev => prev.map(c => c.id === copy.id
+        ? { ...c, copy_code: newCode, copy_kind: derivedKind, status: copy.draftStatus, draftCode: newCode, saving: false }
+        : c));
+      // Keep the search index fresh so the renamed barcode is findable right away.
+      fetchCopyIndex();
+      toast.success(kindChanged
+        ? `Moved to ${derivedKind === 'sale' ? 'sale 🏷️' : 'borrow 📚'} — reprint the label`
+        : 'Barcode updated');
+    } catch (e) {
+      toast.error('Update failed: ' + e.message);
+      setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, saving: false } : c));
+    }
   };
 
   // When a book's category changes, rename its copy codes + book_id to match.
@@ -981,11 +1156,13 @@ export default function Books() {
 
   const filteredBooks = books.filter(book => {
     const term = searchTerm.toLowerCase();
+    const copyCodes = copyIndex.get(String(book.id));
     const matchSearch = (
       book.title?.toLowerCase().includes(term) ||
       book.author?.toLowerCase().includes(term) ||
       book.isbn?.includes(searchTerm) ||
-      book.book_id?.includes(searchTerm)
+      book.book_id?.includes(searchTerm) ||
+      (copyCodes && copyCodes.includes(term))
     );
     const matchCondition = filterCondition === 'all' || book.condition === filterCondition;
     return matchSearch && matchCondition;
@@ -993,6 +1170,7 @@ export default function Books() {
 
   return (
     <div style={{ padding: isMobile ? '12px' : '20px' }}>
+      <style>{`@keyframes bookspin{to{transform:rotate(360deg)}}@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
       {isReadOnly && <ViewOnlyBanner />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h1>📚 Books</h1>
@@ -1253,28 +1431,7 @@ export default function Books() {
                     onChange={editingId ? handleInputChange : undefined}
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: editingId ? '#fff' : '#f5f5f5', color: '#667eea', fontFamily: 'monospace', fontWeight: '600', minHeight: isMobile ? '44px' : 'auto', fontSize: isMobile ? '16px' : 'inherit' }}
                   />
-                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>{editingId ? 'Auto-generated. Use the toggle below to switch borrow ↔ sell.' : `Auto-generated. Each copy gets: B-${getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...`}</p>
-                  {editingId && (
-                    <div style={{ marginTop: '10px' }}>
-                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px' }}>This book is for</label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {[{ k: 'borrow', label: '📚 Borrowing (B-)' }, { k: 'sale', label: '🏷️ Selling (S-)' }].map(opt => (
-                          <button type="button" key={opt.k} onClick={() => setEditKind(opt.k)}
-                            style={{ flex: 1, padding: '9px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
-                              border: `2px solid ${editKind === opt.k ? '#667eea' : '#ddd'}`,
-                              background: editKind === opt.k ? '#eef2ff' : 'white',
-                              color: editKind === opt.k ? '#4f46e5' : '#666' }}>
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                      {editKind !== originalEditKind && (
-                        <p style={{ fontSize: '11px', color: '#c05621', marginTop: '6px' }}>
-                          ⚠️ On save this renames the barcode(s) {originalEditKind === 'borrow' ? 'B → S' : 'S → B'} and switches the book to {editKind === 'sale' ? 'for-sale (no longer borrowable)' : 'library / borrowable'} — reprint the label(s) after.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <p style={{ fontSize: '10px', color: '#999', marginTop: '3px' }}>{editingId ? 'Auto-generated. Switch a copy between borrow ↔ sell in the Barcodes section below.' : `Auto-generated. Each copy gets: B-${getCategoryPrefix(formData.category || 'GEN')}-0001, 0002...`}</p>
                 </div>
               </div>
 
@@ -1289,6 +1446,97 @@ export default function Books() {
                     <option value="">— Not part of a set —</option>
                     {bookSets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
+                </div>
+              )}
+
+              {/* COPIES / BARCODES SECTION — edit each physical copy's barcode + status */}
+              {editingId && (
+                <div style={{ background: '#fffdf5', padding: '14px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #f0e6c8' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: copiesOpen ? '10px' : 0, flexWrap: 'wrap', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('copies')}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', color: '#b7791f' }}
+                    >
+                      <span style={{ display: 'inline-block', transform: copiesOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', fontSize: '11px' }}>▶</span>
+                      🏷️ Barcodes &amp; Copies{editCopies.length > 0 ? ` (${editCopies.length})` : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/books/${editingId}/copies`)}
+                      style={{ padding: '6px 12px', background: '#b7791f', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px' }}
+                    >
+                      🖨️ Print labels
+                    </button>
+                  </div>
+                  {copiesOpen && (
+                    <div>
+                      {copiesLoading ? (
+                        <p style={{ fontSize: '13px', color: '#999', margin: '6px 0' }}>Loading copies…</p>
+                      ) : editCopies.length === 0 ? (
+                        <p style={{ fontSize: '13px', color: '#999', margin: '6px 0' }}>No barcodes/copies for this book yet.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {editCopies.map(copy => {
+                            const s = COPY_STATUS_STYLE[copy.draftStatus] || COPY_STATUS_STYLE.available;
+                            const draftLetter = (copy.draftCode || '').charAt(0).toUpperCase();
+                            const draftKind = draftLetter === 'S' ? 'sale' : 'library';
+                            const isSale = draftKind === 'sale';
+                            // Copy is mismatched if its stored kind no longer matches its barcode prefix.
+                            const mismatch = copy.copy_kind && copy.copy_kind !== draftKind;
+                            const dirty = copy.draftCode !== copy.copy_code || copy.draftStatus !== copy.status || mismatch;
+                            return (
+                              <div key={copy.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', background: '#fff', padding: '8px', borderRadius: '6px', border: `1px solid ${mismatch ? '#f0b429' : '#eee'}` }}>
+                                <span title={isSale ? 'Sale copy' : 'Borrow copy'} style={{ flex: '0 0 auto', padding: '4px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: isSale ? '#fef0e6' : '#e6f4ea', color: isSale ? '#b7791f' : '#1e7e34' }}>
+                                  {isSale ? '🏷️ Sale' : '📚 Borrow'}
+                                </span>
+                                <input
+                                  type="text"
+                                  value={copy.draftCode}
+                                  onChange={e => setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, draftCode: e.target.value } : c))}
+                                  style={{ flex: '1 1 120px', minWidth: '110px', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontFamily: 'monospace', fontWeight: '600', color: '#333', fontSize: isMobile ? '16px' : '13px', textTransform: 'uppercase' }}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={copy.suggesting}
+                                  onClick={() => suggestNextCode(copy)}
+                                  title="Fill in the next free number for this prefix"
+                                  style={{ flex: '0 0 auto', padding: '8px 10px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', borderRadius: '6px', cursor: copy.suggesting ? 'default' : 'pointer', fontWeight: '600', fontSize: '12px', whiteSpace: 'nowrap' }}
+                                >
+                                  {copy.suggesting ? '…' : '🔢 Next free'}
+                                </button>
+                                <select
+                                  value={copy.draftStatus}
+                                  onChange={e => setEditCopies(prev => prev.map(c => c.id === copy.id ? { ...c, draftStatus: e.target.value } : c))}
+                                  style={{ flex: '0 0 auto', padding: '8px', borderRadius: '999px', border: `1px solid ${s.text}`, background: s.bg, color: s.text, fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                                >
+                                  {COPY_STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
+                                </select>
+                                <button
+                                  type="button"
+                                  disabled={!dirty || copy.saving}
+                                  onClick={() => saveCopy(copy)}
+                                  style={{ flex: '0 0 auto', padding: '8px 14px', background: dirty ? '#38a169' : '#e2e8f0', color: dirty ? 'white' : '#a0aec0', border: 'none', borderRadius: '6px', cursor: dirty && !copy.saving ? 'pointer' : 'default', fontWeight: '600', fontSize: '12px' }}
+                                >
+                                  {copy.saving ? '…' : mismatch ? 'Fix' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={copy.saving}
+                                  onClick={() => deleteCopy(copy)}
+                                  title="Delete this copy permanently"
+                                  style={{ flex: '0 0 auto', padding: '8px 10px', background: '#fff', color: '#e53e3e', border: '1px solid #feb2b2', borderRadius: '6px', cursor: copy.saving ? 'default' : 'pointer', fontWeight: '600', fontSize: '13px' }}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            );
+                          })}
+                          <p style={{ fontSize: '11px', color: '#a08a4f', margin: '2px 0 0' }}>The <strong>B-</strong> prefix = 📚 borrow copy, <strong>S-</strong> = 🏷️ sale copy — changing the prefix moves the copy between them. Reprint its label after changing it.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1696,6 +1944,12 @@ export default function Books() {
               </tbody>
             </table>
           )
+        ) : filteredBooks.length === 0 && streaming ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <div style={{ width: '34px', height: '34px', margin: '0 auto 14px', border: '3px solid #e0e8ff', borderTopColor: '#667eea', borderRadius: '50%', animation: 'bookspin 0.8s linear infinite' }} />
+            <p style={{ color: '#667eea', fontSize: '15px', fontWeight: 600, margin: 0 }}>{searchTerm ? 'Searching your catalog…' : 'Loading your books…'}</p>
+            <p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0' }}>{books.length.toLocaleString()} loaded so far</p>
+          </div>
         ) : filteredBooks.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>📚</div>
