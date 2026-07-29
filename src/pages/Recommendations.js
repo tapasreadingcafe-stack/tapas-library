@@ -10,6 +10,7 @@ export default function Recommendations() {
   const [coReads, setCoReads] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
   const [trending, setTrending] = useState([]);
+  const [covers, setCovers] = useState({});
   const [loading, setLoading] = useState(true);
   const [recLoading, setRecLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
@@ -27,12 +28,42 @@ export default function Recommendations() {
     }
   }, [selectedMember, allCirculation]);
 
+  // Lazily pull cover images for only the books currently on screen (at most a
+  // few dozen) instead of dragging every cover down with the main book fetch.
+  useEffect(() => {
+    const shown = [...personalRecs, ...coReads, ...trending, ...newArrivals];
+    const missing = [...new Set(shown.map(b => b?.id).filter(Boolean))]
+      .filter(id => !(id in covers));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('books')
+        .select('id, book_image')
+        .in('id', missing);
+      if (cancelled) return;
+      // Record every id we asked for — including ones with no image — so a book
+      // without a cover doesn't get re-fetched on every render.
+      const next = {};
+      missing.forEach(id => { next[id] = null; });
+      (data || []).forEach(b => { next[b.id] = b.book_image || null; });
+      setCovers(prev => ({ ...prev, ...next }));
+    })();
+    return () => { cancelled = true; };
+  }, [personalRecs, coReads, trending, newArrivals, covers]);
+
   const fetchBaseData = async () => {
     setLoading(true);
     try {
       const [{ data: membersData }, { data: booksData }, { data: circData }] = await Promise.all([
         supabase.from('members').select('id, name, phone').eq('status', 'active').order('name'),
-        supabase.from('books').select('*').order('created_at', { ascending: false }),
+        // Deliberately NOT select('*'): ~715 of these rows carry a base64 cover
+        // image inline (some over 300KB each), so '*' pulls ~46MB in one shot and
+        // stalls the whole database. We only need these fields to compute recs —
+        // covers are fetched separately for the handful of books actually shown.
+        supabase.from('books')
+          .select('id, title, author, category, quantity_available, created_at')
+          .order('created_at', { ascending: false }),
         supabase.from('circulation').select('member_id, book_id, checkout_date, status').order('checkout_date', { ascending: false }),
       ]);
       setMembers(membersData || []);
@@ -125,8 +156,8 @@ export default function Recommendations() {
 
   const BookCard = ({ book, badge, badgeColor = '#667eea' }) => (
     <div style={{ background: 'white', borderRadius: '10px', padding: '16px', border: '1px solid #eee', position: 'relative', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      {book.book_image ? (
-        <img src={book.book_image} alt={book.title}
+      {covers[book.id] ? (
+        <img src={covers[book.id]} alt={book.title}
           style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
           onError={e => { e.target.style.display = 'none'; }} />
       ) : (
