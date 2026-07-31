@@ -89,12 +89,24 @@ export default function BarcodeManager() {
   const fetchCopies = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('book_copies')
-        .select('*, books(id, title, category, price, mrp, sales_price, author, isbn), copy_mrp, copy_price')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setCopies(data || []);
+      // Page through ALL copies. A single un-paginated select is silently
+      // capped at 1000 rows by Supabase, which dropped the oldest copies and
+      // made them show "No match" in Multi-scan even though they exist.
+      const PAGE = 1000;
+      let offset = 0;
+      let all = [];
+      for (;;) {
+        const { data, error } = await supabase
+          .from('book_copies')
+          .select('*, books(id, title, category, price, mrp, sales_price, author, isbn), copy_mrp, copy_price')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        if (data && data.length) all = all.concat(data);
+        if (!data || data.length < PAGE) break;
+        offset += PAGE;
+      }
+      setCopies(all);
     } catch (err) {
       toast.error('Failed to load barcodes: ' + err.message);
     }
