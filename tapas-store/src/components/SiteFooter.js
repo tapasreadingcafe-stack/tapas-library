@@ -119,7 +119,6 @@ export default function SiteFooter() {
           font-size: 14px;
           line-height: 1.6;
           color: ${INK_2};
-          max-width: 46ch;
         }
         .site-footer-contact p { margin: 0; }
         .site-footer-contact a {
@@ -176,8 +175,7 @@ export default function SiteFooter() {
 
           <address className="site-footer-contact">
             <p>
-              2nd Floor, 2628, 27th Main Rd, above Juice Junction,<br />
-              1st Sector, HSR Layout, Bengaluru, Karnataka 560102
+              2nd Floor, 2628, 27th Main Rd, above Juice Junction, 1st Sector, HSR Layout, Bengaluru, Karnataka 560102
             </p>
             <p>
               <a href="tel:+917760393951">+91 77603 93951</a>
