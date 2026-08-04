@@ -180,7 +180,7 @@ export default function ContactInbox() {
       }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#2c3e50' }}>
-            📨 Contact Inbox
+            📩 Website Forms
             {newCount > 0 && (
               <span style={{
                 marginLeft: '10px', padding: '3px 10px',
@@ -191,7 +191,7 @@ export default function ContactInbox() {
             )}
           </h1>
           <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6b7280' }}>
-            Messages from the Contact Form block on your public website.
+            Every form your visitors fill in on the website lands here — read it and reply.
           </p>
         </div>
         <button

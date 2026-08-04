@@ -279,6 +279,7 @@ const NAV_CONFIG = [
       { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },
     ],
   },
+  { to: '/store/inbox', icon: '📩', label: 'Website Forms' },
   {
     icon: '👥', label: 'Members', key: 'members',
     children: [
@@ -308,7 +309,6 @@ const NAV_CONFIG = [
       { to: '/store/orders',     icon: '📦', label: 'Online Orders' },
       { to: '/store/promo-codes', icon: '🏷', label: 'Promo Codes' },
       { to: '/store/cms',        icon: '📝', label: 'Store Content' },
-      { to: '/store/inbox',      icon: '📨', label: 'Contact Inbox' },
       { to: '/store/reviews',    icon: '★',  label: 'Reviews' },
       { to: '/store/rsvps',      icon: '🎟', label: 'Event RSVPs' },
       { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
