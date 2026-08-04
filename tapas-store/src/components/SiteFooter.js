@@ -9,8 +9,8 @@ import { Link } from 'react-router-dom';
 const INK       = '#1a1a1a';
 const INK_2     = '#3a3a3a';
 const MUTED     = '#6e6e6e';
-const RULE      = '#ececea';
-const BG        = '#F6F8F7';
+const RULE      = '#d4d7db';
+const BG        = '#e6e8eb';
 const LIME      = '#caf27e';
 
 const EXPLORE_LINKS = [
