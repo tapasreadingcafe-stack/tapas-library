@@ -117,6 +117,64 @@ const CSS = `
     font-size: 14px;
     margin-top: 6px;
   }
+  .contact-git-thanks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+    padding: 48px 28px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.06);
+  }
+  .contact-git-thanks-badge {
+    width: 66px;
+    height: 66px;
+    border-radius: 999px;
+    background: #E9F9EC;
+    color: #1a7a3e;
+    display: grid;
+    place-items: center;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    animation: cgit-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes cgit-pop {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .contact-git-thanks-title {
+    margin: 4px 0 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  .contact-git-thanks-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #4a4a4a;
+    max-width: 34ch;
+  }
+  .contact-git-thanks-again {
+    margin-top: 10px;
+    background: #E0004F;
+    color: #fff;
+    border: 0;
+    border-radius: 999px;
+    padding: 11px 26px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: background 150ms, transform 150ms;
+  }
+  .contact-git-thanks-again:hover { background: #b80042; transform: translateY(-1px); }
   .contact-git-error {
     color: #c0392b;
     font-size: 13px;
@@ -250,6 +308,14 @@ export default function ContactGetInTouch() {
     setSent(true);
   };
 
+  const firstName = form.name.trim().split(/\s+/).filter(Boolean)[0] || '';
+
+  const resetForm = () => {
+    setSent(false);
+    setForm({ name: '', email: '', phone: '', subject: '', message: '' });
+    setErrors({});
+  };
+
   return (
     <section className="contact-git" aria-labelledby="contact-git-h">
       <style>{CSS}</style>
@@ -290,32 +356,46 @@ export default function ContactGetInTouch() {
             </div>
           </div>
 
-          <form className="contact-git-form" onSubmit={onSubmit} noValidate>
-            <div className="contact-git-field">
-              <label htmlFor="cgit-name">Your name</label>
-              <input id="cgit-name" type="text" placeholder="Priya Sharma" value={form.name} onChange={setField('name')} required />
+          {sent ? (
+            <div className="contact-git-thanks" role="status" aria-live="polite">
+              <div className="contact-git-thanks-badge" aria-hidden="true">✓</div>
+              <h3 className="contact-git-thanks-title">
+                Thank you{firstName ? `, ${firstName}` : ''}!
+              </h3>
+              <p className="contact-git-thanks-text">
+                Your message has landed in our inbox — we&rsquo;ll get back to you shortly.
+              </p>
+              <button type="button" className="contact-git-thanks-again" onClick={resetForm}>
+                Send another message
+              </button>
             </div>
-            <div className="contact-git-field">
-              <label htmlFor="cgit-email">Email address</label>
-              <input id="cgit-email" type="email" inputMode="email" className={errors.email ? 'is-invalid' : undefined} placeholder="priya@gmail.com" value={form.email} onChange={setField('email')} onBlur={onEmailBlur} required />
-              {errors.email && <span className="contact-git-error" role="alert">{errors.email}</span>}
-            </div>
-            <div className="contact-git-field">
-              <label htmlFor="cgit-phone">Phone number</label>
-              <input id="cgit-phone" type="tel" inputMode="tel" className={errors.phone ? 'is-invalid' : undefined} placeholder="+91 98765 43210" value={form.phone} onChange={setPhone} onBlur={onPhoneBlur} />
-              {errors.phone && <span className="contact-git-error" role="alert">{errors.phone}</span>}
-            </div>
-            <div className="contact-git-field">
-              <label htmlFor="cgit-subject">Subject</label>
-              <input id="cgit-subject" type="text" placeholder="What's this about? (optional)" value={form.subject} onChange={setField('subject')} />
-            </div>
-            <div className="contact-git-field">
-              <label htmlFor="cgit-message">Message</label>
-              <textarea id="cgit-message" rows="4" placeholder="Hi! I'd like to ask about" value={form.message} onChange={setField('message')} required />
-            </div>
-            <button type="submit" className="contact-git-submit">Submit</button>
-            {sent && <div className="contact-git-success" role="status">Thanks — we'll be in touch shortly.</div>}
-          </form>
+          ) : (
+            <form className="contact-git-form" onSubmit={onSubmit} noValidate>
+              <div className="contact-git-field">
+                <label htmlFor="cgit-name">Your name</label>
+                <input id="cgit-name" type="text" placeholder="Priya Sharma" value={form.name} onChange={setField('name')} required />
+              </div>
+              <div className="contact-git-field">
+                <label htmlFor="cgit-email">Email address</label>
+                <input id="cgit-email" type="email" inputMode="email" className={errors.email ? 'is-invalid' : undefined} placeholder="priya@gmail.com" value={form.email} onChange={setField('email')} onBlur={onEmailBlur} required />
+                {errors.email && <span className="contact-git-error" role="alert">{errors.email}</span>}
+              </div>
+              <div className="contact-git-field">
+                <label htmlFor="cgit-phone">Phone number</label>
+                <input id="cgit-phone" type="tel" inputMode="tel" className={errors.phone ? 'is-invalid' : undefined} placeholder="+91 98765 43210" value={form.phone} onChange={setPhone} onBlur={onPhoneBlur} />
+                {errors.phone && <span className="contact-git-error" role="alert">{errors.phone}</span>}
+              </div>
+              <div className="contact-git-field">
+                <label htmlFor="cgit-subject">Subject</label>
+                <input id="cgit-subject" type="text" placeholder="What's this about? (optional)" value={form.subject} onChange={setField('subject')} />
+              </div>
+              <div className="contact-git-field">
+                <label htmlFor="cgit-message">Message</label>
+                <textarea id="cgit-message" rows="4" placeholder="Hi! I'd like to ask about" value={form.message} onChange={setField('message')} required />
+              </div>
+              <button type="submit" className="contact-git-submit">Submit</button>
+            </form>
+          )}
         </div>
       </div>
     </section>
