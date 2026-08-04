@@ -50,8 +50,6 @@ const SOCIALS = [
   { label: 'Location',  href: 'https://maps.app.goo.gl/i24rAtukZxwuL1Uk9', Icon: FooterLocIcon },
 ];
 
-const PINK = '#E0004F';
-
 function FooterLink({ item }) {
   if (item.to) return <Link to={item.to}>{item.label}</Link>;
   return <a href={item.href}>{item.label}</a>;
