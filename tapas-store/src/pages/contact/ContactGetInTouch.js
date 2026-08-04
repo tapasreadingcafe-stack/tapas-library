@@ -323,7 +323,7 @@ export default function ContactGetInTouch() {
         <div className="contact-git-head">
           <h2 id="contact-git-h">Get In Touch With Us</h2>
           <p>
-            Questions about membership, events, or visiting? Drop us a message and we&rsquo;ll get back to you soon.
+            Get in touch with us for library memberships, café reservations, book launches, author talks, poetry readings, storytelling sessions, literary events, workshops, collaborations, and venue bookings. We&rsquo;d love to hear from you!
           </p>
         </div>
 
