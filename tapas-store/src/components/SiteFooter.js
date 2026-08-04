@@ -75,11 +75,11 @@ export default function SiteFooter() {
           padding: 0 64px;
         }
         .site-footer-grid {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 48px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 30px;
           padding-bottom: 44px;
-          align-items: center;
         }
         .site-footer-logo {
           height: 84px;
@@ -173,18 +173,16 @@ export default function SiteFooter() {
         @media (max-width: 1023px) {
           .site-footer-wrap { padding: 0 40px; }
           .site-footer-grid {
-            grid-template-columns: 1fr auto;
-            gap: 40px;
+            gap: 26px;
           }
         }
         @media (max-width: 639px) {
           .site-footer { padding: 28px 0 16px; }
           .site-footer-wrap { padding: 0 20px; }
           .site-footer-grid {
-            grid-template-columns: 1fr;
             gap: 22px;
             padding-bottom: 20px;
-            justify-items: center;
+            align-items: center;
             text-align: center;
           }
           .site-footer-brand { text-align: center; }
