@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { supabase } from '../../utils/supabase';
+import { isValidEmail } from '../../data/journalPosts';
 
 const CSS = `
   .contact-git {
@@ -115,6 +117,19 @@ const CSS = `
     font-size: 14px;
     margin-top: 6px;
   }
+  .contact-git-error {
+    color: #c0392b;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .contact-git-field input.is-invalid {
+    border-color: #c0392b;
+    background: #fdf3f2;
+  }
+  .contact-git-field input.is-invalid:focus {
+    border-color: #c0392b;
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12);
+  }
 
   @media (max-width: 1023px) {
     .contact-git { padding: 56px 0 72px; }
@@ -154,15 +169,84 @@ function ClockIcon() {
 }
 
 export default function ContactGetInTouch() {
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);
+  const [errors, setErrors] = useState({});
 
-  const setField = (k) => (e) => setForm((s) => ({ ...s, [k]: e.target.value }));
+  // Clear a field's validation error as soon as the visitor edits it, so
+  // a stale message doesn't linger after they've corrected the value.
+  const clearError = (k) => setErrors((prev) => {
+    if (!prev[k]) return prev;
+    const next = { ...prev };
+    delete next[k];
+    return next;
+  });
 
-  const onSubmit = (e) => {
+  const setField = (k) => (e) => {
+    const { value } = e.target;
+    setForm((s) => ({ ...s, [k]: value }));
+    clearError(k);
+  };
+
+  // Phone field: allow only digits, a leading +, spaces and hyphens —
+  // strip everything else as the visitor types so it can't hold letters.
+  const setPhone = (e) => {
+    const cleaned = e.target.value.replace(/[^\d+\s-]/g, '');
+    setForm((s) => ({ ...s, phone: cleaned }));
+    clearError('phone');
+  };
+
+  // Validate on blur so the box turns red as soon as the visitor leaves a
+  // field with a bad value — not only after they hit Submit.
+  const onEmailBlur = () => {
+    const v = form.email.trim();
+    if (v && !isValidEmail(v)) {
+      setErrors((prev) => ({ ...prev, email: 'Enter a valid email address.' }));
+    }
+  };
+  const onPhoneBlur = () => {
+    const v = form.phone.trim();
+    if (v && v.replace(/\D/g, '').length < 7) {
+      setErrors((prev) => ({ ...prev, phone: 'Enter a valid phone number.' }));
+    }
+  };
+
+  const onSubmit = async (e) => {
     e.preventDefault();
-    // eslint-disable-next-line no-console
-    console.log({ ...form, source: 'contact-get-in-touch' });
+    if (sent) return;
+
+    // Validate before saving: email must look like an email; phone, if
+    // provided, must carry enough digits to be a real number.
+    const nextErrors = {};
+    if (!isValidEmail(form.email.trim())) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+    if (form.phone.trim() && form.phone.replace(/\D/g, '').length < 7) {
+      nextErrors.phone = 'Enter a valid phone number.';
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+    setErrors({});
+
+    // Save to Supabase so the message lands in the staff dashboard's
+    // Contact Inbox (/store/inbox). Mirrors the ContactForm block's
+    // shape: legacy name/email/message columns + the full `fields` blob
+    // (which carries Subject). Errors are swallowed so the visitor still
+    // gets a thank-you and we never leak backend/RLS details.
+    try {
+      await supabase.from('contact_submissions').insert([{
+        source_page: 'contact',
+        created_at: new Date().toISOString(),
+        fields: { ...form },
+        name: form.name.trim() || null,
+        email: form.email.trim() || null,
+        message: form.message.trim() || null,
+      }]);
+    } catch {
+      /* network / RLS — still thank the visitor */
+    }
     setSent(true);
   };
 
@@ -190,7 +274,11 @@ export default function ContactGetInTouch() {
               <span className="contact-git-info-icon"><PhoneIcon /></span>
               <div>
                 <h4>Phone</h4>
-                <p><a href="tel:+918792470576" style={{ color: 'inherit', textDecoration: 'none' }}>+91 87924 70576</a></p>
+                <p>
+                  <a href="tel:+918792470576" style={{ color: 'inherit', textDecoration: 'none' }}>+91 87924 70576</a>
+                  {' / '}
+                  <a href="tel:+917760393951" style={{ color: 'inherit', textDecoration: 'none' }}>+91 77603 93951</a>
+                </p>
               </div>
             </div>
             <div className="contact-git-info-row">
@@ -209,7 +297,13 @@ export default function ContactGetInTouch() {
             </div>
             <div className="contact-git-field">
               <label htmlFor="cgit-email">Email address</label>
-              <input id="cgit-email" type="email" placeholder="priya@gmail.com" value={form.email} onChange={setField('email')} required />
+              <input id="cgit-email" type="email" inputMode="email" className={errors.email ? 'is-invalid' : undefined} placeholder="priya@gmail.com" value={form.email} onChange={setField('email')} onBlur={onEmailBlur} required />
+              {errors.email && <span className="contact-git-error" role="alert">{errors.email}</span>}
+            </div>
+            <div className="contact-git-field">
+              <label htmlFor="cgit-phone">Phone number</label>
+              <input id="cgit-phone" type="tel" inputMode="tel" className={errors.phone ? 'is-invalid' : undefined} placeholder="+91 98765 43210" value={form.phone} onChange={setPhone} onBlur={onPhoneBlur} />
+              {errors.phone && <span className="contact-git-error" role="alert">{errors.phone}</span>}
             </div>
             <div className="contact-git-field">
               <label htmlFor="cgit-subject">Subject</label>

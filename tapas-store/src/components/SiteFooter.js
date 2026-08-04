@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { isValidEmail } from '../data/journalPosts';
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 // Global site footer. Cream/off-white band with three link columns,
 // lime social pills, and a thin-ruled copyright row. Lives outside
@@ -17,17 +16,11 @@ const LIME      = '#caf27e';
 // Column link shapes. Internal routes use <Link>; external or
 // not-yet-built targets use an <a href="#">.
 const EXPLORE_LINKS = [
-  { label: 'Home',   to: '/' },
-  { label: 'About',  to: '/about' },
-  { label: 'Events', to: '/events' },
-  { label: 'Blogs',  to: '/blog' },
-];
-
-const HELP_LINKS = [
-  { label: 'Contact',           to: '/contact' },
-  { label: 'Faqs',              to: '/faqs' },
-  { label: 'Terms & Condition', to: '/terms' },
-  { label: 'Privacy Policy',    to: '/privacy' },
+  { label: 'Home',    to: '/' },
+  { label: 'About',   to: '/about' },
+  { label: 'Events',  to: '/events' },
+  { label: 'Blogs',   to: '/blog' },
+  { label: 'Contact', to: '/contact' },
 ];
 
 function FooterIgIcon() {
@@ -66,133 +59,11 @@ function FooterLink({ item }) {
 
 export default function SiteFooter() {
   const year = new Date().getFullYear();
-  const { pathname } = useLocation();
-  const isHome = pathname === '/';
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState(null);
-  const [sent, setSent] = useState(false);
-
-  const onSubscribe = (e) => {
-    e.preventDefault();
-    if (!isValidEmail(email)) {
-      setError('Enter a valid email.');
-      return;
-    }
-    setError(null);
-    // eslint-disable-next-line no-console
-    console.log({ email, source: 'site-footer-strip' });
-    setSent(true);
-  };
 
   return (
     <>
       {/* Poppins is loaded globally in App.js with all weights and italics. */}
       <style>{`
-        .footer-newsletter-strip {
-          background: #0d0d0d;
-          color: #fff;
-          padding: 28px 0;
-          border-top: 64px solid #F6F8F7;
-          font-family: 'Poppins', system-ui, sans-serif;
-        }
-        .footer-newsletter-strip.is-home { border-top-width: 0; }
-        .footer-newsletter-wrap {
-          max-width: 1320px;
-          margin: 0 auto;
-          padding: 0 64px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          align-items: center;
-          gap: 48px;
-        }
-        .footer-newsletter-intro { min-width: 0; }
-        .footer-newsletter-title {
-          margin: 0 0 6px;
-          font-family: 'Poppins', system-ui, sans-serif;
-          font-weight: 700;
-          font-size: clamp(22px, 2.2vw, 30px);
-          line-height: 1.1;
-          letter-spacing: -0.018em;
-          color: #fff;
-        }
-        .footer-newsletter-title em {
-          color: ${LIME};
-          font-style: italic;
-          font-weight: 700;
-        }
-        .footer-newsletter-lede {
-          margin: 0;
-          font-size: 13px;
-          line-height: 1.5;
-          color: rgba(255,255,255,0.6);
-          max-width: 52ch;
-        }
-        .footer-newsletter-form {
-          display: flex;
-          align-items: center;
-          background: #fff;
-          border-radius: 999px;
-          padding: 5px;
-        }
-        .footer-newsletter-form input {
-          flex: 1;
-          background: transparent;
-          border: 0;
-          outline: none;
-          color: #1a1a1a;
-          font-family: inherit;
-          font-size: 14px;
-          padding: 10px 18px;
-          min-width: 0;
-        }
-        .footer-newsletter-form input::placeholder { color: #9aa0a6; }
-        .footer-newsletter-form button {
-          background: ${PINK};
-          color: #fff;
-          border: 0;
-          border-radius: 999px;
-          padding: 10px 26px;
-          font-family: inherit;
-          font-weight: 600;
-          font-size: 14px;
-          cursor: pointer;
-          transition: background 150ms, transform 150ms;
-        }
-        .footer-newsletter-form button:hover { background: #b80042; transform: translateY(-1px); }
-        .footer-newsletter-success {
-          color: ${LIME};
-          font-size: 14px;
-          font-weight: 500;
-          padding: 12px 22px;
-          background: #1a1a1a;
-          border-radius: 999px;
-        }
-        .footer-newsletter-error {
-          color: #ffa8b8;
-          font-size: 12px;
-          margin-top: 6px;
-          padding-left: 22px;
-        }
-
-        @media (max-width: 1023px) {
-          .footer-newsletter-strip { padding: 24px 0; border-top-width: 48px; }
-          .footer-newsletter-strip.is-home { border-top-width: 0; }
-          .footer-newsletter-wrap {
-            grid-template-columns: 1fr;
-            padding: 0 40px;
-            gap: 18px;
-          }
-        }
-        @media (max-width: 639px) {
-          .footer-newsletter-strip { padding: 16px 0; border-top-width: 24px; }
-          .footer-newsletter-strip.is-home { border-top-width: 0; }
-          .footer-newsletter-wrap { padding: 0 20px; gap: 12px; }
-          .footer-newsletter-title { font-size: 19px; margin: 0 0 4px; }
-          .footer-newsletter-lede { font-size: 12px; line-height: 1.45; }
-          .footer-newsletter-form input { font-size: 13px; padding: 8px 14px; }
-          .footer-newsletter-form button { padding: 8px 18px; font-size: 13px; }
-        }
-
         .site-footer {
           background: ${BG};
           color: ${INK};
@@ -207,9 +78,10 @@ export default function SiteFooter() {
         }
         .site-footer-grid {
           display: grid;
-          grid-template-columns: 1.8fr 1fr 1fr;
+          grid-template-columns: 1fr auto;
           gap: 48px;
           padding-bottom: 44px;
+          align-items: center;
         }
         .site-footer-logo {
           height: 84px;
@@ -248,8 +120,10 @@ export default function SiteFooter() {
           padding: 0;
           margin: 0;
           display: flex;
-          flex-direction: column;
-          gap: 12px;
+          flex-direction: row;
+          flex-wrap: nowrap;
+          white-space: nowrap;
+          gap: 26px;
         }
         .site-footer-col li { line-height: 1.4; }
         .site-footer-col a,
@@ -301,7 +175,7 @@ export default function SiteFooter() {
         @media (max-width: 1023px) {
           .site-footer-wrap { padding: 0 40px; }
           .site-footer-grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr auto;
             gap: 40px;
           }
         }
@@ -309,23 +183,19 @@ export default function SiteFooter() {
           .site-footer { padding: 28px 0 16px; }
           .site-footer-wrap { padding: 0 20px; }
           .site-footer-grid {
-            grid-template-columns: 1fr 1fr;
-            gap: 22px 20px;
+            grid-template-columns: 1fr;
+            gap: 22px;
             padding-bottom: 20px;
+            justify-items: center;
+            text-align: center;
           }
-          .site-footer-brand { grid-column: 1 / -1; text-align: center; }
+          .site-footer-brand { text-align: center; }
           .site-footer-logo { height: 52px; margin: 0 auto 8px; }
           .site-footer-brand-body { font-size: 12.5px; max-width: 38ch; margin: 0 auto; line-height: 1.5; }
-          .site-footer-col:nth-of-type(4) { grid-column: 1 / -1; }
-          .site-footer-col h5 { font-size: 10px; margin: 0 0 10px; letter-spacing: 0.16em; }
-          .site-footer-col ul { gap: 8px; }
+          .site-footer-col h5 { font-size: 10px; margin: 0 0 10px; letter-spacing: 0.16em; text-align: center; }
+          .site-footer-col ul { justify-content: center; gap: 16px; }
           .site-footer-col a,
-          .site-footer-col li { font-size: 13px; line-height: 1.35; }
-          .site-footer-col:nth-of-type(4) ul {
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: 8px 18px;
-          }
+          .site-footer-col li { font-size: 12.5px; line-height: 1.35; }
           .site-footer-bottom {
             padding-top: 14px;
             flex-direction: column-reverse;
@@ -337,41 +207,6 @@ export default function SiteFooter() {
           .site-footer-social svg { width: 14px; height: 14px; }
         }
       `}</style>
-      <section className={`footer-newsletter-strip${isHome ? ' is-home' : ''}`} aria-labelledby="footer-newsletter-h">
-        <div className="footer-newsletter-wrap">
-          <div className="footer-newsletter-intro">
-            <h2 id="footer-newsletter-h" className="footer-newsletter-title">
-              One <em>letter</em> a month.
-            </h2>
-            <p className="footer-newsletter-lede">
-              This week's shelf, next week's clubs, and a paragraph
-              we couldn't stop thinking about.
-            </p>
-          </div>
-
-          {sent ? (
-            <div className="footer-newsletter-success" role="status">
-              You're on the list — see you on the first of the month.
-            </div>
-          ) : (
-            <div>
-              <form className="footer-newsletter-form" onSubmit={onSubscribe} noValidate>
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  aria-label="Email address"
-                  required
-                />
-                <button type="submit">Subscribe</button>
-              </form>
-              {error && <div className="footer-newsletter-error" role="alert">{error}</div>}
-            </div>
-          )}
-        </div>
-      </section>
-
       <footer className="site-footer" aria-labelledby="site-footer-brand">
         <div className="site-footer-wrap">
           <div className="site-footer-grid">
@@ -391,15 +226,6 @@ export default function SiteFooter() {
               <h5>Explore</h5>
               <ul>
                 {EXPLORE_LINKS.map((l) => (
-                  <li key={l.label}><FooterLink item={l} /></li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="site-footer-col">
-              <h5>Helps</h5>
-              <ul>
-                {HELP_LINKS.map((l) => (
                   <li key={l.label}><FooterLink item={l} /></li>
                 ))}
               </ul>

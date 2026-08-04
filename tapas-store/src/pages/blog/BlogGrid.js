@@ -133,7 +133,7 @@ export default function BlogGrid({ articles }) {
       <div className="blog-grid-wrap">
         <div className="blog-grid">
           {articles.length === 0 ? (
-            <p className="blog-grid-empty">No articles yet.</p>
+            <p className="blog-grid-empty">Coming soon</p>
           ) : (
             articles.map((a) => <BlogGridCard key={a.slug} article={a} />)
           )}

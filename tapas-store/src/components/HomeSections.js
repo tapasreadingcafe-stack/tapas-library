@@ -776,7 +776,12 @@ function PricingSection() {
               <li>Borrow 2 books at a time</li>
               <li>10% off the café</li>
             </ul>
-            <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
+            <a
+              href={`https://wa.me/918792470576?text=${encodeURIComponent("Hi Tapas Reading Cafe! I'm interested in the Monthly membership plan (₹600/month). Please share the details.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hs-pricing-btn"
+            >Choose plan</a>
           </div>
           <div className="hs-pricing-card">
             <span className="badge">BEST VALUE</span>
@@ -789,7 +794,12 @@ function PricingSection() {
               <li>Borrow 2 books at a time</li>
               <li>10% off the café</li>
             </ul>
-            <Link to="/sign-up" className="hs-pricing-btn">Choose plan</Link>
+            <a
+              href={`https://wa.me/918792470576?text=${encodeURIComponent("Hi Tapas Reading Cafe! I'm interested in the Yearly membership plan (₹6,000/year). Please share the details.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hs-pricing-btn"
+            >Choose plan</a>
           </div>
         </div>
       </div>

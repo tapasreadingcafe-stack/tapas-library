@@ -260,9 +260,7 @@ function EventsLegacy() {
       .some((s) => (s || '').toLowerCase().includes(query));
   }), [active, query]);
 
-  const emptyText = tab === 'past'
-    ? 'Past events will appear here once they wrap.'
-    : 'Nothing on the books just yet.';
+  const emptyText = 'Coming soon';
 
   return (
     <div className="ev-page">
@@ -278,15 +276,6 @@ function EventsLegacy() {
             onClick={() => setTab('upcoming')}
           >
             Upcoming<span className="ev-tab-count">{upcoming.length}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'past'}
-            className={`ev-tab${tab === 'past' ? ' is-active' : ''}`}
-            onClick={() => setTab('past')}
-          >
-            Past Events
           </button>
         </div>
         <div className="ev-grid">
