@@ -341,9 +341,9 @@ export default function ContactGetInTouch() {
               <div>
                 <h4>Phone</h4>
                 <p>
-                  <a href="tel:+918792470576" style={{ color: 'inherit', textDecoration: 'none' }}>+91 87924 70576</a>
-                  {' / '}
                   <a href="tel:+917760393951" style={{ color: 'inherit', textDecoration: 'none' }}>+91 77603 93951</a>
+                  {' / '}
+                  <a href="tel:+918792470576" style={{ color: 'inherit', textDecoration: 'none' }}>+91 87924 70576</a>
                 </p>
               </div>
             </div>
