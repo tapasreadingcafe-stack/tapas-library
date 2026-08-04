@@ -1,17 +1,21 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-// Emails the cafe whenever the website contact form is submitted.
+// Emails the cafe whenever the website contact form is submitted, using
+// Resend (https://resend.com) — an HTTP email API that works reliably on
+// Supabase Edge (no SMTP ports needed).
 //
-// All credentials + the recipient live in Supabase secrets (set once in
-// the dashboard), so nothing sensitive is ever sent from the browser:
-//   SMTP_EMAIL     – the Gmail address that sends the alert
-//   SMTP_PASSWORD  – a Gmail App Password (not your normal password)
-//   NOTIFY_TO      – where the alert lands (defaults to SMTP_EMAIL)
+// All config lives in Supabase secrets (set once in the dashboard), so
+// nothing sensitive is ever sent from the browser:
+//   RESEND_API_KEY  – your Resend API key (starts with "re_")
+//   NOTIFY_TO       – where the alert lands (use the email you signed up
+//                     to Resend with, so the free tier can deliver it)
+//   NOTIFY_FROM     – optional sender; defaults to Resend's shared
+//                     onboarding address (works with no domain setup)
 //
 // Triggered by the public contact form via supabase.functions.invoke()
 // (the anon key satisfies the default JWT check). Also accepts a Supabase
-// Database Webhook payload ({ record: {...} }) if you'd rather wire it
-// that way. Failures are logged but never block the visitor.
+// Database Webhook payload ({ record: {...} }). Failures are logged but
+// never block the visitor's thank-you.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,13 +35,13 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const SMTP_EMAIL = Deno.env.get("SMTP_EMAIL");
-    const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD");
-    const NOTIFY_TO = Deno.env.get("NOTIFY_TO") || SMTP_EMAIL;
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    const NOTIFY_TO = Deno.env.get("NOTIFY_TO");
+    const NOTIFY_FROM = Deno.env.get("NOTIFY_FROM") || "Tapas Reading Cafe <onboarding@resend.dev>";
 
-    if (!SMTP_EMAIL || !SMTP_PASSWORD) {
+    if (!RESEND_API_KEY || !NOTIFY_TO) {
       return new Response(
-        JSON.stringify({ error: "SMTP_EMAIL / SMTP_PASSWORD secrets are not set" }),
+        JSON.stringify({ error: "RESEND_API_KEY / NOTIFY_TO secrets are not set" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -66,27 +70,33 @@ Deno.serve(async (req: Request) => {
         <p style="margin:18px 0 0;color:#6e6e6e;font-size:12px">Sent from the tapasreadingcafe.com contact form.</p>
       </div>`;
 
-    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: { username: SMTP_EMAIL, password: SMTP_PASSWORD },
-      },
-    });
-
-    await client.send({
-      from: `Tapas Reading Cafe <${SMTP_EMAIL}>`,
-      to: NOTIFY_TO!,
+    const payload: Record<string, unknown> = {
+      from: NOTIFY_FROM,
+      to: [NOTIFY_TO],
       subject: `New contact form: ${name}${subject ? " — " + subject : ""}`,
-      content: "auto",
       html,
+    };
+    if (email) payload.reply_to = email;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    await client.close();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error("Resend error:", res.status, data);
+      return new Response(
+        JSON.stringify({ error: data?.message || "Resend request failed", status: res.status }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, id: data?.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
