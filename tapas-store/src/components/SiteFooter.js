@@ -185,7 +185,7 @@ export default function SiteFooter() {
               <a href="tel:+918792470576">+91 87924 70576</a>
             </p>
             <p>
-              <a href="mailto:hello@tapasreadingcafe.com">hello@tapasreadingcafe.com</a>
+              <a href="mailto:tapasreadingcafe@gmail.com">tapasreadingcafe@gmail.com</a>
             </p>
           </address>
 
