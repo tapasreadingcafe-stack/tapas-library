@@ -305,6 +305,20 @@ export default function ContactGetInTouch() {
     } catch {
       /* network / RLS — still thank the visitor */
     }
+
+    // Fire-and-forget: email the cafe about the new submission. The SMTP
+    // credentials + recipient live in Supabase secrets (server-side) — the
+    // browser only sends the form fields. Failures never affect the
+    // visitor's thank-you.
+    supabase.functions.invoke('notify-contact-email', {
+      body: {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        message: form.message.trim(),
+        fields: { ...form },
+      },
+    }).catch(() => {});
+
     setSent(true);
   };
 
