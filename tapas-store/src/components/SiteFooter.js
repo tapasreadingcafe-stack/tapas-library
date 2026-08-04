@@ -77,11 +77,6 @@ export default function SiteFooter() {
           align-items: center;
           gap: 26px;
         }
-        .site-footer-logo {
-          height: 66px;
-          width: auto;
-          display: block;
-        }
         .site-footer-nav {
           display: flex;
           flex-wrap: wrap;
@@ -149,7 +144,6 @@ export default function SiteFooter() {
         @media (max-width: 639px) {
           .site-footer { padding: 44px 0 22px; }
           .site-footer-wrap { gap: 22px; padding: 0 20px; }
-          .site-footer-logo { height: 52px; }
           .site-footer-nav { gap: 10px 22px; }
           .site-footer-nav a { font-size: 13px; }
           .site-footer-social { width: 34px; height: 34px; }
@@ -159,12 +153,6 @@ export default function SiteFooter() {
       `}</style>
       <footer className="site-footer">
         <div className="site-footer-wrap">
-          <img
-            src={`${process.env.PUBLIC_URL || ''}/logo.png`}
-            alt="Tapas Reading Cafe"
-            className="site-footer-logo"
-          />
-
           <nav className="site-footer-nav" aria-label="Footer">
             {EXPLORE_LINKS.map((l) => (
               <FooterLink key={l.label} item={l} />
