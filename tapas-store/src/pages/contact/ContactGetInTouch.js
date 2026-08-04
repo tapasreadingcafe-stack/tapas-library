@@ -351,7 +351,7 @@ export default function ContactGetInTouch() {
               <span className="contact-git-info-icon"><ClockIcon /></span>
               <div>
                 <h4>Working Time</h4>
-                <p>Tuesday – Sunday: 10 AM – 8 PM<br />Monday: Closed</p>
+                <p>Tuesday – Sunday: 11 AM – 9 PM<br />Monday: Closed</p>
               </div>
             </div>
           </div>

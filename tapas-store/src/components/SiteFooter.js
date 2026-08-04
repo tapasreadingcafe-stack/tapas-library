@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-// Global site footer. Cream/off-white band with three link columns,
-// lime social pills, and a thin-ruled copyright row. Lives outside
-// the v2 tree so it renders on every route without the editor's
-// self-heal having to seed it into each page.
+// Global site footer. Centered layout: logo, a single row of nav links,
+// lime social pills, the cafe's address / phone / email, a thin rule,
+// then the copyright line. Lives outside the v2 tree so it renders on
+// every route without the editor's self-heal having to seed it.
 
 const INK       = '#1a1a1a';
 const INK_2     = '#3a3a3a';
@@ -13,8 +13,6 @@ const RULE      = '#ececea';
 const BG        = '#F6F8F7';
 const LIME      = '#caf27e';
 
-// Column link shapes. Internal routes use <Link>; external or
-// not-yet-built targets use an <a href="#">.
 const EXPLORE_LINKS = [
   { label: 'Home',    to: '/' },
   { label: 'About',   to: '/about' },
@@ -66,81 +64,81 @@ export default function SiteFooter() {
           background: ${BG};
           color: ${INK};
           font-family: 'Poppins', system-ui, sans-serif;
-          padding: 72px 0 28px;
+          padding: 64px 0 30px;
           margin-top: auto;
+          text-align: center;
         }
         .site-footer-wrap {
-          max-width: 1320px;
+          max-width: 960px;
           margin: 0 auto;
-          padding: 0 64px;
-        }
-        .site-footer-grid {
+          padding: 0 24px;
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
-          gap: 30px;
-          padding-bottom: 44px;
-        }
-        .site-footer-logo {
-          height: 84px;
-          width: auto;
-          display: block;
-          margin-bottom: 18px;
-        }
-        .site-footer-brand-headline {
-          font-family: 'Poppins', system-ui, sans-serif;
-          font-weight: 500;
-          font-style: italic;
-          font-size: 16px;
-          line-height: 1.4;
-          letter-spacing: -0.005em;
-          color: ${INK_2};
-          margin: 0 0 14px;
-        }
-        .site-footer-brand-body {
-          font-size: 14px;
-          line-height: 1.6;
-          color: ${INK_2};
-          max-width: 28ch;
-          margin: 0;
-        }
-        .site-footer-col h5 {
-          font-family: 'Poppins', system-ui, sans-serif;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: ${MUTED};
-          margin: 4px 0 18px;
-        }
-        .site-footer-col ul {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: row;
-          flex-wrap: nowrap;
-          white-space: nowrap;
+          align-items: center;
           gap: 26px;
         }
-        .site-footer-col li { line-height: 1.4; }
-        .site-footer-col a,
-        .site-footer-col li {
+        .site-footer-logo {
+          height: 66px;
+          width: auto;
+          display: block;
+        }
+        .site-footer-nav {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 14px 34px;
+        }
+        .site-footer-nav a {
           color: ${INK};
           text-decoration: none;
           font-size: 14px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
           transition: color 150ms;
         }
-        .site-footer-col a:hover { color: ${MUTED}; }
-
-        .site-footer-bottom {
-          border-top: 1px solid ${RULE};
-          padding-top: 24px;
+        .site-footer-nav a:hover { color: ${MUTED}; }
+        .site-footer-socials {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-          flex-wrap: wrap;
+          gap: 12px;
+          justify-content: center;
+        }
+        .site-footer-social {
+          width: 38px; height: 38px;
+          border-radius: 999px;
+          background: ${LIME};
+          color: ${INK};
+          display: inline-grid;
+          place-items: center;
+          text-decoration: none;
+          transition: transform 150ms, background 150ms;
+        }
+        .site-footer-social:hover {
+          background: #b4e46e;
+          transform: translateY(-2px);
+        }
+        .site-footer-contact {
+          font-style: normal;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 14px;
+          line-height: 1.6;
+          color: ${INK_2};
+          max-width: 46ch;
+        }
+        .site-footer-contact p { margin: 0; }
+        .site-footer-contact a {
+          color: inherit;
+          text-decoration: none;
+          transition: color 150ms;
+        }
+        .site-footer-contact a:hover { color: ${INK}; }
+        .site-footer-rule {
+          width: 100%;
+          max-width: 780px;
+          border: 0;
+          border-top: 1px solid ${RULE};
+          margin: 6px 0 0;
         }
         .site-footer-copy {
           font-family: 'Poppins', system-ui, sans-serif;
@@ -148,104 +146,65 @@ export default function SiteFooter() {
           color: ${MUTED};
           letter-spacing: 0.02em;
         }
-        .site-footer-socials {
-          display: flex;
-          gap: 10px;
-        }
-        .site-footer-social {
-          width: 36px; height: 36px;
-          border-radius: 999px;
-          background: ${LIME};
-          color: ${INK};
-          display: inline-grid;
-          place-items: center;
-          text-decoration: none;
-          font-family: 'Poppins', system-ui, sans-serif;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          transition: transform 150ms, background 150ms;
-        }
-        .site-footer-social:hover {
-          background: #b4e46e;
-          transform: translateY(-2px);
-        }
-        @media (max-width: 1023px) {
-          .site-footer-wrap { padding: 0 40px; }
-          .site-footer-grid {
-            gap: 26px;
-          }
-        }
         @media (max-width: 639px) {
-          .site-footer { padding: 28px 0 16px; }
-          .site-footer-wrap { padding: 0 20px; }
-          .site-footer-grid {
-            gap: 22px;
-            padding-bottom: 20px;
-            align-items: center;
-            text-align: center;
-          }
-          .site-footer-brand { text-align: center; }
-          .site-footer-logo { height: 52px; margin: 0 auto 8px; }
-          .site-footer-brand-body { font-size: 12.5px; max-width: 38ch; margin: 0 auto; line-height: 1.5; }
-          .site-footer-col h5 { font-size: 10px; margin: 0 0 10px; letter-spacing: 0.16em; text-align: center; }
-          .site-footer-col ul { justify-content: center; gap: 16px; }
-          .site-footer-col a,
-          .site-footer-col li { font-size: 12.5px; line-height: 1.35; }
-          .site-footer-bottom {
-            padding-top: 14px;
-            flex-direction: column-reverse;
-            align-items: center;
-            gap: 12px;
-          }
-          .site-footer-copy { font-size: 11px; text-align: center; }
-          .site-footer-social { width: 30px; height: 30px; }
-          .site-footer-social svg { width: 14px; height: 14px; }
+          .site-footer { padding: 44px 0 22px; }
+          .site-footer-wrap { gap: 22px; padding: 0 20px; }
+          .site-footer-logo { height: 52px; }
+          .site-footer-nav { gap: 10px 22px; }
+          .site-footer-nav a { font-size: 13px; }
+          .site-footer-social { width: 34px; height: 34px; }
+          .site-footer-contact { font-size: 13px; }
+          .site-footer-copy { font-size: 11px; }
         }
       `}</style>
-      <footer className="site-footer" aria-labelledby="site-footer-brand">
+      <footer className="site-footer">
         <div className="site-footer-wrap">
-          <div className="site-footer-grid">
-            <div className="site-footer-brand">
-              <img
-                src={`${process.env.PUBLIC_URL || ''}/logo.png`}
-                alt="Tapas Reading Cafe"
-                className="site-footer-logo"
-              />
-              <p className="site-footer-brand-body" id="site-footer-brand">
-                A cosy library-café in HSR Layout, Bengaluru — read,
-                borrow books, and linger over coffee.
-              </p>
-            </div>
+          <img
+            src={`${process.env.PUBLIC_URL || ''}/logo.png`}
+            alt="Tapas Reading Cafe"
+            className="site-footer-logo"
+          />
 
-            <div className="site-footer-col">
-              <h5>Explore</h5>
-              <ul>
-                {EXPLORE_LINKS.map((l) => (
-                  <li key={l.label}><FooterLink item={l} /></li>
-                ))}
-              </ul>
-            </div>
+          <nav className="site-footer-nav" aria-label="Footer">
+            {EXPLORE_LINKS.map((l) => (
+              <FooterLink key={l.label} item={l} />
+            ))}
+          </nav>
+
+          <div className="site-footer-socials" aria-label="Social links">
+            {SOCIALS.map((s) => (
+              <a
+                key={s.label}
+                href={s.href}
+                className="site-footer-social"
+                aria-label={s.label}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <s.Icon />
+              </a>
+            ))}
           </div>
 
-          <div className="site-footer-bottom">
-            <div className="site-footer-copy">
-              © {year} Tapas Reading Cafe · Bengaluru
-            </div>
-            <div className="site-footer-socials" aria-label="Social links">
-              {SOCIALS.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  className="site-footer-social"
-                  aria-label={s.label}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <s.Icon />
-                </a>
-              ))}
-            </div>
+          <address className="site-footer-contact">
+            <p>
+              2nd Floor, 2628, 27th Main Rd, above Juice Junction,<br />
+              1st Sector, HSR Layout, Bengaluru, Karnataka 560102
+            </p>
+            <p>
+              <a href="tel:+917760393951">+91 77603 93951</a>
+              {' / '}
+              <a href="tel:+918792470576">+91 87924 70576</a>
+            </p>
+            <p>
+              <a href="mailto:hello@tapasreadingcafe.com">hello@tapasreadingcafe.com</a>
+            </p>
+          </address>
+
+          <hr className="site-footer-rule" />
+
+          <div className="site-footer-copy">
+            © {year} Tapas Reading Cafe · Bengaluru · All rights reserved.
           </div>
         </div>
       </footer>
