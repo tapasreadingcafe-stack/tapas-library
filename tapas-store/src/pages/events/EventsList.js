@@ -57,14 +57,18 @@ function EventCard({ event, focus, cardRef }) {
 }
 
 export default function EventsList({
-  category, focusSlug, listRef, cardRefs,
+  category, focusSlug, listRef, cardRefs, query = '',
 }) {
   const { data: rows, loading } = useEvents();
   const upcoming = splitEvents(rows || []).upcoming;
   const list = upcoming.length > 0 ? upcoming : UPCOMING_EVENTS;
-  const visible = list.filter((e) =>
-    category === 'all' ? true : e.category === category,
-  );
+  const q = query.trim().toLowerCase();
+  const visible = list.filter((e) => {
+    if (category !== 'all' && e.category !== category) return false;
+    if (!q) return true;
+    return [e.title, e.italic, e.description, e.category]
+      .some((s) => (s || '').toLowerCase().includes(q));
+  });
 
   return (
     <div

@@ -189,8 +189,8 @@ export const SHOP_CATEGORIES = [
 export const SHOP_FORMATS = ['Paperback', 'Hardcover', 'Used'];
 export const SHOP_CLUBS   = ['Slow Fiction', 'Translators', 'Poetry', 'Novella'];
 
-export const SHOP_PRICE_MIN = 199;
-export const SHOP_PRICE_MAX = 1999;
+export const SHOP_PRICE_MIN = 10;
+export const SHOP_PRICE_MAX = 10000;
 
 export const MEMBER_DISCOUNT_RATE = 0.10;
 

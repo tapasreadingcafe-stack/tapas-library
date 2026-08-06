@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
 
 // Primary site nav. Sticky, green, matches the Figma redesign.
 // Lives outside the v2 tree so active-state styling can react to the
@@ -14,8 +13,6 @@ const INK = '#1a1a1a';
 
 const NAV_LINKS = [
   { to: '/about',   label: 'About Us' },
-  { to: '/shop',    label: 'Shop' },
-  { to: '/library', label: 'Library' },
   { to: '/events',  label: 'Events' },
   { to: '/blog',    label: 'Blogs' },
   { to: '/contact', label: 'Contact Us' },
@@ -25,21 +22,6 @@ function isActive(pathname, to) {
   if (to === '/') return pathname === '/';
   return pathname === to || pathname.startsWith(to + '/');
 }
-
-const SearchIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
-const BagIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 01-8 0" />
-  </svg>
-);
 
 const MenuIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -59,7 +41,6 @@ const CloseIcon = () => (
 export default function TapasStickyNav() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { itemCount } = useCart();
 
   // Transparent at the top, lime + soft shadow once the user has
   // scrolled past a short threshold. 50px mirrors the usual "leave
@@ -92,24 +73,30 @@ export default function TapasStickyNav() {
         .tapas-snav.is-scrolled {
           background: ${LIME};
         }
-        /* When the nav is transparent at the top, only the right-side
-           items (search, cart, Sign In) sit over the library photo
-           and need to be white. The center links (About Us \u2192
-           Contact Us) sit over the lime curve / lime bg and stay
-           dark ink. Logo is also on lime and stays dark. Sign Up
-           keeps its pink pill either way. */
+        /* At the top of the home page the nav sits over the full-bleed
+           library photo (dark), so ALL nav items go white: logo (inverted
+           to a white silhouette), center links, and Sign In. Sign Up keeps
+           its pink pill. Once the user scrolls (is-scrolled \u2192 lime bg) they
+           revert to dark ink. On mobile the nav sits over lime, not the
+           photo \u2014 the logo filter is reset in the \u2264900 block below. */
+        .tapas-snav.is-top .tapas-snav-logo-img {
+          filter: brightness(0) invert(1);
+        }
+        .tapas-snav.is-top .tapas-snav-links a,
         .tapas-snav.is-top .tapas-snav-signin,
         .tapas-snav.is-top .tapas-snav-icon {
           color: #fff;
+        }
+        .tapas-snav.is-top .tapas-snav-links a:hover,
+        .tapas-snav.is-top .tapas-snav-signin:hover {
+          color: #fff;
+          opacity: 0.75;
         }
         .tapas-snav.is-top .tapas-snav-signin {
           text-decoration-color: rgba(255,255,255,0.6);
         }
         .tapas-snav.is-top .tapas-snav-icon:hover {
-          background: rgba(255,255,255,0.15);
-        }
-        .tapas-snav.is-top .tapas-snav-badge {
-          border-color: rgba(255,255,255,0.9);
+          background: rgba(255,255,255,0.14);
         }
         .tapas-snav-inner {
           max-width: 1320px; margin: 0 auto;
@@ -196,6 +183,67 @@ export default function TapasStickyNav() {
           cursor: pointer; padding: 8px; border-radius: 8px;
         }
         .tapas-snav-hamburger:hover { background: rgba(0,0,0,0.08); }
+        .tapas-snav-search-inline {
+          display: inline-flex;
+          align-items: center;
+          height: 40px;
+          width: 40px;
+          background: transparent;
+          border: 1.5px solid transparent;
+          border-radius: 999px;
+          overflow: hidden;
+          padding: 0;
+          transition: width 260ms cubic-bezier(.2,.8,.2,1), border-color 200ms, background 200ms, padding 260ms cubic-bezier(.2,.8,.2,1);
+        }
+        .tapas-snav-search-inline.is-open {
+          width: 280px;
+          border-color: ${INK};
+          background: transparent;
+          padding-left: 18px;
+        }
+        .tapas-snav-search-inline input {
+          flex: 1;
+          min-width: 0;
+          width: 0;
+          background: transparent;
+          border: 0;
+          outline: none;
+          box-shadow: none;
+          -webkit-appearance: none;
+          appearance: none;
+          font-family: 'Poppins', system-ui, sans-serif;
+          font-size: 14px;
+          color: ${INK};
+          padding: 0;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 180ms 80ms;
+        }
+        .tapas-snav-search-inline input::-webkit-search-decoration,
+        .tapas-snav-search-inline input::-webkit-search-cancel-button,
+        .tapas-snav-search-inline input::-webkit-search-results-button,
+        .tapas-snav-search-inline input::-webkit-search-results-decoration { display: none; }
+        .tapas-snav-search-inline.is-open input { opacity: 1; pointer-events: auto; }
+        .tapas-snav-search-inline input::placeholder { color: rgba(0,0,0,0.45); }
+        .tapas-snav-search-toggle {
+          flex: 0 0 auto;
+          background: transparent;
+          border: 0;
+          color: ${INK};
+          width: 40px;
+          height: 40px;
+          padding: 0;
+          border-radius: 999px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 150ms;
+        }
+        .tapas-snav-search-inline:not(.is-open) .tapas-snav-search-toggle:hover { background: rgba(0,0,0,0.08); }
+        @media (max-width: 767px) {
+          .tapas-snav-search-inline.is-open { width: 200px; padding-left: 14px; }
+        }
         .tapas-snav-mobile {
           display: none;
           background: ${LIME};
@@ -221,6 +269,8 @@ export default function TapasStickyNav() {
           .tapas-snav-mobile { display: block; }
           .tapas-snav-inner { padding: 12px 20px; }
           .tapas-snav-logo-img { height: 48px; }
+          /* Mobile nav sits over lime (not the photo) — keep the logo dark. */
+          .tapas-snav.is-top .tapas-snav-logo-img { filter: none; }
         }
       `}</style>
       <nav
@@ -241,6 +291,8 @@ export default function TapasStickyNav() {
               src={`${process.env.PUBLIC_URL || ''}/logo.png`}
               alt="Tapas Reading Cafe"
               className="tapas-snav-logo-img"
+              width={423}
+              height={228}
             />
           </Link>
 
@@ -258,26 +310,6 @@ export default function TapasStickyNav() {
                 </Link>
               );
             })}
-          </div>
-
-          <div className="tapas-snav-right">
-            <Link to="/search" className="tapas-snav-icon" aria-label="Search">
-              <SearchIcon />
-            </Link>
-            <Link
-              to="/cart"
-              className="tapas-snav-icon"
-              aria-label={itemCount > 0 ? `Shopping bag (${itemCount})` : 'Shopping bag'}
-            >
-              <BagIcon />
-              {itemCount > 0 && (
-                <span className="tapas-snav-badge" aria-hidden="true">
-                  {itemCount > 99 ? '99+' : itemCount}
-                </span>
-              )}
-            </Link>
-            <Link to="/sign-in" className="tapas-snav-signin">Sign In</Link>
-            <Link to="/sign-up" className="tapas-snav-signup">Sign Up</Link>
           </div>
 
           <button
@@ -307,14 +339,6 @@ export default function TapasStickyNav() {
                 </Link>
               );
             })}
-            <div className="tapas-snav-mobile-actions">
-              <Link to="/sign-in" className="tapas-snav-signin" onClick={() => setMenuOpen(false)}>
-                Sign In
-              </Link>
-              <Link to="/sign-up" className="tapas-snav-signup" onClick={() => setMenuOpen(false)}>
-                Sign Up
-              </Link>
-            </div>
           </div>
         )}
       </nav>

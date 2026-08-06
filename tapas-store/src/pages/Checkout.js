@@ -43,7 +43,7 @@ function loadRazorpay() {
 export default function Checkout() {
   const navigate = useNavigate();
   const {
-    items, subtotal, giftWrap, pickup, promoCode, note, clear,
+    items, subtotal, giftWrap, pickup, promoCode, note, clear, updateQty, removeItem,
   } = useCart();
   const { member, loading: authLoading } = useAuth();
 
@@ -88,6 +88,43 @@ export default function Checkout() {
     }
     setSubmitting(true);
     try {
+      // 0. Fresh stock check — refuse to proceed if any book in the
+      //    cart now exceeds available stock. Caps the cart line if
+      //    user accepts so they can retry without re-adding.
+      const bookLines = items.filter((i) => i.type === 'book' && i.book_id);
+      if (bookLines.length > 0) {
+        const ids = bookLines.map((i) => i.book_id);
+        const { data: stockRows, error: stockErr } = await supabase
+          .from('books')
+          .select('id, title, quantity_available')
+          .in('id', ids);
+        if (stockErr) throw new Error('Could not verify stock — please retry.');
+        const stockMap = new Map((stockRows || []).map((r) => [r.id, Number(r.quantity_available || 0)]));
+        const issues = [];
+        for (const line of bookLines) {
+          const have = stockMap.get(line.book_id) ?? 0;
+          if (line.quantity > have) {
+            issues.push({ key: line.key, title: line.title, want: line.quantity, have });
+          }
+        }
+        if (issues.length > 0) {
+          // Clamp cart lines to available stock, surface a message,
+          // and bail out so the user can review before paying.
+          issues.forEach((iss) => {
+            if (iss.have <= 0) removeItem(iss.key);
+            else updateQty(iss.key, iss.have);
+          });
+          const lines = issues
+            .map((i) => i.have <= 0
+              ? `• ${i.title} — out of stock, removed`
+              : `• ${i.title} — only ${i.have} left, qty updated`)
+            .join('\n');
+          setError(`Stock changed since you added these to your cart:\n${lines}\nReview and try again.`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const ok = await loadRazorpay();
       if (!ok) throw new Error('Could not load the Razorpay SDK. Check your connection and retry.');
 

@@ -45,10 +45,16 @@ export default function CartItemCard({
         </svg>
       </button>
 
-      <div className={`ct-item-cover c-${coverVariant} is-${coverVariant}`} aria-hidden="true">
-        <div className="ct-item-cover-title">{book?.coverLabel || item.title}</div>
-        <div className="ct-item-cover-author">{item.author?.toUpperCase()}</div>
-      </div>
+      {item.cover_image ? (
+        <div className="ct-item-cover ct-item-cover-photo" aria-hidden="true">
+          <img src={item.cover_image} alt="" loading="lazy" />
+        </div>
+      ) : (
+        <div className={`ct-item-cover c-${coverVariant} is-${coverVariant}`} aria-hidden="true">
+          <div className="ct-item-cover-title">{book?.coverLabel || item.title}</div>
+          <div className="ct-item-cover-author">{item.author?.toUpperCase()}</div>
+        </div>
+      )}
 
       <div className="ct-item-meta">
         <h3 className="ct-item-title">{item.title}</h3>
@@ -70,7 +76,7 @@ export default function CartItemCard({
           type="button"
           aria-label="Decrease quantity"
           onClick={() => onQty(item.quantity - 1)}
-        >\u2212</button>
+        >{'\u2212'}</button>
         <span className="ct-qty-n" aria-live="polite">{item.quantity}</span>
         <button
           type="button"

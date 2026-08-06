@@ -1,5 +1,5 @@
 const SIGN_IN_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .si-root {
   --si-lime:   #caf27e;
@@ -11,9 +11,9 @@ const SIGN_IN_CSS = `
   --si-muted:  #6e6e6e;
   --si-rule:   #ececea;
   --si-bg:     #faf8f4;
-  --si-f-display: "DM Serif Display", Georgia, serif;
-  --si-f-ui:      "Inter", system-ui, sans-serif;
-  --si-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --si-f-display: "Poppins", system-ui, sans-serif;
+  --si-f-ui:      "Poppins", system-ui, sans-serif;
+  --si-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--si-f-ui);
   color: var(--si-ink);
@@ -48,7 +48,7 @@ const SIGN_IN_CSS = `
 }
 .si-title {
   font-family: var(--si-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(40px, 5vw, 56px);
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -283,7 +283,7 @@ const SIGN_IN_CSS = `
 }
 .si-card-title {
   font-family: var(--si-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 24px;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -373,13 +373,13 @@ const SIGN_IN_CSS = `
   display: inline-grid;
   place-items: center;
   font-family: var(--si-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 14px;
   flex-shrink: 0;
 }
 .si-testimonial-name {
   font-family: var(--si-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 14px;
   color: var(--si-ink);
 }
@@ -403,7 +403,7 @@ const SIGN_IN_CSS = `
 .si-stub-inner { max-width: 480px; }
 .si-stub h1 {
   font-family: var(--si-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(32px, 4vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.02em;

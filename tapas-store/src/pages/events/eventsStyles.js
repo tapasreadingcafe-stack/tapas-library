@@ -1,5 +1,5 @@
 const EVENTS_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .ev-root {
   --ev-lime:   #caf27e;
@@ -19,9 +19,9 @@ const EVENTS_CSS = `
   --chip-peach:     #FFE4CC;
   --chip-softPink:  #FCCEE0;
 
-  --ev-f-display: "DM Serif Display", Georgia, serif;
-  --ev-f-ui:      "Inter", system-ui, sans-serif;
-  --ev-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --ev-f-display: "Poppins", system-ui, sans-serif;
+  --ev-f-ui:      "Poppins", system-ui, sans-serif;
+  --ev-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--ev-f-ui);
   color: var(--ev-ink);
@@ -74,7 +74,7 @@ const EVENTS_CSS = `
 }
 .ev-hero-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -178,7 +178,7 @@ const EVENTS_CSS = `
 }
 .ev-cal-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
   color: var(--ev-ink);
   letter-spacing: -0.01em;
@@ -232,7 +232,7 @@ const EVENTS_CSS = `
 .ev-cal-cell.has-events:hover { background: #fdfcf6; }
 .ev-cal-num {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 16px;
   color: var(--ev-ink);
   letter-spacing: -0.01em;
@@ -297,7 +297,7 @@ const EVENTS_CSS = `
 }
 .ev-head-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -354,7 +354,7 @@ const EVENTS_CSS = `
 }
 .ev-card-date-day {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 54px;
   line-height: 0.95;
   letter-spacing: -0.015em;
@@ -385,7 +385,7 @@ const EVENTS_CSS = `
 }
 .ev-card-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 26px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -457,7 +457,7 @@ const EVENTS_CSS = `
 }
 .ev-club-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 24px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -495,7 +495,7 @@ const EVENTS_CSS = `
 }
 .ev-club-seats-n {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 20px;
   color: var(--ev-ink);
   letter-spacing: -0.01em;
@@ -532,7 +532,7 @@ const EVENTS_CSS = `
 }
 .ev-supper-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(32px, 3.8vw, 52px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -593,7 +593,7 @@ const EVENTS_CSS = `
 }
 .ev-menu-title {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   line-height: 1.2;
   margin: 0 0 16px;
@@ -615,7 +615,7 @@ const EVENTS_CSS = `
 .ev-menu-row:first-child { border-top: 0; padding-top: 0; }
 .ev-menu-n {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   color: var(--ev-purple);
   letter-spacing: -0.01em;
@@ -651,7 +651,7 @@ const EVENTS_CSS = `
 }
 .ev-empty h3 {
   font-family: var(--ev-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   color: var(--ev-ink);
   margin: 0 0 8px;
