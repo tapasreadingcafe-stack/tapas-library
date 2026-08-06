@@ -31,6 +31,7 @@ export function usePage(slug)        { return useFetch(() => cms.fetchPage(slug)
 export function useShopBooks()       { return useFetch(() => cms.fetchShopBooks()); }
 export function useLibraryShelves()  { return useFetch(() => cms.fetchLibraryShelves()); }
 export function useEvents()          { return useFetch(() => cms.fetchEvents()); }
+export function useEvent(slug)       { return useFetch(() => cms.fetchEventBySlug(slug), [slug]); }
 export function useClubs()           { return useFetch(() => cms.fetchClubs()); }
 export function useFeaturedSupper()  { return useFetch(() => cms.fetchFeaturedSupper()); }
 export function useContactInfo()     { return useFetch(() => cms.fetchContactInfo()); }

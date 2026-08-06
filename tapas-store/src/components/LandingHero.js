@@ -226,7 +226,6 @@ export default function LandingHero() {
             <h1 className="lh-title" dangerouslySetInnerHTML={{ __html: headingHtml }} />
             <p className="lh-lede">{lede}</p>
             <div className="lh-ctas">
-              <Link to="/sign-up" className="lh-btn is-pink">Join now!</Link>
               <Link to="/contact" className="lh-btn is-orange">Visit us</Link>
             </div>
           </div>

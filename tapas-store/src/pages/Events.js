@@ -1,223 +1,112 @@
 import React, { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import PageBreadcrumb from '../components/PageBreadcrumb';
-import { UPCOMING_EVENTS, actionMessage } from '../data/eventsData';
+import { UPCOMING_EVENTS } from '../data/eventsData';
 import { useEvents } from '../cms/hooks';
-import { splitEvents } from '../cms/adapters';
 import PageRenderer from '../blocks/PageRenderer';
 import { useSiteContent } from '../context/SiteContent';
 
-const PINK = '#E0004F';
-const INK = '#1a1a1a';
+const GREEN = '#3f6b1f';    // dark leaf green — titles, dots, links, month header
+const LIME = '#caf27e';     // brand lime — filled blocks (date box, "today")
+const ON_LIME = '#23350c';  // dark text that stays legible on the lime fills
+const INK = '#3a3a3a';
 
-const CATEGORY_GRADIENT = {
-  'book-club':      'linear-gradient(155deg, #8F4FD6 0%, #5a2b9a 100%)',
-  'poetry-supper':  'linear-gradient(155deg, #FF934A 0%, #c65a1e 100%)',
-  'silent-reading': 'linear-gradient(155deg, #C9F27F 0%, #6f8a3d 100%)',
-  'guest-night':    'linear-gradient(155deg, #E0004F 0%, #8a002f 100%)',
-  'members-only':   'linear-gradient(155deg, #5b4d3d 0%, #2c241b 100%)',
-};
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// 12-hour clock, "01:00 pm" style, matching the reference layout.
+function fmtTime(t) {
+  if (!t) return '';
+  const [hs, ms] = String(t).split(':');
+  let h = Number(hs);
+  if (Number.isNaN(h)) return '';
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = ((h + 11) % 12) + 1;
+  return `${String(h).padStart(2, '0')}:${(ms || '00').slice(0, 2)} ${ampm}`;
+}
+
+// Flatten the CMS event rows (or the static seed) into a single shape the
+// calendar + list both read from.
+function normalize(rows) {
+  if (rows && rows.length) {
+    return rows
+      .filter((e) => e.start_date && e.slug)
+      .map((e) => ({
+        slug: e.slug,
+        iso: e.start_date,
+        title: `${e.title || ''}${e.italic_accent ? ' ' + e.italic_accent : ''}`.trim(),
+        description: e.description || '',
+        timeLabel: fmtTime(e.start_time),
+        isPaid: !!e.is_paid,
+        price: Number(e.ticket_price) || 0,
+      }));
+  }
+  return UPCOMING_EVENTS.map((e) => ({
+    slug: e.slug,
+    iso: e.iso,
+    title: `${e.title}${e.italic ? ' ' + e.italic : ''}`,
+    description: e.description,
+    timeLabel: e.time || '',
+    isPaid: false,
+    price: 0,
+  }));
+}
 
 const CSS = `
-  .ev-page {
-    background: #F6F8F7;
-    font-family: 'Poppins', system-ui, sans-serif;
-    color: ${INK};
-  }
-  .ev-wrap {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 24px 64px 96px;
-  }
-  .ev-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 28px;
-  }
-  .ev-card {
-    background: #fff;
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
-    display: flex;
-    flex-direction: column;
-    transition: transform 200ms, box-shadow 200ms;
-  }
-  .ev-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 14px 36px rgba(0,0,0,0.10);
-  }
-  .ev-card-image {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 4 / 3;
-  }
-  .ev-card-date {
-    position: absolute;
-    left: 18px;
-    bottom: 18px;
-    background: #fff;
-    border-radius: 8px;
-    padding: 8px 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 1;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  }
-  .ev-card-date .day {
-    font-weight: 700;
-    font-size: 20px;
-    color: ${INK};
-  }
-  .ev-card-date .month {
-    font-size: 11px;
-    font-weight: 600;
-    color: #4a4a4a;
-    margin-top: 3px;
-    letter-spacing: 0.04em;
-  }
-  .ev-card-body {
-    padding: 26px 26px 28px;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-  }
-  .ev-card-title {
-    margin: 0 0 14px;
-    font-weight: 600;
-    font-size: 18px;
-    line-height: 1.3;
-    letter-spacing: -0.01em;
-    color: ${INK};
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .ev-card-desc {
-    margin: 0 0 22px;
-    font-size: 14px;
-    line-height: 1.55;
-    color: #6e6e6e;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .ev-card-cta {
-    margin-top: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: transparent;
-    color: ${INK};
-    border: 0;
-    padding: 0;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    align-self: flex-start;
-    transition: gap 150ms, color 150ms;
-  }
-  .ev-card-cta:hover { color: ${PINK}; gap: 12px; }
-  .ev-card-cta svg { width: 16px; height: 16px; }
+  .evl-page { background: #fff; font-family: 'Poppins', system-ui, sans-serif; color: ${INK}; }
+  .evl-wrap { max-width: 1280px; margin: 0 auto; padding: 8px 64px 96px; }
+  .evl-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 52px; align-items: start; }
 
-  .ev-empty {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 64px 24px;
-    color: #6e6e6e;
-    background: #fafafa;
-    border-radius: 12px;
-  }
+  /* Calendar */
+  .evl-cal-head { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 26px; }
+  .evl-month { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 22px; letter-spacing: 0.06em; color: ${GREEN}; text-align: center; min-width: 210px; }
+  .evl-nav { width: 42px; height: 42px; border-radius: 50%; border: 1px solid #dcdcdc; background: #fff; color: #b0b0b0; font-size: 17px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 150ms, color 150ms; }
+  .evl-nav:hover { border-color: ${GREEN}; color: ${GREEN}; }
+  .evl-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; color: #a6a6a6; margin-bottom: 6px; }
+  .evl-days { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .evl-day { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; position: relative; appearance: none; border: 0; background: none; font: inherit; padding: 0; border-radius: 10px; cursor: pointer; transition: background 120ms; }
+  .evl-day--empty { cursor: default; }
+  .evl-day:hover:not(.is-today):not(.is-selected):not(.evl-day--empty) { background: #f3f3f3; }
+  .evl-daynum { font-size: 16px; color: #8f8f8f; font-weight: 500; }
+  .evl-day.is-today .evl-daynum { background: ${LIME}; color: ${ON_LIME}; width: 58px; height: 58px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .evl-day.is-selected .evl-daynum { background: #E0004F; color: #fff; width: 58px; height: 58px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .evl-dot { position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); width: 7px; height: 7px; border-radius: 50%; background: ${GREEN}; }
 
-  .ev-tabs {
-    display: inline-flex;
-    gap: 4px;
-    background: #ECEFEC;
-    padding: 4px;
-    border-radius: 10px;
-    margin: 4px 0 28px;
-  }
-  .ev-tab {
-    appearance: none;
-    border: 0;
-    background: transparent;
-    color: #5a5a5a;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 14px;
-    padding: 9px 18px;
-    border-radius: 7px;
-    cursor: pointer;
-    transition: background 150ms, color 150ms, box-shadow 150ms;
-  }
-  .ev-tab:hover { color: ${INK}; }
-  .ev-tab.is-active {
-    background: #fff;
-    color: ${INK};
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
-  }
-  .ev-tab-count {
-    margin-left: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #8a8a8a;
-  }
-  .ev-tab.is-active .ev-tab-count { color: ${PINK}; }
-
-  .ev-card.is-past .ev-card-image { filter: saturate(0.55) brightness(0.95); }
-  .ev-card.is-past .ev-card-cta { color: #6e6e6e; cursor: default; }
-  .ev-card.is-past .ev-card-cta:hover { color: #6e6e6e; gap: 8px; }
+  /* Event list */
+  .evl-list { border: 1px solid #ededed; border-radius: 4px; }
+  .evl-item { display: flex; gap: 30px; padding: 34px 38px; border-bottom: 1px solid #ededed; }
+  .evl-item:last-child { border-bottom: 0; }
+  .evl-datecol { flex-shrink: 0; width: 70px; text-align: center; }
+  .evl-datebox { background: #E0004F; color: #fff; border-radius: 3px; padding: 9px 0 11px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+  .evl-datebox .m { font-size: 15px; font-weight: 500; }
+  .evl-datebox .d { font-size: 30px; font-weight: 700; margin: 1px 0; }
+  .evl-datebox .y { font-size: 13px; opacity: 0.92; }
+  .evl-time { margin-top: 16px; font-size: 15px; color: ${INK}; }
+  .evl-body { flex: 1; min-width: 0; }
+  .evl-titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .evl-title { margin: 0 0 12px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 22px; line-height: 1.25; color: #1a1a1a; }
+  .evl-price { flex-shrink: 0; margin-top: 3px; background: ${LIME}; color: ${ON_LIME}; font-size: 14px; font-weight: 700; padding: 5px 13px; border-radius: 999px; white-space: nowrap; }
+  .evl-desc { margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #555; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .evl-more { display: block; text-align: right; font-size: 15px; font-weight: 500; color: ${GREEN}; text-decoration: none; }
+  .evl-more:hover { text-decoration: underline; }
+  .evl-empty { padding: 60px 36px; text-align: center; color: #a0a0a0; border: 1px solid #ededed; border-radius: 4px; font-size: 15px; }
+  .evl-filterbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .evl-filterlabel { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 18px; color: #1a1a1a; }
+  .evl-clear { appearance: none; border: 1px solid #dcdcdc; background: #fff; color: ${GREEN}; font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: border-color 150ms; }
+  .evl-clear:hover { border-color: ${GREEN}; }
 
   @media (max-width: 1023px) {
-    .ev-wrap { padding: 36px 40px 72px; }
-    .ev-grid { grid-template-columns: repeat(2, 1fr); gap: 22px; }
+    .evl-wrap { padding: 8px 40px 72px; }
+    .evl-grid { grid-template-columns: 1fr; gap: 44px; }
+    .evl-cal { max-width: 440px; }
   }
   @media (max-width: 639px) {
-    .ev-wrap { padding: 28px 20px 56px; }
-    .ev-grid { grid-template-columns: 1fr; gap: 18px; }
+    .evl-wrap { padding: 8px 20px 56px; }
+    .evl-item { padding: 24px; gap: 18px; }
+    .evl-title { font-size: 19px; }
+    .evl-day.is-today .evl-daynum { width: 44px; height: 44px; }
   }
 `;
-
-function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-function EventCard({ event, isPast }) {
-  const bg = CATEGORY_GRADIENT[event.category] || CATEGORY_GRADIENT['book-club'];
-  const onAct = () => {
-    if (isPast) return;
-    // eslint-disable-next-line no-console
-    console.log('[events] action', { slug: event.slug, action: event.cta.action });
-    // eslint-disable-next-line no-alert
-    window.alert(actionMessage(event.cta.action, event));
-  };
-  const fullTitle = `${event.title}${event.italic ? ' ' + event.italic : ''}`;
-  return (
-    <article className={`ev-card${isPast ? ' is-past' : ''}`}>
-      <div className="ev-card-image" style={{ background: bg }}>
-        <div className="ev-card-date">
-          <span className="day">{event.dateDay}</span>
-          <span className="month">{event.dateMonth}</span>
-        </div>
-      </div>
-      <div className="ev-card-body">
-        <h3 className="ev-card-title">{fullTitle}</h3>
-        <p className="ev-card-desc">{event.description}</p>
-        <button type="button" className="ev-card-cta" onClick={onAct} disabled={isPast} aria-disabled={isPast}>
-          {isPast ? 'Event ended' : 'Read More'} {!isPast && <ArrowIcon />}
-        </button>
-      </div>
-    </article>
-  );
-}
 
 export default function Events() {
   const content = useSiteContent();
@@ -232,60 +121,133 @@ export default function Events() {
 }
 
 function EventsLegacy() {
-  const [searchParams] = useSearchParams();
-  const query = (searchParams.get('q') || '').trim().toLowerCase();
   const { data: rows } = useEvents();
-  const upcomingFromCms = splitEvents(rows || []).upcoming;
-  const list = upcomingFromCms.length > 0 ? upcomingFromCms : UPCOMING_EVENTS;
+  const events = useMemo(() => normalize(rows), [rows]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const [tab, setTab] = useState('upcoming');
+  const now = new Date();
+  const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const [selectedDay, setSelectedDay] = useState(null);
 
-  const { upcoming, past } = useMemo(() => {
-    const u = [];
-    const p = [];
-    list.forEach((e) => {
-      if (e.iso && e.iso < today) p.push(e);
-      else u.push(e);
+  // Changing month clears any day filter so the new month shows in full.
+  const goMonth = (delta) => {
+    setSelectedDay(null);
+    setView((v) => {
+      const m = v.m + delta;
+      if (m < 0) return { y: v.y - 1, m: 11 };
+      if (m > 11) return { y: v.y + 1, m: 0 };
+      return { y: v.y, m };
     });
-    p.sort((a, b) => (b.iso || '').localeCompare(a.iso || ''));
-    u.sort((a, b) => (a.iso || '').localeCompare(b.iso || ''));
-    return { upcoming: u, past: p };
-  }, [list, today]);
+  };
+  const prevMonth = () => goMonth(-1);
+  const nextMonth = () => goMonth(1);
 
-  const active = tab === 'past' ? past : upcoming;
-  const filtered = useMemo(() => active.filter((e) => {
-    if (!query) return true;
-    return [e.title, e.italic, e.description, e.category]
-      .some((s) => (s || '').toLowerCase().includes(query));
-  }), [active, query]);
+  // Events falling in the displayed month, sorted by date then time.
+  const monthEvents = useMemo(() => (
+    events
+      .filter((e) => {
+        const [y, m] = e.iso.split('-').map(Number);
+        return y === view.y && m - 1 === view.m;
+      })
+      .sort((a, b) => a.iso.localeCompare(b.iso) || a.timeLabel.localeCompare(b.timeLabel))
+  ), [events, view]);
 
-  const emptyText = 'Coming soon';
+  const eventDays = useMemo(
+    () => new Set(monthEvents.map((e) => Number(e.iso.split('-')[2]))),
+    [monthEvents],
+  );
+
+  // Grid cells: leading blanks for the weekday offset, then each day number.
+  const firstWeekday = new Date(view.y, view.m, 1).getDay();
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i += 1) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d += 1) cells.push(d);
+
+  const isToday = (d) => d && view.y === now.getFullYear() && view.m === now.getMonth() && d === now.getDate();
+  const monthLabel = new Date(view.y, view.m, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    .toUpperCase();
+
+  // When a day is picked, narrow the list to that day; otherwise show the month.
+  const dayEvents = selectedDay
+    ? monthEvents.filter((e) => Number(e.iso.split('-')[2]) === selectedDay)
+    : monthEvents;
 
   return (
-    <div className="ev-page">
+    <div className="evl-page">
       <style>{CSS}</style>
       <PageBreadcrumb name="Events" />
-      <div className="ev-wrap">
-        <div className="ev-tabs" role="tablist" aria-label="Events filter">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'upcoming'}
-            className={`ev-tab${tab === 'upcoming' ? ' is-active' : ''}`}
-            onClick={() => setTab('upcoming')}
-          >
-            Upcoming<span className="ev-tab-count">{upcoming.length}</span>
-          </button>
-        </div>
-        <div className="ev-grid">
-          {filtered.length === 0 ? (
-            <div className="ev-empty">
-              <p style={{ margin: 0 }}>{emptyText}</p>
+      <div className="evl-wrap">
+        <div className="evl-grid">
+          {/* Calendar */}
+          <div className="evl-cal">
+            <div className="evl-cal-head">
+              <button type="button" className="evl-nav" onClick={prevMonth} aria-label="Previous month">‹</button>
+              <div className="evl-month">{monthLabel}</div>
+              <button type="button" className="evl-nav" onClick={nextMonth} aria-label="Next month">›</button>
             </div>
-          ) : (
-            filtered.map((e) => <EventCard key={e.slug} event={e} isPast={tab === 'past'} />)
-          )}
+            <div className="evl-weekdays">
+              {WEEKDAYS.map((d) => <span key={d}>{d}</span>)}
+            </div>
+            <div className="evl-days">
+              {cells.map((d, i) => (
+                d === null ? (
+                  <div key={i} className="evl-day evl-day--empty" />
+                ) : (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`evl-day${isToday(d) ? ' is-today' : ''}${selectedDay === d ? ' is-selected' : ''}`}
+                    onClick={() => setSelectedDay((s) => (s === d ? null : d))}
+                    aria-pressed={selectedDay === d}
+                    aria-label={`${monthLabel} ${d}${eventDays.has(d) ? ', has events' : ''}`}
+                  >
+                    <span className="evl-daynum">{d}</span>
+                    {!isToday(d) && selectedDay !== d && eventDays.has(d) && <span className="evl-dot" />}
+                  </button>
+                )
+              ))}
+            </div>
+          </div>
+
+          {/* Event list for the displayed month */}
+          <div className="evl-listcol">
+            {selectedDay && (
+              <div className="evl-filterbar">
+                <span className="evl-filterlabel">{MON_SHORT[view.m]} {selectedDay}, {view.y}</span>
+                <button type="button" className="evl-clear" onClick={() => setSelectedDay(null)}>Show all events</button>
+              </div>
+            )}
+            {dayEvents.length === 0 ? (
+              <div className="evl-empty">{selectedDay ? 'No events on this day.' : 'No events this month.'}</div>
+            ) : (
+              <div className="evl-list">
+                {dayEvents.map((e) => {
+                  const [y, m, d] = e.iso.split('-');
+                  return (
+                    <div className="evl-item" key={e.slug}>
+                      <div className="evl-datecol">
+                        <div className="evl-datebox">
+                          <span className="m">{MON_SHORT[Number(m) - 1]}</span>
+                          <span className="d">{Number(d)}</span>
+                          <span className="y">{y}</span>
+                        </div>
+                        {e.timeLabel && <div className="evl-time">{e.timeLabel}</div>}
+                      </div>
+                      <div className="evl-body">
+                        <div className="evl-titlerow">
+                          <h3 className="evl-title">{e.title}</h3>
+                          {e.isPaid && e.price > 0 && <span className="evl-price">₹{e.price}</span>}
+                        </div>
+                        {e.description && <p className="evl-desc">{e.description}</p>}
+                        <Link to={`/events/${e.slug}`} className="evl-more">Read More</Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

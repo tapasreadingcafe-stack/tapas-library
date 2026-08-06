@@ -122,6 +122,19 @@ export async function fetchEvents() {
   return data || [];
 }
 
+// Single event for the /events/:slug detail page. The public RLS policy only
+// exposes status='upcoming' rows, which covers everything the storefront
+// links to; anything else resolves to null (handled as "not found").
+export async function fetchEventBySlug(slug) {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 export async function fetchClubs() {
   return cached('clubs', async () => {
     const { data, error } = await supabase
