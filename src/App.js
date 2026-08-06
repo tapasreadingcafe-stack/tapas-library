@@ -80,6 +80,7 @@ const CafeReports      = lazyWithRetry(() => import('./pages/CafeReports'));
 const EventListing     = lazyWithRetry(() => import('./pages/EventListing'));
 const EventCreate      = lazyWithRetry(() => import('./pages/EventCreate'));
 const EventAttendance  = lazyWithRetry(() => import('./pages/EventAttendance'));
+const EventManage      = lazyWithRetry(() => import('./pages/EventManage'));
 
 // ── Lazy-loaded pages (New - Phase 4: Inventory, Accounts, Vendors, Settings)
 const InventoryLibrary      = lazyWithRetry(() => import('./pages/InventoryLibrary'));
@@ -784,6 +785,7 @@ function DashboardShell() {
             <Route path="/events"                             element={<EventListing />} />
             <Route path="/events/create"                      element={<EventCreate />} />
             <Route path="/events/attendance"                  element={<EventAttendance />} />
+            <Route path="/events/:id"                         element={<EventManage />} />
 
             {/* Reports */}
             <Route path="/reports"                            element={<Reports />} />

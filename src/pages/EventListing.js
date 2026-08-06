@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
-import { useToast } from '../components/Toast';
-import { useConfirm } from '../components/ConfirmModal';
+import { useNavigate } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 
@@ -59,19 +58,12 @@ CREATE POLICY "open" ON event_attendance FOR ALL USING (true) WITH CHECK (true);
 `;
 
 export default function EventListing() {
-  const toast = useToast();
-  const confirm = useConfirm();
+  const navigate = useNavigate();
   const { isReadOnly, canManageEvents } = usePermission();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
   const [activeTab, setActiveTab] = useState('upcoming');
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [registrations, setRegistrations] = useState([]);
-  const [showRegModal, setShowRegModal] = useState(false);
-  const [memberSearch, setMemberSearch] = useState('');
-  const [memberResults, setMemberResults] = useState([]);
-  const [regTickets, setRegTickets] = useState(1);
 
   useEffect(() => {
     const check = async () => {
@@ -96,54 +88,6 @@ export default function EventListing() {
     if (activeTab === 'cancelled') return e.status === 'cancelled';
     return true;
   });
-
-  const viewEvent = async (event) => {
-    setSelectedEvent(event);
-    const { data } = await supabase.from('event_registrations').select('*, members(name, phone)').eq('event_id', event.id).order('registration_date');
-    setRegistrations(data || []);
-  };
-
-  const searchMembers = async (q) => {
-    setMemberSearch(q);
-    if (q.length < 2) { setMemberResults([]); return; }
-    const { data } = await supabase.from('members').select('id, name, phone').or(`name.ilike.%${q}%,phone.ilike.%${q}%`).limit(5);
-    setMemberResults(data || []);
-  };
-
-  const registerMember = async (member) => {
-    if (!selectedEvent) return;
-    try {
-      const payload = {
-        event_id: selectedEvent.id,
-        member_id: member.id,
-        ticket_count: regTickets,
-        amount_paid: selectedEvent.is_paid ? selectedEvent.ticket_price * regTickets : 0,
-        status: selectedEvent.capacity && registrations.filter(r => r.status === 'registered').length >= selectedEvent.capacity && selectedEvent.waitlist_enabled ? 'waitlisted' : 'registered',
-      };
-      const { error } = await supabase.from('event_registrations').insert([payload]);
-      if (error) throw error;
-      setShowRegModal(false);
-      setMemberSearch('');
-      setMemberResults([]);
-      setRegTickets(1);
-      viewEvent(selectedEvent);
-    } catch (err) {
-      toast.error('Error: ' + (err.message.includes('idx_event_member') ? 'Member already registered' : err.message));
-    }
-  };
-
-  const cancelReg = async (regId) => {
-    if (!await confirm({ title: 'Cancel Registration', message: 'Cancel this registration?', variant: 'warning' })) return;
-    await supabase.from('event_registrations').update({ status: 'cancelled' }).eq('id', regId);
-    viewEvent(selectedEvent);
-  };
-
-  const cancelEvent = async (id) => {
-    if (!await confirm({ title: 'Cancel Event', message: 'Cancel this event?', variant: 'warning' })) return;
-    await supabase.from('events').update({ status: 'cancelled' }).eq('id', id);
-    fetchEvents();
-    if (selectedEvent?.id === id) setSelectedEvent(null);
-  };
 
   const statusBadge = (s) => {
     const colors = { upcoming: '#667eea', registered: '#1dd1a1', waitlisted: '#f39c12', cancelled: '#e74c3c', completed: '#95a5a6', attended: '#27ae60' };
@@ -179,19 +123,17 @@ export default function EventListing() {
         .event-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-2px); }
         .event-card.cancelled { border-left-color: #e74c3c; opacity: 0.6; }
         .event-card .title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+        .event-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .event-card-top .title { margin-bottom: 6px; }
+        .event-edit-btn { flex-shrink: 0; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #667eea; background: #eef0fe; border: 1px solid #d5d9fb; border-radius: 6px; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        .event-edit-btn:hover { background: #667eea; color: #fff; }
         .event-card .meta { display: flex; gap: 12px; font-size: 12px; color: #999; flex-wrap: wrap; }
         .event-card .meta span { display: flex; align-items: center; gap: 4px; }
         .event-card .badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-        .event-detail-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-        .event-detail { background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
-        .event-reg-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-        .event-reg-table th { text-align: left; padding: 8px; font-size: 12px; color: #666; background: #f8f9fa; }
-        .event-reg-table td { padding: 8px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
         @media (max-width: 768px) {
           .events-page { padding: 12px; }
           .events-header h1 { font-size: 22px; }
           .events-grid { grid-template-columns: 1fr; gap: 12px; }
-          .event-detail { padding: 16px; }
         }
         @media (max-width: 480px) {
           .events-page { padding: 8px; }
@@ -225,8 +167,13 @@ export default function EventListing() {
       ) : (
         <div className="events-grid">
           {filtered.map(event => (
-            <div key={event.id} className={`event-card ${event.status === 'cancelled' ? 'cancelled' : ''}`} onClick={() => viewEvent(event)}>
-              <div className="title">{event.title}</div>
+            <div key={event.id} className={`event-card ${event.status === 'cancelled' ? 'cancelled' : ''}`} onClick={() => navigate(`/events/${event.id}`)}>
+              <div className="event-card-top">
+                <div className="title">{event.title}</div>
+                {!isReadOnly && canManageEvents && (
+                  <a href={`/events/create?edit=${event.id}`} className="event-edit-btn" onClick={e => e.stopPropagation()} title="Edit event">✏️ Edit</a>
+                )}
+              </div>
               <div className="meta">
                 <span>📅 {new Date(event.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 {event.start_time && <span>🕐 {event.start_time.slice(0, 5)}</span>}
@@ -241,97 +188,6 @@ export default function EventListing() {
               {event.description && <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', lineHeight: '1.4' }}>{event.description.slice(0, 100)}{event.description.length > 100 ? '...' : ''}</p>}
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Event Detail Modal */}
-      {selectedEvent && (
-        <div className="event-detail-overlay" onClick={() => setSelectedEvent(null)}>
-          <div className="event-detail" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-              <h2 style={{ margin: 0, fontSize: '22px' }}>{selectedEvent.title}</h2>
-              <button onClick={() => setSelectedEvent(null)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-              <span style={statusBadge(selectedEvent.status)}>{selectedEvent.status}</span>
-              {selectedEvent.is_paid && <span style={{ ...statusBadge(''), background: '#f39c1220', color: '#f39c12' }}>₹{selectedEvent.ticket_price}/ticket</span>}
-            </div>
-
-            <div style={{ fontSize: '14px', color: '#666', marginBottom: '16px', lineHeight: '1.5' }}>
-              <p>📅 {new Date(selectedEvent.start_date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              {selectedEvent.start_time && <p>🕐 {selectedEvent.start_time.slice(0, 5)} {selectedEvent.end_time ? `- ${selectedEvent.end_time.slice(0, 5)}` : ''}</p>}
-              <p>📍 {selectedEvent.location}</p>
-              {selectedEvent.capacity && <p>👥 Capacity: {selectedEvent.capacity} | Registered: {registrations.filter(r => r.status === 'registered').length}</p>}
-              {selectedEvent.description && <p style={{ marginTop: '8px' }}>{selectedEvent.description}</p>}
-            </div>
-
-            {/* Registration actions */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              {!isReadOnly && canManageEvents && <button onClick={() => setShowRegModal(true)} style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-                + Register Member
-              </button>}
-              {!isReadOnly && canManageEvents && selectedEvent.status !== 'cancelled' && (
-                <button onClick={() => cancelEvent(selectedEvent.id)} style={{ padding: '8px 16px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-                  Cancel Event
-                </button>
-              )}
-            </div>
-
-            {/* Registrations */}
-            <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Registrations ({registrations.length})</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="event-reg-table">
-                <thead><tr><th>Member</th><th>Tickets</th><th>Status</th><th>Paid</th><th></th></tr></thead>
-                <tbody>
-                  {registrations.length === 0 ? (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', color: '#999', padding: '16px' }}>No registrations yet</td></tr>
-                  ) : registrations.map(reg => (
-                    <tr key={reg.id}>
-                      <td style={{ fontWeight: '500' }}>{reg.members?.name}</td>
-                      <td>{reg.ticket_count}</td>
-                      <td><span style={statusBadge(reg.status)}>{reg.status}</span></td>
-                      <td>₹{reg.amount_paid}</td>
-                      <td>
-                        {!isReadOnly && reg.status === 'registered' && (
-                          <button onClick={() => cancelReg(reg.id)} style={{ padding: '2px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Register Member Modal */}
-      {showRegModal && (
-        <div className="event-detail-overlay" onClick={() => setShowRegModal(false)} style={{ zIndex: 2001 }}>
-          <div className="event-detail" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '18px' }}>Register Member</h3>
-            <input placeholder="Search member by name or phone..." value={memberSearch} onChange={e => searchMembers(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', marginBottom: '8px' }} />
-            {memberResults.length > 0 && (
-              <div style={{ border: '1px solid #e0e0e0', borderRadius: '6px', maxHeight: '150px', overflowY: 'auto', marginBottom: '12px' }}>
-                {memberResults.map(m => (
-                  <div key={m.id} onClick={() => registerMember(m)} style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
-                    <span style={{ fontWeight: '500' }}>{m.name}</span> <span style={{ color: '#999' }}>- {m.phone}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {selectedEvent?.is_paid && (
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '12px', color: '#666', fontWeight: '600' }}>Tickets</label>
-                <input type="number" value={regTickets} onChange={e => setRegTickets(Math.max(1, parseInt(e.target.value) || 1))} min="1"
-                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', marginTop: '4px' }} />
-                <p style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>Total: ₹{(selectedEvent.ticket_price * regTickets).toLocaleString('en-IN')}</p>
-              </div>
-            )}
-            <button onClick={() => setShowRegModal(false)} style={{ width: '100%', padding: '8px', background: '#e0e0e0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Close</button>
-          </div>
         </div>
       )}
     </div>
