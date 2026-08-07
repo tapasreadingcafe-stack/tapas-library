@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/Toast';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { uploadAsset } from '../utils/assetLibrary';
 
 export default function EventCreate() {
   const toast = useToast();
@@ -14,6 +15,7 @@ export default function EventCreate() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(!editId);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [customCat, setCustomCat] = useState(false);
   const fileInputRef = useRef(null);
   const [form, setForm] = useState({
     title: '', description: '', event_type: 'one_time', recurrence_rule: '',
@@ -80,27 +82,18 @@ export default function EventCreate() {
     img.src = url;
   });
 
-  // Upload a picked file to imgbb and store the returned hosted URL in
-  // image_url. We deliberately do NOT fall back to a base64 data URL: a
-  // giant data URL in the events row bloats the table (it has bitten the
-  // books table before), so on failure we just surface the error.
+  // Compress, then upload to Supabase Storage (via assetLibrary) and store
+  // the returned public URL in image_url. Uses the same bucket as the CMS
+  // editor — no external image host / API key involved.
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingImage(true);
     try {
-      const compressed = await compressImage(file);
-      const fd = new FormData();
-      fd.append('image', compressed, 'event.jpg');
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 30000);
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`, {
-        method: 'POST', body: fd, signal: controller.signal,
-      });
-      clearTimeout(tid);
-      const data = await res.json();
-      if (!data?.success) throw new Error(data?.error?.message || 'Upload failed');
-      set('image_url', data.data.display_url);
+      const blob = await compressImage(file);
+      const named = blob instanceof File ? blob : new File([blob], 'event.jpg', { type: blob.type || 'image/jpeg' });
+      const asset = await uploadAsset(named, { pageId: 'events' });
+      set('image_url', asset.url);
       toast.success('Image uploaded');
     } catch (err) {
       toast.error('Image upload failed: ' + (err.message || err));
@@ -127,6 +120,9 @@ export default function EventCreate() {
       const payload = {
         ...form,
         slug: finalSlug,
+        // Category can be a preset or a free-form custom value; trim it and
+        // fall back to a default if the custom box was left blank.
+        category: (form.category || '').trim() || 'book-club',
         // Empty string from the optional badge select means "no badge".
         badge: form.badge || null,
         italic_accent: form.italic_accent || null,
@@ -191,6 +187,8 @@ export default function EventCreate() {
         .ec-field textarea { resize: vertical; min-height: 92px; }
         .ec-field input:disabled, .ec-field select:disabled, .ec-field textarea:disabled { background: #f5f6f7; color: #9aa0a6; }
         .ec-hint { font-size: 12px; color: #8a9099; margin: 6px 0 0; line-height: 1.45; }
+        .ec-linkbtn { display: inline-block; margin-top: 8px; background: none; border: 0; padding: 0; color: #667eea; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .ec-linkbtn:hover { text-decoration: underline; }
 
         .ec-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
@@ -378,13 +376,21 @@ export default function EventCreate() {
 
               <div className="ec-field">
                 <label>Category</label>
-                <select value={form.category} onChange={e => set('category', e.target.value)} disabled={isReadOnly}>
-                  <option value="book-club">Book club</option>
-                  <option value="poetry-supper">Poetry supper</option>
-                  <option value="silent-reading">Silent reading</option>
-                  <option value="guest-night">Guest night</option>
-                  <option value="members-only">Members only</option>
-                </select>
+                {(customCat || !['book-club', 'poetry-supper', 'silent-reading', 'guest-night', 'members-only'].includes(form.category)) ? (
+                  <>
+                    <input value={form.category} onChange={e => set('category', e.target.value)} placeholder="e.g. Board games, Workshop, Live music" disabled={isReadOnly} />
+                    <button type="button" className="ec-linkbtn" onClick={() => { setCustomCat(false); set('category', 'book-club'); }}>← Choose from the list instead</button>
+                  </>
+                ) : (
+                  <select value={form.category} onChange={e => { if (e.target.value === '__new__') { setCustomCat(true); set('category', ''); } else set('category', e.target.value); }} disabled={isReadOnly}>
+                    <option value="book-club">Book club</option>
+                    <option value="poetry-supper">Poetry supper</option>
+                    <option value="silent-reading">Silent reading</option>
+                    <option value="guest-night">Guest night</option>
+                    <option value="members-only">Members only</option>
+                    <option value="__new__">➕ Add a new category…</option>
+                  </select>
+                )}
                 <p className="ec-hint">Sets the event’s colour theme and the small tag shown on its page (e.g. “Guest Night”).</p>
               </div>
 

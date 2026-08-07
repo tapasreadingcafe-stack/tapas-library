@@ -59,7 +59,7 @@ const CSS = `
 
   /* Calendar */
   .evl-cal-head { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 26px; }
-  .evl-month { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 22px; letter-spacing: 0.06em; color: ${GREEN}; text-align: center; min-width: 210px; }
+  .evl-month { font-family: 'Poppins', system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.06em; color: ${GREEN}; text-align: center; min-width: 210px; }
   .evl-nav { width: 42px; height: 42px; border-radius: 50%; border: 1px solid #dcdcdc; background: #fff; color: #b0b0b0; font-size: 17px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 150ms, color 150ms; }
   .evl-nav:hover { border-color: ${GREEN}; color: ${GREEN}; }
   .evl-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; color: #a6a6a6; margin-bottom: 6px; }
@@ -74,8 +74,10 @@ const CSS = `
 
   /* Event list */
   .evl-list { border: 1px solid #ededed; border-radius: 4px; }
-  .evl-item { display: flex; gap: 30px; padding: 34px 38px; border-bottom: 1px solid #ededed; }
+  .evl-item { display: flex; gap: 30px; padding: 34px 38px; border-bottom: 1px solid #ededed; text-decoration: none; color: inherit; cursor: pointer; transition: background 150ms; }
   .evl-item:last-child { border-bottom: 0; }
+  .evl-item:hover { background: #fafafa; }
+  .evl-item:hover .evl-more { text-decoration: underline; }
   .evl-datecol { flex-shrink: 0; width: 70px; text-align: center; }
   .evl-datebox { background: #E0004F; color: #fff; border-radius: 3px; padding: 9px 0 11px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
   .evl-datebox .m { font-size: 15px; font-weight: 500; }
@@ -84,14 +86,14 @@ const CSS = `
   .evl-time { margin-top: 16px; font-size: 15px; color: ${INK}; }
   .evl-body { flex: 1; min-width: 0; }
   .evl-titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-  .evl-title { margin: 0 0 12px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 22px; line-height: 1.25; color: #1a1a1a; }
+  .evl-title { margin: 0 0 12px; font-family: 'Poppins', system-ui, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.25; color: #1a1a1a; }
   .evl-price { flex-shrink: 0; margin-top: 3px; background: ${LIME}; color: ${ON_LIME}; font-size: 14px; font-weight: 700; padding: 5px 13px; border-radius: 999px; white-space: nowrap; }
   .evl-desc { margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #555; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .evl-more { display: block; text-align: right; font-size: 15px; font-weight: 500; color: ${GREEN}; text-decoration: none; }
   .evl-more:hover { text-decoration: underline; }
   .evl-empty { padding: 60px 36px; text-align: center; color: #a0a0a0; border: 1px solid #ededed; border-radius: 4px; font-size: 15px; }
   .evl-filterbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-  .evl-filterlabel { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 18px; color: #1a1a1a; }
+  .evl-filterlabel { font-family: 'Poppins', system-ui, sans-serif; font-weight: 700; font-size: 18px; color: #1a1a1a; }
   .evl-clear { appearance: none; border: 1px solid #dcdcdc; background: #fff; color: ${GREEN}; font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: border-color 150ms; }
   .evl-clear:hover { border-color: ${GREEN}; }
 
@@ -225,7 +227,7 @@ function EventsLegacy() {
                 {dayEvents.map((e) => {
                   const [y, m, d] = e.iso.split('-');
                   return (
-                    <div className="evl-item" key={e.slug}>
+                    <Link className="evl-item" key={e.slug} to={`/events/${e.slug}`}>
                       <div className="evl-datecol">
                         <div className="evl-datebox">
                           <span className="m">{MON_SHORT[Number(m) - 1]}</span>
@@ -240,9 +242,9 @@ function EventsLegacy() {
                           {e.isPaid && e.price > 0 && <span className="evl-price">₹{e.price}</span>}
                         </div>
                         {e.description && <p className="evl-desc">{e.description}</p>}
-                        <Link to={`/events/${e.slug}`} className="evl-more">Read More</Link>
+                        <span className="evl-more">Read More</span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

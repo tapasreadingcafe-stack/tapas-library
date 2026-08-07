@@ -68,7 +68,7 @@ const CSS = `
   .evd-tag { display: inline-flex; align-items: center; font-size: 13px; color: #4a4a4a; border: 1px solid rgba(0,0,0,0.14); border-radius: 999px; padding: 7px 15px; }
 
   /* Right column */
-  .evd-title { margin: 0 0 24px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 46px; line-height: 1.08; letter-spacing: -0.01em; color: #1a1a1a; }
+  .evd-title { margin: 0 0 24px; font-family: 'Poppins', system-ui, sans-serif; font-weight: 700; font-size: 46px; line-height: 1.08; letter-spacing: -0.01em; color: #1a1a1a; }
   .evd-facts { display: flex; flex-direction: column; gap: 18px; margin-bottom: 28px; }
   .evd-fact { display: flex; align-items: center; gap: 14px; }
   .evd-datebadge { width: 46px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(0,0,0,0.10); text-align: center; flex-shrink: 0; background: #fff; }
@@ -101,7 +101,7 @@ const CSS = `
   .evd-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
   .evd-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 70px rgba(0,0,0,0.35); }
   .evd-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 24px 24px 0; }
-  .evd-modal-title { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 24px; color: #1a1a1a; }
+  .evd-modal-title { margin: 0; font-family: 'Poppins', system-ui, sans-serif; font-weight: 700; font-size: 24px; color: #1a1a1a; }
   .evd-modal-sub { margin: 5px 0 0; font-size: 13px; color: #6e6e6e; }
   .evd-modal-close { background: none; border: 0; font-size: 20px; line-height: 1; color: #aaa; cursor: pointer; padding: 4px; }
   .evd-modal-close:hover { color: #1a1a1a; }
@@ -122,7 +122,7 @@ const CSS = `
   .evd-form-cancel:hover { color: #1a1a1a; }
   .evd-success { padding: 34px 26px 28px; text-align: center; }
   .evd-success-check { font-size: 42px; }
-  .evd-success h3 { margin: 12px 0 8px; font-family: Georgia, 'Times New Roman', serif; font-size: 23px; color: #1a1a1a; }
+  .evd-success h3 { margin: 12px 0 8px; font-family: 'Poppins', system-ui, sans-serif; font-size: 23px; color: #1a1a1a; }
   .evd-success p { margin: 0 0 20px; font-size: 14px; color: #6e6e6e; line-height: 1.55; }
 
   @media (max-width: 900px) {
@@ -165,7 +165,7 @@ export default function EventDetail() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [form, setForm] = useState({ name: '', phone: '', email: '', guests: 0 });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', guests: 1 });
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const closeForm = () => { setShowForm(false); setSubmitted(false); setSubmitError(''); };
@@ -182,7 +182,7 @@ export default function EventDetail() {
         guest_name: form.name.trim(),
         guest_email: form.email.trim() || null,
         guest_phone: form.phone.trim(),
-        ticket_count: 1 + Math.max(0, parseInt(form.guests, 10) || 0),
+        ticket_count: Math.max(1, parseInt(form.guests, 10) || 1),
         status: 'confirmed',
         source_page: 'event_detail',
       }]);
@@ -229,7 +229,7 @@ export default function EventDetail() {
   const end = hhmm(event.end_time);
   const timeStr = start ? (end ? `${start} - ${end}` : start) : '';
   const fullTitle = `${event.title}${event.italic_accent ? ' ' + event.italic_accent : ''}`;
-  const tag = CATEGORY_LABEL[event.category] || 'Events';
+  const tag = CATEGORY_LABEL[event.category] || event.category || 'Events';
   const isPaid = event.is_paid && event.ticket_price > 0;
   // Hosts: prefer the multi-host `hosts` array; fall back to the legacy single
   // host_name/host_url; finally the cafe. Always at least one entry.
@@ -348,7 +348,7 @@ export default function EventDetail() {
                     ? 'We’ll be in touch about payment.'
                     : 'See you there!'}
                 </p>
-                <button type="button" className="evd-form-submit" onClick={() => { closeForm(); setForm({ name: '', phone: '', email: '', guests: 0 }); }}>Done</button>
+                <button type="button" className="evd-form-submit" onClick={() => { closeForm(); setForm({ name: '', phone: '', email: '', guests: 1 }); }}>Done</button>
               </div>
             ) : (
               <>
@@ -373,8 +373,8 @@ export default function EventDetail() {
                     <input id="reg-email" type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="you@example.com" />
                   </div>
                   <div className="evd-field">
-                    <label htmlFor="reg-guests">Number of people you’re bringing</label>
-                    <input id="reg-guests" type="number" min="0" value={form.guests} onChange={(e) => setField('guests', e.target.value)} placeholder="0" />
+                    <label htmlFor="reg-guests">Number of people attending</label>
+                    <input id="reg-guests" type="number" min="1" value={form.guests} onChange={(e) => setField('guests', e.target.value)} placeholder="1" />
                   </div>
                   {event.is_paid && event.ticket_price > 0 && (
                     <div className="evd-pay-box">
