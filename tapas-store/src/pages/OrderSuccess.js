@@ -83,7 +83,7 @@ export default function OrderSuccess() {
       }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>?</div>
         <h1 style={{
-          fontFamily: 'var(--font-display, Newsreader, serif)',
+          fontFamily: "Poppins, system-ui, sans-serif",
           fontSize: '28px', fontWeight: 500, color: 'var(--text, #26170c)',
           marginBottom: '10px',
         }}>Order not found</h1>
@@ -130,7 +130,7 @@ export default function OrderSuccess() {
 
         {/* Title */}
         <h1 style={{
-          fontFamily: 'var(--font-display, Newsreader, serif)',
+          fontFamily: "Poppins, system-ui, sans-serif",
           fontSize: '32px', fontWeight: 500, color: 'var(--text, #26170c)',
           margin: '0 0 10px',
         }}>
@@ -159,7 +159,7 @@ export default function OrderSuccess() {
           }}>
             <span style={{ fontSize: '13px', color: 'var(--text-subtle, #8b7355)' }}>Order number</span>
             <span style={{
-              fontFamily: 'var(--font-display, Newsreader, serif)',
+              fontFamily: "Poppins, system-ui, sans-serif",
               fontWeight: 600, color: 'var(--text, #26170c)', fontSize: '15px',
             }}>#{order.order_number}</span>
           </div>
@@ -218,11 +218,11 @@ export default function OrderSuccess() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
           }}>
             <span style={{
-              fontFamily: 'var(--font-display, Newsreader, serif)',
+              fontFamily: "Poppins, system-ui, sans-serif",
               fontWeight: 500, color: 'var(--text, #26170c)', fontSize: '16px',
             }}>Total</span>
             <span style={{
-              fontFamily: 'var(--font-display, Newsreader, serif)',
+              fontFamily: "Poppins, system-ui, sans-serif",
               fontSize: '28px', fontWeight: 500, color: 'var(--accent, #c49040)',
             }}>
               ₹{Number(order.total).toFixed(2)}

@@ -109,7 +109,7 @@ export const MEMBER_CARD_CSS = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -131,7 +131,7 @@ export const MEMBER_CARD_CSS = `
 }
 .mc-rule-foot { margin: 26px 0 0; }
 .mc-title {
-  font-family: "DM Serif Display", Georgia, serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-weight: 400;
   font-size: 24px;
   line-height: 1.2;
@@ -145,7 +145,7 @@ export const MEMBER_CARD_CSS = `
   list-style: none;
   padding: 0;
   margin: 0;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 13px;
   color: rgba(255,255,255,0.92);
 }
@@ -172,7 +172,7 @@ export const MEMBER_CARD_CSS = `
   margin-top: 18px;
   padding-top: 12px;
   border-top: 1px solid rgba(255,255,255,0.15);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 11px;
   letter-spacing: 0.08em;
   color: rgba(255,255,255,0.7);
@@ -192,7 +192,7 @@ export const MEMBER_CARD_CSS = `
   margin-top: 18px;
 }
 .mc-foot-title {
-  font-family: "DM Serif Display", Georgia, serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-weight: 400;
   font-size: 20px;
   color: #fff;
@@ -200,7 +200,7 @@ export const MEMBER_CARD_CSS = `
   line-height: 1.1;
 }
 .mc-foot-sub {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;

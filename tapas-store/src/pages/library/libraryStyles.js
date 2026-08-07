@@ -5,7 +5,7 @@
 // every page has to import.
 
 const LIBRARY_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .library-root {
   --lib-lime:   #caf27e;
@@ -19,9 +19,9 @@ const LIBRARY_CSS = `
   --lib-rule:   #ececea;
   --lib-bg:     #faf8f4;
   --lib-card:   #ffffff;
-  --lib-f-display: "DM Serif Display", Georgia, serif;
-  --lib-f-ui:      "Inter", system-ui, sans-serif;
-  --lib-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --lib-f-display: "Poppins", system-ui, sans-serif;
+  --lib-f-ui:      "Poppins", system-ui, sans-serif;
+  --lib-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--lib-f-ui);
   color: var(--lib-ink);
@@ -74,7 +74,7 @@ const LIBRARY_CSS = `
 }
 .library-hero-title {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -126,7 +126,7 @@ const LIBRARY_CSS = `
 }
 .library-stat-value {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 48px;
   line-height: 1;
   letter-spacing: -0.01em;
@@ -210,7 +210,7 @@ const LIBRARY_CSS = `
 }
 .library-featured-title {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(30px, 3.6vw, 46px);
   line-height: 1.08;
   letter-spacing: -0.015em;
@@ -309,7 +309,7 @@ const LIBRARY_CSS = `
 }
 .library-shelf-title {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 24px;
   color: var(--lib-ink);
   margin: 0;
@@ -378,7 +378,7 @@ const LIBRARY_CSS = `
 }
 .library-cover-title {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 19px;
   line-height: 1.08;
   letter-spacing: -0.01em;
@@ -432,7 +432,7 @@ const LIBRARY_CSS = `
 .library-empty-emoji { font-size: 40px; margin-bottom: 10px; }
 .library-empty h3 {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   color: var(--lib-ink);
   margin: 0 0 8px;
@@ -460,7 +460,7 @@ const LIBRARY_CSS = `
 }
 .library-rules-title {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.4vw, 40px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -490,7 +490,7 @@ const LIBRARY_CSS = `
 .library-rules-item:first-child { border-top: 0; padding-top: 0; }
 .library-rules-num {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 28px;
   color: var(--lib-ink);
   letter-spacing: -0.015em;
@@ -498,7 +498,7 @@ const LIBRARY_CSS = `
 }
 .library-rules-item-title {
   font-family: var(--lib-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--lib-ink);
   margin: 0 0 4px;

@@ -1,5 +1,5 @@
 const BLOG_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Poppins is loaded globally in App.js with all weights and italics. */
 
 .blog-root {
   --bl-lime:   #caf27e;
@@ -11,9 +11,9 @@ const BLOG_CSS = `
   --bl-muted:  #6e6e6e;
   --bl-rule:   #ececea;
   --bl-bg:     #faf8f4;
-  --bl-f-display: "DM Serif Display", Georgia, serif;
-  --bl-f-ui:      "Inter", system-ui, sans-serif;
-  --bl-f-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --bl-f-display: "Poppins", system-ui, sans-serif;
+  --bl-f-ui:      "Poppins", system-ui, sans-serif;
+  --bl-f-mono:    "Poppins", system-ui, sans-serif;
 
   font-family: var(--bl-f-ui);
   color: var(--bl-ink);
@@ -66,7 +66,7 @@ const BLOG_CSS = `
 }
 .blog-hero-title {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(29px, 3.6vw, 48px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -140,7 +140,7 @@ const BLOG_CSS = `
 }
 .blog-featured-title {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(32px, 3.8vw, 52px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -167,7 +167,7 @@ const BLOG_CSS = `
   background: var(--bl-orange);
   color: var(--bl-ink);
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -212,7 +212,7 @@ const BLOG_CSS = `
 .blog-card-kicker.is-purple { color: var(--bl-purple); }
 .blog-card-title {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -263,7 +263,7 @@ const BLOG_CSS = `
 }
 .blog-archive-title {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(28px, 3.6vw, 44px);
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -404,7 +404,7 @@ const BLOG_CSS = `
 }
 .blog-archive-title-text {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 22px;
   line-height: 1.15;
   letter-spacing: -0.005em;
@@ -485,7 +485,7 @@ const BLOG_CSS = `
 }
 .blog-dispatch-title {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(30px, 3.4vw, 44px);
   line-height: 1.05;
   letter-spacing: -0.015em;
@@ -550,7 +550,7 @@ const BLOG_CSS = `
 }
 .blog-dispatch-success {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: 18px;
   color: var(--bl-ink);
   line-height: 1.4;
@@ -576,7 +576,7 @@ const BLOG_CSS = `
 }
 .blog-detail-title {
   font-family: var(--bl-f-display);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(30px, 4vw, 48px);
   line-height: 1.08;
   letter-spacing: -0.015em;
