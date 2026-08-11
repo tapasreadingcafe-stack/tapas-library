@@ -280,6 +280,14 @@ const NAV_CONFIG = [
       { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },
     ],
   },
+  {
+    icon: '🎉', label: 'Events', key: 'events',
+    children: [
+      { to: '/events',            icon: '📅', label: 'All Events' },
+      { to: '/events/create',     icon: '➕', label: 'Create Event' },
+      { to: '/events/attendance', icon: '✅', label: 'Attendance' },
+    ],
+  },
   { to: '/store/inbox', icon: '📩', label: 'Website Forms' },
   {
     icon: '👥', label: 'Members', key: 'members',
@@ -293,14 +301,6 @@ const NAV_CONFIG = [
     children: [
       { to: '/inventory/library', icon: '📚', label: 'Library Stock' },
       { to: '/inventory/cafe',    icon: '☕', label: 'Cafe Stock' },
-    ],
-  },
-  {
-    icon: '🎉', label: 'Events', key: 'events',
-    children: [
-      { to: '/events',            icon: '📅', label: 'All Events' },
-      { to: '/events/create',     icon: '➕', label: 'Create Event' },
-      { to: '/events/attendance', icon: '✅', label: 'Attendance' },
     ],
   },
   { to: '/reports', icon: '📑', label: 'Reports' },
