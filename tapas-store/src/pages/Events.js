@@ -97,6 +97,12 @@ const CSS = `
   .evl-clear { appearance: none; border: 1px solid #dcdcdc; background: #fff; color: ${GREEN}; font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: border-color 150ms; }
   .evl-clear:hover { border-color: ${GREEN}; }
 
+  /* Upcoming / Past toggle */
+  .evl-toggle { display: inline-flex; gap: 4px; padding: 4px; background: #f4f4f4; border-radius: 999px; margin-bottom: 22px; }
+  .evl-toggle-btn { appearance: none; border: 0; background: none; font-family: 'Poppins', system-ui, sans-serif; font-size: 14px; font-weight: 600; color: #7a7a7a; padding: 8px 24px; border-radius: 999px; cursor: pointer; transition: background 150ms, color 150ms; }
+  .evl-toggle-btn.is-active { background: ${LIME}; color: ${ON_LIME}; }
+  .evl-toggle-btn:not(.is-active):hover { color: #1a1a1a; }
+
   @media (max-width: 1023px) {
     .evl-wrap { padding: 8px 40px 72px; }
     .evl-grid { grid-template-columns: 1fr; gap: 44px; }
@@ -129,6 +135,7 @@ function EventsLegacy() {
   const now = new Date();
   const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [selectedDay, setSelectedDay] = useState(null);
+  const [mode, setMode] = useState('upcoming'); // 'upcoming' | 'past' — list toggle
 
   // Changing month clears any day filter so the new month shows in full.
   const goMonth = (delta) => {
@@ -170,10 +177,28 @@ function EventsLegacy() {
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     .toUpperCase();
 
-  // When a day is picked, narrow the list to that day; otherwise show the month.
-  const dayEvents = selectedDay
-    ? monthEvents.filter((e) => Number(e.iso.split('-')[2]) === selectedDay)
-    : monthEvents;
+  // Today as YYYY-MM-DD (local) for the upcoming/past split.
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  // The list is driven by the Upcoming/Past toggle. Picking a calendar day
+  // narrows to that exact date and overrides the toggle for that view.
+  const listEvents = useMemo(() => {
+    if (selectedDay) {
+      const dISO = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+      return events
+        .filter((e) => e.iso === dISO)
+        .sort((a, b) => a.timeLabel.localeCompare(b.timeLabel));
+    }
+    if (mode === 'past') {
+      // Most-recent past first.
+      return events
+        .filter((e) => e.iso < todayISO)
+        .sort((a, b) => b.iso.localeCompare(a.iso) || b.timeLabel.localeCompare(a.timeLabel));
+    }
+    return events
+      .filter((e) => e.iso >= todayISO)
+      .sort((a, b) => a.iso.localeCompare(b.iso) || a.timeLabel.localeCompare(b.timeLabel));
+  }, [events, mode, selectedDay, view.y, view.m, todayISO]);
 
   return (
     <div className="evl-page">
@@ -212,19 +237,23 @@ function EventsLegacy() {
             </div>
           </div>
 
-          {/* Event list for the displayed month */}
+          {/* Event list, driven by the Upcoming/Past toggle */}
           <div className="evl-listcol">
+            <div className="evl-toggle" role="tablist" aria-label="Filter events by time">
+              <button type="button" role="tab" aria-selected={mode === 'upcoming'} className={`evl-toggle-btn${mode === 'upcoming' ? ' is-active' : ''}`} onClick={() => { setMode('upcoming'); setSelectedDay(null); }}>Upcoming</button>
+              <button type="button" role="tab" aria-selected={mode === 'past'} className={`evl-toggle-btn${mode === 'past' ? ' is-active' : ''}`} onClick={() => { setMode('past'); setSelectedDay(null); }}>Past</button>
+            </div>
             {selectedDay && (
               <div className="evl-filterbar">
                 <span className="evl-filterlabel">{MON_SHORT[view.m]} {selectedDay}, {view.y}</span>
                 <button type="button" className="evl-clear" onClick={() => setSelectedDay(null)}>Show all events</button>
               </div>
             )}
-            {dayEvents.length === 0 ? (
-              <div className="evl-empty">{selectedDay ? 'No events on this day.' : 'No events this month.'}</div>
+            {listEvents.length === 0 ? (
+              <div className="evl-empty">{selectedDay ? 'No events on this day.' : (mode === 'past' ? 'No past events.' : 'No upcoming events.')}</div>
             ) : (
               <div className="evl-list">
-                {dayEvents.map((e) => {
+                {listEvents.map((e) => {
                   const [y, m, d] = e.iso.split('-');
                   return (
                     <Link className="evl-item" key={e.slug} to={`/events/${e.slug}`}>
