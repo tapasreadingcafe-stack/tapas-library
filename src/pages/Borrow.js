@@ -10,6 +10,9 @@ import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
 import { sendWhatsApp, reservationReadyWhatsAppMsg, checkoutWhatsAppMsg } from '../utils/whatsappUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
+// How many members the picker preloads for browsing. Typing searches the
+// server, so this cap only bounds the click-to-browse list.
+const MEMBER_ROSTER_CAP = 300;
 
 function getTier(m) {
   if (m.plan) return m.plan.toLowerCase();
@@ -73,6 +76,9 @@ export default function Borrow() {
   const [selectedBook, setSelectedBook] = useState(null);
   const [dueDate, setDueDate] = useState('');
   const [memberResults, setMemberResults] = useState([]);
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [memberTotal, setMemberTotal] = useState(0);
+  const memberPickerRef = useRef(null);
   const [bookResults, setBookResults] = useState([]);
 
   // Child borrowing state
@@ -145,6 +151,32 @@ export default function Borrow() {
     probeBookCopiesTable();
     getFineSettings().then(setFineSettings);
   }, []);
+
+  // Member roster for the picker — loaded once up front so clicking the search
+  // box shows a list immediately instead of an empty dropdown.
+  useEffect(() => {
+    (async () => {
+      const { data, count } = await supabase
+        .from('members')
+        .select('id, name, phone, plan, borrow_limit, email, status, subscription_end', { count: 'exact' })
+        .order('name')
+        .limit(MEMBER_ROSTER_CAP);
+      setMembers(data || []);
+      setMemberTotal(count ?? (data || []).length);
+    })();
+  }, []);
+
+  // Close the picker when clicking anywhere outside it.
+  useEffect(() => {
+    if (!memberPickerOpen) return;
+    const onDown = (e) => {
+      if (memberPickerRef.current && !memberPickerRef.current.contains(e.target)) {
+        setMemberPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [memberPickerOpen]);
 
   // Pre-select parent + child if navigated from ChildProfile — fetch by ID directly
   useEffect(() => {
@@ -365,6 +397,41 @@ export default function Borrow() {
       .filter(c => c.member_id === memberId && isOverdue(c.due_date))
       .reduce((sum, c) => sum + calculateFine(c.due_date, fineSettings).fineAmount, 0);
 
+  // ── Member picker ──────────────────────────────────────────────────
+  // Clicking the search box opens the roster rather than an empty box. Everyone
+  // is listed; the members who can actually take a book out right now sort to
+  // the top, and the blocked ones are tagged with why.
+  // Borrowing requires a live membership. `subscription_end` is the field that
+  // decides it: Members.js nulls it whenever a plan is cleared, and checkout
+  // already refuses anyone without it (it's what seeds the due date). Guests
+  // with no plan therefore can't borrow, and neither can lapsed members.
+  const memberMembership = (m) => {
+    if (m.status && m.status !== 'active') return 'inactive';
+    if (!m.subscription_end) return 'none';
+    if (new Date(m.subscription_end) < new Date()) return 'expired';
+    return 'active';
+  };
+
+  const memberCanBorrow = (m) =>
+    memberMembership(m) === 'active' && getMemberBorrows(m.id) < (m.borrow_limit || 2);
+
+  const memberPickerList = (() => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return members;
+    // Filter the loaded roster instantly so the list reacts on every keystroke,
+    // then append server hits that fall outside the cap so nobody is unfindable.
+    const local = members.filter(m =>
+      (m.name  || '').toLowerCase().includes(q) ||
+      (m.phone || '').includes(q) ||
+      (m.email || '').toLowerCase().includes(q));
+    const seen = new Set(local.map(m => m.id));
+    return [...local, ...memberResults.filter(m => !seen.has(m.id))];
+  })();
+
+  const eligibleMembers   = memberPickerList.filter(m => memberCanBorrow(m));
+  const blockedMembers    = memberPickerList.filter(m => !memberCanBorrow(m));
+  const rosterTruncated   = !memberSearch.trim() && memberTotal > members.length;
+
   // ── Multi-book checkout ────────────────────────────────────────────
   // A member may borrow up to their limit. Books are queued in `bookCart`
   // plus the currently-selected book, and all are issued together.
@@ -378,6 +445,10 @@ export default function Borrow() {
     if (!selectedBook) { showToast('Select a book first', 'error'); return; }
     if (hasCopiesTable && availableCopies.length > 0 && !selectedCopy) { showToast('Select which copy to add', 'error'); return; }
     if (!dueDate) { showToast('Member has no active membership', 'error'); return; }
+    if (memberMembership(selectedMember) !== 'active') {
+      const membership = memberMembership(selectedMember);
+      showToast(membership === 'expired' ? 'Membership has expired — renew before borrowing' : 'Account is inactive — cannot borrow', 'error'); return;
+    }
     if (currentBorrows + bookCart.length + 1 > borrowLimit) { showToast(`This member can borrow ${maxAddable} book(s) at a time`, 'error'); return; }
     if (selectedCopy && bookCart.some(e => e.copy && e.copy.id === selectedCopy.id)) { showToast('That copy is already added', 'error'); return; }
     setBookCart(prev => [...prev, { book: selectedBook, copy: selectedCopy || null }]);
@@ -388,6 +459,10 @@ export default function Borrow() {
   const handleCheckout = async () => {
     if (!selectedMember) { showToast('Please select a member', 'error'); return; }
     if (!dueDate) { showToast('Member has no active membership — cannot check out', 'error'); return; }
+    if (memberMembership(selectedMember) !== 'active') {
+      const membership = memberMembership(selectedMember);
+      showToast(membership === 'expired' ? 'Membership has expired — renew before borrowing' : 'Account is inactive — cannot borrow', 'error'); return;
+    }
     const items = queuedBooks;
     if (items.length === 0) { showToast('Please select at least one book', 'error'); return; }
     if (currentBorrows + items.length > borrowLimit) {
@@ -709,28 +784,40 @@ export default function Borrow() {
           {/* Member panel */}
           <div style={{ background: 'white', borderRadius: '8px', padding: '20px' }}>
             <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700' }}>👤 Select Member</h3>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <input
-                placeholder="Search by name, phone, or ID..."
-                value={memberSearch}
-                onChange={e => { setMemberSearch(e.target.value); if (selectedMember) setSelectedMember(null); }}
-                style={{ ...inputStyle, flex: 1 }}
-              />
-            </div>
+            <div ref={memberPickerRef} style={{ position: 'relative', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  placeholder="Search by name, phone, or ID..."
+                  value={memberSearch}
+                  onFocus={() => setMemberPickerOpen(true)}
+                  onClick={() => setMemberPickerOpen(true)}
+                  onKeyDown={e => { if (e.key === 'Escape') setMemberPickerOpen(false); }}
+                  onChange={e => { setMemberSearch(e.target.value); setMemberPickerOpen(true); if (selectedMember) setSelectedMember(null); }}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+              </div>
 
-            {/* Search results */}
-            {memberResults.length > 0 && !selectedMember && (
-              <div style={{ border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', ...(isMobile ? { maxHeight: '200px', overflowY: 'auto' } : {}) }}>
-                {memberResults.map(m => {
+              {/* Live member list — opens on click, before anything is typed */}
+              {memberPickerOpen && !selectedMember && (() => {
+                // One row renderer, shared by both sections.
+                const row = (m) => {
                   const borrows = getMemberBorrows(m.id);
-                  const fines = getMemberFines(m.id);
+                  const fines   = getMemberFines(m.id);
                   const atLimit = borrows >= (m.borrow_limit || 2);
+                  const membership = memberMembership(m);
+                  const blocked = membership !== 'active' || atLimit;
                   return (
-                    <div key={m.id} onClick={() => selectMember(m)} style={{
-                      padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
-                      borderBottom: '1px solid #f5f5f5',
-                      background: atLimit ? '#fff5f5' : 'white',
-                    }}>
+                    <div key={m.id}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => { selectMember(m); setMemberPickerOpen(false); }}
+                      style={{
+                        padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+                        borderBottom: '1px solid #f5f5f5',
+                        background: blocked ? '#fff5f5' : 'white',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f5f7ff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = blocked ? '#fff5f5' : 'white'; }}
+                    >
                       <div style={{
                         width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
                         background: tierColor(m), color: 'white',
@@ -738,26 +825,74 @@ export default function Borrow() {
                         fontWeight: '700', fontSize: '12px',
                       }}>{initials(m.name)}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: '600', fontSize: '13px' }}>{m.name}</div>
+                        <div style={{ fontWeight: '600', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
                         <div style={{ fontSize: '11px', color: '#999' }}>
-                          {m.phone} · {borrows}/{m.borrow_limit} books{fines > 0 ? ` · ₹${fines} fine` : ''}
+                          {m.phone} · {borrows}/{m.borrow_limit || 2} books{fines > 0 ? ` · ₹${fines} fine` : ''}
                         </div>
                       </div>
-                      {atLimit && <span style={{ fontSize: '10px', color: '#e74c3c', fontWeight: '700', background: '#f8d7da', padding: '2px 6px', borderRadius: '8px' }}>LIMIT</span>}
-                      {fines > 0 && !atLimit && <span style={{ fontSize: '10px', color: '#f39c12', fontWeight: '700', background: '#fff3cd', padding: '2px 6px', borderRadius: '8px' }}>FINES</span>}
+                      {(() => {
+                        // One badge per row, most blocking reason first.
+                        const tag = (text, color, bg) => (
+                          <span style={{ fontSize: '10px', color, fontWeight: '700', background: bg, padding: '2px 6px', borderRadius: '8px', flexShrink: 0 }}>{text}</span>
+                        );
+                        if (membership === 'inactive') return tag('INACTIVE', '#e74c3c', '#f8d7da');
+                        if (membership === 'none')     return tag('NO PLAN',  '#6b7280', '#e5e7eb');
+                        if (membership === 'expired')  return tag('EXPIRED',  '#e74c3c', '#f8d7da');
+                        if (atLimit)                   return tag('LIMIT',    '#e74c3c', '#f8d7da');
+                        if (fines > 0)                 return tag('FINES',    '#f39c12', '#fff3cd');
+                        return null;
+                      })()}
                     </div>
                   );
-                })}
-              </div>
-            )}
+                };
+
+                const header = (text, color) => (
+                  <div style={{
+                    padding: '7px 14px', fontSize: '10px', fontWeight: '800', letterSpacing: '0.6px',
+                    color, background: '#fafbfc', borderBottom: '1px solid #f0f0f0',
+                    position: 'sticky', top: 0, zIndex: 1,
+                  }}>{text}</div>
+                );
+
+                return (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 20,
+                    border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden',
+                    background: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.13)',
+                  }}>
+                    <div style={{ maxHeight: isMobile ? '260px' : '320px', overflowY: 'auto' }}>
+                      {memberPickerList.length === 0 ? (
+                        <div style={{ padding: '16px 14px', fontSize: '13px', color: '#999', textAlign: 'center' }}>
+                          {members.length === 0 ? 'Loading members…' : 'No members match that search'}
+                        </div>
+                      ) : (
+                        <>
+                          {eligibleMembers.length > 0 && header(`AVAILABLE TO BORROW (${eligibleMembers.length})`, '#16a34a')}
+                          {eligibleMembers.map(row)}
+                          {blockedMembers.length > 0 && header(`CAN'T BORROW (${blockedMembers.length})`, '#b91c1c')}
+                          {blockedMembers.map(row)}
+                        </>
+                      )}
+                    </div>
+                    {rosterTruncated && (
+                      <div style={{ padding: '7px 14px', fontSize: '10px', color: '#9ca3af', background: '#fafbfc', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+                        Showing {members.length} of {memberTotal} — type to search all
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
 
             {/* Selected member card */}
             {selectedMember && (() => {
               const borrows = getMemberBorrows(selectedMember.id);
               const fines = getMemberFines(selectedMember.id);
               const atLimit = borrows >= (selectedMember.borrow_limit || 2);
+              const membership = memberMembership(selectedMember);
+              const cantBorrow = atLimit || membership !== 'active';
               return (
-                <div style={{ border: `2px solid ${atLimit ? '#e74c3c' : '#667eea'}`, borderRadius: '8px', padding: '14px', background: atLimit ? '#fff5f5' : '#f5f7ff' }}>
+                <div style={{ border: `2px solid ${cantBorrow ? '#e74c3c' : '#667eea'}`, borderRadius: '8px', padding: '14px', background: cantBorrow ? '#fff5f5' : '#f5f7ff' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
                     <div style={{
                       width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
@@ -786,6 +921,15 @@ export default function Borrow() {
                     {atLimit && (
                       <span style={{ background: '#f8d7da', color: '#721c24', padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
                         ⚠️ At borrow limit
+                      </span>
+                    )}
+                    {membership !== 'active' && (
+                      <span style={{ background: '#f8d7da', color: '#721c24', padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                        ⚠️ {membership === 'none'
+                          ? 'No membership — cannot borrow'
+                          : membership === 'expired'
+                            ? 'Membership expired — cannot borrow'
+                            : 'Account inactive — cannot borrow'}
                       </span>
                     )}
                   </div>

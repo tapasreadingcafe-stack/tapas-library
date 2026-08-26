@@ -8,6 +8,8 @@
  */
 import { putLocal, getMeta, setMeta, uuid } from './localDb';
 import { refreshPending } from './status';
+import { lineNet } from '../utils/cartUtils';
+import { posItemType } from '../utils/revenueStreams';
 
 // Single counter device → this prefix guarantees receipt numbers never clash.
 const DEVICE = 'C1';
@@ -51,13 +53,13 @@ export async function saveBillOffline({
       await putLocal('pos_transaction_items', {
         id: uuid(),
         transaction_id: txnId,
-        item_type: item.type,
+        item_type: posItemType(item),
         item_name: item.copyCode ? `${item.name} [${item.copyCode}]` : item.name,
         book_id: item.bookId || null,
         fine_id: item.fineId || null,
         unit_price: item.price,
         quantity: item.qty,
-        total_price: item.price * item.qty,
+        total_price: lineNet(item),
       });
     }
   } else {

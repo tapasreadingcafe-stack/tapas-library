@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
+import { buildBillNumbers } from '../utils/invoiceNumber';
+import { STREAMS, splitByStream } from '../utils/revenueStreams';
 import { useToast } from '../components/Toast';
 import { useReactToPrint } from 'react-to-print';
 
@@ -60,7 +62,7 @@ export default function AccountsInvoices() {
     try {
       let q = supabase
         .from('pos_transactions')
-        .select('*, members(name, phone)')
+        .select('*, members(name, phone), pos_transaction_items(transaction_id, item_type, item_name, total_price)')
         .order('created_at', { ascending: false });
 
       if (dateFrom) q = q.gte('created_at', dateFrom + 'T00:00:00');
@@ -119,17 +121,55 @@ export default function AccountsInvoices() {
 
   // stats
   const totalCount = filtered.length;
-  const totalRevenue = filtered.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
-  const avgValue = totalCount ? totalRevenue / totalCount : 0;
+  // Money taken across these bills — includes refundable deposits, so it is
+  // NOT the revenue figure. See netRevenue below.
+  const totalBilled = filtered.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+  const avgValue = totalCount ? totalBilled / totalCount : 0;
   const thisMonthCount = filtered.filter(i => {
     const d = new Date(i.created_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).length;
 
-  const invoiceNumber = (index) => {
-    const year = new Date().getFullYear();
-    return `INV-${year}-${String(index + 1).padStart(4, '0')}`;
+  // Date-wise bill numbers: INV-YYYYMMDD-NNN, sequenced within each day.
+  //
+  // Built from `invoices` — the full fetched set — and deliberately NOT from
+  // `filtered`. Numbering a filtered view is what made these numbers move:
+  // the old code used the row's screen position, so the newest bill was always
+  // INV-2026-0001 and every search or deletion renumbered the lot.
+  const billNumbers = buildBillNumbers(invoices);
+  const invoiceNumber = (inv) => billNumbers[inv?.id] || '—';
+
+  // What each bill is made of. One customer bill routinely mixes a membership,
+  // a book and a coffee, plus a refundable deposit — this splits it back out
+  // using the same classifier the Accounts pages use, so the two always agree.
+  const categoriesOf = (inv) => {
+    const lines = inv?.pos_transaction_items || [];
+    if (!lines.length) return [];
+    const totals = splitByStream(lines, { [inv.id]: inv.total_amount || 0 });
+    return Object.keys(STREAMS)
+      .filter(k => totals[k] > 0)
+      .map(k => ({ ...STREAMS[k], amount: totals[k] }));
   };
+
+  // Category totals across the filtered view.
+  const categoryTotals = (() => {
+    const acc = {};
+    Object.keys(STREAMS).forEach(k => { acc[k] = 0; });
+    let anyLines = false;
+    filtered.forEach(inv => {
+      const lines = inv.pos_transaction_items || [];
+      if (!lines.length) return;
+      anyLines = true;
+      const t = splitByStream(lines, { [inv.id]: inv.total_amount || 0 });
+      Object.keys(acc).forEach(k => { acc[k] += t[k]; });
+    });
+    return anyLines ? acc : null;
+  })();
+
+  // A refundable deposit is money held for the customer, not earned. Counting
+  // it as revenue overstated August by ₹6,000 of ₹11,810.
+  const depositsHeld = categoryTotals?.deposit || 0;
+  const netRevenue = totalBilled - depositsHeld;
 
   // GST from localStorage
   const gstRate = Number(localStorage.getItem('gst_rate') || 0);
@@ -166,7 +206,8 @@ export default function AccountsInvoices() {
       <div className="inv-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total Invoices', value: totalCount, color: '#667eea', icon: '📄' },
-          { label: 'Total Revenue', value: fmt(totalRevenue), color: '#1dd1a1', icon: '💰' },
+          { label: 'Revenue', value: fmt(netRevenue), color: '#1dd1a1', icon: '💰',
+            note: depositsHeld > 0 ? `excl. ${fmt(depositsHeld)} deposits` : null },
           { label: 'Avg Invoice', value: fmt(avgValue), color: '#f39c12', icon: '📊' },
           { label: 'This Month', value: thisMonthCount, color: '#9b59b6', icon: '📅' },
         ].map(s => (
@@ -174,6 +215,7 @@ export default function AccountsInvoices() {
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{s.icon}</div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: '#333' }}>{s.value}</div>
             <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.label}</div>
+            {s.note && <div style={{ fontSize: '10px', color: '#b0b4ba', marginTop: '2px', fontStyle: 'italic' }}>{s.note}</div>}
           </div>
         ))}
       </div>
@@ -213,6 +255,35 @@ export default function AccountsInvoices() {
         </div>
       </div>
 
+      {/* Category totals for the filtered view */}
+      {categoryTotals && (
+        <div style={{ ...cardStyle, marginBottom: '16px', padding: '14px 18px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.6px', color: '#9ca3af', marginBottom: '10px' }}>
+            BY CATEGORY
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {Object.keys(STREAMS).map(k => {
+              const st = STREAMS[k];
+              const val = categoryTotals[k];
+              const isDeposit = k === 'deposit';
+              return (
+                <div key={k} style={{
+                  flex: '1 1 130px', minWidth: '130px', padding: '10px 12px', borderRadius: '8px',
+                  background: val > 0 ? '#fafbfc' : 'transparent',
+                  border: `1px solid ${val > 0 ? '#eef0f3' : '#f5f6f8'}`,
+                  borderLeft: `3px solid ${val > 0 ? st.color : '#eef0f3'}`,
+                  opacity: val > 0 ? 1 : 0.45,
+                }}>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>{st.icon} {st.label}</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: val > 0 ? st.color : '#c7cbd1' }}>{fmt(val)}</div>
+                  {isDeposit && <div style={{ fontSize: '9px', color: '#9ca3af', fontStyle: 'italic', marginTop: '2px' }}>refundable — not revenue</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Invoice table */}
       <div style={cardStyle}>
         {loading ? (
@@ -227,23 +298,47 @@ export default function AccountsInvoices() {
                   <th style={thStyle}>Invoice #</th>
                   <th style={thStyle}>Date</th>
                   <th style={thStyle}>Customer</th>
+                  <th style={thStyle}>Category</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
                   <th style={thStyle}>Payment</th>
                   <th style={thStyle}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((inv, idx) => (
+                {filtered.map((inv) => (
                   <tr key={inv.id} style={{ transition: 'background 0.15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ ...tdStyle, fontWeight: 600, color: '#667eea', fontFamily: 'monospace' }}>
-                      {invoiceNumber(idx)}
+                      {invoiceNumber(inv)}
                     </td>
                     <td style={tdStyle}>
                       {new Date(inv.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td style={tdStyle}>{inv.members?.name || 'Walk-in'}</td>
+                    <td style={tdStyle}>
+                      {(() => {
+                        const cats = categoriesOf(inv);
+                        if (!cats.length) {
+                          return <span style={{ fontSize: '11px', color: '#c7cbd1', fontStyle: 'italic' }}>no line detail</span>;
+                        }
+                        return (
+                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                            {cats.map(c => (
+                              <span key={c.key} title={`${c.label}: ${fmt(c.amount)}`}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                  padding: '2px 8px', borderRadius: '11px', whiteSpace: 'nowrap',
+                                  fontSize: '11px', fontWeight: 700,
+                                  color: c.color, background: `${c.color}14`, border: `1px solid ${c.color}33`,
+                                }}>
+                                {c.icon} {c.label} {fmt(c.amount)}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(inv.total_amount)}</td>
                     <td style={tdStyle}>{paymentBadge(inv.payment_method)}</td>
                     <td style={{ ...tdStyle, display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -313,7 +408,7 @@ export default function AccountsInvoices() {
                   {selectedInvoice.members?.phone && <div>Ph: {selectedInvoice.members.phone}</div>}
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div><strong>Invoice:</strong> {invoiceNumber(filtered.findIndex(i => i.id === selectedInvoice.id))}</div>
+                  <div><strong>Invoice:</strong> {invoiceNumber(selectedInvoice)}</div>
                   <div><strong>Date:</strong> {new Date(selectedInvoice.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                   <div style={{ marginTop: '6px' }}>{paymentBadge(selectedInvoice.payment_method)}</div>
                 </div>

@@ -148,10 +148,25 @@ export default function CustomerDisplay() {
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {it.name}
               </span>
+              {it.discLabel && (
+                <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a',
+                  borderRadius: 6, padding: '2px 10px',
+                  fontSize: 'clamp(11px,1.2vw,15px)', fontWeight: 700, flexShrink: 0 }}>
+                  {it.discLabel} off
+                </span>
+              )}
             </div>
             <span style={{ fontSize: 'clamp(16px,2vw,26px)', fontWeight: 700,
-              color: '#0f172a', marginLeft: 16, flexShrink: 0 }}>
-              {fmt(it.price * it.qty)}
+              color: '#0f172a', marginLeft: 16, flexShrink: 0, textAlign: 'right' }}>
+              {it.discLabel ? (
+                <>
+                  <span style={{ display: 'block', fontSize: 'clamp(11px,1.2vw,15px)', fontWeight: 600,
+                    color: '#cbd5e1', textDecoration: 'line-through' }}>
+                    {fmt(it.price * it.qty)}
+                  </span>
+                  <span style={{ color: '#059669' }}>{fmt(it.lineTotal)}</span>
+                </>
+              ) : fmt(it.lineTotal ?? it.price * it.qty)}
             </span>
           </div>
         ))}

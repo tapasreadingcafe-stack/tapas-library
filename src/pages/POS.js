@@ -13,6 +13,9 @@ import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID } from '../utils/me
 import { readCachedBooks, writeCachedBooks, CATALOG_COLS } from '../utils/catalogCache';
 import { saveBillOffline } from '../offline/billing';
 import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
+import { lineGross, lineDisc, lineNet, lineDiscLabel } from '../utils/cartUtils';
+import { posItemType } from '../utils/revenueStreams';
+import { formatBillNo, seqWithinDay, dayKey } from '../utils/invoiceNumber';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -34,7 +37,9 @@ const DEFAULT_SERVICES = [
 
 // Services are loaded from Supabase app_settings (synced across all devices)
 
-const CATS = ['All', 'Books', 'Cafe', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
+// Books and Cafe live as dedicated icon buttons next to the scanner (they're
+// the two things staff switch between constantly), so they're not repeated here.
+const CATS = ['All', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
 // Cafe menu items are billable on the Book POS too; map category → tile emoji.
 const CAFE_EMOJI = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🥐', snacks: '🍟', other: '🍽️' };
 // Fine rate loaded dynamically from settings
@@ -139,6 +144,9 @@ export default function POS() {
 
   // Cart — restored from sessionStorage so navigation doesn't wipe the order
   const [cart, setCart]                   = useState(_saved.cart || []);
+  // cartIds whose per-item discount row is expanded (a line with a discount
+  // already set always shows its row).
+  const [openDisc, setOpenDisc]           = useState({});
   const [discountType, setDiscountType]   = useState(_saved.discountType || 'pct');
   const [discountVal, setDiscountVal]     = useState(_saved.discountVal || 0);
   // Additional manual discount applied ON TOP of a promo code
@@ -587,8 +595,25 @@ export default function POS() {
   const updateItemPrice = (cartId, val) =>
     setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, price: parseFloat(val) || 0 } : c));
 
+  // ── Per-item discount ───────────────────────────────────────────────────────
+  // Marks down one line only (e.g. 10% off the membership, nothing off the
+  // refundable deposit). Bill-level promo/manual discount still stacks on top.
+  const updateItemDisc = (cartId, val) =>
+    setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, disc: Math.max(0, parseFloat(val) || 0) } : c));
+
+  const updateItemDiscType = (cartId, t) =>
+    setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, discType: t } : c));
+
+  const toggleDiscRow = (cartId) =>
+    setOpenDisc(prev => ({ ...prev, [cartId]: !prev[cartId] }));
+
+  const clearItemDisc = (cartId) => {
+    updateItemDisc(cartId, 0);
+    setOpenDisc(prev => ({ ...prev, [cartId]: false }));
+  };
+
   const resetCart = () => {
-    setCart([]); setSelectedMember(null); setMemberSearch('');
+    setCart([]); setOpenDisc({}); setSelectedMember(null); setMemberSearch('');
     setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
     setActivatedMembership(null);
@@ -706,17 +731,25 @@ export default function POS() {
   };
 
   // ── Computed values ───────────────────────────────────────────────────────────
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  // Order of application: per-item discounts first, then the bill-level promo,
+  // then any extra manual discount. Bill-level percentages therefore apply to
+  // what's left after the line markdowns, never to the original gross.
+  const subtotal = cart.reduce((s, i) => s + lineGross(i), 0);
+  const itemDiscountAmount = cart.reduce((s, i) => s + lineDisc(i), 0);
+  const afterItems = Math.max(0, subtotal - itemDiscountAmount);
   // Promo discount (locked once applied)
   const promoDiscountAmount = appliedPromo
-    ? (discountType === 'pct' ? subtotal * (discountVal / 100) : Math.min(discountVal, subtotal))
+    ? (discountType === 'pct' ? afterItems * (discountVal / 100) : Math.min(discountVal, afterItems))
     : 0;
   // Additional manual discount on top of promo (or the only discount when no promo)
-  const afterPromo = subtotal - promoDiscountAmount;
+  const afterPromo = afterItems - promoDiscountAmount;
   const addlDiscountAmount = appliedPromo
     ? (addlDiscType === 'pct' ? afterPromo * (addlDiscVal / 100) : Math.min(addlDiscVal, afterPromo))
-    : (discountType === 'pct' ? subtotal * (discountVal / 100) : Math.min(discountVal, subtotal));
-  const discountAmount = promoDiscountAmount + addlDiscountAmount;
+    : (discountType === 'pct' ? afterItems * (discountVal / 100) : Math.min(discountVal, afterItems));
+  // What the bill-level controls take off, kept separate so the cafe split and
+  // the totals panel can tell line markdowns from bill markdowns.
+  const billDiscountAmount = promoDiscountAmount + addlDiscountAmount;
+  const discountAmount = itemDiscountAmount + billDiscountAmount;
   const total          = Math.max(0, subtotal - discountAmount);
   const cashNum        = parseFloat(cashReceived) || 0;
   const change         = Math.max(0, cashNum - total);
@@ -762,6 +795,7 @@ export default function POS() {
       }
 
       let txnId = null;
+      let txnCreatedAt = null;
 
       if (hasPosTable) {
         const { data: txn, error: txnErr } = await supabase
@@ -775,21 +809,26 @@ export default function POS() {
             cash_received: payMethod === 'cash' ? (cashNum || total) : null,
             change_given:  payMethod === 'cash' ? change : null,
           })
-          .select('id').single();
+          .select('id, created_at').single();
         if (txnErr) throw txnErr;
         txnId = txn.id;
+        txnCreatedAt = txn.created_at;
 
         await supabase.from('pos_transaction_items').insert(
           cart.map(item => {
             const row = {
               transaction_id: txnId,
-              item_type:  item.type,
+              // Specific enough for Accounts to split the bill per stream —
+              // 'service' alone can't tell a membership from a deposit.
+              item_type:  posItemType(item),
               item_name:  item.copyCode ? `${item.name} [${item.copyCode}]` : item.name,
               book_id:    item.bookId  || null,
               fine_id:    item.fineId  || null,
               unit_price: item.price,
               quantity:   item.qty,
-              total_price: item.price * item.qty,
+              // Net of any per-item discount, so line totals still add up to
+              // the bill's total_amount minus the bill-level discount.
+              total_price: lineNet(item),
             };
             return row;
           })
@@ -827,7 +866,7 @@ export default function POS() {
         // Mark individual copy as sold in book_copies
         if (bi.copyId) {
           await supabase.from('book_copies')
-            .update({ status: 'sold', sold_price: bi.price, sold_date: new Date().toISOString().split('T')[0] })
+            .update({ status: 'sold', sold_price: Math.round(lineNet(bi) / (bi.qty || 1)), sold_date: new Date().toISOString().split('T')[0] })
             .eq('id', bi.copyId);
         }
       }
@@ -837,10 +876,14 @@ export default function POS() {
       const cafeItems = cart.filter(c => c.type === 'cafe');
       if (cafeItems.length > 0) {
         try {
-          const cafeTotal = cafeItems.reduce((s, c) => s + c.price * c.qty, 0);
-          // Allocate the bill's discount to the cafe portion proportionally so the
-          // cafe order + Cafe Reports reflect what was actually charged.
-          const cafeDiscount = subtotal > 0 ? Math.round(discountAmount * (cafeTotal / subtotal)) : 0;
+          const cafeTotal = cafeItems.reduce((s, c) => s + lineGross(c), 0);
+          // Per-item discounts belong to the cafe lines that carry them; only the
+          // bill-level discount is prorated, and on post-line-discount value so
+          // the cafe order + Cafe Reports reflect what was actually charged.
+          const cafeItemDisc = cafeItems.reduce((s, c) => s + lineDisc(c), 0);
+          const cafeAfterItems = Math.max(0, cafeTotal - cafeItemDisc);
+          const cafeBillDisc = afterItems > 0 ? Math.round(billDiscountAmount * (cafeAfterItems / afterItems)) : 0;
+          const cafeDiscount = Math.round(cafeItemDisc) + cafeBillDisc;
           const cafeNet = Math.max(0, cafeTotal - cafeDiscount);
           const { data: cafeOrder, error: coErr } = await supabase.from('cafe_orders').insert([{
             member_id: selectedMember?.id || null,
@@ -859,7 +902,7 @@ export default function POS() {
               item_name: c.name,
               unit_price: c.price,
               quantity: c.qty,
-              total_price: c.price * c.qty,
+              total_price: lineNet(c),
             }))
           );
           if (ciErr) { await supabase.from('cafe_orders').delete().eq('id', cafeOrder.id); throw ciErr; }
@@ -935,7 +978,26 @@ export default function POS() {
         }
       }
 
-      const txnRef = `TXN${Date.now().toString().slice(-6)}`;
+      // Same date-wise number the Invoices page derives for this bill, so the
+      // customer's copy and the books agree. Rank is read back from the day's
+      // rows rather than counted locally, so a second till can't collide.
+      const txnRef = await (async () => {
+        const stamp = txnCreatedAt || new Date().toISOString();
+        if (!txnId) return `TXN${Date.now().toString().slice(-6)}`;
+        try {
+          const key = dayKey(stamp);
+          const dayStart = `${key.slice(0, 4)}-${key.slice(4, 6)}-${key.slice(6, 8)}`;
+          const { data: sameDay } = await supabase
+            .from('pos_transactions')
+            .select('id, created_at')
+            .gte('created_at', `${dayStart}T00:00:00`)
+            .lte('created_at', `${dayStart}T23:59:59`);
+          return formatBillNo(stamp, seqWithinDay(stamp, sameDay || [], txnId));
+        } catch (e) {
+          console.error('Bill number lookup failed', e);
+          return formatBillNo(stamp, 1);
+        }
+      })();
       setLastTxn({
         id: txnId,
         txnRef,
@@ -990,7 +1052,8 @@ export default function POS() {
     const block = [];
     txn.items.forEach(it => {
       const name = it.name + (it.qty > 1 ? ` x${it.qty}` : '');
-      block.push(row(name, fmt(it.price * it.qty)));
+      block.push(row(name, fmt(lineGross(it))));
+      if (lineDisc(it) > 0) block.push(row(`  ${lineDiscLabel(it)} off`, '-' + fmt(lineDisc(it))));
     });
     block.push('-'.repeat(W));
     if (txn.discount > 0) {
@@ -1037,7 +1100,11 @@ export default function POS() {
   const sendDisplay = useCallback((extra = {}) => {
     const payload = {
       status: cart.length ? 'active' : 'idle',
-      items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+      items: cart.map(i => ({
+        name: i.name, qty: i.qty, price: i.price,
+        lineTotal: lineNet(i),
+        discLabel: lineDisc(i) > 0 ? lineDiscLabel(i) : null,
+      })),
       subtotal,
       discount: discountAmount,
       total,
@@ -1250,10 +1317,36 @@ export default function POS() {
               placeholder={isMobile ? "🔍 Search books…" : "🔍  Search items, books, author… (F2)"}
               value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
-              style={{ flex: 1, padding: isMobile ? '12px' : '10px 14px', border: '2px solid #e0e0e0', borderRadius: '10px', fontSize: isMobile ? '16px' : '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s', WebkitAppearance: 'none' }}
+              style={{ flex: 1, minWidth: 0, padding: isMobile ? '12px' : '10px 14px', border: '2px solid #e0e0e0', borderRadius: '10px', fontSize: isMobile ? '16px' : '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s', WebkitAppearance: 'none' }}
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e  => e.target.style.borderColor = '#e0e0e0'}
             />
+            {/* Books / Cafe quick filters — the two catalogs staff flip between
+                all day, so they sit up here beside the scanner instead of being
+                two pills among nine below. */}
+            {[
+              { cat: 'Books', label: 'Books', Icon: BookIcon, tint: '#667eea', title: 'Show the book catalog' },
+              { cat: 'Cafe',  label: 'Cafe',  Icon: CafeIcon, tint: '#f59e0b', title: 'Show the cafe menu' },
+            ].map(({ cat, label, Icon, tint, title }) => {
+              const on = activeCat === cat;
+              return (
+                <button key={cat} onClick={() => setActiveCat(cat)} title={title}
+                  style={{
+                    padding: isMobile ? '12px' : '10px 14px',
+                    background: on ? tint : '#f0f2f5',
+                    color: on ? 'white' : '#6b7280',
+                    border: `2px solid ${on ? tint : 'transparent'}`,
+                    borderRadius: '10px', cursor: 'pointer', fontWeight: '700',
+                    fontSize: isMobile ? '13px' : '13px', flexShrink: 0,
+                    minHeight: '48px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: '7px', whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
+                  }}>
+                  <Icon />
+                  {!isMobile && label}
+                </button>
+              );
+            })}
             <button onClick={() => setShowPosScanner(true)}
               style={{ padding: isMobile ? '12px 16px' : '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', flexShrink: 0, minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Scan barcode"><ScannerIcon /></button>
@@ -1669,7 +1762,20 @@ export default function POS() {
                           </>
                         )}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+                        {!isReadOnly && (
+                          <button onClick={() => toggleDiscRow(item.cartId)}
+                            title="Discount this item only"
+                            style={{
+                              background: item.disc > 0 ? '#fef3c7' : 'none',
+                              border: `1px solid ${item.disc > 0 ? '#fbbf24' : '#e5e7eb'}`,
+                              borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: '700',
+                              padding: '2px 6px', lineHeight: 1.5, flexShrink: 0,
+                              color: item.disc > 0 ? '#b45309' : '#9ca3af',
+                            }}>
+                            {item.disc > 0 ? lineDiscLabel(item) : '%'}
+                          </button>
+                        )}
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', fontSize: '11px', color: '#9ca3af' }}>₹</span>
                           <input
@@ -1678,9 +1784,40 @@ export default function POS() {
                             style={{ width: '62px', padding: '3px 5px 3px 16px', border: '1px solid #e0e0e0', borderRadius: '4px', fontSize: '12px', textAlign: 'right' }}
                           />
                         </div>
-                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#667eea', minWidth: '48px', textAlign: 'right' }}>{fmt(item.price * item.qty)}</span>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#667eea', minWidth: '48px', textAlign: 'right' }}>
+                          {lineDisc(item) > 0 ? (
+                            <>
+                              <span style={{ display: 'block', fontSize: '10px', fontWeight: '600', color: '#c7c7c7', textDecoration: 'line-through' }}>{fmt(lineGross(item))}</span>
+                              <span style={{ color: '#059669' }}>{fmt(lineNet(item))}</span>
+                            </>
+                          ) : fmt(lineGross(item))}
+                        </span>
                       </div>
                     </div>
+
+                    {/* Per-item discount — own row so it can't crowd the price
+                        controls in the narrow cart panel. */}
+                    {(openDisc[item.cartId] || item.disc > 0) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '7px', paddingTop: '7px', borderTop: '1px dashed #e5e7eb' }}>
+                        <span style={{ fontSize: '9px', fontWeight: '800', color: '#b45309', letterSpacing: '0.5px', whiteSpace: 'nowrap', flexShrink: 0 }}>ITEM DISC</span>
+                        <select value={item.discType || 'pct'} disabled={isReadOnly}
+                          onChange={e => updateItemDiscType(item.cartId, e.target.value)}
+                          style={{ padding: '2px 3px', border: '1px solid #e0e0e0', borderRadius: '4px', fontSize: '11px', background: 'white', fontWeight: '700', flexShrink: 0 }}>
+                          <option value="pct">%</option>
+                          <option value="fixed">₹</option>
+                        </select>
+                        <input type="number" min="0" value={item.disc || ''} placeholder="0" disabled={isReadOnly}
+                          onChange={e => updateItemDisc(item.cartId, e.target.value)}
+                          style={{ width: '48px', padding: '2px 5px', border: '1px solid #e0e0e0', borderRadius: '4px', fontSize: '11px', textAlign: 'right', flexShrink: 0 }} />
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '11px', fontWeight: '800', color: '#ef4444', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {lineDisc(item) > 0 ? `−${fmt(lineDisc(item))}` : ''}
+                        </span>
+                        {!isReadOnly && (
+                          <button onClick={() => clearItemDisc(item.cartId)} title="Clear item discount"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '12px', padding: '0 2px', flexShrink: 0 }}>✕</button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1755,6 +1892,12 @@ export default function POS() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#9ca3af', marginBottom: '3px' }}>
                       <span>Subtotal</span><span>{fmt(subtotal)}</span>
                     </div>
+                    {/* Per-item discounts (marked down on the line itself) */}
+                    {itemDiscountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
+                        <span>Item discounts</span><span>−{fmt(itemDiscountAmount)}</span>
+                      </div>
+                    )}
                     {/* Promo code discount row */}
                     {promoDiscountAmount > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
@@ -1774,10 +1917,10 @@ export default function POS() {
                         <span>−{fmt(addlDiscountAmount)}</span>
                       </div>
                     )}
-                    {/* Single discount row when no promo */}
-                    {!appliedPromo && discountAmount > 0 && (
+                    {/* Single bill-level discount row when no promo */}
+                    {!appliedPromo && addlDiscountAmount > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ef4444', marginBottom: '3px' }}>
-                        <span>Discount</span><span>−{fmt(discountAmount)}</span>
+                        <span>Bill discount</span><span>−{fmt(addlDiscountAmount)}</span>
                       </div>
                     )}
                   </>
@@ -1989,8 +2132,18 @@ export default function POS() {
                       {item.name.substring(0, 30)}
                       {item.qty > 1 && <span style={{ color: '#888' }}> ×{item.qty}</span>}
                       {item.copyCode && <div style={{ fontSize: '10px', color: '#888', fontFamily: 'monospace' }}>{item.copyCode}</div>}
+                      {lineDisc(item) > 0 && (
+                        <div style={{ fontSize: '10px', color: '#e74c3c' }}>{lineDiscLabel(item)} off −{fmt(lineDisc(item))}</div>
+                      )}
                     </div>
-                    <span style={{ fontWeight: '700' }}>{fmt(item.price * item.qty)}</span>
+                    <span style={{ fontWeight: '700', textAlign: 'right' }}>
+                      {lineDisc(item) > 0 ? (
+                        <>
+                          <span style={{ display: 'block', fontSize: '10px', fontWeight: '600', color: '#aaa', textDecoration: 'line-through' }}>{fmt(lineGross(item))}</span>
+                          {fmt(lineNet(item))}
+                        </>
+                      ) : fmt(lineGross(item))}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -2278,7 +2431,7 @@ export default function POS() {
           <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', borderRadius: '50%', width: '22px', height: '22px', fontSize: '12px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {cart.length}
           </span>
-          <span style={{ fontSize: '9px', fontWeight: '700', marginTop: '1px' }}>{fmt(cart.reduce((s, i) => s + i.price * i.qty, 0))}</span>
+          <span style={{ fontSize: '9px', fontWeight: '700', marginTop: '1px' }}>{fmt(total)}</span>
         </button>
       )}
 
@@ -2432,6 +2585,29 @@ export default function POS() {
 // matching the user's reference glyph. Inherits currentColor so the
 // orange POS scanner button (white text) tints it correctly.
 // ─────────────────────────────────────────────────────────────────────
+function BookIcon({ size = 20 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
+      <path d="M12 6.5C10.5 5.2 8.4 4.5 6 4.5H3v13h3c2.4 0 4.5.7 6 2 1.5-1.3 3.6-2 6-2h3v-13h-3c-2.4 0-4.5.7-6 2z" />
+      <path d="M12 6.5v13" />
+    </svg>
+  );
+}
+
+function CafeIcon({ size = 20 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
+      <path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" />
+      <path d="M17 10.5h1.4a2.5 2.5 0 0 1 0 5H17" />
+      <path d="M7.5 2.6c-.6 1-.6 2 0 3M11 2.6c-.6 1-.6 2 0 3M14.5 2.6c-.6 1-.6 2 0 3" />
+    </svg>
+  );
+}
+
 function ScannerIcon({ size = 22 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">

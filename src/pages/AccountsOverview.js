@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { STREAMS, splitByStream } from '../utils/revenueStreams';
 
 const fmt = (n) => `₹${(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`;
 
 const PERIODS = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
   { key: 'month', label: 'This Month' },
   { key: 'last_month', label: 'Last Month' },
   { key: 'quarter', label: 'This Quarter' },
@@ -16,6 +19,16 @@ function getPeriodDates(period, customStart, customEnd) {
   const now = new Date();
   let start, end;
   switch (period) {
+    case 'today':
+      start = now; end = now;
+      break;
+    case 'week': {
+      // Week starts Monday — matches how the cafe counts a trading week.
+      const dow = (now.getDay() + 6) % 7;
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+      end = now;
+      break;
+    }
     case 'last_month':
       start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       end = new Date(now.getFullYear(), now.getMonth(), 0);
@@ -61,44 +74,85 @@ export default function AccountsOverview() {
   const [weeklyFlow, setWeeklyFlow] = useState([]);
   const [topExpCats, setTopExpCats] = useState([]);
 
-  const gstRates = JSON.parse(localStorage.getItem('gst_rates') || '{"books":0,"cafe":5,"services":18}');
+  // Parsed once. A fresh object on every render invalidated fetchPeriodData →
+  // fetchAll → the [fetchAll] effect, and the page refetched in a loop.
+  const [gstRates, setGstRates] = useState(() =>
+    JSON.parse(localStorage.getItem('gst_rates') || '{"books":0,"cafe":5,"services":18}'));
   const [showGstEditor, setShowGstEditor] = useState(false);
   const [gstForm, setGstForm] = useState(gstRates);
 
   const fetchPeriodData = useCallback(async (startDate, endDate) => {
     const safeQuery = (promise) => promise.then(r => r).catch(() => ({ data: [] }));
 
-    const [salesR, posR, cafeR, eventR, finesR, expR, memberR] = await Promise.all([
-      safeQuery(supabase.from('sales').select('total_amount').gte('sale_date', startDate).lte('sale_date', endDate).eq('status', 'completed')),
-      safeQuery(supabase.from('pos_transactions').select('total_amount').gte('created_at', startDate + 'T00:00:00').lte('created_at', endDate + 'T23:59:59')),
-      safeQuery(supabase.from('cafe_orders').select('total_amount').gte('created_at', startDate + 'T00:00:00').lte('created_at', endDate + 'T23:59:59').eq('status', 'completed')),
-      safeQuery(supabase.from('event_registrations').select('amount_paid').gte('registration_date', startDate + 'T00:00:00').lte('registration_date', endDate + 'T23:59:59').neq('status', 'cancelled')),
-      safeQuery(supabase.from('circulation').select('fine_amount').eq('fine_paid', true).gte('return_date', startDate).lte('return_date', endDate)),
-      safeQuery(supabase.from('cafe_expenses').select('amount, category').gte('expense_date', startDate).lte('expense_date', endDate)),
-      safeQuery(supabase.from('members').select('plan_price').not('plan', 'is', null).gte('subscription_start', startDate).lte('subscription_start', endDate)),
+    const from = startDate + 'T00:00:00';
+    const to   = endDate + 'T23:59:59';
+
+    const [txnR, cafeR, eventR, expR, salesR] = await Promise.all([
+      // Bills in the period, WITH their lines. The per-stream split is derived
+      // from the lines — a bill total can't say which side of the business
+      // earned it, and one bill routinely spans membership, books and cafe.
+      safeQuery(supabase.from('pos_transactions')
+        .select('id, total_amount, pos_transaction_items(transaction_id, item_type, item_name, total_price)')
+        .gte('created_at', from).lte('created_at', to)),
+      // Cafe orders raised on the Cafe screen only. Orders billed through the
+      // Book POS are already counted via that bill's cafe lines — counting the
+      // mirrored cafe_order too was double-counting every POS-billed coffee.
+      safeQuery(supabase.from('cafe_orders').select('total_amount, notes')
+        .gte('created_at', from).lte('created_at', to).eq('status', 'completed')),
+      safeQuery(supabase.from('event_registrations').select('amount_paid')
+        .gte('registration_date', from).lte('registration_date', to).neq('status', 'cancelled')),
+      safeQuery(supabase.from('cafe_expenses').select('amount, category')
+        .gte('expense_date', startDate).lte('expense_date', endDate)),
+      // Legacy fallback for installs with no pos_transactions table.
+      safeQuery(supabase.from('sales').select('total_amount')
+        .gte('sale_date', startDate).lte('sale_date', endDate).eq('status', 'completed')),
     ]);
 
     const sum = (arr, field) => (arr?.data || []).reduce((s, r) => s + (r[field] || 0), 0);
-    const libRevenue = Math.max(sum(salesR, 'total_amount'), sum(posR, 'total_amount'));
-    const cafeRevenue = sum(cafeR, 'total_amount');
-    const eventRevenue = sum(eventR, 'amount_paid');
-    const finesCollected = sum(finesR, 'fine_amount');
-    const membershipRevenue = sum(memberR, 'plan_price');
-    const totalExpenses = sum(expR, 'amount');
+
+    const bills = txnR?.data || [];
+    const lines = bills.flatMap(b => b.pos_transaction_items || []);
+    const billTotals = {};
+    bills.forEach(b => { billTotals[b.id] = b.total_amount || 0; });
+    const streams = splitByStream(lines, billTotals);
+
+    // If the lines aren't available (older data, or the items table is
+    // missing) fall back to bill totals so the page still shows something —
+    // it just can't attribute them, so they land under Library.
+    const billSum = bills.reduce((s, b) => s + (b.total_amount || 0), 0);
+    const unattributed = lines.length === 0 ? Math.max(billSum, sum(salesR, 'total_amount')) : 0;
+
+    const standaloneCafe = (cafeR?.data || [])
+      .filter(o => o.notes !== 'Billed via Book POS')
+      .reduce((s, o) => s + (o.total_amount || 0), 0);
+
+    const libRevenue        = streams.library + unattributed;
+    const cafeRevenue       = streams.cafe + standaloneCafe;
+    const membershipRevenue = streams.membership;
+    const finesCollected    = streams.fines;
+    const depositsHeld      = streams.deposit;
+    const eventRevenue      = sum(eventR, 'amount_paid');
+    const totalExpenses     = sum(expR, 'amount');
+
+    // Deposits are refundable — money held for the customer, not earned. They
+    // are excluded from income and from GST.
     const totalIncome = libRevenue + cafeRevenue + eventRevenue + finesCollected + membershipRevenue;
 
-    // GST calculation
     const gstAmount = Math.round(
       libRevenue * (gstRates.books / 100) +
       cafeRevenue * (gstRates.cafe / 100) +
       (eventRevenue + finesCollected + membershipRevenue) * (gstRates.services / 100)
     );
 
-    // Expense categories
     const cats = {};
     (expR?.data || []).forEach(e => { cats[e.category || 'other'] = (cats[e.category || 'other'] || 0) + (e.amount || 0); });
 
-    return { libRevenue, cafeRevenue, eventRevenue, finesCollected, membershipRevenue, totalExpenses, totalIncome, gstAmount, expenseCategories: cats };
+    return {
+      libRevenue, cafeRevenue, eventRevenue, finesCollected, membershipRevenue,
+      depositsHeld, totalExpenses, totalIncome, gstAmount,
+      expenseCategories: cats,
+      attributed: unattributed === 0,
+    };
   }, [gstRates]);
 
   const fetchAll = useCallback(async () => {
@@ -204,7 +258,7 @@ export default function AccountsOverview() {
               <span style={{ fontSize: '11px', color: '#999' }}>%</span>
             </div>
           ))}
-          <button onClick={() => { localStorage.setItem('gst_rates', JSON.stringify(gstForm)); setShowGstEditor(false); fetchAll(); }}
+          <button onClick={() => { localStorage.setItem('gst_rates', JSON.stringify(gstForm)); setGstRates(gstForm); setShowGstEditor(false); }}
             style={{ padding: '6px 14px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
             Save
           </button>
@@ -234,14 +288,23 @@ export default function AccountsOverview() {
 
       {loading ? <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>Loading financial data...</div> : data && (
         <>
+          {/* Older bills stored no line detail, so they can't be attributed to
+              a stream — say so rather than quietly filing them under Library. */}
+          {!data.attributed && (
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#92400e' }}>
+              ⚠️ Some bills in this period have no line-item detail, so they're shown under Library and can't be split by stream.
+            </div>
+          )}
           {/* Revenue cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '12px', marginBottom: '20px' }}>
             {[
-              { label: 'Library / POS', val: data.libRevenue, prev: prevData?.libRevenue, color: '#667eea', icon: '📚' },
-              { label: 'Cafe', val: data.cafeRevenue, prev: prevData?.cafeRevenue, color: '#1dd1a1', icon: '☕' },
+              { label: 'Library', val: data.libRevenue, prev: prevData?.libRevenue, color: STREAMS.library.color, icon: STREAMS.library.icon },
+              { label: 'Cafe', val: data.cafeRevenue, prev: prevData?.cafeRevenue, color: STREAMS.cafe.color, icon: STREAMS.cafe.icon },
+              { label: 'Memberships', val: data.membershipRevenue, prev: prevData?.membershipRevenue, color: STREAMS.membership.color, icon: STREAMS.membership.icon },
+              { label: 'Fines', val: data.finesCollected, prev: prevData?.finesCollected, color: STREAMS.fines.color, icon: STREAMS.fines.icon },
               { label: 'Events', val: data.eventRevenue, prev: prevData?.eventRevenue, color: '#9b59b6', icon: '🎉' },
-              { label: 'Fines', val: data.finesCollected, prev: prevData?.finesCollected, color: '#f39c12', icon: '⚠️' },
-              { label: 'Memberships', val: data.membershipRevenue, prev: prevData?.membershipRevenue, color: '#06b6d4', icon: '💳' },
+              // Refundable — held for the customer, so it is NOT part of income.
+              { label: 'Deposits held', val: data.depositsHeld, prev: prevData?.depositsHeld, color: STREAMS.deposit.color, icon: STREAMS.deposit.icon, note: 'refundable — not income' },
               { label: 'Expenses', val: data.totalExpenses, prev: prevData?.totalExpenses, color: '#ef4444', icon: '📤' },
             ].map(m => {
               const change = pctChange(m.val, m.prev);
@@ -250,6 +313,7 @@ export default function AccountsOverview() {
                 <div key={m.label} style={{ background: 'white', padding: '16px', borderRadius: '10px', borderTop: `3px solid ${m.color}`, position: 'relative' }}>
                   <div style={{ fontSize: '11px', color: '#999', marginBottom: '6px' }}>{m.icon} {m.label.toUpperCase()}</div>
                   <div style={{ fontSize: '22px', fontWeight: '800', color: m.color }}>{fmt(m.val)}</div>
+                  {m.note && <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '3px', fontStyle: 'italic' }}>{m.note}</div>}
                   {prevData && (
                     <div style={{ fontSize: '11px', fontWeight: '600', marginTop: '4px', color: m.label === 'Expenses' ? (isUp ? '#ef4444' : '#059669') : (isUp ? '#059669' : '#ef4444') }}>
                       {change} vs prev
@@ -265,11 +329,15 @@ export default function AccountsOverview() {
             <div style={{ background: 'white', borderRadius: '10px', padding: '20px', textAlign: 'center', gridColumn: 'span 1', border: `2px solid ${netProfit >= 0 ? '#d1fae5' : '#fecaca'}` }}>
               <div style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>TOTAL INCOME</div>
               <div style={{ fontSize: '28px', fontWeight: '900', color: '#059669' }}>{fmt(data.totalIncome)}</div>
+              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>
+                excludes {fmt(data.depositsHeld)} refundable deposits
+              </div>
             </div>
             <div style={{ background: 'white', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>GST LIABILITY</div>
               <div style={{ fontSize: '28px', fontWeight: '900', color: '#f59e0b' }}>{fmt(data.gstAmount)}</div>
               <div style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>Books {gstRates.books}% · Cafe {gstRates.cafe}% · Services {gstRates.services}%</div>
+              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>deposits excluded</div>
             </div>
             <div style={{ background: netProfit >= 0 ? '#ecfdf5' : '#fef2f2', borderRadius: '10px', padding: '20px', textAlign: 'center', border: `2px solid ${netProfit >= 0 ? '#a7f3d0' : '#fecaca'}` }}>
               <div style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>NET PROFIT</div>

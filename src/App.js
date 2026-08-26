@@ -8,6 +8,7 @@ import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
 import { useAuth } from './context/AuthContext';
 import NotificationBell from './components/NotificationBell';
+import InboxBell from './components/InboxBell';
 import SyncStatus from './components/SyncStatus';
 import CommandPalette from './components/CommandPalette';
 import CustomerDisplay from './pages/CustomerDisplay';
@@ -254,11 +255,25 @@ class ChunkErrorBoundary extends React.Component {
 
 const NAV_CONFIG = [
   { to: '/', icon: '📊', label: 'Dashboard' },
+  // POS and Borrow are the two screens staff are in all day — top level, above
+  // the Library group, so they're always one click away and never collapsed.
+  { to: '/pos',    icon: '🛒', label: 'POS' },
+  { to: '/Borrow', icon: '🔄', label: 'Borrow' },
+  {
+    icon: '💳', label: 'Accounts', key: 'accounts',
+    children: [
+      { to: '/accounts/overview',         icon: '📊', label: 'Overview' },
+      { to: '/accounts/pnl',              icon: '📑', label: 'P&L Statement' },
+      { to: '/accounts/transactions',     icon: '💸', label: 'Transactions' },
+      { to: '/accounts/invoices',         icon: '🧾', label: 'Invoices' },
+      { to: '/accounts/expenses',         icon: '📤', label: 'Expenses' },
+      { to: '/accounts/member-payments',  icon: '💳', label: 'Member Payments' },
+      { to: '/accounts/vendor-payments',  icon: '🏪', label: 'Vendor Payments' },
+    ],
+  },
   {
     icon: '📖', label: 'Library', key: 'library',
     children: [
-      { to: '/pos',             icon: '🛒', label: 'POS' },
-      { to: '/Borrow',          icon: '🔄', label: 'Borrow' },
       { to: '/books',           icon: '📚', label: 'Books' },
       { to: '/overdue',         icon: '🔴', label: 'Overdue' },
       { to: '/availability',    icon: '🔍', label: 'Availability' },
@@ -273,7 +288,7 @@ const NAV_CONFIG = [
   {
     icon: '☕', label: 'Cafe', key: 'cafe',
     children: [
-      // Cafe billing now happens on the Book POS (Library → POS → Cafe tab),
+      // Cafe billing now happens on the Book POS (POS → Cafe tab),
       // so the standalone "Menu & POS" item was removed. The route still exists.
       { to: '/cafe/manage',  icon: '📝', label: 'Manage Menu' },
       { to: '/cafe/orders',  icon: '📋', label: 'Orders' },
@@ -342,18 +357,6 @@ const NAV_CONFIG = [
     ],
   },
   { to: '/tasks', icon: '📒', label: 'Tasks & Notes' },
-  {
-    icon: '💳', label: 'Accounts', key: 'accounts',
-    children: [
-      { to: '/accounts/overview',         icon: '📊', label: 'Overview' },
-      { to: '/accounts/pnl',              icon: '📑', label: 'P&L Statement' },
-      { to: '/accounts/transactions',     icon: '💸', label: 'Transactions' },
-      { to: '/accounts/invoices',         icon: '🧾', label: 'Invoices' },
-      { to: '/accounts/expenses',         icon: '📤', label: 'Expenses' },
-      { to: '/accounts/member-payments',  icon: '💳', label: 'Member Payments' },
-      { to: '/accounts/vendor-payments',  icon: '🏪', label: 'Vendor Payments' },
-    ],
-  },
   { to: '/staff', icon: '👤', label: 'Staff' },
   {
     icon: '🏪', label: 'Vendors', key: 'vendors',
@@ -717,6 +720,9 @@ function DashboardShell() {
         </div>
         <div className="navbar-right">
           <SyncStatus />
+          {/* Website forms + event registrations get their own bell — the
+              operational alerts in NotificationBell run to 99+ and bury them. */}
+          {getStaffPermission(staff, getPermissionForPath('/store/inbox')) !== 'none' && <InboxBell />}
           <NotificationBell staffId={staff?.id} />
           <button onClick={toggleTheme} className="menu-toggle" title={dark ? 'Light mode' : 'Dark mode'} style={{ fontSize: '18px' }}>
             {dark ? '☀️' : '🌙'}
