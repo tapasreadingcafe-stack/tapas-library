@@ -62,6 +62,56 @@ export default function EventManage() {
   };
 
   const activeCount = () => registrations.filter(r => ['registered', 'confirmed'].includes(r.status)).length;
+
+  // ── Payment ────────────────────────────────────────────────────────────────
+  // What this booking owes, from the event's price — `amount_paid` records what
+  // has actually been collected, so the two must not be conflated. A storefront
+  // sign-up leaves amount_paid at 0 because nobody has taken any money yet.
+  const dueFor = (reg) => (event?.is_paid ? (event.ticket_price || 0) * (reg.ticket_count || 1) : 0);
+  const paidFor = (reg) => Number(reg.amount_paid) || 0;
+  const payState = (reg) => {
+    const due = dueFor(reg);
+    if (due <= 0) return 'free';
+    const paid = paidFor(reg);
+    if (paid <= 0) return 'pending';
+    return paid >= due ? 'paid' : 'partial';
+  };
+
+  const markPaid = async (reg) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from('event_registrations')
+        .update({ amount_paid: dueFor(reg) }).eq('id', reg.id);
+      if (error) throw error;
+      toast.success('Marked as paid');
+      reloadRegs();
+    } catch (err) { toast.error('Error: ' + err.message); }
+    finally { setBusy(false); }
+  };
+
+  const markUnpaid = async (reg) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from('event_registrations')
+        .update({ amount_paid: 0 }).eq('id', reg.id);
+      if (error) throw error;
+      toast.success('Marked as not paid');
+      reloadRegs();
+    } catch (err) { toast.error('Error: ' + err.message); }
+    finally { setBusy(false); }
+  };
+
+  // Proofs live in a private bucket — a short-lived signed URL is the only way in.
+  const openProof = async (path) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('payment-proofs').createSignedUrl(path, 300);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank', 'noopener');
+    } catch (e) { toast.error('Could not open screenshot: ' + (e.message || e)); }
+  };
   const resetAdd = () => { setShowAdd(false); setMemberSearch(''); setMemberResults([]); setGuestForm({ name: '', phone: '', email: '' }); setRegTickets(1); };
 
   const registerMember = async (member) => {
@@ -208,10 +258,10 @@ export default function EventManage() {
         <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Registrations ({registrations.length})</h3>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>{['Name', 'Tickets', 'Status', 'Paid', ''].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{['Name', 'Tickets', 'Status', 'Payment', 'Proof', ''].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {registrations.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#999', padding: 20 }}>No registrations yet</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#999', padding: 20 }}>No registrations yet</td></tr>
               ) : registrations.map(reg => {
                 const phone = reg.members?.phone || reg.guest_phone;
                 const wl = waLink(phone, event);
@@ -223,7 +273,46 @@ export default function EventManage() {
                     </td>
                     <td style={td}>{reg.ticket_count}</td>
                     <td style={td}><span style={badgeStyle(reg.status)}>{reg.status}</span></td>
-                    <td style={td}>₹{reg.amount_paid}</td>
+                    <td style={td}>
+                      {(() => {
+                        const st = payState(reg);
+                        if (st === 'free') return <span style={{ color: '#999', fontSize: 12 }}>Free</span>;
+                        const due = dueFor(reg), paid = paidFor(reg);
+                        const chip = {
+                          paid:    { text: 'PAID',    bg: '#d1fae5', fg: '#047857' },
+                          partial: { text: 'PARTIAL', bg: '#fef3c7', fg: '#b45309' },
+                          pending: { text: 'UNPAID',  bg: '#fee2e2', fg: '#b91c1c' },
+                        }[st];
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                            <span style={{ background: chip.bg, color: chip.fg, padding: '2px 8px', borderRadius: 9, fontSize: 10, fontWeight: 800, letterSpacing: '0.4px' }}>
+                              {chip.text}
+                            </span>
+                            <span style={{ fontSize: 12, color: '#374151' }}>
+                              ₹{paid.toLocaleString('en-IN')} of ₹{due.toLocaleString('en-IN')}
+                            </span>
+                            {!isReadOnly && (
+                              st === 'paid'
+                                ? <button onClick={() => markUnpaid(reg)} disabled={busy} style={{ background: 'none', border: 0, color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Undo</button>
+                                : <button onClick={() => markPaid(reg)} disabled={busy} style={{ padding: '3px 9px', background: '#059669', color: '#fff', border: 0, borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Mark paid</button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td style={td}>
+                      {reg.payment_proof_url ? (
+                        <button onClick={() => openProof(reg.payment_proof_url)}
+                          title="Open the screenshot this person uploaded"
+                          style={{ padding: '3px 9px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: 5, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                          🧾 Screenshot
+                        </button>
+                      ) : reg.payment_reference ? (
+                        <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#374151' }}>{reg.payment_reference}</span>
+                      ) : (
+                        <span style={{ color: '#d1d5db' }}>—</span>
+                      )}
+                    </td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>
                       {wl && <a href={wl} target="_blank" rel="noopener noreferrer" style={{ padding: '3px 9px', background: '#25D366', color: '#fff', borderRadius: 5, fontSize: 11, fontWeight: 600, textDecoration: 'none', marginRight: 6 }}>WhatsApp</a>}
                       {!isReadOnly && reg.status !== 'cancelled' && <button onClick={() => cancelReg(reg.id)} style={{ padding: '3px 9px', background: '#ff6b6b', color: '#fff', border: 0, borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>Cancel</button>}
