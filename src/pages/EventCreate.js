@@ -15,6 +15,16 @@ export default function EventCreate() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(!editId);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingQr, setUploadingQr] = useState(false);
+  const qrInputRef = React.useRef(null);
+  // The payment columns arrive with 20260827_event_payments.sql. Probe once so
+  // the section can explain itself instead of failing the save on a column
+  // that doesn't exist yet.
+  const [paymentColsReady, setPaymentColsReady] = useState(true);
+  React.useEffect(() => {
+    supabase.from('events').select('payment_qr_url').limit(1)
+      .then(({ error }) => setPaymentColsReady(!error));
+  }, []);
   const [customCat, setCustomCat] = useState(false);
   const fileInputRef = useRef(null);
   const [form, setForm] = useState({
@@ -22,6 +32,8 @@ export default function EventCreate() {
     start_date: '', end_date: '', start_time: '', end_time: '',
     location: 'Tapas Reading Cafe', is_paid: false, ticket_price: 0,
     capacity: '', waitlist_enabled: false, image_url: '', status: 'upcoming',
+    // Payment (20260827_event_payments.sql)
+    payment_qr_url: '', payment_link: '', payment_note: '', payment_proof_enabled: false,
     // CMS display fields — drive how the event appears on the customer site.
     slug: '', italic_accent: '',
     category: 'book-club', badge: '', cta_type: 'rsvp', chip_color: 'lavender',
@@ -38,6 +50,8 @@ export default function EventCreate() {
           location: data.location || '', is_paid: data.is_paid || false, ticket_price: data.ticket_price || 0,
           capacity: data.capacity || '', waitlist_enabled: data.waitlist_enabled || false,
           image_url: data.image_url || '', status: data.status || 'upcoming',
+          payment_qr_url: data.payment_qr_url || '', payment_link: data.payment_link || '',
+          payment_note: data.payment_note || '', payment_proof_enabled: data.payment_proof_enabled || false,
           slug: data.slug || '', italic_accent: data.italic_accent || '',
           category: data.category || 'book-club', badge: data.badge || '',
           cta_type: data.cta_type || 'rsvp', chip_color: data.chip_color || 'lavender',
@@ -81,6 +95,30 @@ export default function EventCreate() {
     img.onerror = () => { clearTimeout(timer); done(file); };
     img.src = url;
   });
+
+  // QR images are line art — compressing them to JPEG would soften the
+  // modules and can make a code unreadable, so the original file is uploaded
+  // as-is. They're small by nature.
+  const handleQrUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('QR image is too large (max 8 MB)');
+      if (qrInputRef.current) qrInputRef.current.value = '';
+      return;
+    }
+    setUploadingQr(true);
+    try {
+      const asset = await uploadAsset(file, { pageId: 'event-payments' });
+      set('payment_qr_url', asset.url);
+      toast.success('QR uploaded');
+    } catch (err) {
+      toast.error('QR upload failed: ' + (err.message || err));
+    } finally {
+      setUploadingQr(false);
+      if (qrInputRef.current) qrInputRef.current.value = '';
+    }
+  };
 
   // Compress, then upload to Supabase Storage (via assetLibrary) and store
   // the returned public URL in image_url. Uses the same bucket as the CMS
@@ -146,6 +184,19 @@ export default function EventCreate() {
       delete payload.host_name;
       delete payload.host_url;
       if (cleanHosts.length) payload.hosts = cleanHosts; else delete payload.hosts;
+      // Same guard as hosts above: without the payment migration these columns
+      // don't exist, and sending them would fail the whole save.
+      if (paymentColsReady) {
+        payload.payment_qr_url = form.payment_qr_url || null;
+        payload.payment_link = form.payment_link || null;
+        payload.payment_note = form.payment_note || null;
+        payload.payment_proof_enabled = !!form.payment_proof_enabled;
+      } else {
+        delete payload.payment_qr_url;
+        delete payload.payment_link;
+        delete payload.payment_note;
+        delete payload.payment_proof_enabled;
+      }
       const { error } = editId
         ? await supabase.from('events').update(payload).eq('id', editId)
         : await supabase.from('events').insert([payload]);
@@ -339,6 +390,73 @@ export default function EventCreate() {
               <div className="ec-field" style={{ marginTop: 14 }}>
                 <label>Ticket price (₹)</label>
                 <input type="number" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0" min="0" disabled={isReadOnly} />
+              </div>
+            )}
+
+            {/* How the registrant pays. Only meaningful for a paid event. */}
+            {form.is_paid && !paymentColsReady && (
+              <div style={{ marginTop: 16, padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
+                ⚠️ Payment options need one database update first — run{' '}
+                <code style={{ fontFamily: 'monospace', fontSize: 12 }}>supabase/migrations/20260827_event_payments.sql</code>{' '}
+                in the Supabase SQL editor. Everything else on this page saves normally.
+              </div>
+            )}
+
+            {form.is_paid && paymentColsReady && (
+              <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid #eef0f3' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>How people pay</h3>
+                <p style={{ fontSize: 12, color: '#999', margin: '0 0 14px' }}>
+                  Shown in the register form on the website. Leave blank to just say
+                  “we’ll share payment details after you register”.
+                </p>
+
+                {/* QR */}
+                <div className="event-image-row">
+                  <div className="event-image-thumb">
+                    {form.payment_qr_url
+                      ? <img src={form.payment_qr_url} alt="Payment QR preview" />
+                      : <span className="event-image-empty">No QR</span>}
+                  </div>
+                  <div className="event-image-controls">
+                    <input ref={qrInputRef} type="file" accept="image/*" onChange={handleQrUpload} style={{ display: 'none' }} disabled={isReadOnly || uploadingQr} />
+                    <button type="button" className="event-image-upload" onClick={() => qrInputRef.current && qrInputRef.current.click()} disabled={isReadOnly || uploadingQr}>
+                      {uploadingQr ? 'Uploading…' : (form.payment_qr_url ? '📷 Replace QR' : '📷 Upload QR code')}
+                    </button>
+                    {form.payment_qr_url && !uploadingQr && (
+                      <button type="button" className="event-image-remove" onClick={() => set('payment_qr_url', '')} disabled={isReadOnly}>
+                        Remove
+                      </button>
+                    )}
+                    <p style={{ fontSize: 12, color: '#999', margin: '6px 0 0' }}>
+                      Your UPI QR. Uploaded as-is — QR codes aren’t compressed, so the code stays scannable.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="ec-field" style={{ marginTop: 14 }}>
+                  <label>Payment link <span className="ec-opt">optional</span></label>
+                  <input type="url" value={form.payment_link} onChange={e => set('payment_link', e.target.value)}
+                    placeholder="upi://pay?pa=… or https://…" disabled={isReadOnly} />
+                  <p style={{ fontSize: 12, color: '#999', margin: '6px 0 0' }}>
+                    A UPI deep link or payment page. Shown as a “Pay now” button — handy on phones, where a QR can’t be scanned from the same screen.
+                  </p>
+                </div>
+
+                <div className="ec-field" style={{ marginTop: 14 }}>
+                  <label>Payment instruction <span className="ec-opt">optional</span></label>
+                  <input type="text" value={form.payment_note} onChange={e => set('payment_note', e.target.value)}
+                    placeholder="e.g. Add your name in the UPI note" disabled={isReadOnly} maxLength={160} />
+                </div>
+
+                <label className="ec-check" style={{ marginTop: 16 }}>
+                  <input type="checkbox" checked={form.payment_proof_enabled}
+                    onChange={e => set('payment_proof_enabled', e.target.checked)} disabled={isReadOnly} />
+                  <span>Let people upload a screenshot of their payment</span>
+                </label>
+                <p style={{ fontSize: 12, color: '#999', margin: '6px 0 0 26px' }}>
+                  Adds an optional upload to the register form. Screenshots are private —
+                  only signed-in staff can open them, from Event RSVPs.
+                </p>
               </div>
             )}
           </section>

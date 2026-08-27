@@ -23,10 +23,29 @@ export default function EventRsvpInbox() {
     try {
       const { data, error: err } = await supabase
         .from('event_registrations')
-        .select('id, event_id, member_id, guest_name, guest_email, guest_phone, ticket_count, status, notes, source_page, created_at')
+        .select('id, event_id, member_id, guest_name, guest_email, guest_phone, ticket_count, status, notes, source_page, created_at, payment_proof_url, payment_reference')
         .order('created_at', { ascending: false })
         .limit(1000);
-      if (err) throw err;
+      if (err) {
+        // Before 20260827_event_payments.sql the proof columns don't exist and
+        // the whole select fails — retry without them rather than showing an
+        // empty inbox.
+        const { data: legacy, error: legacyErr } = await supabase
+          .from('event_registrations')
+          .select('id, event_id, member_id, guest_name, guest_email, guest_phone, ticket_count, status, notes, source_page, created_at')
+          .order('created_at', { ascending: false })
+          .limit(1000);
+        if (legacyErr) throw err;
+        setRows(legacy || []);
+        const legacyIds = [...new Set((legacy || []).map(r => r.event_id).filter(Boolean))];
+        if (legacyIds.length) {
+          const { data: evRows } = await supabase.from('events').select('id, title, event_date, start_time, location').in('id', legacyIds);
+          const map = {};
+          (evRows || []).forEach(e => { map[e.id] = e; });
+          setEvents(map);
+        }
+        return;
+      }
       setRows(data || []);
       const eventIds = [...new Set((data || []).map(r => r.event_id).filter(Boolean))];
       if (eventIds.length) {
@@ -43,6 +62,20 @@ export default function EventRsvpInbox() {
   }, []);
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  // Payment screenshots live in a private bucket — a signed URL is the only way
+  // to view one, and it expires so it can't be forwarded around indefinitely.
+  const openProof = async (path) => {
+    try {
+      const { data, error: err } = await supabase.storage
+        .from('payment-proofs')
+        .createSignedUrl(path, 300); // 5 minutes
+      if (err) throw err;
+      window.open(data.signedUrl, '_blank', 'noopener');
+    } catch (e) {
+      setError('Could not open that screenshot: ' + (e.message || e));
+    }
+  };
 
   const deleteRow = async (row) => {
     if (!window.confirm('Delete this RSVP? The visitor will not be notified.')) return;
@@ -136,6 +169,7 @@ export default function EventRsvpInbox() {
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Event</th>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Guest</th>
                 <th style={{ padding: '10px 16px', textAlign: 'center', fontSize: '11px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Guests</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment</th>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>When</th>
                 <th style={{ padding: '10px 16px' }}></th>
               </tr>
@@ -155,6 +189,19 @@ export default function EventRsvpInbox() {
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#111827' }}>
                     {row.ticket_count || 1}
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: '12px' }}>
+                    {row.payment_proof_url ? (
+                      <button onClick={() => openProof(row.payment_proof_url)}
+                        title="Open the screenshot the guest uploaded"
+                        style={{ padding: '4px 10px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>
+                        🧾 Screenshot
+                      </button>
+                    ) : row.payment_reference ? (
+                      <span style={{ fontFamily: 'monospace', color: '#374151' }}>{row.payment_reference}</span>
+                    ) : (
+                      <span style={{ color: '#d1d5db' }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '12px' }}>{fmtDate(row.created_at)}</td>
                   <td style={{ padding: '8px 16px', textAlign: 'right' }}>

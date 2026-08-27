@@ -114,6 +114,17 @@ const CSS = `
   .evd-pay-box { border: 1px dashed #E0004F; background: #fff5f8; border-radius: 10px; padding: 14px 16px; }
   .evd-pay-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #E0004F; }
   .evd-pay-box p { margin: 6px 0 0; font-size: 13px; color: #8a2a49; line-height: 1.5; }
+  .evd-qr { display: flex; gap: 14px; align-items: flex-start; margin-top: 12px; }
+  .evd-qr img { width: 132px; height: 132px; object-fit: contain; background: #fff; border: 1px solid #f2c9d8; border-radius: 8px; padding: 6px; flex-shrink: 0; }
+  .evd-qr-side { flex: 1; min-width: 0; }
+  .evd-pay-link { display: inline-block; margin-top: 8px; padding: 9px 16px; border-radius: 8px; background: #E0004F; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; }
+  .evd-pay-link:hover { background: #b8003f; }
+  .evd-pay-note { margin-top: 8px; font-size: 12px; color: #8a2a49; font-style: italic; }
+  .evd-proof { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #f2c9d8; }
+  .evd-proof-label { font-size: 12px; font-weight: 700; color: #8a2a49; display: block; margin-bottom: 6px; }
+  .evd-proof input[type=file] { font-size: 12px; color: #8a2a49; max-width: 100%; }
+  .evd-proof-hint { margin-top: 6px; font-size: 11px; color: #a86b80; }
+  .evd-proof-chosen { margin-top: 6px; font-size: 12px; color: #1a7f52; font-weight: 600; }
   .evd-form-submit { background: #E0004F; color: #fff; border: 0; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 4px; transition: background 150ms; }
   .evd-form-submit:hover { background: #c70045; }
   .evd-form-submit:disabled { background: #e79bb4; cursor: default; }
@@ -167,17 +178,53 @@ export default function EventDetail() {
   const [submitError, setSubmitError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', email: '', guests: 1 });
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Optional proof-of-payment, only offered when staff enabled it on the event.
+  const [proofFile, setProofFile] = useState(null);
+  const [proofError, setProofError] = useState('');
 
-  const closeForm = () => { setShowForm(false); setSubmitted(false); setSubmitError(''); };
+  const closeForm = () => {
+    setShowForm(false); setSubmitted(false); setSubmitError('');
+    setProofFile(null); setProofError('');
+  };
+
+  const MAX_PROOF_BYTES = 5 * 1024 * 1024; // matches the bucket's own limit
+  const pickProof = (e) => {
+    const f = e.target.files?.[0] || null;
+    setProofError('');
+    if (f && f.size > MAX_PROOF_BYTES) {
+      setProofError('That file is over 5 MB — please attach a smaller screenshot.');
+      setProofFile(null);
+      e.target.value = '';
+      return;
+    }
+    setProofFile(f);
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.phone.trim() || submitting) return;
     setSubmitting(true);
     setSubmitError('');
     try {
+      // Upload the payment screenshot first, if one was attached. The bucket
+      // is private and insert-only for visitors, so what's stored is the path —
+      // staff open it through a signed URL from the dashboard.
+      let proofPath = null;
+      if (proofFile && event.payment_proof_enabled) {
+        const ext = (proofFile.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
+        const rand = (window.crypto?.randomUUID?.() || String(Date.now()));
+        const path = `events/${event.id}/${rand}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from('payment-proofs')
+          .upload(path, proofFile, { contentType: proofFile.type || 'image/jpeg', upsert: false });
+        // A failed upload must not cost them the registration — record the
+        // sign-up anyway and let staff chase the payment.
+        if (upErr) console.error('Payment proof upload failed', upErr);
+        else proofPath = path;
+      }
+
       // Public sign-up → event_registrations (guest_* columns), the same
       // shape the storefront's event block uses. Lands in the staff dashboard.
-      const { error } = await supabase.from('event_registrations').insert([{
+      const row = {
         event_id: event.id,
         guest_name: form.name.trim(),
         guest_email: form.email.trim() || null,
@@ -185,7 +232,12 @@ export default function EventDetail() {
         ticket_count: Math.max(1, parseInt(form.guests, 10) || 1),
         status: 'confirmed',
         source_page: 'event_detail',
-      }]);
+      };
+      // Only sent when there's something to send, so registrations still work
+      // before 20260827_event_payments.sql is applied.
+      if (proofPath) row.payment_proof_url = proofPath;
+
+      const { error } = await supabase.from('event_registrations').insert([row]);
       if (error) throw error;
       setSubmitted(true);
     } catch (err) {
@@ -379,7 +431,46 @@ export default function EventDetail() {
                   {event.is_paid && event.ticket_price > 0 && (
                     <div className="evd-pay-box">
                       <span className="evd-pay-label">Payment</span>
-                      <p>This is a paid event — ₹{event.ticket_price} per person. We’ll share payment details after you register.</p>
+                      <p>
+                        This is a paid event — ₹{event.ticket_price} per person
+                        {(() => {
+                          const people = Math.max(1, parseInt(form.guests, 10) || 1);
+                          return people > 1 ? ` · ₹${event.ticket_price * people} for ${people}` : '';
+                        })()}.
+                        {!event.payment_qr_url && !event.payment_link && ' We’ll share payment details after you register.'}
+                      </p>
+
+                      {(event.payment_qr_url || event.payment_link) && (
+                        <div className="evd-qr">
+                          {event.payment_qr_url && (
+                            <img src={event.payment_qr_url} alt="Scan this QR code to pay" />
+                          )}
+                          <div className="evd-qr-side">
+                            <p style={{ margin: 0 }}>
+                              {event.payment_qr_url ? 'Scan to pay' : 'Pay online'}
+                              {event.payment_qr_url && event.payment_link ? ', or tap the button below.' : '.'}
+                            </p>
+                            {event.payment_link && (
+                              <a className="evd-pay-link" href={event.payment_link} target="_blank" rel="noopener noreferrer">
+                                Pay ₹{event.ticket_price * Math.max(1, parseInt(form.guests, 10) || 1)} now
+                              </a>
+                            )}
+                            {event.payment_note && <p className="evd-pay-note">{event.payment_note}</p>}
+                          </div>
+                        </div>
+                      )}
+
+                      {event.payment_proof_enabled && (
+                        <div className="evd-proof">
+                          <label className="evd-proof-label" htmlFor="reg-proof">
+                            Payment screenshot <span style={{ fontWeight: 400 }}>(optional)</span>
+                          </label>
+                          <input id="reg-proof" type="file" accept="image/*,application/pdf" onChange={pickProof} />
+                          {proofFile && <p className="evd-proof-chosen">✓ {proofFile.name}</p>}
+                          {proofError && <p className="evd-form-error" style={{ marginTop: 6 }}>{proofError}</p>}
+                          <p className="evd-proof-hint">Helps us confirm your seat faster. You can also send it on WhatsApp later.</p>
+                        </div>
+                      )}
                     </div>
                   )}
                   {submitError && <p className="evd-form-error">{submitError}</p>}
