@@ -111,20 +111,40 @@ const CSS = `
   .evd-field .opt { color: #9a9a9a; font-weight: 400; }
   .evd-field input { width: 100%; padding: 12px 13px; border: 1px solid #dcdcdc; border-radius: 10px; font-size: 15px; font-family: inherit; box-sizing: border-box; transition: border-color 150ms; }
   .evd-field input:focus { outline: none; border-color: #E0004F; box-shadow: 0 0 0 3px rgba(224,0,79,0.10); }
-  .evd-pay-box { border: 1px dashed #E0004F; background: #fff5f8; border-radius: 10px; padding: 14px 16px; }
-  .evd-pay-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #E0004F; }
-  .evd-pay-box p { margin: 6px 0 0; font-size: 13px; color: #8a2a49; line-height: 1.5; }
-  .evd-qr { display: flex; gap: 14px; align-items: flex-start; margin-top: 12px; }
-  .evd-qr img { width: 132px; height: 132px; object-fit: contain; background: #fff; border: 1px solid #f2c9d8; border-radius: 8px; padding: 6px; flex-shrink: 0; }
-  .evd-qr-side { flex: 1; min-width: 0; }
-  .evd-pay-link { display: inline-block; margin-top: 8px; padding: 9px 16px; border-radius: 8px; background: #E0004F; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; }
+  /* Payment block — a calm neutral card. The QR is the thing to look at, so
+     nothing else competes with it for attention. */
+  .evd-pay-box { border: 1px solid #e6e6e6; background: #fbfbfb; border-radius: 12px; padding: 18px; }
+  .evd-pay-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8a8a; }
+  .evd-pay-box p { margin: 6px 0 0; font-size: 14px; color: #3d3d3d; line-height: 1.5; }
+  /* The amount actually due — the one number people look for. */
+  .evd-pay-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin-top: 12px; padding: 12px 14px; background: #fff; border: 1px solid #ececec; border-radius: 10px; }
+  .evd-pay-total-label { font-size: 13px; color: #6a6a6a; }
+  .evd-pay-total-amt { font-size: 26px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.01em; }
+  .evd-pay-total-calc { font-size: 12px; color: #9a9a9a; margin-top: 2px; }
+  /* QR — big enough to scan from another phone held at arm's length. */
+  .evd-qr { margin-top: 14px; text-align: center; }
+  .evd-qr img { width: 100%; max-width: 300px; aspect-ratio: 1; object-fit: contain;
+    background: #fff; border: 1px solid #ececec; border-radius: 12px; padding: 10px; }
+  .evd-qr-cap { margin-top: 8px; font-size: 14px; font-weight: 600; color: #3d3d3d; }
+  .evd-pay-link { display: block; margin-top: 12px; padding: 13px 16px; border-radius: 10px;
+    background: #E0004F; color: #fff; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center; }
   .evd-pay-link:hover { background: #b8003f; }
-  .evd-pay-note { margin-top: 8px; font-size: 12px; color: #8a2a49; font-style: italic; }
-  .evd-proof { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #f2c9d8; }
-  .evd-proof-label { font-size: 12px; font-weight: 700; color: #8a2a49; display: block; margin-bottom: 6px; }
-  .evd-proof input[type=file] { font-size: 12px; color: #8a2a49; max-width: 100%; }
-  .evd-proof-hint { margin-top: 6px; font-size: 11px; color: #a86b80; }
-  .evd-proof-chosen { margin-top: 6px; font-size: 12px; color: #1a7f52; font-weight: 600; }
+  .evd-pay-note { margin-top: 10px; font-size: 13px; color: #6a6a6a; font-style: italic; text-align: center; }
+  /* Upload — a proper drop-zone sized target, not a hairline file input. */
+  .evd-proof { margin-top: 16px; padding-top: 16px; border-top: 1px solid #ececec; }
+  .evd-proof-label { font-size: 14px; font-weight: 700; color: #1a1a1a; display: block; margin-bottom: 8px; }
+  .evd-proof-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; min-height: 104px; padding: 18px; box-sizing: border-box; cursor: pointer;
+    background: #fff; border: 2px dashed #d8d8d8; border-radius: 12px; transition: border-color 150ms, background 150ms; }
+  .evd-proof-drop:hover { border-color: #E0004F; background: #fffafc; }
+  .evd-proof-drop-icon { font-size: 26px; line-height: 1; }
+  .evd-proof-drop-main { font-size: 15px; font-weight: 600; color: #3d3d3d; }
+  .evd-proof-drop-sub { font-size: 12px; color: #9a9a9a; }
+  .evd-proof-chosen { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; padding: 10px 12px; background: #f2fbf6; border: 1px solid #cdebda; border-radius: 10px;
+    font-size: 13px; color: #1a7f52; font-weight: 600; }
+  .evd-proof-clear { background: none; border: 0; color: #6a6a6a; font-size: 13px; cursor: pointer; font-family: inherit; padding: 0 2px; }
   .evd-form-submit { background: #E0004F; color: #fff; border: 0; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 4px; transition: background 150ms; }
   .evd-form-submit:hover { background: #c70045; }
   .evd-form-submit:disabled { background: #e79bb4; cursor: default; }
@@ -428,51 +448,71 @@ export default function EventDetail() {
                     <label htmlFor="reg-guests">Number of people attending</label>
                     <input id="reg-guests" type="number" min="1" value={form.guests} onChange={(e) => setField('guests', e.target.value)} placeholder="1" />
                   </div>
-                  {event.is_paid && event.ticket_price > 0 && (
+                  {event.is_paid && event.ticket_price > 0 && (() => {
+                    const people = Math.max(1, parseInt(form.guests, 10) || 1);
+                    const total = event.ticket_price * people;
+                    return (
                     <div className="evd-pay-box">
                       <span className="evd-pay-label">Payment</span>
-                      <p>
-                        This is a paid event — ₹{event.ticket_price} per person
-                        {(() => {
-                          const people = Math.max(1, parseInt(form.guests, 10) || 1);
-                          return people > 1 ? ` · ₹${event.ticket_price * people} for ${people}` : '';
-                        })()}.
-                        {!event.payment_qr_url && !event.payment_link && ' We’ll share payment details after you register.'}
-                      </p>
 
-                      {(event.payment_qr_url || event.payment_link) && (
-                        <div className="evd-qr">
-                          {event.payment_qr_url && (
-                            <img src={event.payment_qr_url} alt="Scan this QR code to pay" />
-                          )}
-                          <div className="evd-qr-side">
-                            <p style={{ margin: 0 }}>
-                              {event.payment_qr_url ? 'Scan to pay' : 'Pay online'}
-                              {event.payment_qr_url && event.payment_link ? ', or tap the button below.' : '.'}
-                            </p>
-                            {event.payment_link && (
-                              <a className="evd-pay-link" href={event.payment_link} target="_blank" rel="noopener noreferrer">
-                                Pay ₹{event.ticket_price * Math.max(1, parseInt(form.guests, 10) || 1)} now
-                              </a>
-                            )}
-                            {event.payment_note && <p className="evd-pay-note">{event.payment_note}</p>}
+                      {/* The amount due, worked out for the number of people
+                          chosen above — that arithmetic shouldn't be homework. */}
+                      <div className="evd-pay-total">
+                        <div>
+                          <div className="evd-pay-total-label">Amount to pay</div>
+                          <div className="evd-pay-total-calc">
+                            ₹{event.ticket_price} × {people} {people === 1 ? 'person' : 'people'}
                           </div>
                         </div>
+                        <div className="evd-pay-total-amt">₹{total.toLocaleString('en-IN')}</div>
+                      </div>
+
+                      {!event.payment_qr_url && !event.payment_link && (
+                        <p>We’ll share payment details after you register.</p>
                       )}
+
+                      {event.payment_qr_url && (
+                        <div className="evd-qr">
+                          <img src={event.payment_qr_url} alt="Scan this QR code to pay" />
+                          <div className="evd-qr-cap">Scan to pay ₹{total.toLocaleString('en-IN')}</div>
+                        </div>
+                      )}
+
+                      {event.payment_link && (
+                        <a className="evd-pay-link" href={event.payment_link} target="_blank" rel="noopener noreferrer">
+                          Pay ₹{total.toLocaleString('en-IN')} now
+                        </a>
+                      )}
+
+                      {event.payment_note && <p className="evd-pay-note">{event.payment_note}</p>}
 
                       {event.payment_proof_enabled && (
                         <div className="evd-proof">
-                          <label className="evd-proof-label" htmlFor="reg-proof">
-                            Payment screenshot <span style={{ fontWeight: 400 }}>(optional)</span>
+                          <span className="evd-proof-label">Payment screenshot</span>
+                          <input id="reg-proof" type="file" accept="image/*,application/pdf"
+                            onChange={pickProof} style={{ display: 'none' }} />
+                          <label htmlFor="reg-proof" className="evd-proof-drop">
+                            <span className="evd-proof-drop-icon">📷</span>
+                            <span className="evd-proof-drop-main">
+                              {proofFile ? 'Choose a different file' : 'Tap to upload your payment screenshot'}
+                            </span>
+                            <span className="evd-proof-drop-sub">PNG, JPG or PDF · up to 5 MB</span>
                           </label>
-                          <input id="reg-proof" type="file" accept="image/*,application/pdf" onChange={pickProof} />
-                          {proofFile && <p className="evd-proof-chosen">✓ {proofFile.name}</p>}
-                          {proofError && <p className="evd-form-error" style={{ marginTop: 6 }}>{proofError}</p>}
-                          <p className="evd-proof-hint">Helps us confirm your seat faster. You can also send it on WhatsApp later.</p>
+                          {proofFile && (
+                            <div className="evd-proof-chosen">
+                              <span>✓ {proofFile.name}</span>
+                              <button type="button" className="evd-proof-clear"
+                                onClick={() => { setProofFile(null); setProofError(''); const el = document.getElementById('reg-proof'); if (el) el.value = ''; }}>
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                          {proofError && <p className="evd-form-error" style={{ marginTop: 8 }}>{proofError}</p>}
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
                   {submitError && <p className="evd-form-error">{submitError}</p>}
                   <button type="submit" className="evd-form-submit" disabled={submitting}>{submitting ? 'Registering…' : 'Register'}</button>
                   <button type="button" className="evd-form-cancel" onClick={closeForm} disabled={submitting}>Cancel</button>
