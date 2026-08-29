@@ -81,11 +81,29 @@ export default function EventListing() {
     setLoading(false);
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  // Local date, not toISOString() — that yields UTC, so between midnight and
+  // 05:30 IST "today" would still read as yesterday and an event happening
+  // today would be filed under tomorrow.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  // Which bucket an event belongs in. The DATE decides, not the stored status:
+  // `status` is written once when the event is created and never revisited, so
+  // a finished event still says 'upcoming' forever. That's why past events kept
+  // appearing under Upcoming — and, because the Past tab matched on date, the
+  // same event was counted in both tabs at once.
+  //
+  // A multi-day event counts as still running until its end_date passes.
+  const bucketOf = (e) => {
+    if (e.status === 'cancelled') return 'cancelled';
+    const endsOn = e.end_date || e.start_date;
+    if (e.status === 'completed' || (endsOn && endsOn < today)) return 'past';
+    return 'upcoming';
+  };
   const filtered = events.filter(e => {
-    if (activeTab === 'upcoming') return e.status === 'upcoming' || (e.start_date >= today && e.status !== 'cancelled');
-    if (activeTab === 'past') return e.start_date < today || e.status === 'completed';
-    if (activeTab === 'cancelled') return e.status === 'cancelled';
+    if (activeTab === 'upcoming') return bucketOf(e) === 'upcoming';
+    if (activeTab === 'past') return bucketOf(e) === 'past';
+    if (activeTab === 'cancelled') return bucketOf(e) === 'cancelled';
     return true;
   });
 
@@ -149,12 +167,7 @@ export default function EventListing() {
       <div className="events-tabs">
         {['upcoming', 'past', 'cancelled'].map(tab => (
           <button key={tab} className={`events-tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)} ({events.filter(e => {
-              if (tab === 'upcoming') return e.status === 'upcoming' || (e.start_date >= today && e.status !== 'cancelled');
-              if (tab === 'past') return e.start_date < today || e.status === 'completed';
-              if (tab === 'cancelled') return e.status === 'cancelled';
-              return true;
-            }).length})
+            {tab.charAt(0).toUpperCase() + tab.slice(1)} ({events.filter(e => bucketOf(e) === tab).length})
           </button>
         ))}
       </div>
@@ -180,7 +193,7 @@ export default function EventListing() {
                 <span>📍 {event.location}</span>
               </div>
               <div className="badges">
-                <span style={statusBadge(event.status)}>{event.status}</span>
+                <span style={statusBadge(bucketOf(event))}>{bucketOf(event)}</span>
                 {event.is_paid && <span style={{ ...statusBadge(''), background: '#f39c1220', color: '#f39c12' }}>₹{event.ticket_price}</span>}
                 {event.capacity && <span style={{ ...statusBadge(''), background: '#3498db20', color: '#3498db' }}>{event.capacity} capacity</span>}
                 {event.event_type === 'recurring' && <span style={{ ...statusBadge(''), background: '#9b59b620', color: '#9b59b6' }}>Recurring</span>}
