@@ -22,11 +22,14 @@ export default function EventCreate() {
   // that doesn't exist yet.
   const [paymentColsReady, setPaymentColsReady] = useState(true);
   const [tierColsReady, setTierColsReady] = useState(true);
+  const [contactColsReady, setContactColsReady] = useState(true);
   React.useEffect(() => {
     supabase.from('events').select('payment_qr_url').limit(1)
       .then(({ error }) => setPaymentColsReady(!error));
     supabase.from('events').select('ticket_tiers').limit(1)
       .then(({ error }) => setTierColsReady(!error));
+    supabase.from('events').select('contact_phone').limit(1)
+      .then(({ error }) => setContactColsReady(!error));
   }, []);
 
   // ── Ticket options ─────────────────────────────────────────────────────────
@@ -45,6 +48,7 @@ export default function EventCreate() {
     // Payment (20260827_event_payments.sql)
     payment_qr_url: '', payment_link: '', payment_note: '', payment_proof_enabled: false,
     ticket_tiers: [],
+    contact_phone: '', contact_label: '',
     // CMS display fields — drive how the event appears on the customer site.
     slug: '', italic_accent: '',
     category: 'book-club', badge: '', cta_type: 'rsvp', chip_color: 'lavender',
@@ -64,6 +68,7 @@ export default function EventCreate() {
           payment_qr_url: data.payment_qr_url || '', payment_link: data.payment_link || '',
           payment_note: data.payment_note || '', payment_proof_enabled: data.payment_proof_enabled || false,
           ticket_tiers: Array.isArray(data.ticket_tiers) ? data.ticket_tiers.map(t => ({ label: t.label || '', price: t.price ?? '' })) : [],
+          contact_phone: data.contact_phone || '', contact_label: data.contact_label || '',
           slug: data.slug || '', italic_accent: data.italic_accent || '',
           category: data.category || 'book-club', badge: data.badge || '',
           cta_type: data.cta_type || 'rsvp', chip_color: data.chip_color || 'lavender',
@@ -198,6 +203,13 @@ export default function EventCreate() {
       if (cleanHosts.length) payload.hosts = cleanHosts; else delete payload.hosts;
       // Same guard as hosts above: without the payment migration these columns
       // don't exist, and sending them would fail the whole save.
+      if (contactColsReady) {
+        payload.contact_phone = (form.contact_phone || '').trim() || null;
+        payload.contact_label = (form.contact_label || '').trim() || null;
+      } else {
+        delete payload.contact_phone;
+        delete payload.contact_label;
+      }
       if (tierColsReady) {
         // Drop half-filled rows. The single ticket_price is kept in step with
         // the cheapest option so cards and lists can still show a "from" price.
@@ -400,6 +412,32 @@ export default function EventCreate() {
               <input type="checkbox" checked={form.waitlist_enabled} onChange={e => set('waitlist_enabled', e.target.checked)} disabled={isReadOnly} />
               <span>Enable waitlist when full</span>
             </label>
+
+            {/* Per-event contact. Blank falls back to the cafe's own number,
+                which is what every existing event does. */}
+            {contactColsReady && (
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eef0f3' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>Contact number <span className="ec-opt">optional</span></h3>
+                <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+                  Shown on the event page and used for its WhatsApp link. Leave blank to use the cafe’s
+                  number — set it when an outside host wants enquiries coming to them.
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div className="ec-field" style={{ flex: '1 1 190px', marginBottom: 0 }}>
+                    <label>Phone</label>
+                    <input type="tel" value={form.contact_phone}
+                      onChange={e => set('contact_phone', e.target.value)}
+                      placeholder="e.g. 98765 43210" disabled={isReadOnly} />
+                  </div>
+                  <div className="ec-field" style={{ flex: '1 1 190px', marginBottom: 0 }}>
+                    <label>Whose number <span className="ec-opt">optional</span></label>
+                    <input type="text" value={form.contact_label}
+                      onChange={e => set('contact_label', e.target.value)}
+                      placeholder="e.g. Meenu" maxLength={40} disabled={isReadOnly} />
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Tickets */}

@@ -30,6 +30,20 @@ const MAP_LINK = 'https://maps.app.goo.gl/i24rAtukZxwuL1Uk9';
 const MAP_EMBED = 'https://www.google.com/maps?q=Tapas%20Reading%20Cafe%2C%2027th%20Main%20Rd%2C%20HSR%20Layout%2C%20Bengaluru%2C%20Karnataka%20560102&output=embed';
 const WHATSAPP_NUMBER = '917760393951';
 
+// Accepts what a person would actually type and returns { wa, display }.
+// wa: digits only with the country code, as wa.me/tel: require.
+function normalisePhone(raw) {
+  // Strip a leading 0 BEFORE the length test: "09876543210" is a normal way to
+  // write a mobile here, and testing first left it one digit short of the
+  // country-code rule, so it was rejected and quietly fell back to the cafe.
+  const digits = String(raw || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!digits) return null;
+  const wa = digits.length === 10 ? `91${digits}` : digits;
+  if (wa.length < 11) return null;
+  const local = wa.slice(-10);
+  return { wa, display: `+${wa.slice(0, wa.length - 10)} ${local.slice(0, 5)} ${local.slice(5)}` };
+}
+
 function formatLongDate(iso) {
   if (!iso) return '';
   const d = new Date(`${iso}T00:00:00`);
@@ -374,7 +388,9 @@ export default function EventDetail() {
     : (event.host_name ? [{ name: event.host_name, url: event.host_url }] : [{ name: HOST_NAME }]);
 
   const waText = encodeURIComponent(`Hi Tapas! I'd like to register for "${event.title}"${longDate ? ' on ' + longDate : ''}.`);
-  const waHref = `https://wa.me/${WHATSAPP_NUMBER}?text=${waText}`;
+  // An event can carry its own contact so an outside host gets the enquiries.
+  const contact = normalisePhone(event.contact_phone) || normalisePhone(WHATSAPP_NUMBER);
+  const waHref = `https://wa.me/${contact.wa}?text=${waText}`;
 
   return (
     <div className="evd">
@@ -469,11 +485,13 @@ export default function EventDetail() {
                 <div className="evd-fact-icon"><PhoneIcon /></div>
                 <div>
                   <div className="evd-fact-main">
-                    <a className="evd-fact-link" href={`tel:+${WHATSAPP_NUMBER}`}>
-                      +91 77603 93951
+                    <a className="evd-fact-link" href={`tel:+${contact.wa}`}>
+                      {contact.display}
                     </a>
                   </div>
-                  <div className="evd-fact-sub">Call or WhatsApp us</div>
+                  <div className="evd-fact-sub">
+                    {event.contact_label ? `${event.contact_label} · call or WhatsApp` : 'Call or WhatsApp us'}
+                  </div>
                 </div>
               </div>
             </div>
