@@ -67,7 +67,13 @@ export default function EventManage() {
   // What this booking owes, from the event's price — `amount_paid` records what
   // has actually been collected, so the two must not be conflated. A storefront
   // sign-up leaves amount_paid at 0 because nobody has taken any money yet.
-  const dueFor = (reg) => (event?.is_paid ? (event.ticket_price || 0) * (reg.ticket_count || 1) : 0);
+  // Price actually booked at, falling back to the event's base price for
+  // registrations taken before ticket options existed.
+  const dueFor = (reg) => {
+    if (!event?.is_paid) return 0;
+    const unit = Number(reg.ticket_unit_price) || Number(event.ticket_price) || 0;
+    return unit * (reg.ticket_count || 1);
+  };
   const paidFor = (reg) => Number(reg.amount_paid) || 0;
   const payState = (reg) => {
     const due = dueFor(reg);
@@ -271,7 +277,12 @@ export default function EventManage() {
                       <div style={{ fontWeight: 500 }}>{reg.members?.name || reg.guest_name || '—'}</div>
                       {(phone || reg.guest_email) && <div style={{ fontSize: 11, color: '#999' }}>{phone}{phone && reg.guest_email ? ' · ' : ''}{reg.guest_email}</div>}
                     </td>
-                    <td style={td}>{reg.ticket_count}</td>
+                    <td style={td}>
+                      {reg.ticket_count}
+                      {reg.ticket_tier && (
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{reg.ticket_tier}</div>
+                      )}
+                    </td>
                     <td style={td}><span style={badgeStyle(reg.status)}>{reg.status}</span></td>
                     <td style={td}>
                       {(() => {

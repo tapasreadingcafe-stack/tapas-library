@@ -21,10 +21,20 @@ export default function EventCreate() {
   // the section can explain itself instead of failing the save on a column
   // that doesn't exist yet.
   const [paymentColsReady, setPaymentColsReady] = useState(true);
+  const [tierColsReady, setTierColsReady] = useState(true);
   React.useEffect(() => {
     supabase.from('events').select('payment_qr_url').limit(1)
       .then(({ error }) => setPaymentColsReady(!error));
+    supabase.from('events').select('ticket_tiers').limit(1)
+      .then(({ error }) => setTierColsReady(!error));
   }, []);
+
+  // ── Ticket options ─────────────────────────────────────────────────────────
+  const addTier    = () => setForm(f => ({ ...f, ticket_tiers: [...(f.ticket_tiers || []), { label: '', price: '' }] }));
+  const removeTier = (i) => setForm(f => ({ ...f, ticket_tiers: f.ticket_tiers.filter((_, x) => x !== i) }));
+  const setTier    = (i, k, v) => setForm(f => ({
+    ...f, ticket_tiers: f.ticket_tiers.map((t, x) => x === i ? { ...t, [k]: v } : t),
+  }));
   const [customCat, setCustomCat] = useState(false);
   const fileInputRef = useRef(null);
   const [form, setForm] = useState({
@@ -34,6 +44,7 @@ export default function EventCreate() {
     capacity: '', waitlist_enabled: false, image_url: '', status: 'upcoming',
     // Payment (20260827_event_payments.sql)
     payment_qr_url: '', payment_link: '', payment_note: '', payment_proof_enabled: false,
+    ticket_tiers: [],
     // CMS display fields — drive how the event appears on the customer site.
     slug: '', italic_accent: '',
     category: 'book-club', badge: '', cta_type: 'rsvp', chip_color: 'lavender',
@@ -52,6 +63,7 @@ export default function EventCreate() {
           image_url: data.image_url || '', status: data.status || 'upcoming',
           payment_qr_url: data.payment_qr_url || '', payment_link: data.payment_link || '',
           payment_note: data.payment_note || '', payment_proof_enabled: data.payment_proof_enabled || false,
+          ticket_tiers: Array.isArray(data.ticket_tiers) ? data.ticket_tiers.map(t => ({ label: t.label || '', price: t.price ?? '' })) : [],
           slug: data.slug || '', italic_accent: data.italic_accent || '',
           category: data.category || 'book-club', badge: data.badge || '',
           cta_type: data.cta_type || 'rsvp', chip_color: data.chip_color || 'lavender',
@@ -186,6 +198,17 @@ export default function EventCreate() {
       if (cleanHosts.length) payload.hosts = cleanHosts; else delete payload.hosts;
       // Same guard as hosts above: without the payment migration these columns
       // don't exist, and sending them would fail the whole save.
+      if (tierColsReady) {
+        // Drop half-filled rows. The single ticket_price is kept in step with
+        // the cheapest option so cards and lists can still show a "from" price.
+        const tiers = (form.ticket_tiers || [])
+          .map(t => ({ label: (t.label || '').trim(), price: parseFloat(t.price) || 0 }))
+          .filter(t => t.label);
+        payload.ticket_tiers = tiers;
+        if (tiers.length) payload.ticket_price = Math.min(...tiers.map(t => t.price));
+      } else {
+        delete payload.ticket_tiers;
+      }
       if (paymentColsReady) {
         payload.payment_qr_url = form.payment_qr_url || null;
         payload.payment_link = form.payment_link || null;
@@ -386,10 +409,55 @@ export default function EventCreate() {
               <input type="checkbox" checked={form.is_paid} onChange={e => set('is_paid', e.target.checked)} disabled={isReadOnly} />
               <span>This is a paid event</span>
             </label>
-            {form.is_paid && (
+            {form.is_paid && (form.ticket_tiers || []).length === 0 && (
               <div className="ec-field" style={{ marginTop: 14 }}>
                 <label>Ticket price (₹)</label>
                 <input type="number" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0" min="0" disabled={isReadOnly} />
+              </div>
+            )}
+
+            {/* Named price options. With none, the single price above applies —
+                which is how every existing event keeps working. */}
+            {form.is_paid && tierColsReady && (
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eef0f3' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>Price options <span className="ec-opt">optional</span></h3>
+                <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
+                  For events with more than one rate — “Adult ₹300”, “Parent + Child ₹500”.
+                  Add these and people pick one when registering, instead of you writing it into the payment note.
+                </p>
+
+                {(form.ticket_tiers || []).map((t, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <input type="text" value={t.label} disabled={isReadOnly}
+                      onChange={e => setTier(i, 'label', e.target.value)}
+                      placeholder="What it's called — e.g. Parent + Child"
+                      style={{ flex: 1, minWidth: 0, padding: '9px 11px', border: '1px solid #e0e0e0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#9ca3af' }}>₹</span>
+                      <input type="number" min="0" value={t.price} disabled={isReadOnly}
+                        onChange={e => setTier(i, 'price', e.target.value)} placeholder="0"
+                        style={{ width: 110, padding: '9px 11px 9px 22px', border: '1px solid #e0e0e0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    </div>
+                    {!isReadOnly && (
+                      <button type="button" onClick={() => removeTier(i)} title="Remove this option"
+                        style={{ flexShrink: 0, width: 34, height: 34, border: '1px solid #e5e7eb', background: '#fff', color: '#b00', borderRadius: 8, cursor: 'pointer', fontSize: 15 }}>×</button>
+                    )}
+                  </div>
+                ))}
+
+                {!isReadOnly && (
+                  <button type="button" onClick={addTier}
+                    style={{ padding: '9px 16px', borderRadius: 8, border: '1px dashed #c7cbd1', background: '#fff', color: '#4a4fc4', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    + Add a price option
+                  </button>
+                )}
+
+                {(form.ticket_tiers || []).length > 0 && (
+                  <p style={{ fontSize: 12, color: '#999', margin: '10px 0 0' }}>
+                    Someone picks one option and a quantity — a booking can’t mix two options.
+                    Listings show the cheapest as a “from” price.
+                  </p>
+                )}
               </div>
             )}
 

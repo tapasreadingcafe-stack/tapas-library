@@ -122,6 +122,13 @@ const CSS = `
   .evd-pay-total-label { font-size: 13px; color: #6a6a6a; }
   .evd-pay-total-amt { font-size: 26px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.01em; }
   .evd-pay-total-calc { font-size: 12px; color: #9a9a9a; margin-top: 2px; }
+  .evd-tiers { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .evd-tier { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid #dcdcdc;
+    border-radius: 10px; cursor: pointer; background: #fff; transition: border-color 150ms, background 150ms; }
+  .evd-tier.is-on { border-color: #E0004F; background: #fff7fa; }
+  .evd-tier input { accent-color: #E0004F; width: 17px; height: 17px; flex-shrink: 0; }
+  .evd-tier-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: #1a1a1a; }
+  .evd-tier-price { font-size: 15px; font-weight: 700; color: #1a1a1a; flex-shrink: 0; }
   /* QR — big enough to scan from another phone held at arm's length. */
   .evd-qr { margin-top: 14px; text-align: center; }
   .evd-qr img { width: 100%; max-width: 300px; aspect-ratio: 1; object-fit: contain;
@@ -198,6 +205,14 @@ export default function EventDetail() {
   const [submitError, setSubmitError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', email: '', guests: 1 });
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Which price option is selected, when the event offers several.
+  const [tierIdx, setTierIdx] = useState(0);
+
+  // Named price options, when the event has them. Falls back to the event's
+  // single ticket_price so events without tiers behave exactly as before.
+  const tiers = Array.isArray(event?.ticket_tiers) ? event.ticket_tiers.filter((t) => t && t.label) : [];
+  const chosenTier = tiers.length ? (tiers[tierIdx] || tiers[0]) : null;
+  const unitPrice = chosenTier ? Number(chosenTier.price) || 0 : Number(event?.ticket_price) || 0;
   // Optional proof-of-payment, only offered when staff enabled it on the event.
   const [proofFile, setProofFile] = useState(null);
   const [proofError, setProofError] = useState('');
@@ -256,6 +271,12 @@ export default function EventDetail() {
       // Only sent when there's something to send, so registrations still work
       // before 20260827_event_payments.sql is applied.
       if (proofPath) row.payment_proof_url = proofPath;
+      // Which option they picked, and what it cost then — stored rather than
+      // looked up later, so editing a tier can't restate an old booking.
+      if (chosenTier) {
+        row.ticket_tier = chosenTier.label;
+        row.ticket_unit_price = unitPrice;
+      }
 
       const { error } = await supabase.from('event_registrations').insert([row]);
       if (error) throw error;
@@ -444,13 +465,27 @@ export default function EventDetail() {
                     <label htmlFor="reg-email">Email <span className="opt">(optional)</span></label>
                     <input id="reg-email" type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="you@example.com" />
                   </div>
+                  {tiers.length > 0 && (
+                    <div className="evd-field">
+                      <label>Choose your ticket</label>
+                      <div className="evd-tiers">
+                        {tiers.map((t, i) => (
+                          <label key={i} className={`evd-tier${i === tierIdx ? ' is-on' : ''}`}>
+                            <input type="radio" name="evd-tier" checked={i === tierIdx} onChange={() => setTierIdx(i)} />
+                            <span className="evd-tier-name">{t.label}</span>
+                            <span className="evd-tier-price">₹{(Number(t.price) || 0).toLocaleString('en-IN')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="evd-field">
-                    <label htmlFor="reg-guests">Number of people attending</label>
+                    <label htmlFor="reg-guests">{tiers.length ? 'How many?' : 'Number of people attending'}</label>
                     <input id="reg-guests" type="number" min="1" value={form.guests} onChange={(e) => setField('guests', e.target.value)} placeholder="1" />
                   </div>
-                  {event.is_paid && event.ticket_price > 0 && (() => {
+                  {event.is_paid && unitPrice > 0 && (() => {
                     const people = Math.max(1, parseInt(form.guests, 10) || 1);
-                    const total = event.ticket_price * people;
+                    const total = unitPrice * people;
                     return (
                     <div className="evd-pay-box">
                       <span className="evd-pay-label">Payment</span>
@@ -461,7 +496,7 @@ export default function EventDetail() {
                         <div>
                           <div className="evd-pay-total-label">Amount to pay</div>
                           <div className="evd-pay-total-calc">
-                            ₹{event.ticket_price} × {people} {people === 1 ? 'person' : 'people'}
+                            ₹{unitPrice.toLocaleString('en-IN')} × {people}{chosenTier ? ` · ${chosenTier.label}` : ` ${people === 1 ? 'person' : 'people'}`}
                           </div>
                         </div>
                         <div className="evd-pay-total-amt">₹{total.toLocaleString('en-IN')}</div>
