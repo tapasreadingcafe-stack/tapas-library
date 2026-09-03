@@ -123,31 +123,39 @@ const CSS = `
   .evd-pay-total-amt { font-size: 26px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.01em; }
   .evd-pay-total-calc { font-size: 12px; color: #9a9a9a; margin-top: 2px; }
   .evd-tiers { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-  .evd-tier { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid #dcdcdc;
-    border-radius: 10px; cursor: pointer; background: #fff; transition: border-color 150ms, background 150ms; }
-  .evd-tier.is-on { border-color: #E0004F; background: #fff7fa; }
-  .evd-tier input { accent-color: #E0004F; width: 17px; height: 17px; flex-shrink: 0; }
-  .evd-tier-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: #1a1a1a; }
-  .evd-tier-price { font-size: 15px; font-weight: 700; color: #1a1a1a; flex-shrink: 0; }
+  .evd-field label.evd-tier { display: flex; align-items: center; gap: 11px; padding: 11px 14px; margin-bottom: 0;
+    border: 1px solid #dcdcdc; border-radius: 10px; cursor: pointer; background: #fff;
+    font-size: 15px; color: #1a1a1a; transition: border-color 150ms, background 150ms; }
+  .evd-field label.evd-tier.is-on { border-color: #E0004F; background: #fff7fa; }
+  .evd-tier input { accent-color: #E0004F; width: 17px; height: 17px; flex-shrink: 0; margin: 0; }
+  .evd-tier-name { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 600; }
+  .evd-tier-price { flex: 0 0 auto; margin-left: auto; font-size: 15px; font-weight: 700; }
   /* QR — big enough to scan from another phone held at arm's length. */
   .evd-qr { margin-top: 14px; text-align: center; }
   .evd-qr img { width: 100%; max-width: 300px; aspect-ratio: 1; object-fit: contain;
     background: #fff; border: 1px solid #ececec; border-radius: 12px; padding: 10px; }
   .evd-qr-cap { margin-top: 8px; font-size: 14px; font-weight: 600; color: #3d3d3d; }
+  .evd-fact-tier { display: inline-block; margin: 3px 6px 0 0; padding: 2px 9px; border-radius: 20px;
+    background: #f2f2f2; color: #555; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .evd-qr-dl { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; padding: 10px 16px;
+    border: 1px solid #dcdcdc; border-radius: 9px; background: #fff; color: #3d3d3d;
+    font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .evd-qr-dl:hover { border-color: #E0004F; color: #E0004F; }
+  .evd-qr-dl[disabled] { opacity: 0.6; cursor: default; }
   .evd-pay-link { display: block; margin-top: 12px; padding: 13px 16px; border-radius: 10px;
     background: #E0004F; color: #fff; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center; }
   .evd-pay-link:hover { background: #b8003f; }
   .evd-pay-note { margin-top: 10px; font-size: 13px; color: #6a6a6a; font-style: italic; text-align: center; }
   /* Upload — a proper drop-zone sized target, not a hairline file input. */
   .evd-proof { margin-top: 16px; padding-top: 16px; border-top: 1px solid #ececec; }
-  .evd-proof-label { font-size: 14px; font-weight: 700; color: #1a1a1a; display: block; margin-bottom: 8px; }
-  .evd-proof-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-    width: 100%; min-height: 104px; padding: 18px; box-sizing: border-box; cursor: pointer;
-    background: #fff; border: 2px dashed #d8d8d8; border-radius: 12px; transition: border-color 150ms, background 150ms; }
-  .evd-proof-drop:hover { border-color: #E0004F; background: #fffafc; }
-  .evd-proof-drop-icon { font-size: 26px; line-height: 1; }
-  .evd-proof-drop-main { font-size: 15px; font-weight: 600; color: #3d3d3d; }
-  .evd-proof-drop-sub { font-size: 12px; color: #9a9a9a; }
+  .evd-proof-label { font-size: 13px; font-weight: 600; color: #444; display: block; margin-bottom: 6px; }
+  .evd-proof-drop { display: flex; align-items: center; gap: 9px; width: 100%; padding: 11px 13px;
+    box-sizing: border-box; cursor: pointer; background: #fff; border: 1px dashed #d4d4d4;
+    border-radius: 10px; transition: border-color 150ms; }
+  .evd-proof-drop:hover { border-color: #E0004F; }
+  .evd-proof-drop-icon { font-size: 15px; line-height: 1; flex-shrink: 0; }
+  .evd-proof-drop-main { font-size: 14px; font-weight: 600; color: #3d3d3d; }
+  .evd-proof-drop-sub { margin-left: auto; font-size: 11px; color: #a4a4a4; white-space: nowrap; flex-shrink: 0; }
   .evd-proof-chosen { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     margin-top: 10px; padding: 10px 12px; background: #f2fbf6; border: 1px solid #cdebda; border-radius: 10px;
     font-size: 13px; color: #1a7f52; font-weight: 600; }
@@ -186,6 +194,14 @@ function ArrowUpRight() {
     </svg>
   );
 }
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6.5 3.5h3l1.5 4-2 1.4a12 12 0 006.1 6.1l1.4-2 4 1.5v3a2 2 0 01-2.2 2A16.5 16.5 0 014.5 5.7 2 2 0 016.5 3.5z"
+        stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+    </svg>
+  );
+}
 function TicketIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -220,6 +236,32 @@ export default function EventDetail() {
   const closeForm = () => {
     setShowForm(false); setSubmitted(false); setSubmitError('');
     setProofFile(null); setProofError('');
+  };
+
+  const [dlBusy, setDlBusy] = useState(false);
+  const downloadQr = async (url) => {
+    if (!url || dlBusy) return;
+    setDlBusy(true);
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = `tapas-payment-qr.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoked on the next tick — Safari needs the URL alive during the click.
+      setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch {
+      // Blocked by CORS or offline — open it instead so they can long-press to save.
+      window.open(url, '_blank', 'noopener');
+    } finally {
+      setDlBusy(false);
+    }
   };
 
   const MAX_PROOF_BYTES = 5 * 1024 * 1024; // matches the bucket's own limit
@@ -396,8 +438,42 @@ export default function EventDetail() {
               <div className="evd-fact">
                 <div className="evd-fact-icon"><TicketIcon /></div>
                 <div>
-                  <div className="evd-fact-main">{isPaid ? `₹${event.ticket_price}` : 'Free'}</div>
-                  <div className="evd-fact-sub">{isPaid ? 'per person' : 'Free entry'}</div>
+                  {/* With named options, show the range and then spell each one
+                      out — the headline price alone hid the ₹500 family rate. */}
+                  {isPaid && tiers.length > 0 ? (() => {
+                    const prices = tiers.map((t) => Number(t.price) || 0);
+                    const lo = Math.min(...prices), hi = Math.max(...prices);
+                    return (
+                      <>
+                        <div className="evd-fact-main">
+                          ₹{lo.toLocaleString('en-IN')}{hi !== lo ? ` – ₹${hi.toLocaleString('en-IN')}` : ''}
+                        </div>
+                        <div className="evd-fact-sub">
+                          {tiers.map((t, i) => (
+                            <span key={i} className="evd-fact-tier">
+                              {t.label} ₹{(Number(t.price) || 0).toLocaleString('en-IN')}
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })() : (
+                    <>
+                      <div className="evd-fact-main">{isPaid ? `₹${event.ticket_price}` : 'Free'}</div>
+                      <div className="evd-fact-sub">{isPaid ? 'per person' : 'Free entry'}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="evd-fact">
+                <div className="evd-fact-icon"><PhoneIcon /></div>
+                <div>
+                  <div className="evd-fact-main">
+                    <a className="evd-fact-link" href={`tel:+${WHATSAPP_NUMBER}`}>
+                      +91 77603 93951
+                    </a>
+                  </div>
+                  <div className="evd-fact-sub">Call or WhatsApp us</div>
                 </div>
               </div>
             </div>
@@ -510,6 +586,13 @@ export default function EventDetail() {
                         <div className="evd-qr">
                           <img src={event.payment_qr_url} alt="Scan this QR code to pay" />
                           <div className="evd-qr-cap">Scan to pay ₹{total.toLocaleString('en-IN')}</div>
+                          <button type="button" className="evd-qr-dl" disabled={dlBusy}
+                            onClick={() => downloadQr(event.payment_qr_url)}>
+                            ⬇ {dlBusy ? 'Saving…' : 'Download QR'}
+                          </button>
+                          <p className="evd-proof-hint" style={{ textAlign: 'center' }}>
+                            On a phone? Save the QR, then pick it from your gallery in any UPI app.
+                          </p>
                         </div>
                       )}
 
@@ -527,11 +610,11 @@ export default function EventDetail() {
                           <input id="reg-proof" type="file" accept="image/*,application/pdf"
                             onChange={pickProof} style={{ display: 'none' }} />
                           <label htmlFor="reg-proof" className="evd-proof-drop">
-                            <span className="evd-proof-drop-icon">📷</span>
+                            <span className="evd-proof-drop-icon">📎</span>
                             <span className="evd-proof-drop-main">
-                              {proofFile ? 'Choose a different file' : 'Tap to upload your payment screenshot'}
+                              {proofFile ? 'Choose a different file' : 'Upload screenshot'}
                             </span>
-                            <span className="evd-proof-drop-sub">PNG, JPG or PDF · up to 5 MB</span>
+                            <span className="evd-proof-drop-sub">JPG, PNG, PDF · 5 MB</span>
                           </label>
                           {proofFile && (
                             <div className="evd-proof-chosen">
