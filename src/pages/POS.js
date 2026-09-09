@@ -1024,7 +1024,7 @@ export default function POS() {
   };
 
   // ── Print ─────────────────────────────────────────────────────────────────────
-  const handlePrint = useReactToPrint({ content: () => receiptRef.current });
+  const handlePrint = useReactToPrint({ contentRef: receiptRef });
 
   // ── WhatsApp receipt (free click-to-send via wa.me) ───────────────────────────
   // Normalise an Indian mobile number to wa.me format (countrycode + number, digits only).
