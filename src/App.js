@@ -8,7 +8,7 @@ import { useTheme } from './components/ThemeProvider';
 import { useDevMode, Editable } from './components/DevMode';
 import { useAuth } from './context/AuthContext';
 import NotificationBell from './components/NotificationBell';
-import InboxBell from './components/InboxBell';
+import { WebsiteFormsBell, EventRsvpBell } from './components/InboxBell';
 import SyncStatus from './components/SyncStatus';
 import CommandPalette from './components/CommandPalette';
 import CustomerDisplay from './pages/CustomerDisplay';
@@ -720,9 +720,11 @@ function DashboardShell() {
         </div>
         <div className="navbar-right">
           <SyncStatus />
-          {/* Website forms + event registrations get their own bell — the
-              operational alerts in NotificationBell run to 99+ and bury them. */}
-          {getStaffPermission(staff, getPermissionForPath('/store/inbox')) !== 'none' && <InboxBell />}
+          {/* Website forms and event registrations each get their own bell —
+              the operational alerts in NotificationBell run to 99+ and bury
+              them, and the two streams are different people's jobs. */}
+          {getStaffPermission(staff, getPermissionForPath('/store/inbox')) !== 'none' && <WebsiteFormsBell />}
+          {getStaffPermission(staff, getPermissionForPath('/store/rsvps')) !== 'none' && <EventRsvpBell />}
           <NotificationBell staffId={staff?.id} />
           <button onClick={toggleTheme} className="menu-toggle" title={dark ? 'Light mode' : 'Dark mode'} style={{ fontSize: '18px' }}>
             {dark ? '☀️' : '🌙'}
