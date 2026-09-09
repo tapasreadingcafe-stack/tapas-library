@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase';
 import { useNavigate } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { formatTime12h } from '../utils/timeFormat';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor:
@@ -189,7 +190,7 @@ export default function EventListing() {
               </div>
               <div className="meta">
                 <span>📅 {new Date(event.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                {event.start_time && <span>🕐 {event.start_time.slice(0, 5)}</span>}
+                {event.start_time && <span>🕐 {formatTime12h(event.start_time)}</span>}
                 <span>📍 {event.location}</span>
               </div>
               <div className="badges">

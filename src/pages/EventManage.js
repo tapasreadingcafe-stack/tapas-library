@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { formatTimeRange12h } from '../utils/timeFormat';
 
 const badgeStyle = (s) => {
   const colors = { upcoming: '#667eea', registered: '#1dd1a1', confirmed: '#1dd1a1', waitlisted: '#f39c12', cancelled: '#e74c3c', completed: '#95a5a6', attended: '#27ae60' };
@@ -204,7 +205,7 @@ export default function EventManage() {
         </div>
         <div style={{ fontSize: 14, color: '#555', lineHeight: 1.7 }}>
           <div>📅 {new Date(event.start_date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
-          {event.start_time && <div>🕐 {event.start_time.slice(0, 5)}{event.end_time ? ' – ' + event.end_time.slice(0, 5) : ''}</div>}
+          {event.start_time && <div>🕐 {formatTimeRange12h(event.start_time, event.end_time)}</div>}
           <div>📍 {event.location}</div>
           {event.capacity && <div>👥 Capacity {event.capacity} · Registered {activeCount()}</div>}
         </div>
