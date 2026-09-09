@@ -23,6 +23,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
+import { formatTime12h } from '../utils/timeFormat';
 import { logAbConversions } from './PageRenderer';
 
 // Shared wrapper every block uses. Provides the data-editable attribute
@@ -2396,7 +2397,7 @@ export function EventList({ id, pageKey, props, blockIndex, totalBlocks }) {
                     </p>
                   )}
                   <div style={{ fontSize: '12px', color: '#8a7a5c', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                    {e.start_time && <span>⏰ {e.start_time.slice(0, 5)}</span>}
+                    {e.start_time && <span>⏰ {formatTime12h(e.start_time)}</span>}
                     {e.location && <span>📍 {e.location}</span>}
                     {e.is_paid && e.ticket_price && <span>💰 ₹{e.ticket_price}</span>}
                   </div>
@@ -3411,7 +3412,7 @@ export function EventRSVP({ id, pageKey, props, blockIndex, totalBlocks }) {
 
   const when = [
     event.event_date && new Date(event.event_date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }),
-    event.start_time && event.start_time.slice(0, 5),
+    event.start_time && formatTime12h(event.start_time),
   ].filter(Boolean).join(' · ');
 
   return (

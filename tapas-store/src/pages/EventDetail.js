@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useEvent } from '../cms/hooks';
 import { supabase } from '../utils/supabase';
+import { formatTimeRange12h } from '../utils/timeFormat';
 
 // Category → gradient, used as the cover when an event has no image of its own.
 const CATEGORY_GRADIENT = {
@@ -49,13 +50,6 @@ function formatLongDate(iso) {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
-// 24-hour HH:MM, dropping seconds (matches the reference layout).
-function hhmm(t) {
-  if (!t) return '';
-  const [h, m] = t.split(':');
-  return `${h}:${(m || '00')}`;
 }
 
 const CSS = `
@@ -374,9 +368,7 @@ export default function EventDetail() {
   const monLabel = mo ? MON[Number(mo) - 1] : '';
 
   const longDate = formatLongDate(event.start_date);
-  const start = hhmm(event.start_time);
-  const end = hhmm(event.end_time);
-  const timeStr = start ? (end ? `${start} - ${end}` : start) : '';
+  const timeStr = formatTimeRange12h(event.start_time, event.end_time);
   const fullTitle = `${event.title}${event.italic_accent ? ' ' + event.italic_accent : ''}`;
   const tag = CATEGORY_LABEL[event.category] || event.category || 'Events';
   const isPaid = event.is_paid && event.ticket_price > 0;

@@ -5,6 +5,7 @@ import { UPCOMING_EVENTS } from '../data/eventsData';
 import { useEvents } from '../cms/hooks';
 import PageRenderer from '../blocks/PageRenderer';
 import { useSiteContent } from '../context/SiteContent';
+import { formatTime12h } from '../utils/timeFormat';
 
 const GREEN = '#3f6b1f';    // dark leaf green — titles, dots, links, month header
 const LIME = '#caf27e';     // brand lime — filled blocks (date box, "today")
@@ -13,17 +14,6 @@ const INK = '#3a3a3a';
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// 12-hour clock, "01:00 pm" style, matching the reference layout.
-function fmtTime(t) {
-  if (!t) return '';
-  const [hs, ms] = String(t).split(':');
-  let h = Number(hs);
-  if (Number.isNaN(h)) return '';
-  const ampm = h >= 12 ? 'pm' : 'am';
-  h = ((h + 11) % 12) + 1;
-  return `${String(h).padStart(2, '0')}:${(ms || '00').slice(0, 2)} ${ampm}`;
-}
 
 // Flatten the CMS event rows (or the static seed) into a single shape the
 // calendar + list both read from.
@@ -36,7 +26,7 @@ function normalize(rows) {
         iso: e.start_date,
         title: `${e.title || ''}${e.italic_accent ? ' ' + e.italic_accent : ''}`.trim(),
         description: e.description || '',
-        timeLabel: fmtTime(e.start_time),
+        timeLabel: formatTime12h(e.start_time),
         isPaid: !!e.is_paid,
         price: Number(e.ticket_price) || 0,
       }));
