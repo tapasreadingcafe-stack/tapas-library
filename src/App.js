@@ -89,6 +89,7 @@ const InventoryCafe         = lazyWithRetry(() => import('./pages/InventoryCafe'
 const VendorList            = lazyWithRetry(() => import('./pages/VendorList'));
 const PurchaseOrders        = lazyWithRetry(() => import('./pages/PurchaseOrders'));
 const AccountsOverview      = lazyWithRetry(() => import('./pages/AccountsOverview'));
+const AccountsGst           = lazyWithRetry(() => import('./pages/AccountsGst'));
 const AccountsTransactions  = lazyWithRetry(() => import('./pages/AccountsTransactions'));
 const AccountsExpenses      = lazyWithRetry(() => import('./pages/AccountsExpenses'));
 const AccountsPnL           = lazyWithRetry(() => import('./pages/AccountsPnL'));
@@ -255,44 +256,43 @@ class ChunkErrorBoundary extends React.Component {
 
 const NAV_CONFIG = [
   { to: '/', icon: '📊', label: 'Dashboard' },
-  // POS and Borrow are the two screens staff are in all day — top level, above
-  // the Library group, so they're always one click away and never collapsed.
-  { to: '/pos',    icon: '🛒', label: 'POS' },
-  { to: '/Borrow', icon: '🔄', label: 'Borrow' },
+
+  // Grouped by job, in the order it's done: the tills first, then money,
+  // customers, stock, the website, and admin last. `section` entries are
+  // headings only — SidebarNav hides one when nothing under it is visible to
+  // the signed-in staff member.
+  { section: 'Daily work' },
+  { to: '/pos',         icon: '🛒', label: 'Library POS' },
+  // Cafe billing has its own till — the POS in cafe mode: same engine, cafe
+  // catalog, its own cart. The Library POS keeps its Cafe tab so a customer
+  // buying a book AND a coffee still leaves with one bill.
+  { to: '/cafe/pos',    icon: '☕', label: 'Cafe POS' },
+  { to: '/Borrow',      icon: '🔄', label: 'Borrow & Return' },
+  { to: '/store/inbox', icon: '📩', label: 'Website Inbox' },
+
+  { section: 'Money' },
   {
     icon: '💳', label: 'Accounts', key: 'accounts',
     children: [
-      { to: '/accounts/overview',         icon: '📊', label: 'Overview' },
-      { to: '/accounts/pnl',              icon: '📑', label: 'P&L Statement' },
-      { to: '/accounts/transactions',     icon: '💸', label: 'Transactions' },
-      { to: '/accounts/invoices',         icon: '🧾', label: 'Invoices' },
-      { to: '/accounts/expenses',         icon: '📤', label: 'Expenses' },
-      { to: '/accounts/member-payments',  icon: '💳', label: 'Member Payments' },
-      { to: '/accounts/vendor-payments',  icon: '🏪', label: 'Vendor Payments' },
+      { to: '/accounts/overview',        icon: '📊', label: 'Overview' },
+      { to: '/accounts/pnl',             icon: '📑', label: 'Profit & Loss' },
+      { to: '/accounts/invoices',        icon: '🧾', label: 'Invoices' },
+      { to: '/accounts/expenses',        icon: '📤', label: 'Expenses' },
+      { to: '/accounts/transactions',    icon: '💸', label: 'Transactions' },
+      { to: '/accounts/member-payments', icon: '💳', label: 'Member Payments' },
+      { to: '/accounts/vendor-payments', icon: '🏪', label: 'Vendor Payments' },
+      { to: '/accounts/gst',             icon: '⚙️', label: 'GST Settings' },
     ],
   },
+  { to: '/reports', icon: '📈', label: 'Reports' },
+
+  { section: 'Customers' },
   {
-    icon: '📖', label: 'Library', key: 'library',
+    icon: '👥', label: 'Members', key: 'members',
     children: [
-      { to: '/books',           icon: '📚', label: 'Books' },
-      { to: '/overdue',         icon: '🔴', label: 'Overdue' },
-      { to: '/availability',    icon: '🔍', label: 'Availability' },
-      { to: '/statistics',      icon: '📈', label: 'Statistics' },
-      { to: '/recommendations', icon: '💡', label: 'Recommend' },
-      { to: '/wishlist',        icon: '📋', label: 'Wishlist' },
-      { to: '/reviews',         icon: '⭐', label: 'Reviews' },
-      { to: '/reservations',    icon: '🔖', label: 'Reservations' },
-      { to: '/barcodes',         icon: '🏷️', label: 'Barcodes' },
-    ],
-  },
-  {
-    icon: '☕', label: 'Cafe', key: 'cafe',
-    children: [
-      // Cafe billing now happens on the Book POS (POS → Cafe tab),
-      // so the standalone "Menu & POS" item was removed. The route still exists.
-      { to: '/cafe/manage',  icon: '📝', label: 'Manage Menu' },
-      { to: '/cafe/orders',  icon: '📋', label: 'Orders' },
-      { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },
+      { to: '/members', icon: '👥', label: 'Members List' },
+      { to: '/fines',   icon: '💰', label: 'Fines' },
+      { to: '/overdue', icon: '🔴', label: 'Overdue Books' },
     ],
   },
   {
@@ -300,40 +300,63 @@ const NAV_CONFIG = [
     children: [
       { to: '/events',            icon: '📅', label: 'All Events' },
       { to: '/events/create',     icon: '➕', label: 'Create Event' },
+      { to: '/store/rsvps',       icon: '🎟', label: 'Registrations' },
       { to: '/events/attendance', icon: '✅', label: 'Attendance' },
     ],
   },
-  { to: '/store/inbox', icon: '📩', label: 'Website Forms' },
+
+  { section: 'Library & cafe' },
   {
-    icon: '👥', label: 'Members', key: 'members',
+    icon: '📖', label: 'Library', key: 'library',
     children: [
-      { to: '/members', icon: '👥', label: 'Members List' },
-      { to: '/fines',   icon: '💰', label: 'Fines' },
+      { to: '/books',           icon: '📚', label: 'Books' },
+      { to: '/availability',    icon: '🔍', label: 'Availability' },
+      { to: '/reservations',    icon: '🔖', label: 'Reservations' },
+      { to: '/barcodes',        icon: '🏷️', label: 'Barcodes' },
+      { to: '/wishlist',        icon: '📋', label: 'Wishlist' },
+      { to: '/reviews',         icon: '⭐', label: 'Book Reviews' },
+      { to: '/recommendations', icon: '💡', label: 'Recommendations' },
+      { to: '/statistics',      icon: '📈', label: 'Borrow Statistics' },
     ],
   },
   {
-    icon: '📦', label: 'Inventory', key: 'inventory',
+    icon: '☕', label: 'Cafe', key: 'cafe',
+    children: [
+      { to: '/cafe/manage',  icon: '📝', label: 'Menu' },
+      { to: '/cafe/orders',  icon: '📋', label: 'Cafe Orders' },
+      { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },
+    ],
+  },
+  {
+    icon: '📦', label: 'Stock', key: 'inventory',
     children: [
       { to: '/inventory/library', icon: '📚', label: 'Library Stock' },
       { to: '/inventory/cafe',    icon: '☕', label: 'Cafe Stock' },
     ],
   },
-  { to: '/reports', icon: '📑', label: 'Reports' },
   {
-    icon: '🛒', label: 'Online Store', key: 'store',
+    icon: '🏪', label: 'Vendors', key: 'vendors',
     children: [
-      { to: '/store/orders',     icon: '📦', label: 'Online Orders' },
-      { to: '/store/promo-codes', icon: '🏷', label: 'Promo Codes' },
-      { to: '/store/cms',        icon: '📝', label: 'Store Content' },
-      { to: '/store/reviews',    icon: '★',  label: 'Reviews' },
-      { to: '/store/rsvps',      icon: '🎟', label: 'Event RSVPs' },
-      { to: '/store/newsletter', icon: '💌', label: 'Newsletter' },
-      { to: '/store/analytics',  icon: '📊', label: 'Analytics' },
+      { to: '/vendors',        icon: '🏪', label: 'Vendor List' },
+      { to: '/vendors/orders', icon: '📦', label: 'Purchase Orders' },
+    ],
+  },
+
+  { section: 'Website & marketing' },
+  {
+    icon: '🌐', label: 'Website', key: 'store',
+    children: [
+      { to: '/store/orders',      icon: '📦', label: 'Online Orders' },
+      { to: '/store/cms',         icon: '📝', label: 'Website Content' },
+      { to: '/store/promo-codes', icon: '🏷', label: 'Online Promo Codes' },
+      { to: '/store/reviews',     icon: '★',  label: 'Website Reviews' },
+      { to: '/store/newsletter',  icon: '💌', label: 'Newsletter Signups' },
+      { to: '/store/analytics',   icon: '📊', label: 'Website Analytics' },
       { to: '/commerce-insights', icon: '💹', label: 'Commerce Insights' },
-      // Website Editor (v2 block-tree) is being rebuilt as part of the
-      // CMS migration. Hidden from the sidebar so staff don't reach a
-      // dead editor; the route still resolves so existing bookmarks
-      // open the rebuilt-banner page.
+      // Website Editor (v2 block-tree) is being rebuilt as part of the CMS
+      // migration. Hidden from the sidebar so staff don't reach a dead
+      // editor; the route still resolves so existing bookmarks open the
+      // rebuilt-banner page.
     ],
   },
   {
@@ -356,25 +379,20 @@ const NAV_CONFIG = [
       { to: '/marketing',      icon: '💡', label: 'Ideas Board' },
     ],
   },
+
+  { section: 'Admin' },
   { to: '/tasks', icon: '📒', label: 'Tasks & Notes' },
   { to: '/staff', icon: '👤', label: 'Staff' },
   {
-    icon: '🏪', label: 'Vendors', key: 'vendors',
-    children: [
-      { to: '/vendors',        icon: '🏪', label: 'Vendor List' },
-      { to: '/vendors/orders', icon: '📦', label: 'Purchase Orders' },
-    ],
-  },
-  {
     icon: '⚙️', label: 'Settings', key: 'settings',
     children: [
-      { to: '/settings/health',  icon: '🩺', label: 'System Health' },
-      { to: '/settings/app',     icon: '🔧', label: 'App Config' },
-      { to: '/settings/profile', icon: '👤', label: 'Profile' },
+      { to: '/settings/health',   icon: '🩺', label: 'System Health' },
+      { to: '/settings/app',      icon: '🔧', label: 'App Config' },
+      { to: '/settings/profile',  icon: '👤', label: 'Profile' },
       { to: '/settings/activity', icon: '📋', label: 'Activity Log' },
-      { to: '/settings/devices', icon: '🔌', label: 'Devices' },
-      { to: '/catalog',          icon: '🌐', label: 'Public Catalog' },
-      { to: '/kiosk',            icon: '🖥️', label: 'Kiosk Mode' },
+      { to: '/settings/devices',  icon: '🔌', label: 'Devices' },
+      { to: '/catalog',           icon: '🌐', label: 'Public Catalog' },
+      { to: '/kiosk',             icon: '🖥️', label: 'Kiosk Mode' },
     ],
   },
 ];
@@ -565,7 +583,10 @@ function SidebarNav({ sidebarOpen, openGroups, toggleGroup, isActive, isGroupAct
     return getStaffPermission(staff, permKey) !== 'none';
   };
 
-  const filteredNav = NAV_CONFIG.map(item => {
+  const visibleItems = NAV_CONFIG.map(item => {
+    // Section headings pass through here; whether one shows is decided below,
+    // once we know whether anything under it survived the filter.
+    if (item.section) return item;
     // Hide entire groups if module is disabled in settings
     if (item.key && MODULE_TOGGLE_MAP[item.key]) {
       const toggleKey = MODULE_TOGGLE_MAP[item.key];
@@ -578,12 +599,21 @@ function SidebarNav({ sidebarOpen, openGroups, toggleGroup, isActive, isGroupAct
     }
     return canSee(item.to) ? item : null;
   }).filter(Boolean);
+  // A heading with nothing visible under it is dropped, so someone without
+  // Marketing access doesn't see an empty "Website & marketing" label.
+  const filteredNav = visibleItems.filter((item, i) => {
+    if (!item.section) return true;
+    const next = visibleItems[i + 1];
+    return !!next && !next.section;
+  });
 
   return (
     <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
       <nav className="sidebar-nav">
         {filteredNav.map((item) =>
-          item.children ? (
+          item.section ? (
+            <div key={`section-${item.section}`} className="nav-section">{item.section}</div>
+          ) : item.children ? (
             <div key={item.key} className="nav-group">
               <button
                 className={`nav-group-header ${isGroupActive(item) ? 'has-active' : ''}`}
@@ -772,6 +802,8 @@ function DashboardShell() {
             <Route path="/reviews"                            element={<Reviews />} />
             <Route path="/reservations"                       element={<Reservations />} />
             <Route path="/pos"                                element={<POS />} />
+            {/* Same billing engine, cafe catalog. Separate screen and cart. */}
+            <Route path="/cafe/pos"                           element={<POS mode="cafe" />} />
 
             {/* Cafe */}
             <Route path="/cafe/menu"                          element={<CafePOS />} />
@@ -800,6 +832,7 @@ function DashboardShell() {
 
             {/* Accounts */}
             <Route path="/accounts/overview"                  element={<AccountsOverview />} />
+            <Route path="/accounts/gst"                       element={<AccountsGst />} />
             <Route path="/accounts/pnl"                       element={<AccountsPnL />} />
             <Route path="/accounts/transactions"              element={<AccountsTransactions />} />
             <Route path="/accounts/invoices"                  element={<AccountsInvoices />} />

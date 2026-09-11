@@ -234,6 +234,19 @@ body {
   min-width: 20px;
 }
 
+/* Section headings — group the sidebar by job. Quiet on purpose: they label
+   the groups beneath them and should never read as clickable. */
+.nav-section {
+  padding: 18px 20px 6px 23px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #9ca3af;
+  white-space: nowrap;
+  user-select: none;
+}
+
 /* Main Content */
 .main-content {
   margin-top: 60px;

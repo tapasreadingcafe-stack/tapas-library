@@ -16,6 +16,9 @@ import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 import { lineGross, lineDisc, lineNet, lineDiscLabel } from '../utils/cartUtils';
 import { posItemType } from '../utils/revenueStreams';
 import { formatBillNo, seqWithinDay, dayKey } from '../utils/invoiceNumber';
+import { loadGstSettings, gstActive } from '../utils/gstSettings';
+import { billTaxFor } from '../utils/billTax';
+import { queueReceipt, waitForJob, usePrinterStatus, printerStateText } from '../utils/receiptPrinter';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -116,7 +119,12 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
 }
 
 // ── Main POS component ────────────────────────────────────────────────────────
-export default function POS() {
+export default function POS({ mode = 'library' }) {
+  const isCafeTill = mode === 'cafe';
+  // Separate cart per till: a coffee half-rung on the cafe screen must not
+  // reappear in the book till's cart, and the two are often different people
+  // on different devices.
+  const CART_KEY = isCafeTill ? 'pos_cart_cafe' : 'pos_cart';
   const { devMode } = useDevMode();
   const { isReadOnly, canProcessOrders } = usePermission();
   const navigate = useNavigate();
@@ -127,10 +135,10 @@ export default function POS() {
   const [allBooks, setAllBooks]         = useState([]);
   const [booksLoading, setBooksLoading] = useState(false);
   const [itemSearch, setItemSearch]     = useState('');
-  const [activeCat, setActiveCat]       = useState('Books');
+  const [activeCat, setActiveCat]       = useState(mode === 'cafe' ? 'Cafe' : 'Books');
 
   // Restore cart state persisted across navigation
-  const _saved = (() => { try { return JSON.parse(sessionStorage.getItem('pos_cart') || '{}'); } catch { return {}; } })();
+  const _saved = (() => { try { return JSON.parse(sessionStorage.getItem(CART_KEY) || '{}'); } catch { return {}; } })();
 
   // Member
   const [allMembers, setAllMembers]     = useState([]);
@@ -147,6 +155,26 @@ export default function POS() {
   // cartIds whose per-item discount row is expanded (a line with a discount
   // already set always shows its row).
   const [openDisc, setOpenDisc]           = useState({});
+  // GST configuration, loaded once. It stays null until loaded — and for good
+  // if the GST migration hasn't been run — and null means bills behave exactly
+  // as they always have.
+  const [gstCfg, setGstCfg] = useState(null);
+  // Re-read on focus too: a till left open would otherwise keep billing with
+  // whatever GST settings were in force when the page was first opened.
+  useEffect(() => {
+    const refresh = () => { loadGstSettings().then(setGstCfg); };
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    refresh();
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+  // Is the receipt printer reachable right now? Shown beside Print Receipt.
+  const printerStatus = usePrinterStatus();
+  const [printingDirect, setPrintingDirect] = useState(false);
   const [discountType, setDiscountType]   = useState(_saved.discountType || 'pct');
   const [discountVal, setDiscountVal]     = useState(_saved.discountVal || 0);
   // Additional manual discount applied ON TOP of a promo code
@@ -160,7 +188,8 @@ export default function POS() {
   const [promoLoading, setPromoLoading] = useState(false);
 
   // Payment
-  const [payMethod, setPayMethod]       = useState(_saved.payMethod || 'cash');
+  // Cash or UPI only — a cart saved while card was still offered falls back to cash.
+  const [payMethod, setPayMethod]       = useState(_saved.payMethod === 'upi' ? 'upi' : 'cash');
   const [cashReceived, setCashReceived] = useState('');
 
   // UPI QR
@@ -271,6 +300,9 @@ export default function POS() {
 
   // ── Data fetching ─────────────────────────────────────────────────────────────
   const fetchBooks = async () => {
+    // The cafe till never lists books, so skip the catalog entirely rather than
+    // paying for it on every load.
+    if (isCafeTill) { setBooksLoading(false); return; }
     // 1) Instant paint from the local catalog cache (offline-mode brick #1).
     const cached = readCachedBooks();
     if (cached && cached.length) { setAllBooks(cached); setBooksLoading(false); }
@@ -617,7 +649,7 @@ export default function POS() {
     setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
     setActivatedMembership(null);
-    sessionStorage.removeItem('pos_cart');
+    sessionStorage.removeItem(CART_KEY);
   };
 
   const holdCurrentBill = () => {
@@ -657,7 +689,7 @@ export default function POS() {
     setAddlDiscVal(held.addlDiscVal);
     setAppliedPromo(held.appliedPromo);
     setPromoInput(held.promoInput);
-    setPayMethod(held.payMethod);
+    setPayMethod(held.payMethod === 'upi' ? 'upi' : 'cash');
     setMemberFines(held.memberFines);
     setFamilyMembers(held.familyMembers);
     setCashReceived('');
@@ -750,7 +782,14 @@ export default function POS() {
   // the totals panel can tell line markdowns from bill markdowns.
   const billDiscountAmount = promoDiscountAmount + addlDiscountAmount;
   const discountAmount = itemDiscountAmount + billDiscountAmount;
-  const total          = Math.max(0, subtotal - discountAmount);
+  const preTaxTotal    = Math.max(0, subtotal - discountAmount);
+  // GST, when switched on. Computed per line so each stream uses its own rate
+  // and basis — the cafe can add tax on top while a membership keeps its price.
+  // Off or not configured: billTax is null and `total` is exactly as before.
+  const gstOn          = gstActive(gstCfg);
+  const billTax        = gstOn ? billTaxFor(cart, { billDiscount: billDiscountAmount, settings: gstCfg }) : null;
+  const total          = billTax ? billTax.payable : preTaxTotal;
+  const fmtTax         = (n) => `₹${(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const cashNum        = parseFloat(cashReceived) || 0;
   const change         = Math.max(0, cashNum - total);
 
@@ -784,6 +823,8 @@ export default function POS() {
           member: selectedMember,
           items: [...cart],
           subtotal, discount: discountAmount, total,
+          tax: billTax,
+          gstin: billTax ? gstCfg?.gstin : null,
           promoCode: appliedPromo?.code || null,
           payMethod, cashReceived: cashNum || total, change,
           offline: true,
@@ -808,13 +849,24 @@ export default function POS() {
             payment_method: payMethod,
             cash_received: payMethod === 'cash' ? (cashNum || total) : null,
             change_given:  payMethod === 'cash' ? change : null,
+            // Tax columns exist only once the GST migration has run — and billTax
+            // is only non-null after that — so a pre-GST bill sends none of them.
+            ...(billTax ? {
+              taxable_value:   billTax.taxableValue,
+              cgst_amount:     billTax.cgst,
+              sgst_amount:     billTax.sgst,
+              igst_amount:     billTax.igst,
+              exempt_value:    billTax.exemptValue,
+              round_off:       billTax.roundOff,
+              place_of_supply: gstCfg?.place_of_supply || null,
+            } : {}),
           })
           .select('id, created_at').single();
         if (txnErr) throw txnErr;
         txnId = txn.id;
         txnCreatedAt = txn.created_at;
 
-        await supabase.from('pos_transaction_items').insert(
+        const { error: itemsErr } = await supabase.from('pos_transaction_items').insert(
           cart.map(item => {
             const row = {
               transaction_id: txnId,
@@ -830,9 +882,27 @@ export default function POS() {
               // the bill's total_amount minus the bill-level discount.
               total_price: lineNet(item),
             };
+            const tl = billTax?.lines.find(l => l.cartId === item.cartId);
+            if (tl) {
+              row.hsn_code      = tl.hsn || null;
+              row.gst_rate      = tl.rate;
+              row.taxable_value = tl.taxable;
+              row.cgst_amount   = tl.cgst;
+              row.sgst_amount   = tl.sgst;
+              row.igst_amount   = tl.igst;
+              row.is_exempt     = !!tl.exempt;
+            }
             return row;
           })
         );
+        // A bill with no lines can't be attributed to cafe or library, so every
+        // revenue report would silently drop it. Undo the bill and fail the
+        // checkout rather than leave it half-saved — the cashier sees the error
+        // and can simply ring it again.
+        if (itemsErr) {
+          await supabase.from('pos_transactions').delete().eq('id', txnId);
+          throw itemsErr;
+        }
       } else {
         // Fallback: save to legacy sales table
         const { data: sale, error: saleErr } = await supabase
@@ -892,7 +962,7 @@ export default function POS() {
             discount_amount: cafeDiscount,
             payment_method: payMethod,
             status: 'completed',
-            notes: 'Billed via Book POS',
+            notes: isCafeTill ? 'Billed via Cafe POS' : 'Billed via Book POS',
           }]).select().single();
           if (coErr) throw coErr;
           const { error: ciErr } = await supabase.from('cafe_order_items').insert(
@@ -998,6 +1068,12 @@ export default function POS() {
           return formatBillNo(stamp, 1);
         }
       })();
+      // Once GST is on the bill is a tax invoice, and its serial must be
+      // permanent (Rule 46) — store it rather than re-deriving it later.
+      if (billTax && txnId) {
+        const { error: invErr } = await supabase.from('pos_transactions').update({ invoice_no: txnRef }).eq('id', txnId);
+        if (invErr) console.error('Could not store invoice number', invErr);
+      }
       setLastTxn({
         id: txnId,
         txnRef,
@@ -1005,6 +1081,8 @@ export default function POS() {
         member: selectedMember,
         items: [...cart],
         subtotal, discount: discountAmount, total,
+        tax: billTax,
+        gstin: billTax ? gstCfg?.gstin : null,
         promoCode: appliedPromo?.code || null,
         payMethod, cashReceived: cashNum || total, change,
       });
@@ -1025,6 +1103,29 @@ export default function POS() {
 
   // ── Print ─────────────────────────────────────────────────────────────────────
   const handlePrint = useReactToPrint({ contentRef: receiptRef });
+
+  // ── Direct receipt printing ─────────────────────────────────────────────────
+  // Queues the receipt; the print station at the counter sends it straight to
+  // the thermal printer — no print dialog, no driver, and the same from a phone
+  // or a laptop. The browser print dialog stays one tap away as a fallback.
+  const printReceiptDirect = async () => {
+    if (!lastTxn || printingDirect) return;
+    if (printerStatus.state === 'setup-needed') { handlePrint(); return; }
+    setPrintingDirect(true);
+    try {
+      const job = await queueReceipt(lastTxn, gstCfg);
+      const result = await waitForJob(job.id);
+      if (result.status === 'done') showToast('Receipt printed');
+      else if (result.status === 'failed') showToast(`Could not print: ${result.error || 'printer error'}`, 'error');
+      else showToast(printerStatus.state === 'online'
+        ? 'Sent to the printer'
+        : 'Queued — it will print as soon as the printer is back', 'info');
+    } catch (e) {
+      showToast(`Could not send to the printer: ${e.message || e}`, 'error');
+    } finally {
+      setPrintingDirect(false);
+    }
+  };
 
   // ── WhatsApp receipt (free click-to-send via wa.me) ───────────────────────────
   // Normalise an Indian mobile number to wa.me format (countrycode + number, digits only).
@@ -1060,11 +1161,19 @@ export default function POS() {
       block.push(row('Subtotal', fmt(txn.subtotal)));
       block.push(row('Discount', '-' + fmt(txn.discount)));
     }
+    if (txn.tax && txn.tax.totalTax > 0) {
+      const f2 = (n) => '₹' + (Number(n) || 0).toFixed(2);
+      block.push(row('Taxable value', f2(txn.tax.taxableValue)));
+      block.push(row('CGST', f2(txn.tax.cgst)));
+      block.push(row('SGST', f2(txn.tax.sgst)));
+      if (txn.tax.roundOff) block.push(row('Round off', f2(txn.tax.roundOff)));
+    }
     block.push(row('TOTAL', fmt(txn.total)));
 
     const L = [];
     L.push('*TAPAS READING CAFE*');
-    L.push('_Point of Sale Receipt_');
+    L.push(txn.tax ? '_Tax Invoice_' : '_Point of Sale Receipt_');
+    if (txn.gstin) L.push('GSTIN: ' + txn.gstin);
     L.push('');
     L.push('Ref: ' + txn.txnRef);
     L.push('Date: ' + txn.date.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
@@ -1187,7 +1296,7 @@ export default function POS() {
 
   // Persist cart to sessionStorage so navigation doesn't wipe the order.
   useEffect(() => {
-    sessionStorage.setItem('pos_cart', JSON.stringify({
+    sessionStorage.setItem(CART_KEY, JSON.stringify({
       cart, selectedMember, discountType, discountVal,
       addlDiscType, addlDiscVal, appliedPromo, payMethod,
     }));
@@ -1205,12 +1314,15 @@ export default function POS() {
     isCafe: true,
   }));
   const visibleServices = [...SERVICES, ...cafeTiles].filter(s => {
+    // The cafe till is the cafe menu — memberships, fines and printing belong
+    // to the library counter and would only be noise here.
+    if (isCafeTill) return s.isCafe && (!sl || s.name.toLowerCase().includes(sl));
     if (activeCat === 'Books') return false;
     if (activeCat !== 'All' && s.cat !== activeCat) return false;
     if (sl) return s.name.toLowerCase().includes(sl);
     return true;
   });
-  const visibleBooks = (activeCat === 'All' || activeCat === 'Books')
+  const visibleBooks = !isCafeTill && (activeCat === 'All' || activeCat === 'Books')
     ? allBooks.filter(b =>
         !sl ||
         b.title?.toLowerCase().includes(sl) ||
@@ -1314,7 +1426,9 @@ export default function POS() {
             <input
               ref={itemSearchRef}
               type="text"
-              placeholder={isMobile ? "🔍 Search books…" : "🔍  Search items, books, author… (F2)"}
+              placeholder={isCafeTill
+                ? (isMobile ? "🔍 Search menu…" : "🔍  Search the cafe menu… (F2)")
+                : (isMobile ? "🔍 Search books…" : "🔍  Search items, books, author… (F2)")}
               value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
               style={{ flex: 1, minWidth: 0, padding: isMobile ? '12px' : '10px 14px', border: '2px solid #e0e0e0', borderRadius: '10px', fontSize: isMobile ? '16px' : '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s', WebkitAppearance: 'none' }}
@@ -1324,10 +1438,10 @@ export default function POS() {
             {/* Books / Cafe quick filters — the two catalogs staff flip between
                 all day, so they sit up here beside the scanner instead of being
                 two pills among nine below. */}
-            {[
+            {(isCafeTill ? [] : [
               { cat: 'Books', label: 'Books', Icon: BookIcon, tint: '#667eea', title: 'Show the book catalog' },
               { cat: 'Cafe',  label: 'Cafe',  Icon: CafeIcon, tint: '#f59e0b', title: 'Show the cafe menu' },
-            ].map(({ cat, label, Icon, tint, title }) => {
+            ]).map(({ cat, label, Icon, tint, title }) => {
               const on = activeCat === cat;
               return (
                 <button key={cat} onClick={() => setActiveCat(cat)} title={title}
@@ -1352,7 +1466,9 @@ export default function POS() {
               title="Scan barcode"><ScannerIcon /></button>
           </div>
 
-          {/* Category tabs */}
+          {/* Category tabs — library only. The cafe till's categories live in
+              the menu itself, so a second row of filters would be dead weight. */}
+          {!isCafeTill && (
           <div style={{ padding: isMobile ? '8px 10px' : '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
             {CATS.map(cat => (
               <button key={cat} onClick={() => setActiveCat(cat)} style={{
@@ -1366,6 +1482,7 @@ export default function POS() {
               </button>
             ))}
           </div>
+          )}
 
           {/* Content */}
           <div style={{ padding: '16px', maxHeight: 'calc(100vh - 270px)', overflowY: 'auto' }}>
@@ -1925,8 +2042,32 @@ export default function POS() {
                     )}
                   </>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: discountAmount > 0 ? '1px solid #e5e7eb' : 'none' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#111827' }}>TOTAL</span>
+                {billTax && billTax.totalTax > 0 && (() => {
+                  // One slab on the bill (the usual cafe-only case): show the
+                  // rate beside each half, e.g. "CGST @ 2.5%".
+                  const half = billTax.bySlab.length === 1 ? ` @ ${billTax.bySlab[0].rate / 2}%` : '';
+                  const taxRow = { display: 'flex', justifyContent: 'space-between', marginBottom: '3px' };
+                  return (
+                    <div style={{ fontSize: '13px', color: '#4b5563', margin: '2px 0 4px' }}>
+                      {discountAmount === 0 && (
+                        <div style={taxRow}><span>Subtotal</span><span>{fmtTax(preTaxTotal)}</span></div>
+                      )}
+                      <div style={taxRow}><span>Taxable value</span><span>{fmtTax(billTax.taxableValue)}</span></div>
+                      <div style={taxRow}><span>CGST{half}</span><span>{fmtTax(billTax.cgst)}</span></div>
+                      <div style={taxRow}><span>SGST{half}</span><span>{fmtTax(billTax.sgst)}</span></div>
+                      {billTax.untaxedValue + billTax.exemptValue > 0 && (
+                        <div style={taxRow}><span>Items without GST</span><span>{fmtTax(billTax.untaxedValue + billTax.exemptValue)}</span></div>
+                      )}
+                      {billTax.roundOff !== 0 && (
+                        <div style={taxRow}><span>Round off</span><span>{fmtTax(billTax.roundOff)}</span></div>
+                      )}
+                    </div>
+                  );
+                })()}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: (discountAmount > 0 || (billTax && billTax.totalTax > 0)) ? '1px solid #e5e7eb' : 'none' }}>
+                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#111827' }}>
+                    TOTAL{billTax && billTax.totalTax > 0 && <span style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280' }}> (incl. GST)</span>}
+                  </span>
                   <span style={{ fontSize: '24px', fontWeight: '900', color: '#059669' }}>{fmt(total)}</span>
                 </div>
               </div>
@@ -1934,10 +2075,9 @@ export default function POS() {
 
             {/* Payment method selector */}
             {cart.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
                 {[
                   { key: 'cash', emoji: '💵', label: 'CASH' },
-                  { key: 'card', emoji: '💳', label: 'CARD' },
                   { key: 'upi',  emoji: '📱', label: 'UPI'  },
                 ].map(m => (
                   <button key={m.key} onClick={() => setPayMethod(m.key)} style={{
@@ -1996,28 +2136,8 @@ export default function POS() {
 
             {/* UPI hint */}
             {cart.length > 0 && payMethod === 'upi' && (
-              <div style={{ marginBottom: '10px', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-                {upiQrUrl ? (
-                  <>
-                    <img src={upiQrUrl} alt="UPI QR" style={{ width: 72, height: 72, borderRadius: 6, border: '1px solid #ddd6fe', marginBottom: 4 }} />
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#7c3aed' }}>QR shown on customer display</div>
-                    <button onClick={() => setShowQrSetup(true)} style={{ marginTop: 4, fontSize: '10px', color: '#a78bfa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Change QR</button>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: '28px', marginBottom: '4px' }}>📱</div>
-                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#7c3aed' }}>No UPI QR set</div>
-                    <div style={{ fontSize: '11px', color: '#a78bfa', marginTop: '2px' }}>Click CHECKOUT once payment is confirmed</div>
-                    <button onClick={() => setShowQrSetup(true)} style={{ marginTop: 6, fontSize: '11px', color: '#7c3aed', background: '#ede9fe', border: '1px solid #ddd6fe', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: '700' }}>Set UPI QR Code</button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Card hint */}
-            {cart.length > 0 && payMethod === 'card' && (
-              <div style={{ marginBottom: '10px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '8px', padding: '10px', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: '#1d4ed8' }}>
-                💳 Process card payment, then click CHECKOUT
+              <div style={{ marginBottom: '10px', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: '#7c3aed' }}>
+                📱 Collect {fmt(total)} by UPI, then click CHECKOUT
               </div>
             )}
 
@@ -2111,12 +2231,14 @@ export default function POS() {
             <div ref={receiptRef} style={{ padding: '24px', fontFamily: '"Courier New", monospace', overflowY: 'auto' }}>
               {/* Receipt header */}
               <div style={{ textAlign: 'center', marginBottom: '16px', paddingBottom: '16px', borderBottom: '2px dashed #ccc' }}>
-                <div style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '3px' }}>TAPAS READING CAFE</div>
+                <img src="/receipt-logo.png" alt="Tapas Reading Cafe"
+                  style={{ display: 'block', width: '130px', maxWidth: '60%', height: 'auto', margin: '0 auto 4px' }} />
                 <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Point of Sale Receipt</div>
                 <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>
                   {lastTxn.date.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </div>
                 <div style={{ fontSize: '11px', color: '#888' }}>Ref: {lastTxn.txnRef}</div>
+                {lastTxn.gstin && <div style={{ fontSize: '11px', color: '#888' }}>GSTIN: {lastTxn.gstin}</div>}
                 {lastTxn.member && (
                   <div style={{ fontSize: '12px', fontWeight: '700', marginTop: '6px', color: '#333' }}>
                     Customer: {lastTxn.member.name}
@@ -2158,6 +2280,24 @@ export default function POS() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#e74c3c' }}>
                       <span>Discount</span><span>−{fmt(lastTxn.discount)}</span>
                     </div>
+                  </>
+                )}
+                {lastTxn.tax && lastTxn.tax.totalTax > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#777' }}>
+                      <span>Taxable value</span><span>{fmtTax(lastTxn.tax.taxableValue)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#777' }}>
+                      <span>CGST</span><span>{fmtTax(lastTxn.tax.cgst)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#777' }}>
+                      <span>SGST</span><span>{fmtTax(lastTxn.tax.sgst)}</span>
+                    </div>
+                    {lastTxn.tax.roundOff !== 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#777' }}>
+                        <span>Round off</span><span>{fmtTax(lastTxn.tax.roundOff)}</span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '900', paddingTop: '6px', borderTop: '2px solid #333', marginTop: lastTxn.discount > 0 ? 0 : '4px' }}>
@@ -2207,12 +2347,21 @@ export default function POS() {
                 💬 Send Bill on WhatsApp{lastTxn.member ? ` → ${lastTxn.member.name}` : ''}
               </button>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={handlePrint} style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
-                  🖨️ Print Receipt
+                <button onClick={printReceiptDirect} disabled={printingDirect} style={{ flex: 1, padding: '11px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: printingDirect ? 'default' : 'pointer', fontWeight: '700', fontSize: '14px', opacity: printingDirect ? 0.7 : 1 }}>
+                  {printingDirect ? 'Printing…' : '🖨️ Print Receipt'}
                 </button>
                 <button onClick={() => { setShowReceipt(false); resetCart(); }}
                   style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
                   + New Sale
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginTop: '10px', fontSize: '12px', color: '#6b7280', flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: printerStateText(printerStatus.state).dot, flexShrink: 0 }} />
+                  {printerStateText(printerStatus.state).text}
+                </span>
+                <button onClick={handlePrint} style={{ background: 'none', border: 0, color: '#6b7280', textDecoration: 'underline', cursor: 'pointer', fontSize: '12px', padding: 0, fontFamily: 'inherit' }}>
+                  Print via browser instead
                 </button>
               </div>
             </div>

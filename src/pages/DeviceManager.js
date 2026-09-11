@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/Toast';
+import { supabase } from '../utils/supabase';
+import { usePrinterStatus, queueTestPrint, waitForJob } from '../utils/receiptPrinter';
 
 const BRIDGE_URL = 'http://127.0.0.1:5050';
 
 const DEVICE_TYPES = [
   { key: 'barcode_scanner', icon: '📷', name: 'Barcode Scanner', desc: 'USB/Bluetooth barcode scanner for scanning book ISBNs and copy codes', connectTip: 'Plug in USB scanner or pair Bluetooth. Scanner types barcodes as keyboard input — no driver needed.' },
-  { key: 'bill_printer', icon: '🧾', name: 'Bill / Receipt Printer', desc: 'Thermal printer for printing checkout receipts and POS bills', connectTip: 'Connect via USB. Install printer driver. Select it when clicking Print in the app.' },
+  { key: 'bill_printer', icon: '🧾', name: 'Bill / Receipt Printer', desc: 'POSIFLOW KP307 or any ESC/POS thermal printer — Print Receipt on any phone or laptop prints here directly, no driver', connectTip: null },
   { key: 'barcode_printer', icon: '🏷️', name: 'Barcode Label Printer', desc: 'Thermal printer for printing book barcode stickers (Zebra, TSC, TVS)', connectTip: null },
 ];
 
@@ -40,6 +42,16 @@ export default function DeviceManager() {
   const [diag, setDiag] = useState(null);                 // detailed printer status from bridge
   const [fixing, setFixing] = useState(false);
   const [scanTest, setScanTest] = useState('');
+  // Receipt printer — real status from the print station's heartbeat.
+  const receipt = usePrinterStatus(10000);
+  const [stationKey, setStationKey] = useState(null);
+  const [keyShown, setKeyShown] = useState(false);
+  const [testingReceipt, setTestingReceipt] = useState(false);
+
+  useEffect(() => {
+    supabase.from('print_station_keys').select('token').eq('id', 1).maybeSingle()
+      .then(({ data }) => setStationKey(data?.token || null));
+  }, []);
 
   const saveDevices = (d) => { setDevices(d); localStorage.setItem('connected_devices', JSON.stringify(d)); };
 
@@ -125,6 +137,99 @@ export default function DeviceManager() {
     setTimeout(() => setTesting(null), 3000);
   };
 
+  const runReceiptTest = async () => {
+    setTestingReceipt(true);
+    try {
+      const job = await queueTestPrint();
+      const result = await waitForJob(job.id, { timeoutMs: 15000 });
+      if (result.status === 'done') toast.success('Test receipt printed');
+      else if (result.status === 'failed') toast.error(`Could not print: ${result.error || 'printer error'}`);
+      else toast.warning('Test print queued — it prints as soon as the station and printer are ready');
+    } catch (e) {
+      toast.error(`Could not queue a test print: ${e.message || e}`);
+    } finally {
+      setTestingReceipt(false);
+    }
+  };
+
+  const copyStationKey = async () => {
+    try {
+      await navigator.clipboard.writeText(`STATION_KEY=${stationKey}`);
+      toast.success('Copied — paste it into printer_bridge/.env on the counter computer');
+    } catch {
+      toast.error('Could not copy — click Show, then select and copy the key');
+    }
+  };
+
+  const smallBtn = { padding: '7px 11px', background: '#fff', border: '1px solid #d6dbe4', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0, fontFamily: 'inherit' };
+  const panel = (bg, border) => ({ background: bg, border: `1px solid ${border}`, borderRadius: '6px', padding: '10px', fontSize: '12px', lineHeight: 1.6 });
+  const command = (text) => (
+    <div style={{ marginTop: '6px', background: '#1a1a2e', color: '#CFF389', borderRadius: '6px', padding: '9px 12px', fontFamily: 'monospace', fontSize: '12px', userSelect: 'all', overflowX: 'auto', whiteSpace: 'nowrap' }}>{text}</div>
+  );
+
+  const renderReceiptPanel = () => {
+    if (receipt.state === 'checking') {
+      return <div style={panel('#f8f8f8', '#eee')}>⏳ Checking the receipt printer…</div>;
+    }
+    if (receipt.state === 'setup-needed') {
+      return (
+        <div style={panel('#f8f9ff', '#e0e8ff')}>
+          <strong style={{ color: '#4c51bf' }}>One-time setup:</strong> run{' '}
+          <code>supabase/migrations/20260911_print_queue.sql</code> in the Supabase SQL editor, then reload this page.
+        </div>
+      );
+    }
+    if (receipt.state === 'no-station' || receipt.state === 'station-offline') {
+      return (
+        <div style={panel('#fffaf0', '#fbd38d')}>
+          <div style={{ color: '#975a16', fontWeight: 600 }}>
+            {receipt.state === 'no-station'
+              ? '🖥️ Set up the print station on the counter computer (about 2 minutes)'
+              : `🖥️ The print station on ${receipt.station?.id || 'the counter computer'} has stopped — start it again`}
+          </div>
+          <div style={{ marginTop: '8px' }}><strong>1.</strong> Put this line in <code>printer_bridge/.env</code>:</div>
+          {stationKey ? (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+              <div style={{ flex: 1, minWidth: 0, background: '#1a1a2e', color: '#CFF389', borderRadius: '6px', padding: '9px 12px', fontFamily: 'monospace', fontSize: '12px', overflowX: 'auto', whiteSpace: 'nowrap', userSelect: 'all' }}>
+                STATION_KEY={keyShown ? stationKey : '•'.repeat(24)}
+              </div>
+              <button onClick={() => setKeyShown(v => !v)} style={smallBtn}>{keyShown ? 'Hide' : 'Show'}</button>
+              <button onClick={copyStationKey} style={smallBtn}>Copy</button>
+            </div>
+          ) : (
+            <div style={{ color: '#999', marginTop: '4px' }}>Loading station key…</div>
+          )}
+          <div style={{ marginTop: '8px' }}><strong>2.</strong> Start the print station:</div>
+          {command('cd ~/Desktop/tapas-library/printer_bridge && python3 print_bridge.py')}
+          <div style={{ marginTop: '6px', color: '#888', fontSize: '11px' }}>
+            Do this once, on the computer the printer is plugged into — nothing is needed on other phones or laptops. Leave it running, or set it to start at login — see printer_bridge/README.md.
+          </div>
+        </div>
+      );
+    }
+    if (receipt.state === 'printer-offline') {
+      return (
+        <div style={panel('#fff5f5', '#feb2b2')}>
+          <div style={{ color: '#c53030', fontWeight: 600 }}>⚠️ {receipt.station?.detail || 'The printer is not answering'}</div>
+          <div style={{ color: '#742a2a', fontSize: '11px', marginTop: '4px' }}>
+            Check the printer is switched on, has paper, and is still connected to {receipt.station?.id || 'the counter computer'}.
+            Receipts sent in the meantime wait in the queue for up to 30 minutes.
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={panel('#f0fff4', '#9ae6b4')}>
+        <span style={{ color: '#276749' }}>
+          ✅ <strong>Receipt printer ready</strong>
+          {receipt.station?.printer_address ? ` · ${receipt.station.printer_address}` : ''}
+          {receipt.station?.id ? ` · via ${receipt.station.id}` : ''}
+        </span>
+        <div style={{ color: '#2f855a', fontSize: '11px', marginTop: '4px' }}>Print Receipt on any phone or laptop now prints here directly.</div>
+      </div>
+    );
+  };
+
   // Printer needs attention when the bridge is up but the device isn't healthy.
   const printerNeedsFix = bridgeStatus === true && diag && !diag.healthy;
 
@@ -136,6 +241,7 @@ export default function DeviceManager() {
       {DEVICE_TYPES.map(dev => {
         const connected = devices[dev.key];
         const isBridgePrinter = dev.key === 'barcode_printer';
+        const isReceiptPrinter = dev.key === 'bill_printer';
 
         // Status badge (label + colors)
         let badge = { label: connected ? 'Connected' : 'Not connected', bg: connected ? '#d4edda' : '#f8f8f8', fg: connected ? '#155724' : '#999' };
@@ -145,6 +251,14 @@ export default function DeviceManager() {
           else if (printerNeedsFix) { badge = { label: 'Needs attention', bg: '#fff3cd', fg: '#8a6d00' }; borderColor = '#f6c343'; }
           else if (bridgeStatus === true) { badge = { label: 'Connected', bg: '#d4edda', fg: '#155724' }; borderColor = '#1dd1a1'; }
           else { badge = { label: 'Not connected', bg: '#f8f8f8', fg: '#999' }; borderColor = '#e0e0e0'; }
+        }
+        if (isReceiptPrinter) {
+          const st = receipt.state;
+          if (st === 'online') { badge = { label: 'Connected', bg: '#d4edda', fg: '#155724' }; borderColor = '#1dd1a1'; }
+          else if (st === 'printer-offline') { badge = { label: 'Printer offline', bg: '#fde8e8', fg: '#c53030' }; borderColor = '#fc8181'; }
+          else if (st === 'no-station' || st === 'station-offline') { badge = { label: 'Station not running', bg: '#fff3cd', fg: '#8a6d00' }; borderColor = '#f6c343'; }
+          else if (st === 'setup-needed') { badge = { label: 'Not set up', bg: '#f8f8f8', fg: '#999' }; borderColor = '#e0e0e0'; }
+          else { badge = { label: 'Checking…', bg: '#f8f8f8', fg: '#999' }; borderColor = '#e0e0e0'; }
         }
 
         return (
@@ -166,7 +280,7 @@ export default function DeviceManager() {
                 </div>
                 <p style={{ fontSize: '13px', color: '#666', margin: '4px 0 8px' }}>{dev.desc}</p>
 
-                {isBridgePrinter ? (
+                {isReceiptPrinter ? renderReceiptPanel() : isBridgePrinter ? (
                   bridgeStatus === null ? (
                     <div style={{ background: '#f8f8f8', border: '1px solid #eee', borderRadius: '6px', padding: '10px', fontSize: '12px', color: '#888' }}>
                       ⏳ Checking printer status…
@@ -211,7 +325,7 @@ export default function DeviceManager() {
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-                {!isBridgePrinter && (
+                {!isBridgePrinter && !isReceiptPrinter && (
                   <button onClick={() => { saveDevices({ ...devices, [dev.key]: !connected }); toast.success(connected ? `${dev.name} disconnected` : `${dev.name} marked as connected`); }}
                     style={{ padding: '8px 16px', background: connected ? '#ff6b6b' : '#1dd1a1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px' }}>
                     {connected ? 'Disconnect' : 'Mark Connected'}
@@ -223,10 +337,17 @@ export default function DeviceManager() {
                     {fixing ? 'Fixing…' : '🔧 Auto-Fix'}
                   </button>
                 )}
-                <button onClick={() => testDevice(dev.key)} disabled={testing === dev.key}
-                  style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px' }}>
-                  {testing === dev.key ? 'Checking...' : isBridgePrinter ? 'Check Connection' : 'Test'}
-                </button>
+                {isReceiptPrinter ? (
+                  <button onClick={runReceiptTest} disabled={testingReceipt || receipt.state === 'setup-needed' || receipt.state === 'checking'}
+                    style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', opacity: (testingReceipt || receipt.state === 'setup-needed') ? 0.6 : 1 }}>
+                    {testingReceipt ? 'Printing…' : '🧾 Test Print'}
+                  </button>
+                ) : (
+                  <button onClick={() => testDevice(dev.key)} disabled={testing === dev.key}
+                    style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px' }}>
+                    {testing === dev.key ? 'Checking...' : isBridgePrinter ? 'Check Connection' : 'Test'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -249,7 +370,7 @@ export default function DeviceManager() {
         <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>🖨️ Printer Setup Tips</h4>
         <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#856404', lineHeight: '1.8' }}>
           <li><strong>Label printer stuck?</strong> If the Barcode Label Printer shows <em>Needs attention</em>, click <strong>Auto-Fix</strong> — it clears the queue and re-enables the printer.</li>
-          <li><strong>Receipt printer:</strong> Set as default printer for fastest printing</li>
+          <li><strong>Receipt printer:</strong> No driver needed — plug it into the counter computer and keep the print station running there; every phone and laptop then prints to it. Use <strong>Test Print</strong> to check.</li>
           <li><strong>Barcode labels:</strong> Set paper size to 58mm or 80mm width in printer settings</li>
           <li><strong>Chrome:</strong> Go to chrome://settings → Printing → set default printer</li>
           <li><strong>Bluetooth scanner:</strong> Pair in System Settings → Bluetooth, then it works like a keyboard</li>

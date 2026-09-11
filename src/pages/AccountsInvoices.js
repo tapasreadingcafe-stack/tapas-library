@@ -62,7 +62,7 @@ export default function AccountsInvoices() {
     try {
       let q = supabase
         .from('pos_transactions')
-        .select('*, members(name, phone), pos_transaction_items(transaction_id, item_type, item_name, total_price)')
+        .select('*, members(name, phone), pos_transaction_items(*)')
         .order('created_at', { ascending: false });
 
       if (dateFrom) q = q.gte('created_at', dateFrom + 'T00:00:00');
@@ -137,7 +137,14 @@ export default function AccountsInvoices() {
   // the old code used the row's screen position, so the newest bill was always
   // INV-2026-0001 and every search or deletion renumbered the lot.
   const billNumbers = buildBillNumbers(invoices);
-  const invoiceNumber = (inv) => billNumbers[inv?.id] || '—';
+  // A stored serial (assigned at checkout once GST is on) is permanent and
+  // wins; older bills fall back to the date-wise number derived above.
+  const invoiceNumber = (inv) => inv?.invoice_no || billNumbers[inv?.id] || '—';
+  // GST on a bill is held for the government, and round-off is an artefact of
+  // settling to the rupee — neither is revenue, so both come off first.
+  const taxOnBill = (inv) => (Number(inv?.cgst_amount) || 0) + (Number(inv?.sgst_amount) || 0) + (Number(inv?.igst_amount) || 0);
+  const preTax = (inv) => (Number(inv?.total_amount) || 0) - taxOnBill(inv) - (Number(inv?.round_off) || 0);
+  const forSplit = (ls) => ls.map(l => (l.taxable_value !== null && l.taxable_value !== undefined ? { ...l, total_price: Number(l.taxable_value) } : l));
 
   // What each bill is made of. One customer bill routinely mixes a membership,
   // a book and a coffee, plus a refundable deposit — this splits it back out
@@ -145,7 +152,7 @@ export default function AccountsInvoices() {
   const categoriesOf = (inv) => {
     const lines = inv?.pos_transaction_items || [];
     if (!lines.length) return [];
-    const totals = splitByStream(lines, { [inv.id]: inv.total_amount || 0 });
+    const totals = splitByStream(forSplit(lines), { [inv.id]: preTax(inv) });
     return Object.keys(STREAMS)
       .filter(k => totals[k] > 0)
       .map(k => ({ ...STREAMS[k], amount: totals[k] }));
@@ -160,7 +167,7 @@ export default function AccountsInvoices() {
       const lines = inv.pos_transaction_items || [];
       if (!lines.length) return;
       anyLines = true;
-      const t = splitByStream(lines, { [inv.id]: inv.total_amount || 0 });
+      const t = splitByStream(forSplit(lines), { [inv.id]: preTax(inv) });
       Object.keys(acc).forEach(k => { acc[k] += t[k]; });
     });
     return anyLines ? acc : null;
@@ -169,7 +176,8 @@ export default function AccountsInvoices() {
   // A refundable deposit is money held for the customer, not earned. Counting
   // it as revenue overstated August by ₹6,000 of ₹11,810.
   const depositsHeld = categoryTotals?.deposit || 0;
-  const netRevenue = totalBilled - depositsHeld;
+  const taxCollected = filtered.reduce((s, i) => s + taxOnBill(i) + (Number(i.round_off) || 0), 0);
+  const netRevenue = totalBilled - depositsHeld - taxCollected;
 
   // GST from localStorage
   const gstRate = Number(localStorage.getItem('gst_rate') || 0);

@@ -23,6 +23,10 @@ import tempfile
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+# Receipt printing (POSIFLOW KP307 / any ESC/POS printer) runs alongside the
+# Zebra label bridge in a background thread. See receipt_printer.py.
+import receipt_printer
+
 # The exact CUPS queue name macOS uses for the Zebra. To check yours
 # run `lpstat -p` in Terminal. If it changes (e.g. you reinstall the
 # printer), update this constant.
@@ -237,9 +241,16 @@ def print_label():
         return jsonify(success=False, error=str(e)), 500
 
 
+@app.route("/api/receipt-printer", methods=["GET"])
+def receipt_printer_status():
+    """What the receipt worker sees right now — handy when testing on this Mac."""
+    return jsonify(ok=True, **receipt_printer.STATE)
+
+
 if __name__ == "__main__":
     print("\n🖨️  Tapas print bridge")
     print(f"   Listening on  http://127.0.0.1:{PORT}")
     print(f"   Printer        {PRINTER_NAME}")
+    receipt_printer.start_worker()
     print("   Keep this terminal open while you print. Ctrl+C to stop.\n")
     app.run(host="127.0.0.1", port=PORT, debug=False)

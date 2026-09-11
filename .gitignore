@@ -12,3 +12,6 @@ tapas-store/.env.*.local
 
 # Visual-regression harness output — regenerated on every run.
 tests/visual/output/
+
+# Receipt print station: discovered printer address (per machine)
+printer_bridge/.receipt-printer

@@ -92,7 +92,9 @@ export default function AccountsOverview() {
       // from the lines — a bill total can't say which side of the business
       // earned it, and one bill routinely spans membership, books and cafe.
       safeQuery(supabase.from('pos_transactions')
-        .select('id, total_amount, pos_transaction_items(transaction_id, item_type, item_name, total_price)')
+        // `*`, not named columns: GST columns only exist after that migration,
+        // and naming a missing column would fail the whole query.
+        .select('*, pos_transaction_items(*)')
         .gte('created_at', from).lte('created_at', to)),
       // Cafe orders raised on the Cafe screen only. Orders billed through the
       // Book POS are already counted via that bill's cafe lines — counting the
@@ -111,9 +113,14 @@ export default function AccountsOverview() {
     const sum = (arr, field) => (arr?.data || []).reduce((s, r) => s + (r[field] || 0), 0);
 
     const bills = txnR?.data || [];
-    const lines = bills.flatMap(b => b.pos_transaction_items || []);
+    // Once GST is on, a line's taxable value is its ex-GST amount — prefer it,
+    // so revenue never includes tax collected on the government's behalf.
+    const lines = bills.flatMap(b => b.pos_transaction_items || [])
+      .map(l => (l.taxable_value !== null && l.taxable_value !== undefined ? { ...l, total_price: Number(l.taxable_value) } : l));
+    const taxOf = (x) => (Number(x.cgst_amount) || 0) + (Number(x.sgst_amount) || 0) + (Number(x.igst_amount) || 0);
     const billTotals = {};
-    bills.forEach(b => { billTotals[b.id] = b.total_amount || 0; });
+    // total_amount includes any GST and round-off; strip both before splitting.
+    bills.forEach(b => { billTotals[b.id] = (Number(b.total_amount) || 0) - taxOf(b) - (Number(b.round_off) || 0); });
     const streams = splitByStream(lines, billTotals);
 
     // If the lines aren't available (older data, or the items table is
@@ -123,7 +130,10 @@ export default function AccountsOverview() {
     const unattributed = lines.length === 0 ? Math.max(billSum, sum(salesR, 'total_amount')) : 0;
 
     const standaloneCafe = (cafeR?.data || [])
-      .filter(o => o.notes !== 'Billed via Book POS')
+      // Any order raised from a POS bill is already counted via that bill's
+      // cafe lines. Match the whole family, not one exact string — the cafe
+      // till writes "Billed via Cafe POS" and would otherwise be counted twice.
+      .filter(o => !String(o.notes || '').startsWith('Billed via'))
       .reduce((s, o) => s + (o.total_amount || 0), 0);
 
     const libRevenue        = streams.library + unattributed;
@@ -138,11 +148,10 @@ export default function AccountsOverview() {
     // are excluded from income and from GST.
     const totalIncome = libRevenue + cafeRevenue + eventRevenue + finesCollected + membershipRevenue;
 
-    const gstAmount = Math.round(
-      libRevenue * (gstRates.books / 100) +
-      cafeRevenue * (gstRates.cafe / 100) +
-      (eventRevenue + finesCollected + membershipRevenue) * (gstRates.services / 100)
-    );
+    // GST actually collected on bills — zero until GST is switched on. The old
+    // figure applied guessed rates to all revenue, inventing a tax liability
+    // on sales that never had GST charged.
+    const gstAmount = Math.round(bills.reduce((s, b) => s + taxOf(b), 0) * 100) / 100;
 
     const cats = {};
     (expR?.data || []).forEach(e => { cats[e.category || 'other'] = (cats[e.category || 'other'] || 0) + (e.amount || 0); });
@@ -153,7 +162,7 @@ export default function AccountsOverview() {
       expenseCategories: cats,
       attributed: unattributed === 0,
     };
-  }, [gstRates]);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -224,7 +233,8 @@ export default function AccountsOverview() {
   const maxMonthly = Math.max(...monthlyData.map(m => Math.max(m.income, m.expense)), 1);
   const maxWeekly = Math.max(...weeklyFlow.map(w => Math.max(w.inflow, w.outflow)), 1);
 
-  const netProfit = data ? data.totalIncome - data.totalExpenses - data.gstAmount : 0;
+  // Revenue is already ex-GST, so GST is not deducted again from profit.
+  const netProfit = data ? data.totalIncome - data.totalExpenses : 0;
 
   return (
     <div style={{ padding: '20px', maxWidth: '1100px', margin: '0 auto' }}>
@@ -235,7 +245,7 @@ export default function AccountsOverview() {
           <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>Complete revenue, expenses & cash flow dashboard</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button onClick={() => setShowGstEditor(!showGstEditor)}
+          <button onClick={() => navigate('/accounts/gst')}
             style={{ padding: '6px 12px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
             title="GST Settings">⚙️ GST</button>
           <button onClick={fetchAll} disabled={loading}
@@ -334,9 +344,9 @@ export default function AccountsOverview() {
               </div>
             </div>
             <div style={{ background: 'white', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>GST LIABILITY</div>
+              <div style={{ fontSize: '11px', color: '#999', fontWeight: '600' }}>GST COLLECTED</div>
               <div style={{ fontSize: '28px', fontWeight: '900', color: '#f59e0b' }}>{fmt(data.gstAmount)}</div>
-              <div style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>Books {gstRates.books}% · Cafe {gstRates.cafe}% · Services {gstRates.services}%</div>
+              <div style={{ fontSize: '10px', color: '#999', marginTop: '2px' }}>held for the government · not income</div>
               <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>deposits excluded</div>
             </div>
             <div style={{ background: netProfit >= 0 ? '#ecfdf5' : '#fef2f2', borderRadius: '10px', padding: '20px', textAlign: 'center', border: `2px solid ${netProfit >= 0 ? '#a7f3d0' : '#fecaca'}` }}>
