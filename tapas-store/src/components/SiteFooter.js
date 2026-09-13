@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { CAFE_ADDRESS, CAFE_PHONES, CAFE_EMAIL, CAFE_LINKS } from '../data/cafeDetails';
 
 // Global site footer. Centered layout: logo, a single row of nav links,
 // lime social pills, the cafe's address / phone / email, a thin rule,
@@ -43,9 +44,9 @@ function FooterLocIcon() {
   );
 }
 const SOCIALS = [
-  { label: 'Instagram', href: 'https://www.instagram.com/tapasreadingcafe/', Icon: FooterIgIcon },
-  { label: 'WhatsApp',  href: 'https://wa.me/918792470576', Icon: FooterWaIcon },
-  { label: 'Location',  href: 'https://maps.app.goo.gl/i24rAtukZxwuL1Uk9', Icon: FooterLocIcon },
+  { label: 'Instagram', href: CAFE_LINKS.instagram, Icon: FooterIgIcon },
+  { label: 'WhatsApp',  href: CAFE_LINKS.whatsapp,  Icon: FooterWaIcon },
+  { label: 'Location',  href: CAFE_LINKS.maps,      Icon: FooterLocIcon },
 ];
 
 function FooterLink({ item }) {
@@ -174,16 +175,17 @@ export default function SiteFooter() {
           </div>
 
           <address className="site-footer-contact">
+            <p>{CAFE_ADDRESS}</p>
             <p>
-              2nd Floor, 2628, 27th Main Rd, above Juice Junction, 1st Sector, HSR Layout, Bengaluru, Karnataka 560102
+              {CAFE_PHONES.map((p, i) => (
+                <React.Fragment key={p.tel}>
+                  {i > 0 && ' / '}
+                  <a href={`tel:${p.tel}`}>{p.label}</a>
+                </React.Fragment>
+              ))}
             </p>
             <p>
-              <a href="tel:+917760393951">+91 77603 93951</a>
-              {' / '}
-              <a href="tel:+918792470576">+91 87924 70576</a>
-            </p>
-            <p>
-              <a href="mailto:tapasreadingcafe@gmail.com">tapasreadingcafe@gmail.com</a>
+              <a href={`mailto:${CAFE_EMAIL}`}>{CAFE_EMAIL}</a>
             </p>
           </address>
 

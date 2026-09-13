@@ -13,7 +13,9 @@ import './App.css';
 // Auth flows get a dedicated split-screen layout; stacking the
 // sticky navbar on top would compete with the focused form. Add any
 // new auth routes to this set to hide the nav there.
-const HIDE_NAV_ROUTES = new Set([]);
+// /links is a link-in-bio page — it is opened from an Instagram bio and has to
+// be the whole screen, so the sticky nav and the full site footer stay off it.
+const HIDE_NAV_ROUTES = new Set(['/links']);
 
 function GlobalHeader() {
   const { pathname } = useLocation();
@@ -25,6 +27,8 @@ function GlobalFooter() {
   // SiteFooter owns the footer for the entire site. The landing tree
   // no longer carries its own footer node, so nothing else renders
   // below; SiteFooter always takes over.
+  const { pathname } = useLocation();
+  if (HIDE_NAV_ROUTES.has(pathname)) return null;
   return <SiteFooter />;
 }
 
@@ -72,6 +76,7 @@ const ForgotPassword  = lazyWithRetry(() => import('./pages/ForgotPassword'));
 const Welcome         = lazyWithRetry(() => import('./pages/Welcome'));
 const CodeOfTheRoom   = lazyWithRetry(() => import('./pages/CodeOfTheRoom'));
 const Privacy         = lazyWithRetry(() => import('./pages/Privacy'));
+const Links           = lazyWithRetry(() => import('./pages/Links'));
 const ComingSoon      = lazyWithRetry(() => import('./pages/ComingSoon'));
 
 // ---------------------------------------------------------------------
@@ -142,6 +147,7 @@ function AppShell() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/welcome"       element={<Welcome />} />
             <Route path="/code-of-the-room" element={<CodeOfTheRoom />} />
+            <Route path="/links"         element={<Links />} />
             <Route path="/privacy"       element={<Privacy />} />
             <Route path="/orders"        element={<Navigate to="/" replace />} />
             <Route path="/wishlist"      element={<Navigate to="/" replace />} />
