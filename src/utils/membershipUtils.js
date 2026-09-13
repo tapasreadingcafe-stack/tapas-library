@@ -135,12 +135,18 @@ export function isActiveMember(member) {
   return daysLeft >= 0;
 }
 
+// Today as YYYY-MM-DD in the cafe's own timezone. toISOString() is UTC and
+// rolls over at 5:30am IST, which would date an early-morning signup yesterday.
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Calculate subscription end date from start date and duration
 export function calculateEndDate(startDate, durationDays) {
-  const start = new Date(startDate);
-  const end = new Date(start);
-  end.setDate(end.getDate() + durationDays);
-  return end.toISOString().split('T')[0]; // Return as YYYY-MM-DD
+  const [y, m, d] = String(startDate).slice(0, 10).split('-').map(Number);
+  const end = (y && m && d) ? new Date(y, m - 1, d + Number(durationDays || 0)) : new Date(startDate);
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
 }
 
 // Create membership object
@@ -151,9 +157,11 @@ export function createMembership(plan, customValues = {}) {
     throw new Error(`Invalid plan: ${plan}`);
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  // start_date / end_date let an admin record a membership that began on a day
+  // other than today — a paper signup being entered late, or a correction.
+  const today = customValues.start_date || localToday();
   const durationDays = customValues.duration_days || defaults.duration_days;
-  const endDate = calculateEndDate(today, durationDays);
+  const endDate = customValues.end_date || calculateEndDate(today, durationDays);
 
   return {
     plan,
@@ -176,9 +184,9 @@ export function renewMembership(member, customValues = {}) {
     throw new Error(`Invalid plan: ${member.plan}`);
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = customValues.start_date || localToday();
   const durationDays = customValues.duration_days || member.plan_duration_days || defaults.duration_days;
-  const endDate = calculateEndDate(today, durationDays);
+  const endDate = customValues.end_date || calculateEndDate(today, durationDays);
 
   return {
     plan: member.plan,

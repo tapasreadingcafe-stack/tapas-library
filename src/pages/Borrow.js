@@ -8,6 +8,10 @@ import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { getFineSettings, calculateFine } from '../utils/fineUtils';
 import { sendEmail, reservationReadyEmailHtml } from '../utils/emailUtils';
 import { sendWhatsApp, reservationReadyWhatsAppMsg, checkoutWhatsAppMsg } from '../utils/whatsappUtils';
+import { useAuth } from '../context/AuthContext';
+import DateOverride from '../components/DateOverride';
+import { todayYmd, ymdToTs } from '../utils/backdate';
+import EditRecordDate from '../components/EditRecordDate';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 // How many members the picker preloads for browsing. Typing searches the
@@ -75,6 +79,8 @@ export default function Borrow() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedBook, setSelectedBook] = useState(null);
   const [dueDate, setDueDate] = useState('');
+  const [checkoutDate, setCheckoutDate] = useState(todayYmd());
+  const [returnDate, setReturnDate] = useState(todayYmd());
   const [memberResults, setMemberResults] = useState([]);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [memberTotal, setMemberTotal] = useState(0);
@@ -122,6 +128,7 @@ export default function Borrow() {
   }, []);
 
   const { isReadOnly } = usePermission();
+  const { isAdmin } = useAuth();
 
   // Toast
   const toast = useToast();
@@ -340,6 +347,7 @@ export default function Borrow() {
     setSelectedChild(null);
     setChildrenOfMember([]);
     setDueDate(m.subscription_end ? m.subscription_end.split('T')[0] : '');
+    setCheckoutDate(todayYmd());
     fetchChildrenForMember(m.id);
   };
 
@@ -470,7 +478,7 @@ export default function Borrow() {
       return;
     }
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = checkoutDate || todayYmd();
 
       for (const e of items) {
         const circRecord = {
@@ -533,6 +541,7 @@ export default function Borrow() {
       setMemberSearch('');
       setBookSearch('');
       setDueDate('');
+      setCheckoutDate(todayYmd());
       fetchData();
     } catch (err) {
       showToast('Checkout failed: ' + err.message, 'error');
@@ -543,12 +552,13 @@ export default function Borrow() {
     setReturnModal(item);
     setReturnCondition('Good');
     setCollectFine(false);
+    setReturnDate(todayYmd());
   };
 
   const handleReturn = async () => {
     if (!returnModal) return;
     const fine = calculateFine(returnModal.due_date, fineSettings).fineAmount;
-    const today = new Date().toISOString().split('T')[0];
+    const today = returnDate || todayYmd();
     try {
       const updates = {
         status: 'returned',
@@ -571,7 +581,7 @@ export default function Borrow() {
           quantity: 1,
           amount: fine,
           payment_method: finePaymentMethod,
-          transaction_date: today,
+          transaction_date: ymdToTs(today),
           status: 'completed',
         });
       }
@@ -1142,6 +1152,29 @@ export default function Borrow() {
             </div>
           )}
 
+          {/* Issue + due dates — admins only */}
+          {selectedMember && isAdmin() && (
+            <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '14px' : '14px 20px' }}>
+              <DateOverride
+                label="Issued on"
+                value={checkoutDate}
+                onChange={setCheckoutDate}
+                compact
+                hint="Change this to record a book that went out on an earlier day."
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#6b7280' }}>📚 Due back</label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  style={{ padding: '6px 8px', border: '1px solid #e0e0e0', borderRadius: '7px', fontSize: '13px' }}
+                />
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>Defaults to the membership expiry.</span>
+              </div>
+            </div>
+          )}
+
           {/* Checkout — full width */}
           <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '14px' : '18px 20px', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '12px' : '20px', flexDirection: isMobile ? 'column' : 'row' }}>
             {selectedMember && (
@@ -1277,10 +1310,23 @@ export default function Borrow() {
                           </span>
                         </td>
                         <td style={{ padding: '11px 14px' }}>
-                          <div style={{ display: 'flex', gap: '6px' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             <button onClick={() => openReturn(item)} disabled={isReadOnly} style={{ padding: '5px 10px', background: isReadOnly ? '#f5f5f5' : '#e8faf0', color: isReadOnly ? '#ccc' : '#27ae60', border: 'none', borderRadius: '5px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600', opacity: isReadOnly ? 0.5 : 1 }}>
                               ✓ Return
                             </button>
+                            <EditRecordDate
+                              table="circulation"
+                              id={item.id}
+                              record={item}
+                              what="Loan"
+                              label="Change the dates on this loan"
+                              fields={[
+                                { column: 'checkout_date', label: 'Issued on', kind: 'date' },
+                                { column: 'due_date', label: 'Due back', kind: 'date' },
+                              ]}
+                              onSaved={fetchData}
+                              buttonStyle={{ padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: '5px', background: '#fff', cursor: 'pointer', fontSize: '12px', lineHeight: 1.2 }}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -1394,6 +1440,14 @@ export default function Borrow() {
                 <div style={{ marginTop: '8px', color: '#27ae60', fontWeight: '600' }}>✓ Returned on time — no fine</div>
               )}
             </div>
+
+            <DateOverride
+              label="Returned on"
+              value={returnDate}
+              onChange={setReturnDate}
+              compact
+              hint="Change this if the book actually came back on an earlier day."
+            />
 
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '8px', letterSpacing: '0.5px' }}>

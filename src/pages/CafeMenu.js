@@ -4,6 +4,8 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { uploadAsset } from '../utils/assetLibrary';
+import { GST_SLABS } from '../utils/gstSettings';
 
 const CATEGORIES = ['tea', 'coffee', 'juice', 'bakery', 'snacks', 'other'];
 const CAT_ICONS = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🍰', snacks: '🍿', other: '🍽️' };
@@ -19,7 +21,33 @@ export default function CafeMenu() {
   const [editItem, setEditItem] = useState(null);
   const [filterCat, setFilterCat] = useState('all');
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name: '', category: 'tea', price: '', cost_price: '', description: '', image_url: '', is_available: true });
+  const [form, setForm] = useState({ name: '', category: 'tea', price: '', cost_price: '', description: '', image_url: '', is_available: true, tax_mode: 'default', gst_rate: '', hsn_code: '' });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = React.useRef();
+
+  // Photos go to the editor-assets Storage bucket, not into the row. A menu
+  // grid of base64 images would be read on every POS load and is exactly the
+  // kind of payload that has knocked the database over before.
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.warning('Please choose an image file'); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.warning('Image must be under 8MB'); return; }
+    setUploadingImage(true);
+    try {
+      const asset = await uploadAsset(file, { pageId: 'cafe-menu' });
+      // The thumbnail is a 400px square — the right size for a POS tile, and a
+      // fraction of the bytes of the original.
+      setForm(f => ({ ...f, image_url: asset.thumb_url || asset.url }));
+      toast.success('Photo uploaded');
+    } catch (err) {
+      console.error('Menu photo upload failed', err);
+      toast.error(`Upload failed: ${err.message || err}`);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   useEffect(() => { checkAndFetch(); }, []);
 
@@ -38,23 +66,47 @@ export default function CafeMenu() {
 
   const openAdd = () => {
     setEditItem(null);
-    setForm({ name: '', category: 'tea', price: '', cost_price: '', description: '', image_url: '', is_available: true });
+    setForm({ name: '', category: 'tea', price: '', cost_price: '', description: '', image_url: '', is_available: true, tax_mode: 'default', gst_rate: '', hsn_code: '' });
     setShowModal(true);
   };
 
   const openEdit = (item) => {
     setEditItem(item);
-    setForm({ name: item.name, category: item.category, price: item.price, cost_price: item.cost_price || '', description: item.description || '', image_url: item.image_url || '', is_available: item.is_available });
+    setForm({ name: item.name, category: item.category, price: item.price, cost_price: item.cost_price || '', description: item.description || '', image_url: item.image_url || '', is_available: item.is_available, tax_mode: item.tax_mode || 'default', gst_rate: item.gst_rate ?? '', hsn_code: item.hsn_code || '' });
     setShowModal(true);
   };
 
   const saveItem = async () => {
     if (!form.name || !form.price) return toast.warning('Name and price are required');
-    const payload = { ...form, price: parseFloat(form.price), cost_price: parseFloat(form.cost_price) || 0, updated_at: new Date().toISOString() };
-    if (editItem) {
-      await supabase.from('cafe_menu_items').update(payload).eq('id', editItem.id);
+    const payload = {
+      ...form,
+      price: parseFloat(form.price),
+      cost_price: parseFloat(form.cost_price) || 0,
+      // 'default' means "follow the stream setting" — stored as NULL so an
+      // untouched item is indistinguishable from one saved before this existed.
+      tax_mode: form.tax_mode && form.tax_mode !== 'default' ? form.tax_mode : null,
+      gst_rate: form.gst_rate === '' || form.gst_rate === null ? null : Number(form.gst_rate),
+      hsn_code: form.hsn_code?.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const write = (row) => (editItem
+      ? supabase.from('cafe_menu_items').update(row).eq('id', editItem.id)
+      : supabase.from('cafe_menu_items').insert([row]));
+
+    let { error } = await write(payload);
+    if (error) {
+      // The tax columns arrive with a migration. Until it has been run, save
+      // everything else rather than failing the whole edit — and say so, so the
+      // tax setting isn't silently dropped without anyone noticing.
+      const { tax_mode, gst_rate, hsn_code, ...rest } = payload;
+      const retry = await write(rest);
+      if (retry.error) { toast.error(`Could not save: ${retry.error.message || retry.error}`); return; }
+      if (tax_mode || gst_rate !== null || hsn_code) {
+        toast.warning('Saved, but the tax settings need the GST migration (20260913_menu_item_tax_override.sql) run first.');
+      }
     } else {
-      await supabase.from('cafe_menu_items').insert([payload]);
+      toast.success(editItem ? 'Menu item updated' : 'Menu item added');
     }
     setShowModal(false);
     fetchItems();
@@ -230,9 +282,84 @@ export default function CafeMenu() {
               <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Optional description" />
             </div>
             <div className="cafe-form-group">
-              <label>Image URL</label>
-              <input value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." />
+              <label>Photo</label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <div style={{
+                  width: '76px', height: '76px', flexShrink: 0, borderRadius: '10px',
+                  border: '1px dashed #d5d9e6', background: '#fafbff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden', fontSize: '26px',
+                }}>
+                  {form.image_url
+                    ? <img src={form.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    : (CAT_ICONS[form.category] || '🍽️')}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={isReadOnly || uploadingImage}
+                      style={{ padding: '7px 14px', background: '#667eea', color: 'white', border: 'none', borderRadius: '7px', cursor: uploadingImage ? 'wait' : 'pointer', fontSize: '13px', fontWeight: '600' }}
+                    >
+                      {uploadingImage ? 'Uploading…' : '📷 Upload photo'}
+                    </button>
+                    {form.image_url && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, image_url: '' })}
+                        disabled={isReadOnly}
+                        style={{ padding: '7px 12px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    value={form.image_url}
+                    onChange={e => setForm({ ...form, image_url: e.target.value })}
+                    placeholder="…or paste an image URL"
+                  />
+                </div>
+              </div>
             </div>
+            <div className="cafe-form-group">
+              <label>GST treatment</label>
+              <select value={form.tax_mode} onChange={e => setForm({ ...form, tax_mode: e.target.value })}>
+                <option value="default">Follow the Cafe setting (default)</option>
+                <option value="mrp">Price is MRP — GST already included</option>
+                <option value="exclusive">Add GST on top of the price</option>
+                <option value="outside_gst">Outside GST (alcohol — state excise)</option>
+              </select>
+              <small style={{ color: '#888', fontSize: '11px', display: 'block', marginTop: '5px', lineHeight: 1.5 }}>
+                {form.tax_mode === 'mrp'
+                  ? 'The customer pays exactly the printed price; GST is worked backwards out of it. Use this for anything sold in a sealed can, bottle or packet — MRP is the maximum price including all taxes, so nothing can be added on top.'
+                  : form.tax_mode === 'exclusive'
+                  ? 'GST is added to the price at the till, so the customer pays more than the number above.'
+                  : form.tax_mode === 'outside_gst'
+                  ? 'No GST is charged and this stays out of GST turnover. Alcoholic liquor for human consumption is outside GST — state excise and VAT apply instead.'
+                  : 'Uses whatever Settings → GST says for the Cafe stream.'}
+              </small>
+            </div>
+
+            {(form.tax_mode === 'mrp' || form.tax_mode === 'exclusive') && (
+              <div className="cafe-form-row">
+                <div className="cafe-form-group">
+                  <label>GST rate %</label>
+                  <select value={form.gst_rate} onChange={e => setForm({ ...form, gst_rate: e.target.value })}>
+                    <option value="">Use the Cafe rate</option>
+                    {GST_SLABS.map(r => <option key={r} value={r}>{r}%</option>)}
+                  </select>
+                  <small style={{ color: '#888', fontSize: '11px' }}>Packaged goods are usually not on the restaurant rate — check with your accountant.</small>
+                </div>
+                <div className="cafe-form-group">
+                  <label>HSN code</label>
+                  <input value={form.hsn_code} onChange={e => setForm({ ...form, hsn_code: e.target.value })} placeholder="Leave blank to use the Cafe SAC" />
+                </div>
+              </div>
+            )}
+
             <div className="cafe-form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input type="checkbox" checked={form.is_available} onChange={e => setForm({ ...form, is_available: e.target.checked })} />
               <label style={{ margin: 0 }}>Available for ordering</label>

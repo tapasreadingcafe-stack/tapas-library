@@ -9,6 +9,9 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { sendEmail, membershipExpiryEmailHtml } from '../utils/emailUtils';
 import { sendWhatsApp, membershipExpiryWhatsAppMsg, membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
+import { useAuth } from '../context/AuthContext';
+import DateOverride from '../components/DateOverride';
+import { todayYmd, tsToYmd, addDaysYmd } from '../utils/backdate';
 
 import {
   calculateStatusColor,
@@ -31,6 +34,7 @@ function Members() {
   const toast = useToast();
   const confirm = useConfirm();
   const { isReadOnly, canManageMembers } = usePermission();
+  const { isAdmin } = useAuth();
   const [members, setMembers] = useState([]);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
@@ -62,7 +66,9 @@ function Members() {
     duration_days: 30,
     borrow_limit: 3,
     discount_percent: 0,
-    price: 100
+    price: 100,
+    subscription_start: '',
+    subscription_end: ''
   });
 
   useEffect(() => {
@@ -140,7 +146,9 @@ function Members() {
       borrow_limit: 2,
       discount_percent: 0,
       price: 600,
-      profile_photo: ''
+      profile_photo: '',
+      subscription_start: todayYmd(),
+      subscription_end: addDaysYmd(todayYmd(), 30)
     });
     setShowModal(true);
   };
@@ -159,7 +167,9 @@ function Members() {
       borrow_limit: member.borrow_limit || 3,
       discount_percent: member.discount_percent || 0,
       price: member.plan_price || PLAN_DEFAULTS[member.plan || 'individual_monthly']?.price || 600,
-      profile_photo: member.profile_photo || ''
+      profile_photo: member.profile_photo || '',
+      subscription_start: tsToYmd(member.subscription_start) || todayYmd(),
+      subscription_end: tsToYmd(member.subscription_end) || addDaysYmd(tsToYmd(member.subscription_start) || todayYmd(), member.plan_duration_days || 30)
     });
     setShowModal(true);
   };
@@ -177,7 +187,9 @@ function Members() {
       duration_days: 30,
       borrow_limit: 3,
       discount_percent: 0,
-      price: 100
+      price: 100,
+      subscription_start: todayYmd(),
+      subscription_end: addDaysYmd(todayYmd(), 30)
     });
     setShowModal(true);
   };
@@ -196,7 +208,9 @@ function Members() {
       duration_days: renewed.plan_duration_days,
       borrow_limit: renewed.borrow_limit,
       discount_percent: renewed.discount_percent,
-      price: renewed.plan_price
+      price: renewed.plan_price,
+      subscription_start: tsToYmd(renewed.subscription_start),
+      subscription_end: tsToYmd(renewed.subscription_end)
     });
     setShowModal(true);
   };
@@ -278,15 +292,38 @@ function Members() {
       });
     } else {
       const defaults = PLAN_DEFAULTS[plan];
+      const start = formData.subscription_start || todayYmd();
       setFormData({
         ...formData,
         plan,
         duration_days: defaults.duration_days,
         borrow_limit: defaults.borrow_limit,
         discount_percent: defaults.discount_percent,
-        price: defaults.price
+        price: defaults.price,
+        subscription_start: start,
+        subscription_end: addDaysYmd(start, defaults.duration_days)
       });
     }
+  };
+
+  // Start date and duration drive the expiry, so moving either re-derives it.
+  // The expiry stays directly editable underneath — a membership that was sold
+  // with an odd end date has to be enterable as it was actually sold.
+  const handleStartDateChange = (start) => {
+    setFormData({
+      ...formData,
+      subscription_start: start,
+      subscription_end: addDaysYmd(start, formData.duration_days || 30)
+    });
+  };
+
+  const handleDurationChange = (days) => {
+    const duration = parseInt(days) || 0;
+    setFormData({
+      ...formData,
+      duration_days: duration,
+      subscription_end: addDaysYmd(formData.subscription_start || todayYmd(), duration)
+    });
   };
 
   const handleSaveMember = async () => {
@@ -317,8 +354,12 @@ function Members() {
           updateData.borrow_limit = formData.borrow_limit;
           updateData.discount_percent = formData.discount_percent;
           updateData.plan_price = formData.price;
-          updateData.subscription_start = editingMember.subscription_start || new Date().toISOString().split('T')[0];
-          updateData.subscription_end = calculateEndDate(new Date().toISOString().split('T')[0], formData.duration_days);
+          // Both dates come from the form. Previously the expiry was rebuilt as
+          // today + duration on every save, so editing a member's phone number
+          // silently pushed their expiry out to a fresh full term.
+          updateData.subscription_start = formData.subscription_start || editingMember.subscription_start || todayYmd();
+          updateData.subscription_end = formData.subscription_end
+            || calculateEndDate(updateData.subscription_start, formData.duration_days);
           updateData.membership_type = 'active_member';
           updateData.status_color = 'gold';
         } else {
@@ -358,7 +399,9 @@ function Members() {
             duration_days: formData.duration_days,
             borrow_limit: formData.borrow_limit,
             discount_percent: formData.discount_percent,
-            price: formData.price
+            price: formData.price,
+            start_date: formData.subscription_start,
+            end_date: formData.subscription_end
           });
           Object.assign(newData, newMembership);
         } else {
@@ -808,13 +851,46 @@ function Members() {
 
               {formData.plan && (
                 <div className="plan-conditional-fields">
+                  <DateOverride
+                    label="Membership starts"
+                    value={formData.subscription_start}
+                    onChange={handleStartDateChange}
+                    max=""
+                    disabled={isReadOnly}
+                    hint="Expiry follows the start date and duration. Change it to enter a membership that began earlier."
+                  />
+                  {isAdmin() && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Membership expires</label>
+                        <input
+                          type="date"
+                          value={formData.subscription_end}
+                          onChange={(e) => setFormData({ ...formData, subscription_end: e.target.value })}
+                          disabled={isReadOnly}
+                        />
+                        <small style={{ color: '#9ca3af', fontSize: '11px' }}>Set directly to override the calculated expiry.</small>
+                      </div>
+                      <div className="form-group">
+                        <label>&nbsp;</label>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => setFormData({ ...formData, subscription_end: addDaysYmd(formData.subscription_start || todayYmd(), formData.duration_days || 30) })}
+                          style={{ width: '100%' }}
+                        >
+                          Recalculate from duration
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="form-row">
                     <div className="form-group">
                       <label>Duration (days)</label>
                       <input
                         type="number"
                         value={formData.duration_days}
-                        onChange={(e) => setFormData({ ...formData, duration_days: parseInt(e.target.value) })}
+                        onChange={(e) => handleDurationChange(e.target.value)}
                         min="1"
                       />
                     </div>

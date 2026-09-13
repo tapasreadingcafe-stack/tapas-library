@@ -4,6 +4,9 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { getFineSettings, calculateFine } from '../utils/fineUtils';
 import { useToast } from '../components/Toast';
+import DateOverride from '../components/DateOverride';
+import { todayYmd, ymdToTs } from '../utils/backdate';
+import EditRecordDate from '../components/EditRecordDate';
 
 export default function Fines() {
   const { isReadOnly, canProcessFines } = usePermission();
@@ -22,6 +25,7 @@ export default function Fines() {
   const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
   const [modalMode, setModalMode] = useState('pay'); // 'pay' | 'waive'
   const [customAmount, setCustomAmount] = useState('');
+  const [paidDate, setPaidDate] = useState(todayYmd());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function Fines() {
     setSelectedItem(item);
     setModalMode(mode);
     setCustomAmount(item.calculatedFine?.toString() || item.fine_amount?.toString() || '0');
+    setPaidDate(todayYmd());
     setShowModal(true);
   };
 
@@ -100,7 +105,7 @@ export default function Fines() {
           item_type: 'fine',
           quantity: 1,
           amount,
-          transaction_date: new Date().toISOString(),
+          transaction_date: ymdToTs(paidDate),
           status: 'completed',
         }).then(() => {}); // Ignore error if transactions table has different schema
       } else {
@@ -341,7 +346,22 @@ export default function Fines() {
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: '14px' }}>{item.books?.title || '—'}</td>
                     <td style={{ padding: '12px 14px', fontSize: '13px', color: '#555' }}>
-                      {item.return_date ? new Date(item.return_date).toLocaleDateString('en-IN') : '—'}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        {item.return_date ? new Date(item.return_date).toLocaleDateString('en-IN') : '—'}
+                        <EditRecordDate
+                          table="circulation"
+                          id={item.id}
+                          record={item}
+                          what="Return"
+                          label="Change the dates on this loan"
+                          fields={[
+                            { column: 'return_date', label: 'Returned on', kind: 'date' },
+                            { column: 'due_date', label: 'Due back', kind: 'date' },
+                          ]}
+                          onSaved={fetchAll}
+                          buttonStyle={{ padding: '1px 5px', border: '1px solid #e5e7eb', borderRadius: '5px', background: '#fff', cursor: 'pointer', fontSize: '10px', lineHeight: 1.4 }}
+                        />
+                      </span>
                     </td>
                     <td style={{ padding: '12px 14px', fontWeight: '600', color: item.fine_amount > 0 ? '#27ae60' : '#3498db' }}>
                       {item.fine_amount > 0 ? `₹${item.fine_amount.toLocaleString('en-IN')}` : '—'}
@@ -389,6 +409,16 @@ export default function Fines() {
                 <span style={{ fontWeight: '700', color: '#e74c3c' }}>₹{selectedItem.calculatedFine?.toLocaleString('en-IN')}</span>
               </div>
             </div>
+
+            {modalMode === 'pay' && (
+              <DateOverride
+                label="Collected on"
+                value={paidDate}
+                onChange={setPaidDate}
+                compact
+                hint="Change this if the fine was actually collected on an earlier day."
+              />
+            )}
 
             {modalMode === 'pay' && (
               <div style={{ marginBottom: '18px' }}>

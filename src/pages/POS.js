@@ -19,6 +19,8 @@ import { formatBillNo, seqWithinDay, dayKey } from '../utils/invoiceNumber';
 import { loadGstSettings, gstActive } from '../utils/gstSettings';
 import { billTaxFor } from '../utils/billTax';
 import { queueReceipt, waitForJob, usePrinterStatus, printerStateText } from '../utils/receiptPrinter';
+import DateOverride from '../components/DateOverride';
+import { todayYmd, ymdToTs, isBackdated } from '../utils/backdate';
 
 // ── Default service items ─────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
@@ -109,7 +111,23 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
           ✏️
         </button>
       )}
-      <div style={{ fontSize: '24px', marginBottom: '5px' }}>{svc.emoji}</div>
+      {/* A real photo of the item beats a category emoji — the emoji is shared
+          by every item in a category, so a salad and a croissant looked alike. */}
+      {svc.image ? (
+        <img
+          src={svc.image}
+          alt=""
+          loading="lazy"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          style={{
+            width: '100%', height: '62px', objectFit: 'cover',
+            borderRadius: '7px', marginBottom: '6px', display: 'block',
+            background: '#eef1ff',
+          }}
+        />
+      ) : (
+        <div style={{ fontSize: '24px', marginBottom: '5px' }}>{svc.emoji}</div>
+      )}
       <div style={{ fontSize: '11px', fontWeight: '700', color: hovered ? 'white' : '#333', lineHeight: 1.3, marginBottom: '4px' }}>{svc.name}</div>
       <div style={{ fontSize: '13px', fontWeight: '800', color: hovered ? 'rgba(255,255,255,0.92)' : '#667eea' }}>
         {svc.price === 0 ? 'Custom' : fmt(svc.price)}
@@ -191,6 +209,8 @@ export default function POS({ mode = 'library' }) {
   // Cash or UPI only — a cart saved while card was still offered falls back to cash.
   const [payMethod, setPayMethod]       = useState(_saved.payMethod === 'upi' ? 'upi' : 'cash');
   const [cashReceived, setCashReceived] = useState('');
+  // The day this bill is booked on. Admin-only; everyone else always bills today.
+  const [billDate, setBillDate]         = useState(todayYmd());
 
   // UPI QR
   const [upiQrUrl, setUpiQrUrl]         = useState(null);
@@ -434,6 +454,11 @@ export default function POS({ mode = 'library' }) {
         qty:    1,
         bookId: item.cartType === 'book' ? item.id : null,
         menuItemId: item.cartType === 'cafe' ? item.id : null, // cafe_menu_items.id for the cafe order
+        // Carried onto the line so the tax engine can override the stream's
+        // inclusive/exclusive answer and rate for this one item.
+        taxMode: item.taxMode || null,
+        gstRate: item.gstRate ?? null,
+        hsnCode: item.hsnCode || null,
       }];
     });
   }, []);
@@ -442,7 +467,7 @@ export default function POS({ mode = 'library' }) {
   useEffect(() => {
     supabase
       .from('cafe_menu_items')
-      .select('id, name, price, category, image_url')
+      .select('id, name, price, category, image_url, tax_mode, gst_rate, hsn_code')
       .eq('is_available', true)
       .order('display_order')
       .then(({ data }) => setCafeMenu(data || []));
@@ -649,6 +674,7 @@ export default function POS({ mode = 'library' }) {
     setMemberFines([]); setDiscountVal(0); setAddlDiscVal(0); setCashReceived(''); setPayMethod('cash');
     setPromoInput(''); setAppliedPromo(null); setPromoError('');
     setActivatedMembership(null);
+    setBillDate(todayYmd());
     sessionStorage.removeItem(CART_KEY);
   };
 
@@ -800,6 +826,10 @@ export default function POS({ mode = 'library' }) {
       showToast('Cash received is less than total!', 'error'); return;
     }
     setCheckingOut(true);
+    // One stamp for the whole bill, so the transaction, its cafe mirror, the
+    // copies it sold and the membership it starts all land on the same day.
+    const billStamp = ymdToTs(billDate);
+    const billDay   = billDate || todayYmd();
     try {
       // ── Offline branch (safe additive): no network → save the bill locally +
       // queue it, show a receipt, and let the sync module replay it later. The
@@ -815,11 +845,12 @@ export default function POS({ mode = 'library' }) {
           payMethod,
           cashReceived: cashNum,
           change,
+          createdAt: billStamp,
         });
         setLastTxn({
           id: offlineId,
           txnRef: receiptNo,
-          date: new Date(),
+          date: new Date(billStamp),
           member: selectedMember,
           items: [...cart],
           subtotal, discount: discountAmount, total,
@@ -843,6 +874,7 @@ export default function POS({ mode = 'library' }) {
           .from('pos_transactions')
           .insert({
             member_id: selectedMember?.id || null,
+            ...(isBackdated(billDate) ? { created_at: billStamp } : {}),
             total_amount: total,
             discount_amount: discountAmount,
             promo_code: appliedPromo?.code || null,
@@ -912,7 +944,7 @@ export default function POS({ mode = 'library' }) {
             book_id:      cart.find(c => c.bookId)?.bookId || null,
             quantity:     cart.reduce((s, c) => s + c.qty, 0),
             total_amount: total,
-            sale_date:    new Date().toISOString().split('T')[0],
+            sale_date:    billDay,
             status:       'completed',
           })
           .select('id').single();
@@ -936,7 +968,7 @@ export default function POS({ mode = 'library' }) {
         // Mark individual copy as sold in book_copies
         if (bi.copyId) {
           await supabase.from('book_copies')
-            .update({ status: 'sold', sold_price: Math.round(lineNet(bi) / (bi.qty || 1)), sold_date: new Date().toISOString().split('T')[0] })
+            .update({ status: 'sold', sold_price: Math.round(lineNet(bi) / (bi.qty || 1)), sold_date: billDay })
             .eq('id', bi.copyId);
         }
       }
@@ -957,6 +989,7 @@ export default function POS({ mode = 'library' }) {
           const cafeNet = Math.max(0, cafeTotal - cafeDiscount);
           const { data: cafeOrder, error: coErr } = await supabase.from('cafe_orders').insert([{
             member_id: selectedMember?.id || null,
+            ...(isBackdated(billDate) ? { created_at: billStamp } : {}),
             customer_name: selectedMember?.name || 'Book POS',
             total_amount: cafeNet,
             discount_amount: cafeDiscount,
@@ -1018,11 +1051,13 @@ export default function POS({ mode = 'library' }) {
           const isRenew  = memItem.cartId.includes('renew');
           const planKey  = isAnnual ? 'individual_annual' : 'individual_monthly';
           const defaults = PLAN_DEFAULTS[planKey];
-          const today    = new Date().toISOString().split('T')[0];
+          const today    = billDay;
           let startDate  = today;
           if (isRenew && selectedMember.subscription_end) {
+            // A renewal picks up where the current term ends — measured against
+            // the bill's own day, so a backdated renewal stacks correctly.
             const currentEnd = new Date(selectedMember.subscription_end);
-            if (currentEnd > new Date()) startDate = selectedMember.subscription_end.split('T')[0];
+            if (currentEnd > new Date(`${today}T00:00:00`)) startDate = selectedMember.subscription_end.split('T')[0];
           }
           const endDate = calculateEndDate(startDate, defaults.duration_days);
           try {
@@ -1052,7 +1087,7 @@ export default function POS({ mode = 'library' }) {
       // customer's copy and the books agree. Rank is read back from the day's
       // rows rather than counted locally, so a second till can't collide.
       const txnRef = await (async () => {
-        const stamp = txnCreatedAt || new Date().toISOString();
+        const stamp = txnCreatedAt || billStamp;
         if (!txnId) return `TXN${Date.now().toString().slice(-6)}`;
         try {
           const key = dayKey(stamp);
@@ -1077,7 +1112,7 @@ export default function POS({ mode = 'library' }) {
       setLastTxn({
         id: txnId,
         txnRef,
-        date: new Date(),
+        date: new Date(billStamp),
         member: selectedMember,
         items: [...cart],
         subtotal, discount: discountAmount, total,
@@ -1310,6 +1345,11 @@ export default function POS({ mode = 'library' }) {
     name: m.name,
     price: Number(m.price) || 0,
     emoji: CAFE_EMOJI[(m.category || '').toLowerCase()] || '🍽️',
+    image: m.image_url || null,
+    // Per-item GST treatment, for things sold at a printed MRP.
+    taxMode: m.tax_mode || null,
+    gstRate: m.gst_rate ?? null,
+    hsnCode: m.hsn_code || null,
     cat: 'Cafe',
     isCafe: true,
   }));
@@ -2071,6 +2111,17 @@ export default function POS({ mode = 'library' }) {
                   <span style={{ fontSize: '24px', fontWeight: '900', color: '#059669' }}>{fmt(total)}</span>
                 </div>
               </div>
+            )}
+
+            {/* Bill date — admins only; staff always bill today */}
+            {cart.length > 0 && (
+              <DateOverride
+                label="Bill date"
+                value={billDate}
+                onChange={setBillDate}
+                compact
+                hint="Change this to enter a sale from an earlier day."
+              />
             )}
 
             {/* Payment method selector */}

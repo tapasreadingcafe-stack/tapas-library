@@ -12,7 +12,7 @@
  * revenueStreams.splitByStream uses, so the tax and the revenue reports agree.
  */
 import { taxForBill } from './gst';
-import { rateForStream } from './gstSettings';
+import { rateForCartItem } from './gstSettings';
 import { streamOf, posItemType } from './revenueStreams';
 import { lineNet } from './cartUtils';
 
@@ -29,7 +29,9 @@ export const streamForCartItem = (item) =>
 export function billTaxFor(cart, { billDiscount = 0, settings } = {}) {
   const lines = (cart || []).map((item) => {
     const stream = streamForCartItem(item);
-    return { item, stream, net: lineNet(item), cfg: rateForStream(settings, stream) };
+    // Per-item first: an MRP-priced can and a made-to-order coffee sit in the
+    // same stream but cannot share one inclusive/exclusive answer.
+    return { item, stream, net: lineNet(item), cfg: rateForCartItem(settings, stream, item) };
   });
 
   const revenueNet = lines.filter((l) => !l.cfg.exempt).reduce((s, l) => s + l.net, 0);

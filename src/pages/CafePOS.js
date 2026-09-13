@@ -3,6 +3,8 @@ import { supabase } from '../utils/supabase';
 import { useReactToPrint } from 'react-to-print';
 import { useToast } from '../components/Toast';
 import { logActivity, ACTIONS } from '../utils/activityLog';
+import DateOverride from '../components/DateOverride';
+import { todayYmd, ymdToTs, isBackdated } from '../utils/backdate';
 
 const SETUP_SQL = `
 -- Run this SQL in your Supabase SQL Editor to create cafe tables:
@@ -76,6 +78,7 @@ export default function CafePOS() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [cashReceived, setCashReceived] = useState('');
+  const [orderDate, setOrderDate] = useState(todayYmd());
   const [discount, setDiscount] = useState(0);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -152,6 +155,9 @@ export default function CafePOS() {
     try {
       const orderData = {
         member_id: selectedMember?.id || null,
+        // Only sent when it differs from today, so an install whose cafe_orders
+        // predates any date control keeps its own default.
+        ...(isBackdated(orderDate) ? { created_at: ymdToTs(orderDate) } : {}),
         customer_name: selectedMember?.name || customerName || 'Walk-in',
         total_amount: total,
         discount_amount: discount,
@@ -225,6 +231,7 @@ export default function CafePOS() {
       setMemberSearch('');
       setCashReceived('');
       setDiscount(0);
+      setOrderDate(todayYmd());
       fetchData();
     } catch (err) {
       console.error(err);
@@ -432,6 +439,14 @@ export default function CafePOS() {
                   placeholder="₹0" />
               </div>
               <div className="cafe-cart-row total"><span>Total</span><span>₹{total.toLocaleString('en-IN')}</span></div>
+
+              <DateOverride
+                label="Order date"
+                value={orderDate}
+                onChange={setOrderDate}
+                compact
+                hint="Change this to enter an order from an earlier day."
+              />
 
               {/* Payment */}
               <label style={{ fontSize: '12px', color: '#999', fontWeight: '600', marginTop: '8px', display: 'block' }}>PAYMENT METHOD</label>

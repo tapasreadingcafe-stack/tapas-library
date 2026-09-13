@@ -32,9 +32,12 @@ export async function nextReceiptNo() {
  */
 export async function saveBillOffline({
   hasPosTable, member, cart, total, discountAmount, appliedPromo, payMethod, cashReceived, change,
+  // An admin can book the bill on an earlier day; the replayed row must carry
+  // that day too, or syncing would silently move the sale to the sync date.
+  createdAt,
 }) {
   const receiptNo = await nextReceiptNo();
-  const now = new Date().toISOString();
+  const now = createdAt || new Date().toISOString();
   const txnId = uuid();
 
   if (hasPosTable) {

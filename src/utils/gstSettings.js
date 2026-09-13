@@ -126,6 +126,46 @@ export function rateForStream(settings, stream) {
   return { exempt: false, untaxed: false, rate: entry.rate, hsn: entry.hsn || null, inclusive: entry.inclusive };
 }
 
+/**
+ * How one CART LINE is taxed — the stream's configuration, with any per-item
+ * override applied on top.
+ *
+ * A stream-level answer is not enough for anything sold at a printed MRP. The
+ * MRP is by law the maximum price inclusive of all taxes, so GST has to be
+ * taken OUT of it; adding 5% on top would put the bill above MRP. The same
+ * cafe stream also holds coffee that may be priced before tax, so the two have
+ * to be able to disagree inside one bill.
+ *
+ * The override also carries the two cases a rate alone cannot express:
+ * packaged goods taxed at a different slab from the restaurant rate, and
+ * alcoholic liquor for human consumption, which is outside GST altogether.
+ *
+ * @param item  cart line, optionally carrying taxMode / gstRate / hsnCode
+ */
+export function rateForCartItem(settings, stream, item) {
+  const base = rateForStream(settings, stream);
+  const mode = item?.taxMode;
+
+  // Alcohol is outside GST whatever the stream says — state excise and VAT
+  // apply instead, and it must stay out of GST taxable turnover.
+  if (mode === 'outside_gst') {
+    return { ...base, exempt: false, untaxed: true, rate: null };
+  }
+
+  // A deposit is never a supply, and GST switched off for the stream stays off.
+  if (base.exempt || base.untaxed) return base;
+
+  const out = { ...base };
+  if (mode === 'mrp') out.inclusive = true;
+  else if (mode === 'exclusive') out.inclusive = false;
+
+  const rate = item?.gstRate;
+  if (rate !== undefined && rate !== null && rate !== '') out.rate = Number(rate) || 0;
+  if (item?.hsnCode) out.hsn = item.hsnCode;
+
+  return out;
+}
+
 /** Is GST actually live? Off unless enabled AND a valid GSTIN is on file. */
 export function gstActive(settings) {
   return !!(settings?.enabled && validateGstin(settings.gstin).valid);

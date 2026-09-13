@@ -3,12 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { calculateAge, isMinor, generateCustomerID, formatCurrency, formatDate, calculateStatusColor, PLAN_DEFAULTS } from '../utils/membershipUtils';
 import { useConfirm } from '../components/ConfirmModal';
-
-const TIERS = {
-  basic:  { name: 'Basic',  icon: '🥉', borrow_limit: 2,  loan_days: 7,  color: '#95a5a6', bg: '#f4f4f4' },
-  silver: { name: 'Silver', icon: '🥈', borrow_limit: 4,  loan_days: 14, color: '#7f8c8d', bg: '#ecf0f1' },
-  gold:   { name: 'Gold',   icon: '🥇', borrow_limit: 6,  loan_days: 21, color: '#f39c12', bg: '#fefdf0' },
-};
+import EditRecordDate from '../components/EditRecordDate';
 
 const CHILD_COLORS = ['#3498db', '#27ae60', '#9b59b6', '#f39c12', '#e91e63'];
 
@@ -48,8 +43,9 @@ export default function MemberProfile() {
   const [membershipHistory, setMembershipHistory] = useState([]);
   const [borrowingHistory, borrowingHistoryData] = useState([]);
   const [purchaseHistory, setPurchaseHistory] = useState([]);
+  const [txns, setTxns] = useState([]);
+  const [txnsLoading, setTxnsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [upgradingTier, setUpgradingTier] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = React.useRef();
 
@@ -66,6 +62,7 @@ export default function MemberProfile() {
 
   useEffect(() => {
     fetchMemberProfile();
+    fetchTransactions();
   }, [memberId]);
 
   const fetchMemberProfile = async () => {
@@ -164,29 +161,88 @@ export default function MemberProfile() {
     }
   };
 
-  const handleTierUpgrade = async (tierKey) => {
-    if (!await confirm({ title: 'Upgrade Membership', message: `Upgrade membership to ${TIERS[tierKey].name} tier?`, variant: 'warning' })) return;
-    setUpgradingTier(true);
-    try {
-      const tier = TIERS[tierKey];
-      const { error } = await supabase
-        .from('members')
-        .update({ borrow_limit: tier.borrow_limit, membership_tier: tierKey })
-        .eq('id', memberId);
-      if (error) {
-        const { error: e2 } = await supabase
-          .from('members')
-          .update({ borrow_limit: tier.borrow_limit })
-          .eq('id', memberId);
-        if (e2) throw e2;
-      }
-      alert(`Tier updated to ${tier.name}! Borrow limit: ${tier.borrow_limit} books.`);
-      fetchMemberProfile();
-    } catch (err) {
-      alert('Error: ' + err.message);
-    } finally {
-      setUpgradingTier(false);
-    }
+  /* Everything this member has ever paid for, in one list.
+   *
+   * The money lives in three places and no single table has all of it:
+   *   pos_transactions — every bill from either till (books, cafe, membership,
+   *                      deposits, fines settled at the counter)
+   *   cafe_orders      — orders rung up on the Cafe screen on their own. The
+   *                      POS also writes a mirror order for the kitchen when a
+   *                      bill has cafe items; those are the same sale as the
+   *                      bill, so they are skipped by their "Billed via" note.
+   *   transactions     — fines collected from Fines / Overdue / a return.
+   *
+   * Any of these can be missing on an older install, so each is read on its own
+   * and a failure just contributes nothing rather than emptying the list.
+   */
+  const fetchTransactions = async () => {
+    setTxnsLoading(true);
+    const rows = [];
+
+    const [billsR, cafeR, fineR] = await Promise.all([
+      supabase.from('pos_transactions')
+        .select('id, created_at, total_amount, discount_amount, payment_method, invoice_no, pos_transaction_items(item_name, item_type, quantity, total_price)')
+        .eq('member_id', memberId).order('created_at', { ascending: false }),
+      supabase.from('cafe_orders')
+        .select('id, created_at, total_amount, discount_amount, payment_method, status, notes, cafe_order_items(item_name, quantity, total_price)')
+        .eq('member_id', memberId).order('created_at', { ascending: false }),
+      supabase.from('transactions')
+        .select('id, transaction_date, transaction_type, item_name, amount, payment_method, status')
+        .eq('member_id', memberId).order('transaction_date', { ascending: false }),
+    ]);
+
+    // payment_method was added to `transactions` later than the rest; on an
+    // install without it the whole select fails, which would drop every fine
+    // from this list rather than just the column.
+    const fines = fineR.error
+      ? await supabase.from('transactions')
+          .select('id, transaction_date, transaction_type, item_name, amount, status')
+          .eq('member_id', memberId).order('transaction_date', { ascending: false })
+      : fineR;
+
+    (billsR.data || []).forEach(b => rows.push({
+      key: `b-${b.id}`,
+      at: new Date(b.created_at),
+      icon: '🧾',
+      title: b.invoice_no ? `Bill ${b.invoice_no}` : 'Counter bill',
+      lines: (b.pos_transaction_items || []).map(i => `${i.item_name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}`),
+      amount: Number(b.total_amount) || 0,
+      discount: Number(b.discount_amount) || 0,
+      method: b.payment_method,
+      edit: { table: 'pos_transactions', column: 'created_at', kind: 'timestamp', id: b.id, record: b, what: 'Bill' },
+    }));
+
+    (cafeR.data || [])
+      .filter(o => !String(o.notes || '').startsWith('Billed via'))
+      .forEach(o => rows.push({
+        key: `c-${o.id}`,
+        at: new Date(o.created_at),
+        icon: '☕',
+        title: 'Cafe order',
+        lines: (o.cafe_order_items || []).map(i => `${i.item_name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}`),
+        amount: Number(o.total_amount) || 0,
+        discount: Number(o.discount_amount) || 0,
+        method: o.payment_method,
+        status: o.status && o.status !== 'completed' ? o.status : null,
+        edit: { table: 'cafe_orders', column: 'created_at', kind: 'timestamp', id: o.id, record: o, what: 'Cafe order' },
+      }));
+
+    (fines.data || []).forEach(t => rows.push({
+      key: `t-${t.id}`,
+      at: new Date(t.transaction_date),
+      icon: t.transaction_type === 'fine' ? '⚠️' : '💳',
+      title: t.transaction_type === 'fine' ? 'Fine collected' : (t.transaction_type || 'Payment'),
+      lines: t.item_name ? [t.item_name] : [],
+      amount: Number(t.amount) || 0,
+      discount: 0,
+      method: t.payment_method,
+      status: t.status && t.status !== 'completed' ? t.status : null,
+      edit: { table: 'transactions', column: 'transaction_date', kind: 'timestamp', id: t.id, record: t, what: 'Payment' },
+    }));
+
+    rows.sort((a, b) => b.at - a.at);
+    setTxns(rows);
+    setTxnsLoading(false);
   };
 
   const handlePhotoUpload = async (e) => {
@@ -324,10 +380,6 @@ export default function MemberProfile() {
     streak++;
     m.setMonth(m.getMonth() - 1);
   }
-
-  const bLimit = member.borrow_limit || 0;
-  const currentTierKey = bLimit <= 2 ? 'basic' : bLimit <= 4 ? 'silver' : 'gold';
-  const currentTier = TIERS[currentTierKey];
 
   // Family summary stats
   const familyTotalOut = Object.values(childCirculation).flat().filter(c => c.status === 'checked_out').length;
@@ -646,41 +698,77 @@ export default function MemberProfile() {
         )}
       </div>
 
-      {/* Membership Tier Card */}
+      {/* Transaction History Card */}
       <div style={{ background: 'white', padding: '25px', borderRadius: '8px', marginBottom: '25px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ margin: '0 0 20px 0', color: '#333', borderBottom: '2px solid #667eea', paddingBottom: '10px' }}>🏅 Membership Tier</h2>
-        <div style={{ marginBottom: '16px', padding: '14px', background: currentTier.bg, border: `2px solid ${currentTier.color}`, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '32px' }}>{currentTier.icon}</span>
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '18px', color: currentTier.color }}>{currentTier.name} Tier</div>
-            <div style={{ fontSize: '13px', color: '#666', marginTop: '3px' }}>
-              Borrow limit: {currentTier.borrow_limit} books · Loan duration: {currentTier.loan_days} days
+        <h2 style={{ margin: '0 0 20px 0', color: '#333', borderBottom: '2px solid #667eea', paddingBottom: '10px' }}>
+          🧾 Transaction History {txns.length > 0 && <span style={{ color: '#999', fontWeight: '400', fontSize: '16px' }}>({txns.length})</span>}
+        </h2>
+
+        {txns.length > 0 && (
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '18px' }}>
+            <div style={{ flex: '1 1 140px', background: '#f7f8ff', border: '1px solid #e5e7ff', borderRadius: '8px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#8b8fa8', fontWeight: '700', letterSpacing: '0.4px' }}>TOTAL SPENT</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#667eea', marginTop: '3px' }}>
+                {formatCurrency(txns.reduce((sum, t) => sum + t.amount, 0))}
+              </div>
+            </div>
+            <div style={{ flex: '1 1 140px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '8px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#999', fontWeight: '700', letterSpacing: '0.4px' }}>LAST VISIT</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#333', marginTop: '3px' }}>{formatDate(txns[0].at)}</div>
+            </div>
+            <div style={{ flex: '1 1 140px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '8px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#999', fontWeight: '700', letterSpacing: '0.4px' }}>SAVED ON DISCOUNTS</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#27ae60', marginTop: '3px' }}>
+                {formatCurrency(txns.reduce((sum, t) => sum + t.discount, 0))}
+              </div>
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: '13px', color: '#666' }}>
-            Current borrow limit: <strong>{member.borrow_limit || '—'}</strong>
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-          {Object.entries(TIERS).map(([key, tier]) => {
-            const isCurrentTier = key === currentTierKey;
-            return (
-              <div key={key} style={{ border: `2px solid ${isCurrentTier ? tier.color : '#eee'}`, borderRadius: '8px', padding: '16px', textAlign: 'center', background: isCurrentTier ? tier.bg : 'white', opacity: isCurrentTier ? 1 : 0.8 }}>
-                <div style={{ fontSize: '28px', marginBottom: '6px' }}>{tier.icon}</div>
-                <div style={{ fontWeight: '700', color: tier.color }}>{tier.name}</div>
-                <div style={{ fontSize: '12px', color: '#666', margin: '6px 0' }}>{tier.borrow_limit} books · {tier.loan_days} days</div>
-                {isCurrentTier ? (
-                  <span style={{ background: tier.color, color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>Current</span>
-                ) : (
-                  <button onClick={() => handleTierUpgrade(key)} disabled={upgradingTier}
-                    style={{ padding: '5px 14px', background: tier.color, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                    {upgradingTier ? '...' : key === 'gold' ? '⬆️ Upgrade' : '⬇️ Downgrade'}
-                  </button>
-                )}
+        )}
+
+        {txnsLoading ? (
+          <p style={{ color: '#999', textAlign: 'center', padding: '20px' }}>Loading transactions…</p>
+        ) : txns.length === 0 ? (
+          <p style={{ color: '#999', textAlign: 'center', padding: '20px' }}>No transactions yet</p>
+        ) : (
+          <div>
+            {txns.map(t => (
+              <div key={t.key} style={{ padding: '13px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <span style={{ fontSize: '20px', lineHeight: '1.3' }}>{t.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: '700', color: '#333', fontSize: '14px' }}>
+                    {t.title}
+                    {t.status && (
+                      <span style={{ marginLeft: '8px', background: '#f8d7da', color: '#721c24', padding: '1px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>{t.status}</span>
+                    )}
+                  </div>
+                  {t.lines.length > 0 && (
+                    <div style={{ color: '#666', fontSize: '13px', marginTop: '3px' }}>{t.lines.join(' · ')}</div>
+                  )}
+                  <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+                    <span>{formatDate(t.at)} · {t.at.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {t.method && <span style={{ fontWeight: '700', color: '#888' }}>{String(t.method).toUpperCase()}</span>}
+                    <EditRecordDate
+                      table={t.edit.table}
+                      id={t.edit.id}
+                      record={t.edit.record}
+                      what={t.edit.what}
+                      label="Change the date of this transaction"
+                      fields={[{ column: t.edit.column, label: 'Date', kind: t.edit.kind }]}
+                      onSaved={fetchTransactions}
+                      buttonStyle={{ padding: '1px 5px', border: '1px solid #e5e7eb', borderRadius: '5px', background: '#fff', cursor: 'pointer', fontSize: '10px', lineHeight: 1.4 }}
+                    />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontWeight: '800', color: '#667eea', fontSize: '16px' }}>{formatCurrency(t.amount)}</div>
+                  {t.discount > 0 && (
+                    <div style={{ color: '#27ae60', fontSize: '12px', marginTop: '3px' }}>−{formatCurrency(t.discount)}</div>
+                  )}
+                </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Membership History Card */}

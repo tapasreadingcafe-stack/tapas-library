@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
+import EditRecordDate from '../components/EditRecordDate';
 
 const SETUP_SQL = `CREATE TABLE IF NOT EXISTS cafe_expenses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -181,7 +182,21 @@ export default function AccountsExpenses() {
                 const side = sideOf(exp.vertical);
                 return (
                   <tr key={exp.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>{new Date(exp.expense_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</td>
+                    <td style={{ padding: '10px 12px', fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        {new Date(exp.expense_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        <EditRecordDate
+                          table="cafe_expenses"
+                          id={exp.id}
+                          record={exp}
+                          what="Expense"
+                          label="Change the date of this expense"
+                          fields={[{ column: 'expense_date', label: 'Expense date', kind: 'date' }]}
+                          onSaved={fetchExpenses}
+                          buttonStyle={{ padding: '1px 5px', border: '1px solid #e5e7eb', borderRadius: '5px', background: '#fff', cursor: 'pointer', fontSize: '10px', lineHeight: 1.4 }}
+                        />
+                      </span>
+                    </td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ padding: '3px 9px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: side.color + '1a', color: side.color, whiteSpace: 'nowrap' }}>{side.icon} {side.label}</span>
                     </td>

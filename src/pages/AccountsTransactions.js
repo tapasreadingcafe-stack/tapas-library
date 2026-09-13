@@ -19,6 +19,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { STREAMS, splitByStream } from '../utils/revenueStreams';
 import { buildBillNumbers } from '../utils/invoiceNumber';
+import EditRecordDate from '../components/EditRecordDate';
 
 const PRESETS = [
   { key: 'today',      label: 'Today' },
@@ -157,6 +158,7 @@ export default function AccountsTransactions() {
         customer: b.members?.name || 'Walk-in', chips, amount: n(b.total_amount),
         method: METHODS[(b.payment_method || '').toLowerCase()] ? b.payment_method.toLowerCase() : 'other',
         gst, deposit: split ? split.deposit : 0, types, counts: true,
+        edit: { table: 'pos_transactions', id: b.id, column: 'created_at', kind: 'timestamp', record: b, what: 'Bill' },
       });
     });
 
@@ -169,6 +171,7 @@ export default function AccountsTransactions() {
         method: METHODS[(o.payment_method || '').toLowerCase()] ? o.payment_method.toLowerCase() : 'other',
         gst: 0, deposit: 0, types: new Set(['cafe']),
         status: o.status, counts: !o.status || o.status === 'completed',
+        edit: { table: 'cafe_orders', id: o.id, column: 'created_at', kind: 'timestamp', record: o, what: 'Cafe order' },
       }));
 
     // Older sales, from before pos_transactions existed. The POS writes to one
@@ -179,6 +182,7 @@ export default function AccountsTransactions() {
         customer: s.members?.name || 'Walk-in', chips: [{ ...STREAMS.library, amount: n(s.total_amount) }],
         amount: n(s.total_amount), method: 'other', gst: 0, deposit: 0, types: new Set(['library']),
         status: s.status, counts: !s.status || s.status === 'completed',
+        edit: { table: 'sales', id: s.id, column: 'sale_date', kind: 'date', record: s, what: 'Older sale' },
       }));
     }
 
@@ -344,8 +348,20 @@ export default function AccountsTransactions() {
                   </div>
                   <div className="txn-who" style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customer}</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>
-                      {r.ref}{r.status && r.status !== 'completed' ? ` · ${r.status}` : ''}
+                    <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{r.ref}{r.status && r.status !== 'completed' ? ` · ${r.status}` : ''}</span>
+                      {r.edit && (
+                        <EditRecordDate
+                          table={r.edit.table}
+                          id={r.edit.id}
+                          record={r.edit.record}
+                          what={r.edit.what}
+                          label="Change the date of this sale"
+                          fields={[{ column: r.edit.column, label: 'Date of sale', kind: r.edit.kind }]}
+                          onSaved={load}
+                          buttonStyle={{ padding: '1px 5px', border: '1px solid #e5e7eb', borderRadius: 5, background: '#fff', cursor: 'pointer', fontSize: 10, lineHeight: 1.4 }}
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="txn-chips" style={{ minWidth: 0 }}>

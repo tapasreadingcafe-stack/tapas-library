@@ -6,6 +6,8 @@ import { useToast } from '../components/Toast';
 import { getFineSettings, calculateFine, daysOverdue } from '../utils/fineUtils';
 import { sendEmail, overdueEmailHtml } from '../utils/emailUtils';
 import { sendWhatsApp, overdueWhatsAppMsg } from '../utils/whatsappUtils';
+import DateOverride from '../components/DateOverride';
+import { todayYmd, ymdToTs } from '../utils/backdate';
 
 export default function OverdueBooks() {
   const confirm = useConfirm();
@@ -15,6 +17,7 @@ export default function OverdueBooks() {
   const [searchTerm, setSearchTerm] = useState('');
   const [fineSettings, setFineSettings] = useState({ ratePerDay: 10, gracePeriod: 0, maxFine: 0 });
   const [showFineModal, setShowFineModal] = useState(false);
+  const [finePaidDate, setFinePaidDate] = useState(todayYmd());
   const [selectedItem, setSelectedItem] = useState(null);
   const [fineAmount, setFineAmount] = useState(0);
   const [finePaid, setFinePaid] = useState(false);
@@ -63,6 +66,7 @@ export default function OverdueBooks() {
     setSelectedItem(item);
     setFineAmount(item.fineAmount);
     setFinePaid(false);
+    setFinePaidDate(todayYmd());
     setShowFineModal(true);
   };
 
@@ -80,7 +84,7 @@ export default function OverdueBooks() {
           item_type: 'fine',
           quantity: 1,
           amount: fineAmount,
-          transaction_date: new Date().toISOString(),
+          transaction_date: ymdToTs(finePaidDate),
           status: 'completed'
         }]);
 
@@ -382,6 +386,14 @@ export default function OverdueBooks() {
                 {formatCurrency(fineAmount)}
               </p>
             </div>
+
+            <DateOverride
+              label="Collected on"
+              value={finePaidDate}
+              onChange={setFinePaidDate}
+              compact
+              hint="Change this if the fine was actually collected on an earlier day."
+            />
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '8px', letterSpacing: '0.5px' }}>PAYMENT METHOD</label>
