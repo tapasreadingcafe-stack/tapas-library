@@ -22,10 +22,14 @@ Configuration (printer_bridge/.env — never committed):
                              Or a fixed address:  192.168.0.50   (port 9100)
                                                   192.168.0.50:9100
                              Or a USB printer:    cups:QUEUE_NAME
+    LABEL_PRINTER=...        optional. The Zebra that prints barcode labels.
+                             On the Wi-Fi:        192.168.0.60   (raw ZPL, 9100)
+                             On USB:              cups:QUEUE_NAME
     STATION_NAME=counter     optional. Defaults to this computer's name.
 
-The Supabase URL and public anon key are read from the app's own .env in the
-repo root, so there is nothing else to copy.
+The Supabase URL and public anon key are read from this file's own .env, or
+from the app's .env when the station is running inside the repo — so a station
+installed on its own needs nothing but the .env beside it.
 
 Python 3.9+, standard library only.
 """
@@ -81,6 +85,11 @@ def _read_env(path):
     return out
 
 
+# The USB queue the old counter Mac used; kept as the default so an existing
+# till keeps working without being reconfigured.
+DEFAULT_LABEL_PRINTER = "cups:Zebra_Technologies_ZTC_ZD230_203dpi_ZPL"
+
+
 def load_config():
     app_env = _read_env(os.path.join(REPO, ".env"))
     own = _read_env(os.path.join(HERE, ".env"))
@@ -93,6 +102,11 @@ def load_config():
         "anon": get("SUPABASE_ANON_KEY") or app_env.get("REACT_APP_SUPABASE_ANON_KEY", ""),
         "station_key": get("STATION_KEY"),
         "printer": get("RECEIPT_PRINTER", "auto") or "auto",
+        # Where labels go. Either a CUPS queue on this machine ("cups:NAME",
+        # for a Zebra on USB) or a network address ("192.168.0.60"), which
+        # needs no driver at all — Zebras take raw ZPL on port 9100 exactly as
+        # the receipt printer takes ESC/POS.
+        "label_printer": get("LABEL_PRINTER", DEFAULT_LABEL_PRINTER) or DEFAULT_LABEL_PRINTER,
         "station": get("STATION_NAME") or socket.gethostname().split(".")[0],
     }
 
@@ -504,28 +518,48 @@ def rpc(cfg, name, args, timeout=10):
         raise RuntimeError(message)
 
 
-# ── label printing (Zebra ZPL via CUPS) ──────────────────────────────────────
+# ── label printing (Zebra ZPL) ───────────────────────────────────────────────
 #
-# Labels used to be POSTed by the browser straight to the Flask bridge on
-# 127.0.0.1:5050, which only works when the dashboard is open on this very
+# Labels used to be POSTed by the browser straight to a Flask bridge on
+# 127.0.0.1:5050, which only works when the dashboard is open on that very
 # machine. They now arrive through the same queue as receipts, so a phone or a
-# second laptop can print a shelf label too — this station owns the printer and
-# everyone else queues work for it.
+# second laptop can print a shelf label too.
 #
-# The ZPL goes to CUPS in raw mode: no driver interprets it, the printer reads
-# the label language itself.
+# Two ways to reach the printer, the same two the receipt printer supports:
+#
+#   cups:QUEUE_NAME   a Zebra plugged into this machine by USB. CUPS sends the
+#                     bytes raw, so no driver interprets the label language.
+#   192.168.0.60      a Zebra on the Wi-Fi. Raw ZPL straight to port 9100 —
+#                     nothing to install on the machine, and the printer stops
+#                     belonging to whichever laptop it happens to be cabled to.
 
-LABEL_PRINTER = os.environ.get(
-    "LABEL_PRINTER", "Zebra_Technologies_ZTC_ZD230_203dpi_ZPL"
-)
 
-
-def print_label(payload, log=print):
+def print_label(payload, cfg, log=print):
     """Send a queued label's ZPL to the Zebra. Returns (ok, error)."""
     zpl = (payload or {}).get("zpl") or ""
     if not zpl:
         return False, "No ZPL in the label job"
 
+    target = (cfg.get("label_printer") or "").strip()
+    if not target:
+        return False, "No label printer configured — set LABEL_PRINTER in the station's .env"
+
+    if target.startswith("cups:"):
+        return _label_via_cups(target[5:], zpl)
+    return _label_via_network(target, zpl)
+
+
+def _label_via_network(target, zpl):
+    host, port = _split_address(target)
+    try:
+        with socket.create_connection((host, port), timeout=6) as sock:
+            sock.sendall(zpl.encode("utf-8"))
+        return True, None
+    except OSError as exc:
+        return False, "Could not reach the label printer at %s (%s)" % (target, exc)
+
+
+def _label_via_cups(queue, zpl):
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -535,7 +569,7 @@ def print_label(payload, log=print):
             tmp_path = fp.name
 
         result = subprocess.run(
-            ["lp", "-d", LABEL_PRINTER, "-o", "raw", tmp_path],
+            ["lp", "-d", queue, "-o", "raw", tmp_path],
             capture_output=True, text=True, timeout=20,
         )
         if result.returncode != 0:
@@ -603,7 +637,7 @@ def start_worker(log=print):
                         if kind == "label":
                             # A label goes to the Zebra via CUPS, not to the
                             # ESC/POS receipt printer.
-                            ok, err = print_label(payload, log)
+                            ok, err = print_label(payload, cfg, log)
                         else:
                             data = render_test(payload) if kind == "test" else render_receipt(payload)
                             ok, err = printer.send(data)
@@ -632,6 +666,7 @@ def start_worker(log=print):
     threading.Thread(target=loop, name="receipt-worker", daemon=True).start()
     STATE["running"] = True
     log("   Receipts       ON · station '%s' · printer %s" % (cfg["station"], cfg["printer"]))
+    log("   Labels         ON · printer %s" % cfg["label_printer"])
     return STATE
 
 

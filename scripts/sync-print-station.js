@@ -138,6 +138,21 @@ if [ -z "$PRINTER" ]; then
   fi
 fi
 
+# The Zebra that prints barcode labels. On the network it needs no driver at
+# all; on USB it needs a CUPS queue, same as the receipt printer.
+LABELS="\${LABEL_PRINTER:-}"
+if [ -z "$LABELS" ]; then
+  echo ""
+  echo "  Barcode label printer (Zebra). Leave blank if you don't print labels."
+  echo "    - on the Wi-Fi:  type its IP, e.g. 192.168.0.60"
+  echo "    - on USB:        type  cups:QUEUE_NAME"
+  if [ "$ASK" = "1" ]; then
+    echo "  Queues on this Mac:"
+    lpstat -p 2>/dev/null | awk '{print "    - cups:" $2}' || true
+  fi
+  prompt LABELS "  Label printer [skip]: " ""
+fi
+
 if [ -z "\${STATION_NAME:-}" ]; then
   prompt STATION_NAME "  A name for this till [$(hostname -s)]: " "$(hostname -s)"
 fi
@@ -148,6 +163,7 @@ SUPABASE_URL=${SUPABASE_URL}
 SUPABASE_ANON_KEY=${SUPABASE_ANON}
 STATION_KEY=$STATION_KEY
 RECEIPT_PRINTER=$PRINTER
+LABEL_PRINTER=$LABELS
 STATION_NAME=$STATION_NAME
 ENVEOF
 chmod 600 "$DIR/.env"
