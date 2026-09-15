@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useEvent } from '../cms/hooks';
 import { supabase } from '../utils/supabase';
 import { formatTimeRange12h } from '../utils/timeFormat';
+import { eventExternalUrl, eventHost } from '../utils/eventLink';
 
 // Category → gradient, used as the cover when an event has no image of its own.
 const CATEGORY_GRADIENT = {
@@ -372,6 +373,9 @@ export default function EventDetail() {
   const fullTitle = `${event.title}${event.italic_accent ? ' ' + event.italic_accent : ''}`;
   const tag = CATEGORY_LABEL[event.category] || event.category || 'Events';
   const isPaid = event.is_paid && event.ticket_price > 0;
+  // Booked on the host's own site (Luma and the like) rather than here.
+  const externalUrl = eventExternalUrl(event);
+  const externalHost = eventHost(event);
   // Hosts: prefer the multi-host `hosts` array; fall back to the legacy single
   // host_name/host_url; finally the cafe. Always at least one entry.
   const rawHosts = Array.isArray(event.hosts) ? event.hosts.filter((h) => h && h.name) : [];
@@ -488,11 +492,27 @@ export default function EventDetail() {
               </div>
             </div>
 
+            {/* An event booked on another site has no registration here to
+                open — offering our form would take a booking the host never
+                sees. Links out instead. Visitors normally reach that site
+                straight from the listings; this page is what they get from an
+                old link or a shared URL. */}
             <div className="evd-reg">
               <div className="evd-reg-head">Registration</div>
               <div className="evd-reg-body">
-                <p>Welcome! To join the event, please register below.</p>
-                <button type="button" className="evd-reg-btn" onClick={() => { setSubmitted(false); setShowForm(true); }}>Register</button>
+                {externalUrl ? (
+                  <>
+                    <p>This one is booked on {externalHost}. Tickets and details are on their page.</p>
+                    <a className="evd-reg-btn" href={externalUrl} target="_blank" rel="noopener noreferrer">
+                      Book on {externalHost} ↗
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <p>Welcome! To join the event, please register below.</p>
+                    <button type="button" className="evd-reg-btn" onClick={() => { setSubmitted(false); setShowForm(true); }}>Register</button>
+                  </>
+                )}
               </div>
             </div>
 

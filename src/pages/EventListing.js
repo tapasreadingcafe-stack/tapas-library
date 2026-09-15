@@ -58,6 +58,11 @@ CREATE POLICY "open" ON event_registrations FOR ALL USING (true) WITH CHECK (tru
 CREATE POLICY "open" ON event_attendance FOR ALL USING (true) WITH CHECK (true);
 `;
 
+/** "lu.ma" out of "https://lu.ma/abc" — what to show on the card. */
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'linked'; }
+}
+
 export default function EventListing() {
   const navigate = useNavigate();
   const { isReadOnly, canManageEvents } = usePermission();
@@ -198,6 +203,13 @@ export default function EventListing() {
                 {event.is_paid && <span style={{ ...statusBadge(''), background: '#f39c1220', color: '#f39c12' }}>₹{event.ticket_price}</span>}
                 {event.capacity && <span style={{ ...statusBadge(''), background: '#3498db20', color: '#3498db' }}>{event.capacity} capacity</span>}
                 {event.event_type === 'recurring' && <span style={{ ...statusBadge(''), background: '#9b59b620', color: '#9b59b6' }}>Recurring</span>}
+                {/* Booked on someone else's site — no RSVPs will ever land
+                    here, so say so on the card rather than in the edit form. */}
+                {event.external_url && (
+                  <span style={{ ...statusBadge(''), background: '#667eea20', color: '#667eea' }}>
+                    🔗 {hostOf(event.external_url)}
+                  </span>
+                )}
               </div>
               {event.description && <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', lineHeight: '1.4' }}>{event.description.slice(0, 100)}{event.description.length > 100 ? '...' : ''}</p>}
             </div>

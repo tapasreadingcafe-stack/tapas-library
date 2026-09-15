@@ -107,6 +107,16 @@ supabase functions deploy razorpay-webhook
 
 Once deployed, configure Razorpay to POST `payment.captured`, `order.paid`, and `payment.failed` webhooks to the `razorpay-webhook` function URL.
 
+Optional, for the "Fill in from link" button on the event form (reads a Luma /
+Insider / Eventbrite page and fills in the title, photo, date and price):
+
+```sh
+supabase functions deploy fetch-event-link
+```
+
+No secrets needed. Without it the event form still works — staff type the
+details in themselves.
+
 ## Deployment — two Vercel projects, one repo
 
 ### Staff dashboard — `dashboard.tapasreadingcafe.com`

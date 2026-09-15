@@ -20,3 +20,6 @@ printer_bridge/.receipt-printer
 public/print-station.py
 public/print-station-logo.pbm
 public/install-print-station.sh
+
+# Supabase CLI scratch (version check cache, project link ref)
+supabase/.temp/

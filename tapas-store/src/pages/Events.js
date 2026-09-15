@@ -6,6 +6,7 @@ import { useEvents } from '../cms/hooks';
 import PageRenderer from '../blocks/PageRenderer';
 import { useSiteContent } from '../context/SiteContent';
 import { formatTime12h } from '../utils/timeFormat';
+import { eventExternalUrl, eventHost } from '../utils/eventLink';
 
 const GREEN = '#3f6b1f';    // dark leaf green — titles, dots, links, month header
 const LIME = '#caf27e';     // brand lime — filled blocks (date box, "today")
@@ -29,6 +30,10 @@ function normalize(rows) {
         timeLabel: formatTime12h(e.start_time),
         isPaid: !!e.is_paid,
         price: Number(e.ticket_price) || 0,
+        // Set for an event booked on someone else's site — the card then
+        // links there rather than to our own detail page.
+        href: eventExternalUrl(e),
+        host: eventHost(e),
       }));
   }
   return UPCOMING_EVENTS.map((e) => ({
@@ -39,6 +44,8 @@ function normalize(rows) {
     timeLabel: e.time || '',
     isPaid: false,
     price: 0,
+    href: null,
+    host: null,
   }));
 }
 
@@ -245,8 +252,8 @@ function EventsLegacy() {
               <div className="evl-list">
                 {listEvents.map((e) => {
                   const [y, m, d] = e.iso.split('-');
-                  return (
-                    <Link className="evl-item" key={e.slug} to={`/events/${e.slug}`}>
+                  const body = (
+                    <>
                       <div className="evl-datecol">
                         <div className="evl-datebox">
                           <span className="m">{MON_SHORT[Number(m) - 1]}</span>
@@ -261,9 +268,18 @@ function EventsLegacy() {
                           {e.isPaid && e.price > 0 && <span className="evl-price">₹{e.price}</span>}
                         </div>
                         {e.description && <p className="evl-desc">{e.description}</p>}
-                        <span className="evl-more">Read More</span>
+                        {/* Naming the site is the point: someone about to leave
+                            tapasreadingcafe.com should know it before tapping. */}
+                        <span className="evl-more">{e.host ? `Book on ${e.host} ↗` : 'Read More'}</span>
                       </div>
-                    </Link>
+                    </>
+                  );
+                  // Hosted elsewhere → a real anchor. A router Link would read
+                  // the URL as an in-app path and land on the 404 page.
+                  return e.href ? (
+                    <a className="evl-item" key={e.slug} href={e.href} target="_blank" rel="noopener noreferrer">{body}</a>
+                  ) : (
+                    <Link className="evl-item" key={e.slug} to={`/events/${e.slug}`}>{body}</Link>
                   );
                 })}
               </div>

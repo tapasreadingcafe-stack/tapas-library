@@ -211,6 +211,19 @@ export default function EventManage() {
         </div>
         {event.description && <p style={{ fontSize: 14, color: '#444', lineHeight: 1.6, marginTop: 12 }}>{event.description}</p>}
 
+        {/* Booked elsewhere: the register form on our site is hidden for this
+            event, so this list will only ever hold registrations staff add by
+            hand. Better said here than discovered as an empty page. */}
+        {event.external_url && (
+          <div style={{ marginTop: 14, padding: '11px 13px', borderRadius: 10, background: '#f5f6ff', border: '1px solid #d9ddfb', fontSize: 13, color: '#3a3f8f', lineHeight: 1.55 }}>
+            🔗 People book this one on{' '}
+            <a href={event.external_url} target="_blank" rel="noopener noreferrer" style={{ color: '#4a4fc4', fontWeight: 600 }}>
+              {(() => { try { return new URL(event.external_url).hostname.replace(/^www\./, ''); } catch { return 'another site'; } })()}
+            </a>
+            , so their guest list lives there. Anything below is only what staff added here.
+          </div>
+        )}
+
         {!isReadOnly && canManageEvents && (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
             <button onClick={() => setShowAdd(v => !v)} style={btnPrimary}>+ Add registration</button>

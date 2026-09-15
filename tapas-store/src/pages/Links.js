@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useEvents } from '../cms/hooks';
 import { formatTime12h } from '../utils/timeFormat';
+import { eventExternalUrl, eventHost } from '../utils/eventLink';
 import {
   CAFE_ADDRESS, CAFE_PHONES, CAFE_EMAIL, CAFE_LINKS,
   CAFE_TAGLINE, CAFE_FOUNDER, CAFE_COORDS, CAFE_HOURS,
@@ -297,8 +298,13 @@ export default function Links() {
               const cover = e.cover_url || e.image_url;
               const time = formatTime12h(e.start_time);
               const price = e.is_paid && Number(e.ticket_price) > 0 ? `₹${Number(e.ticket_price)}` : 'Free';
-              return (
-                <Link className="lk-ev" key={e.slug} to={`/events/${e.slug}`}>
+              // An event booked on Luma (or anywhere else) goes straight there.
+              // Routing it through our own page would only add a tap and a
+              // register form that can't take the booking.
+              const away = eventHost(e);
+              const href = eventExternalUrl(e);
+              const inner = (
+                <>
                   <div className="lk-ev-thumb-wrap">
                     <span
                       className="lk-ev-thumb"
@@ -313,11 +319,18 @@ export default function Links() {
                       {e.title}{e.italic_accent ? ` ${e.italic_accent}` : ''}
                     </div>
                     <div className="lk-ev-meta">
-                      {[`${d.getDate()} ${MON_SHORT[d.getMonth()]}`, time, price].filter(Boolean).join(' · ')}
+                      {[`${d.getDate()} ${MON_SHORT[d.getMonth()]}`, time, price, away].filter(Boolean).join(' · ')}
                     </div>
                   </div>
-                  <span className="lk-ev-chev" aria-hidden="true">›</span>
-                </Link>
+                  {/* ↗ rather than › so it's clear before the tap that this one
+                      leaves the site. */}
+                  <span className="lk-ev-chev" aria-hidden="true">{away ? '↗' : '›'}</span>
+                </>
+              );
+              return away ? (
+                <a className="lk-ev" key={e.slug} href={href} target="_blank" rel="noopener noreferrer">{inner}</a>
+              ) : (
+                <Link className="lk-ev" key={e.slug} to={`/events/${e.slug}`}>{inner}</Link>
               );
             })}
           </section>

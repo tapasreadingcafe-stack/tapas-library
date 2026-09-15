@@ -6,6 +6,11 @@ import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { uploadAsset } from '../utils/assetLibrary';
 
+/** "lu.ma" out of "https://lu.ma/abc" — the bit worth showing a human. */
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'that site'; }
+}
+
 export default function EventCreate() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -23,6 +28,7 @@ export default function EventCreate() {
   const [paymentColsReady, setPaymentColsReady] = useState(true);
   const [tierColsReady, setTierColsReady] = useState(true);
   const [contactColsReady, setContactColsReady] = useState(true);
+  const [externalColReady, setExternalColReady] = useState(true);
   React.useEffect(() => {
     supabase.from('events').select('payment_qr_url').limit(1)
       .then(({ error }) => setPaymentColsReady(!error));
@@ -30,7 +36,15 @@ export default function EventCreate() {
       .then(({ error }) => setTierColsReady(!error));
     supabase.from('events').select('contact_phone').limit(1)
       .then(({ error }) => setContactColsReady(!error));
+    supabase.from('events').select('external_url').limit(1)
+      .then(({ error }) => setExternalColReady(!error));
   }, []);
+
+  // Reading an outside event page (Luma and the like) happens in an edge
+  // function — those sites send no CORS headers, so the browser can't read
+  // their HTML itself. `fetchNote` carries whatever came back to the field.
+  const [fetching, setFetching] = useState(false);
+  const [fetchNote, setFetchNote] = useState(null);
 
   // ── Ticket options ─────────────────────────────────────────────────────────
   const addTier    = () => setForm(f => ({ ...f, ticket_tiers: [...(f.ticket_tiers || []), { label: '', price: '' }] }));
@@ -48,6 +62,8 @@ export default function EventCreate() {
     // Payment (20260827_event_payments.sql)
     payment_qr_url: '', payment_link: '', payment_note: '', payment_proof_enabled: false,
     ticket_tiers: [],
+    // Set when the event lives on someone else's site (20260915_event_external_link.sql)
+    external_url: '',
     contact_phone: '', contact_label: '',
     // CMS display fields — drive how the event appears on the customer site.
     slug: '', italic_accent: '',
@@ -69,6 +85,7 @@ export default function EventCreate() {
           payment_note: data.payment_note || '', payment_proof_enabled: data.payment_proof_enabled || false,
           ticket_tiers: Array.isArray(data.ticket_tiers) ? data.ticket_tiers.map(t => ({ label: t.label || '', price: t.price ?? '' })) : [],
           contact_phone: data.contact_phone || '', contact_label: data.contact_label || '',
+          external_url: data.external_url || '',
           slug: data.slug || '', italic_accent: data.italic_accent || '',
           category: data.category || 'book-club', badge: data.badge || '',
           cta_type: data.cta_type || 'rsvp', chip_color: data.chip_color || 'lavender',
@@ -89,6 +106,81 @@ export default function EventCreate() {
 
   const slugify = (s) =>
     s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+
+  // Which form fields a fetched page can fill, and what to call them when
+  // reporting back what was filled.
+  const FETCHABLE = {
+    title: 'title', description: 'description', image_url: 'cover image',
+    start_date: 'date', start_time: 'start time', end_date: 'end date',
+    end_time: 'end time', location: 'location', ticket_price: 'price',
+  };
+
+  /* Read the linked page and fill in what it tells us.
+   *
+   * Deliberately overwrites — someone who presses this button is asking for
+   * the host's version of the details. What it never touches is a field the
+   * page had nothing to say about. */
+  const handleFetchDetails = async () => {
+    const url = (form.external_url || '').trim();
+    if (!url) return toast.warning('Paste the event link first');
+    setFetching(true);
+    setFetchNote(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-event-link', { body: { url } });
+      // A missing function and a page we couldn't read are different problems
+      // with the same shape, so say which one this is.
+      if (error) {
+        const status = error.context?.status;
+        // The function replies with its own message in the body; invoke()
+        // surfaces only a generic error, so dig the real one out.
+        let detail = '';
+        try { detail = (await error.context?.json())?.error || ''; } catch { /* body wasn't json */ }
+        // An undeployed function is the likeliest thing to go wrong here, and
+        // it doesn't announce itself: the request never completes (no CORS
+        // headers on the gateway's 404), so the browser reports a bare
+        // "failed to send a request" with no status at all. Say the useful
+        // thing rather than passing that along.
+        if (status === 404 || error.name === 'FunctionsFetchError' || status === undefined) {
+          throw new Error('Auto-fill isn’t switched on yet — it needs the fetch-event-link function deployed once, from Supabase → Edge Functions. Until then, fill the details in below by hand; everything else works normally.');
+        }
+        throw new Error(detail || error.message || 'Could not read that page.');
+      }
+      if (data?.error) throw new Error(data.error);
+
+      const fields = data?.fields || {};
+      const filled = [];
+      setForm((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(FETCHABLE)) {
+          const v = fields[key];
+          if (v === undefined || v === null || v === '') continue;
+          next[key] = v;
+          filled.push(FETCHABLE[key]);
+        }
+        // Price only means anything alongside the paid flag, and a free event
+        // shouldn't be flipped to paid by a page that stated ₹0.
+        if (typeof fields.is_paid === 'boolean') next.is_paid = fields.is_paid;
+        else if (Number(fields.ticket_price) > 0) next.is_paid = true;
+        return next;
+      });
+
+      if (!filled.length) {
+        setFetchNote({ tone: 'warn', text: 'That page didn’t give us anything usable — fill the details in below.' });
+      } else {
+        const missing = Object.values(FETCHABLE).filter((label) => !filled.includes(label));
+        setFetchNote({
+          tone: 'ok',
+          text: `Filled in ${filled.join(', ')} from ${data.source || 'the link'}.`
+            + (missing.length ? ` Not on the page: ${missing.join(', ')} — add those yourself if you need them.` : ''),
+        });
+        toast.success('Details filled in from the link');
+      }
+    } catch (err) {
+      setFetchNote({ tone: 'warn', text: err.message || String(err) });
+    } finally {
+      setFetching(false);
+    }
+  };
 
   // Downscale to max 1200px / re-encode as JPEG before upload so we don't
   // push multi-MB phone photos to the image host (and so covers load fast on
@@ -161,6 +253,13 @@ export default function EventCreate() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.start_date) return toast.warning('Title and start date are required');
+    // A link typed as "lu.ma/xyz" would be saved as a relative path and send
+    // people to tapasreadingcafe.com/lu.ma/xyz. Catch it here rather than on
+    // the customer's phone.
+    const ext = (form.external_url || '').trim();
+    if (ext && !/^https?:\/\//i.test(ext)) {
+      return toast.warning('The event link must start with https://');
+    }
     setSaving(true);
     try {
       // Auto-generate a unique-ish slug from the title for new events when
@@ -221,6 +320,11 @@ export default function EventCreate() {
       } else {
         delete payload.ticket_tiers;
       }
+      if (externalColReady) {
+        payload.external_url = (form.external_url || '').trim() || null;
+      } else {
+        delete payload.external_url;
+      }
       if (paymentColsReady) {
         payload.payment_qr_url = form.payment_qr_url || null;
         payload.payment_link = form.payment_link || null;
@@ -245,6 +349,12 @@ export default function EventCreate() {
   };
 
   if (!loaded) return <p style={{ padding: '20px', color: '#999' }}>Loading...</p>;
+
+  // With a link set, nothing on this page that concerns OUR registrations has
+  // anything to act on — no one can RSVP here, so a waitlist can't fill and a
+  // payment QR is never shown. The price still shows in our listings, so that
+  // stays.
+  const isExternal = externalColReady && !!(form.external_url || '').trim();
 
   return (
     <div className="ec-page">
@@ -277,6 +387,20 @@ export default function EventCreate() {
         .ec-linkbtn:hover { text-decoration: underline; }
 
         .ec-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        /* Event link + its fetch button */
+        .ec-fetch-row { display: flex; gap: 8px; align-items: stretch; }
+        .ec-fetch-row input { flex: 1 1 auto; min-width: 0; }
+        .ec-fetch-btn { flex-shrink: 0; padding: 0 16px; border-radius: 9px; border: 1px solid #667eea;
+                        background: #eef0fe; color: #4a4fc4; font-weight: 600; font-size: 13.5px;
+                        font-family: inherit; cursor: pointer; white-space: nowrap; }
+        .ec-fetch-btn:hover:not(:disabled) { background: #667eea; color: #fff; }
+        .ec-fetch-btn:disabled { opacity: 0.55; cursor: default; }
+        .ec-fetch-note { font-size: 12.5px; line-height: 1.5; margin: 8px 0 0; padding: 9px 11px; border-radius: 8px; }
+        .ec-fetch-note.is-ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+        .ec-fetch-note.is-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+        .ec-ext-banner { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #f5f6ff;
+                         border: 1px solid #d9ddfb; font-size: 13px; line-height: 1.55; color: #3a3f8f; }
 
         .ec-check { display: flex; align-items: center; gap: 11px; padding: 13px 15px; border: 1px solid #eceef1; border-radius: 10px; background: #fafbfc; cursor: pointer; font-size: 14.5px; color: #374151; }
         .ec-check + .ec-check { margin-top: 10px; }
@@ -327,6 +451,8 @@ export default function EventCreate() {
           .ec-page { padding: 16px 12px 32px; }
           .ec-card { padding: 18px 16px; }
           .ec-row { grid-template-columns: 1fr; }
+          .ec-fetch-row { flex-direction: column; }
+          .ec-fetch-btn { padding: 11px 16px; }
           .ec-details > summary { padding: 16px; }
           .ec-details-body { padding: 0 16px 18px; }
         }
@@ -339,6 +465,59 @@ export default function EventCreate() {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Hosted elsewhere. First on the page because it changes what the
+              rest of the form is for: with a link set, our register form is
+              never shown and these fields only decide how the event LOOKS in
+              the listings before someone taps through. */}
+          <section className="ec-card">
+            <h2 className="ec-card-title">Event link <span className="ec-opt">optional — for events booked on another site</span></h2>
+            {!externalColReady ? (
+              <div style={{ padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
+                ⚠️ This needs one database update first — run{' '}
+                <code style={{ fontFamily: 'monospace', fontSize: 12 }}>supabase/migrations/20260915_event_external_link.sql</code>{' '}
+                in the Supabase SQL editor. Everything else on this page saves normally.
+              </div>
+            ) : (
+              <>
+                <p className="ec-note" style={{ marginTop: -4 }}>
+                  Booking on Luma, Insider, or the host’s own page? Paste that link and the event still
+                  shows up everywhere ours do — the events page, the calendar, the links page — but tapping
+                  it opens their page instead of ours, and we don’t collect registrations for it.
+                </p>
+                <div className="ec-field">
+                  <label>Link to the event <span className="ec-opt">(leave blank for events we run ourselves)</span></label>
+                  <div className="ec-fetch-row">
+                    <input type="url" value={form.external_url}
+                      onChange={e => { set('external_url', e.target.value); setFetchNote(null); }}
+                      placeholder="https://lu.ma/your-event" disabled={isReadOnly} />
+                    <button type="button" className="ec-fetch-btn"
+                      onClick={handleFetchDetails}
+                      disabled={isReadOnly || fetching || !(form.external_url || '').trim()}>
+                      {fetching ? 'Reading…' : '↓ Fill in from link'}
+                    </button>
+                  </div>
+                  <p className="ec-hint">
+                    “Fill in from link” reads the page and fills the title, photo, date, time and price below.
+                    Check them over — anything it couldn’t find, you can type in yourself.
+                  </p>
+                  {fetchNote && (
+                    <p className={`ec-fetch-note ${fetchNote.tone === 'ok' ? 'is-ok' : 'is-warn'}`}>
+                      {fetchNote.tone === 'ok' ? '✓ ' : '⚠️ '}{fetchNote.text}
+                    </p>
+                  )}
+                </div>
+                {(form.external_url || '').trim() && (
+                  <div className="ec-ext-banner">
+                    People who tap this event on the website go straight to{' '}
+                    <strong>{hostOf(form.external_url)}</strong>, so our own register form never opens for it —
+                    the payment QR and waitlist settings are hidden below. Everything else still matters:
+                    the title, photo, date and price are what the event looks like in our listings.
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
           {/* Event details */}
           <section className="ec-card">
             <h2 className="ec-card-title">Event details</h2>
@@ -408,10 +587,12 @@ export default function EventCreate() {
               <label>Capacity <span className="ec-opt">(leave empty for unlimited)</span></label>
               <input type="number" value={form.capacity} onChange={e => set('capacity', e.target.value)} placeholder="e.g. 30" min="1" disabled={isReadOnly} />
             </div>
-            <label className="ec-check">
-              <input type="checkbox" checked={form.waitlist_enabled} onChange={e => set('waitlist_enabled', e.target.checked)} disabled={isReadOnly} />
-              <span>Enable waitlist when full</span>
-            </label>
+            {!isExternal && (
+              <label className="ec-check">
+                <input type="checkbox" checked={form.waitlist_enabled} onChange={e => set('waitlist_enabled', e.target.checked)} disabled={isReadOnly} />
+                <span>Enable waitlist when full</span>
+              </label>
+            )}
 
             {/* Per-event contact. Blank falls back to the cafe's own number,
                 which is what every existing event does. */}
@@ -443,11 +624,17 @@ export default function EventCreate() {
           {/* Tickets */}
           <section className="ec-card">
             <h2 className="ec-card-title">Tickets</h2>
+            {isExternal && (
+              <p className="ec-note" style={{ marginTop: -4 }}>
+                For a linked event this is only what our listings say the price is —
+                people actually pay on {hostOf(form.external_url)}.
+              </p>
+            )}
             <label className="ec-check">
               <input type="checkbox" checked={form.is_paid} onChange={e => set('is_paid', e.target.checked)} disabled={isReadOnly} />
               <span>This is a paid event</span>
             </label>
-            {form.is_paid && (form.ticket_tiers || []).length === 0 && (
+            {form.is_paid && (isExternal || (form.ticket_tiers || []).length === 0) && (
               <div className="ec-field" style={{ marginTop: 14 }}>
                 <label>Ticket price (₹)</label>
                 <input type="number" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0" min="0" disabled={isReadOnly} />
@@ -456,7 +643,7 @@ export default function EventCreate() {
 
             {/* Named price options. With none, the single price above applies —
                 which is how every existing event keeps working. */}
-            {form.is_paid && tierColsReady && (
+            {form.is_paid && tierColsReady && !isExternal && (
               <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #eef0f3' }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>Price options <span className="ec-opt">optional</span></h3>
                 <p style={{ fontSize: 12, color: '#999', margin: '0 0 12px' }}>
@@ -500,7 +687,7 @@ export default function EventCreate() {
             )}
 
             {/* How the registrant pays. Only meaningful for a paid event. */}
-            {form.is_paid && !paymentColsReady && (
+            {form.is_paid && !paymentColsReady && !isExternal && (
               <div style={{ marginTop: 16, padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
                 ⚠️ Payment options need one database update first — run{' '}
                 <code style={{ fontFamily: 'monospace', fontSize: 12 }}>supabase/migrations/20260827_event_payments.sql</code>{' '}
@@ -508,7 +695,7 @@ export default function EventCreate() {
               </div>
             )}
 
-            {form.is_paid && paymentColsReady && (
+            {form.is_paid && paymentColsReady && !isExternal && (
               <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid #eef0f3' }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>How people pay</h3>
                 <p style={{ fontSize: 12, color: '#999', margin: '0 0 14px' }}>
