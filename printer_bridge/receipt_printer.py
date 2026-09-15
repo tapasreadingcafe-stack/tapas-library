@@ -636,6 +636,25 @@ def start_worker(log=print):
 
 
 if __name__ == "__main__":
+    import sys
+
+    # `--serve` runs the print station itself and blocks, which is what the
+    # launchd agent on a counter laptop calls. Without it the script prints a
+    # sample receipt as text, which is the handy way to check formatting on a
+    # machine with no printer attached.
+    if "--serve" in sys.argv:
+        start_worker()
+        if not STATE.get("running"):
+            print(STATE.get("detail") or "The print station could not start.")
+            raise SystemExit(1)
+        print("Tapas print station running as '%s'. Ctrl+C to stop." % STATE.get("station"))
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            print("\nStopped.")
+        raise SystemExit(0)
+
     # Preview a receipt as text without a printer: python3 receipt_printer.py
     sample = {
         "shop": {"name": "Tapas Reading Cafe", "lines": ["2nd Floor, 2628, 27th Main Rd, HSR Layout", "Bengaluru 560102"], "gstin": None},

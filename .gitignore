@@ -15,3 +15,8 @@ tests/visual/output/
 
 # Receipt print station: discovered printer address (per machine)
 printer_bridge/.receipt-printer
+
+# Generated at build time from printer_bridge/ — see scripts/sync-print-station.js
+public/print-station.py
+public/print-station-logo.pbm
+public/install-print-station.sh
