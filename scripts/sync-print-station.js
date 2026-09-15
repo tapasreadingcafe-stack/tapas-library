@@ -154,6 +154,8 @@ chmod 600 "$DIR/.env"
 
 # Auto-start at login, and restart if it ever stops — a till that silently
 # stopped printing after a reboot is the failure that actually costs money.
+# python3 -u: without it stdout is block-buffered when it is not a terminal and
+# station.log stays empty, which is exactly when someone needs to read it.
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -165,6 +167,7 @@ cat > "$PLIST" <<PLISTEOF
   <array>
     <string>/usr/bin/env</string>
     <string>python3</string>
+    <string>-u</string>
     <string>$DIR/receipt_printer.py</string>
     <string>--serve</string>
   </array>
