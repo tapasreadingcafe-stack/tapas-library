@@ -81,40 +81,66 @@ if [ -f "$DIR/.env" ]; then
   EXISTING_KEY="$(grep -E '^STATION_KEY=' "$DIR/.env" | cut -d= -f2- || true)"
 fi
 
-echo ""
-echo "  Open the dashboard on this Mac:  Settings -> Devices -> Receipt printer"
-echo "  and copy the station key."
-echo ""
-if [ -n "$EXISTING_KEY" ]; then
-  read -r -p "  Station key [press Enter to keep the saved one]: " STATION_KEY < /dev/tty
-  STATION_KEY="\${STATION_KEY:-$EXISTING_KEY}"
-else
-  read -r -p "  Station key: " STATION_KEY < /dev/tty
-fi
-[ -n "$STATION_KEY" ] || { echo "  No key given — stopping."; exit 1; }
+# Every answer can come from the environment instead of a prompt, so this can
+# be run unattended — over SSH, from a setup script, or to re-point an existing
+# till without a person sitting in front of it:
+#
+#   STATION_KEY=... RECEIPT_PRINTER=cups:KP307_Receipt bash install-print-station.sh
+#
+# Anything not supplied is asked for, so the plain curl-to-bash run is unchanged.
+ASK=1
+[ -t 0 ] || ASK=0            # piped into bash with no terminal to read from
+[ -e /dev/tty ] || ASK=0
 
-echo ""
-echo "  How is the receipt printer connected?"
-echo "    1) USB to this Mac      (set it up in System Settings -> Printers first)"
-echo "    2) On the Wi-Fi or LAN  (recommended — not tied to any one laptop)"
-read -r -p "  Choose 1 or 2 [2]: " CONN < /dev/tty
-CONN="\${CONN:-2}"
+prompt() {                    # prompt <varname> <question> <default>
+  local __var="$1" __q="$2" __def="\${3:-}" __ans=""
+  if [ "$ASK" = "1" ]; then
+    read -r -p "$__q" __ans < /dev/tty || __ans=""
+  fi
+  printf -v "$__var" '%s' "\${__ans:-$__def}"
+}
 
-if [ "$CONN" = "1" ]; then
+STATION_KEY="\${STATION_KEY:-}"
+if [ -z "$STATION_KEY" ]; then
   echo ""
-  echo "  Printer queues on this Mac:"
-  lpstat -p 2>/dev/null | awk '{print "    - " $2}' || echo "    (none found)"
-  read -r -p "  Queue name: " QUEUE < /dev/tty
-  PRINTER="cups:\${QUEUE}"
-else
+  echo "  Open the dashboard on this Mac:  Settings -> Devices -> Receipt printer"
+  echo "  and copy the station key."
   echo ""
-  echo "  Leave blank to find the printer on the network automatically."
-  read -r -p "  Printer IP address [auto]: " IP < /dev/tty
-  PRINTER="\${IP:-auto}"
+  if [ -n "$EXISTING_KEY" ]; then
+    prompt STATION_KEY "  Station key [press Enter to keep the saved one]: " "$EXISTING_KEY"
+  else
+    prompt STATION_KEY "  Station key: " ""
+  fi
+fi
+[ -n "$STATION_KEY" ] || {
+  echo "  No station key. Pass STATION_KEY=... or run this in a terminal."
+  exit 1
+}
+
+PRINTER="\${RECEIPT_PRINTER:-}"
+if [ -z "$PRINTER" ]; then
+  echo ""
+  echo "  How is the receipt printer connected?"
+  echo "    1) USB to this Mac      (set it up in System Settings -> Printers first)"
+  echo "    2) On the Wi-Fi or LAN  (recommended — not tied to any one laptop)"
+  prompt CONN "  Choose 1 or 2 [2]: " "2"
+  if [ "$CONN" = "1" ]; then
+    echo ""
+    echo "  Printer queues on this Mac:"
+    lpstat -p 2>/dev/null | awk '{print "    - " $2}' || echo "    (none found)"
+    prompt QUEUE "  Queue name: " ""
+    PRINTER="cups:\${QUEUE}"
+  else
+    echo ""
+    echo "  Leave blank to find the printer on the network automatically."
+    prompt IP "  Printer IP address [auto]: " "auto"
+    PRINTER="$IP"
+  fi
 fi
 
-read -r -p "  A name for this till [$(hostname -s)]: " STATION_NAME < /dev/tty
-STATION_NAME="\${STATION_NAME:-$(hostname -s)}"
+if [ -z "\${STATION_NAME:-}" ]; then
+  prompt STATION_NAME "  A name for this till [$(hostname -s)]: " "$(hostname -s)"
+fi
 
 cat > "$DIR/.env" <<ENVEOF
 # Tapas print station — this file holds a secret. Do not share it.
