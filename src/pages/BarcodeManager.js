@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { printLabel } from '../utils/labelPrinter';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
@@ -527,8 +528,9 @@ export default function BarcodeManager() {
     win.document.close();
   };
 
-  // Direct print: generate raw ZPL and send to Zebra via Flask API (port 5050)
-  const PRINT_API = 'http://127.0.0.1:5050';
+  // Direct print: build raw ZPL and hand it to printLabel, which uses the
+  // bridge on this machine when there is one and the print queue otherwise —
+  // so this works from a phone or a second laptop, not just the shop Mac.
   const [directPrinting, setDirectPrinting] = useState(false);
 
   // Mark the just-printed copies as label-printed (from the confirm popup).
@@ -599,26 +601,18 @@ export default function BarcodeManager() {
 
       const zpl = generateZPL(labels, template);
 
-      const res = await fetch(`${PRINT_API}/api/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zpl }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const copyIds = selected.map(c => c.id);
-        if (copyIds.length > 0) {
-          // Ask whether the labels actually printed; on Yes we mark those copies
-          // printed so scanning skips them next time.
-          setPrintConfirm({ copyIds, count: selected.length + selectedSets.length });
-        } else {
-          toast.success(`Printed ${selectedSets.length} label(s)!`);
-        }
-      } else {
-        toast.error('Print failed: ' + (data.message || data.error || 'Unknown error'));
+      const { via } = await printLabel(zpl);
+      const copyIds = selected.map(c => c.id);
+      if (via === 'queue') toast.success('Sent to the print station at the counter');
+      if (copyIds.length > 0) {
+        // Ask whether the labels actually printed; on Yes we mark those copies
+        // printed so scanning skips them next time.
+        setPrintConfirm({ copyIds, count: selected.length + selectedSets.length });
+      } else if (via === 'local') {
+        toast.success(`Printed ${selectedSets.length} label(s)!`);
       }
     } catch (err) {
-      toast.error('Cannot reach label printer service. Is it running on port 5050?');
+      toast.error(`Could not send the labels to the printer: ${err.message || err}`);
     }
     setDirectPrinting(false);
   };

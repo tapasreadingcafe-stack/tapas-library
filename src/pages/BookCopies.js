@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { printLabel } from '../utils/labelPrinter';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
@@ -20,7 +21,6 @@ export default function BookCopies() {
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [showPriceOnLabel, setShowPriceOnLabel] = useState(true);
   const [directPrinting, setDirectPrinting] = useState(false);
-  const PRINT_API = 'http://127.0.0.1:5050';
 
   useEffect(() => { checkAndFetch(); }, [bookId]);
 
@@ -136,19 +136,12 @@ export default function BookCopies() {
       }
 
       const zpl = generateZPL(labels, template);
-      const res = await fetch(`${PRINT_API}/api/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zpl }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`Printed ${selected.length} label(s)!`);
-      } else {
-        toast.error('Print failed: ' + (data.message || data.error || 'Unknown'));
-      }
+      const { via } = await printLabel(zpl);
+      toast.success(via === 'queue'
+        ? `Sent ${selected.length} label(s) to the print station`
+        : `Printed ${selected.length} label(s)!`);
     } catch (err) {
-      toast.error('Cannot reach printer service. Is it running on port 5050?');
+      toast.error(`Could not send the labels to the printer: ${err.message || err}`);
     }
     setDirectPrinting(false);
   };

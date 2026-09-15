@@ -504,6 +504,61 @@ def rpc(cfg, name, args, timeout=10):
         raise RuntimeError(message)
 
 
+# ── label printing (Zebra ZPL via CUPS) ──────────────────────────────────────
+#
+# Labels used to be POSTed by the browser straight to the Flask bridge on
+# 127.0.0.1:5050, which only works when the dashboard is open on this very
+# machine. They now arrive through the same queue as receipts, so a phone or a
+# second laptop can print a shelf label too — this station owns the printer and
+# everyone else queues work for it.
+#
+# The ZPL goes to CUPS in raw mode: no driver interprets it, the printer reads
+# the label language itself.
+
+LABEL_PRINTER = os.environ.get(
+    "LABEL_PRINTER", "Zebra_Technologies_ZTC_ZD230_203dpi_ZPL"
+)
+
+
+def print_label(payload, log=print):
+    """Send a queued label's ZPL to the Zebra. Returns (ok, error)."""
+    zpl = (payload or {}).get("zpl") or ""
+    if not zpl:
+        return False, "No ZPL in the label job"
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".zpl", delete=False, encoding="utf-8"
+        ) as fp:
+            fp.write(zpl)
+            tmp_path = fp.name
+
+        result = subprocess.run(
+            ["lp", "-d", LABEL_PRINTER, "-o", "raw", tmp_path],
+            capture_output=True, text=True, timeout=20,
+        )
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "lp failed").strip()
+            # The commonest cause by far is the queue being paused after a jam.
+            if "disabled" in err.lower() or "not accepting" in err.lower():
+                err += " — the print queue looks paused; use Settings → Devices → Auto-Fix"
+            return False, err
+        return True, None
+    except FileNotFoundError:
+        return False, "lp not found — CUPS printing is unavailable on this machine"
+    except subprocess.TimeoutExpired:
+        return False, "The label printer did not respond within 20s"
+    except Exception as exc:
+        return False, "Could not print the label: %s" % exc
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
 # ── the worker ───────────────────────────────────────────────────────────────
 
 def start_worker(log=print):
@@ -544,17 +599,25 @@ def start_worker(log=print):
                 for job in jobs:
                     try:
                         payload = job.get("payload") or {}
-                        data = render_test(payload) if job.get("kind") == "test" else render_receipt(payload)
-                        ok, err = printer.send(data)
+                        kind = job.get("kind")
+                        if kind == "label":
+                            # A label goes to the Zebra via CUPS, not to the
+                            # ESC/POS receipt printer.
+                            ok, err = print_label(payload, log)
+                        else:
+                            data = render_test(payload) if kind == "test" else render_receipt(payload)
+                            ok, err = printer.send(data)
                     except Exception as exc:  # a malformed payload must not kill the worker
-                        ok, err = False, "Could not format the receipt: %s" % exc
+                        ok, err = False, "Could not handle the print job: %s" % exc
                     rpc(cfg, "print_bridge_finish", {
                         "p_token": cfg["station_key"], "p_id": job["id"],
                         "p_ok": ok, "p_error": None if ok else err,
                     })
                     STATE["last_job"] = {"id": job["id"], "ok": ok, "error": err, "at": time.strftime("%H:%M:%S")}
                     log("  %s %s %s" % ("printed" if ok else "FAILED ", job.get("kind"), err or ""))
-                    if ok:
+                    if ok and job.get("kind") != "label":
+                        # Only a successful RECEIPT proves the receipt printer
+                        # is alive; a label print says nothing about it.
                         STATE["online"] = True
                 last_error = None
             except Exception as exc:

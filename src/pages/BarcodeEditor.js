@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { printLabel } from '../utils/labelPrinter';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
@@ -278,8 +279,8 @@ export default function BarcodeEditor() {
     w.document.close();
   };
 
-  // ---- Direct print: generate raw ZPL and send to Zebra via Flask API (port 5050) ----
-  const PRINT_API = 'http://127.0.0.1:5050';
+  // ---- Direct print: build ZPL and let printLabel pick the route — the
+  // bridge on this machine, or the print queue from any other device ----
   const [directPrinting, setDirectPrinting] = useState(false);
 
   const directPrint = async () => {
@@ -298,19 +299,12 @@ export default function BarcodeEditor() {
       // Use current editor layout as the template
       const zpl = generateZPL([testLabel], { elements, canvasSize });
 
-      const res = await fetch(`${PRINT_API}/api/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zpl }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast('Test label sent to printer!', 'success');
-      } else {
-        showToast('Print failed: ' + (data.message || data.error || 'Unknown error'), 'error');
-      }
+      const { via } = await printLabel(zpl);
+      showToast(via === 'queue'
+        ? 'Test label sent to the print station at the counter'
+        : 'Test label sent to printer!', 'success');
     } catch (err) {
-      showToast('Cannot reach label printer service. Is it running on port 5050?', 'error');
+      showToast(`Could not send the label to the printer: ${err.message || err}`, 'error');
     }
     setDirectPrinting(false);
   };
