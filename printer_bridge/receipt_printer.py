@@ -38,6 +38,7 @@ import concurrent.futures as cf
 import json
 import os
 import socket
+import ssl
 import subprocess
 import tempfile
 import textwrap
@@ -494,6 +495,54 @@ class ReceiptPrinter:
 
 # ── Supabase ─────────────────────────────────────────────────────────────────
 
+# ── HTTPS trust ──────────────────────────────────────────────────────────────
+#
+# A Python from python.org ships with NO trusted certificates on macOS until
+# someone runs its "Install Certificates" script, which nobody setting up a till
+# knows to do. Every call to Supabase then fails CERTIFICATE_VERIFY_FAILED. The
+# worker survives that — it logs it and retries — so the station looks alive
+# while never reaching the dashboard and never printing. Apple's own Python
+# (from the developer-tools popup) doesn't have the problem; this makes the
+# other kind behave the same.
+#
+# Verification stays ON throughout. When Python has no roots of its own, it
+# borrows the Mac's: /etc/ssl/cert.pem, which every macOS has, or failing that
+# Apple's system root keychain.
+_SSL_CONTEXT = None
+
+
+def _ssl_context():
+    global _SSL_CONTEXT
+    if _SSL_CONTEXT is not None:
+        return _SSL_CONTEXT
+    ctx = ssl.create_default_context()
+
+    def roots():
+        return ctx.cert_store_stats().get("x509_ca", 0)
+
+    if roots() == 0:
+        for cafile in ("/etc/ssl/cert.pem", "/private/etc/ssl/cert.pem"):
+            if os.path.exists(cafile):
+                try:
+                    ctx.load_verify_locations(cafile=cafile)
+                    break
+                except (OSError, ssl.SSLError):
+                    pass
+    if roots() == 0:
+        try:
+            pem = subprocess.run(
+                ["security", "find-certificate", "-a", "-p",
+                 "/System/Library/Keychains/SystemRootCertificates.keychain"],
+                capture_output=True, text=True, timeout=20,
+            ).stdout
+            if pem.strip():
+                ctx.load_verify_locations(cadata=pem)
+        except Exception:
+            pass
+    _SSL_CONTEXT = ctx
+    return ctx
+
+
 def rpc(cfg, name, args, timeout=10):
     req = urllib.request.Request(
         cfg["url"].rstrip("/") + "/rest/v1/rpc/" + name,
@@ -506,7 +555,7 @@ def rpc(cfg, name, args, timeout=10):
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
             body = resp.read()
             return json.loads(body) if body else None
     except urllib.error.HTTPError as exc:
@@ -616,6 +665,7 @@ def start_worker(log=print):
     def loop():
         last_beat = 0.0
         last_error = None
+        connected = False
         while True:
             try:
                 if time.time() - last_beat >= 10:
@@ -626,6 +676,13 @@ def start_worker(log=print):
                         "p_online": online, "p_address": address, "p_detail": detail,
                     })
                     last_beat = time.time()
+                    # Said once, and only after the dashboard has actually
+                    # accepted a heartbeat. The installer waits for this exact
+                    # line: "the process is running" is not the same claim as
+                    # "this till will print", and only the second one matters.
+                    if not connected:
+                        log("   Connected to the dashboard as '%s' - waiting for receipts" % cfg["station"])
+                        connected = True
 
                 jobs = rpc(cfg, "print_bridge_claim", {
                     "p_token": cfg["station_key"], "p_station": cfg["station"],

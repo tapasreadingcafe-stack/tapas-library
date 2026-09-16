@@ -304,31 +304,53 @@ launchctl unload "$PLIST" >/dev/null 2>&1 || true
 : > "$DIR/station.log"
 launchctl load "$PLIST"
 
-# Don't take launchd's word for it. A station that crashes on start gets
-# restarted every few seconds and looks "loaded" the whole time, so wait,
-# then check it is really up and hasn't logged a crash.
+# Don't take launchd's word for it, and don't settle for "the process is up"
+# either: a station that can't reach Supabase (wrong key, no internet, a Python
+# with no certificates) stays running and retries forever without printing.
+# The station writes "Connected to the dashboard" only once a heartbeat has
+# actually been accepted — that line, and nothing less, is success.
 echo ""
-echo "  Starting the station…"
-sleep 8
+echo "  Starting the station and checking it can reach the dashboard…"
+CONNECTED=0
+for i in $(seq 1 40); do
+  if grep -q "Connected to the dashboard" "$DIR/station.log" 2>/dev/null; then CONNECTED=1; break; fi
+  if grep -q "Traceback" "$DIR/station.log" 2>/dev/null; then break; fi
+  sleep 1
+done
 PID="$(launchctl list 2>/dev/null | awk '$3 == "com.tapas.printstation" {print $1}')"
-if [ -n "$PID" ] && [ "$PID" != "-" ] && ! grep -q "Traceback" "$DIR/station.log" 2>/dev/null; then
+if [ "$CONNECTED" = "1" ] && [ -n "$PID" ] && [ "$PID" != "-" ]; then
   echo ""
-  echo "  Done. The station is running and will start again by itself at login."
+  echo "  Done. The station is running and connected to the dashboard."
+  echo "  It will start again by itself whenever this Mac logs in."
   echo ""
   echo "    Folder   $DIR"
   echo "    Log      $DIR/station.log"
   echo "    Stop     launchctl unload $PLIST"
   echo ""
-  echo "  Check Settings -> Devices on the dashboard — this till should appear"
-  echo "  as \"$STATION_NAME\" within about ten seconds."
+  echo "  In the dashboard, Settings -> Devices should now show the receipt"
+  echo "  printer as ready via \"$STATION_NAME\". Press Test Print."
   echo ""
 else
   echo ""
-  echo "  The station did NOT start. Last lines of its log:"
+  echo "  The station is NOT working yet."
   echo ""
-  tail -n 15 "$DIR/station.log" 2>/dev/null | sed 's/^/    /'
-  echo ""
-  echo "  Send a photo of this screen to whoever set up the dashboard."
+  # The likely causes, in words a person at the counter can act on.
+  if grep -qi "invalid print station key" "$DIR/station.log" 2>/dev/null; then
+    echo "  The station key was not accepted. In the dashboard, Settings -> Devices,"
+    echo "  press Copy next to the key and run this installer again — paste only the"
+    echo "  key when it asks."
+  elif grep -qiE "nodename|name or service|timed out|network is unreachable|connection refused" "$DIR/station.log" 2>/dev/null; then
+    echo "  This Mac could not reach the internet. Check the Wi-Fi, then run this again."
+  elif grep -qi "certificate" "$DIR/station.log" 2>/dev/null; then
+    echo "  This Mac's Python could not check secure connections. Easiest fix: install"
+    echo "  Apple's developer tools (run: xcode-select --install), then run this again."
+  else
+    echo "  Last lines of its log:"
+    echo ""
+    tail -n 15 "$DIR/station.log" 2>/dev/null | sed 's/^/    /'
+    echo ""
+    echo "  Send a photo of this screen to whoever set up the dashboard."
+  fi
   echo ""
   exit 1
 fi
