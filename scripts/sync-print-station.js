@@ -111,9 +111,19 @@ fi
 #   STATION_KEY=... RECEIPT_PRINTER=cups:KP307_Receipt bash install-print-station.sh
 #
 # Anything not supplied is asked for, so the plain curl-to-bash run is unchanged.
-ASK=1
-[ -t 0 ] || ASK=0            # piped into bash with no terminal to read from
-[ -e /dev/tty ] || ASK=0
+#
+# Can we ask? Not "is stdin a terminal": in the normal curl | bash run, stdin is
+# the pipe carrying this very script, so that test said no every time — the
+# installer never asked for the key and stopped at "No station key" on every
+# computer it was pasted into. What matters is whether there's a keyboard, and
+# /dev/tty answers that even while stdin is the pipe.
+#
+# And when the key comes with the command (the dashboard's Copy button puts it
+# there), ask nothing at all: USB receipt printer found automatically, the
+# computer's own name for the till. One paste, no questions.
+ASK=0
+if (exec </dev/tty) 2>/dev/null; then ASK=1; fi
+[ -n "\${STATION_KEY:-}" ] && ASK=0
 
 prompt() {                    # prompt <varname> <question> <default>
   local __var="$1" __q="$2" __def="\${3:-}" __ans=""
@@ -130,16 +140,29 @@ prompt() {                    # prompt <varname> <question> <default>
 # the counter Mac, Sept 2026) is a queue whose PPD declares a do-nothing
 # filter. This builds that queue.
 #
-#   setup_usb_queue <QueueName> <what it is> <URI from env, or empty>
+#   setup_usb_queue <QueueName> <what it is> <URI from env, or empty> <prefer> <avoid>
 #   → prints the queue name on success
+#
+# <prefer>/<avoid> are name patterns. With the receipt printer AND the Zebra
+# both plugged in, "pick number 1" is a coin toss — and with no questions asked
+# it would be taken silently, so a receipt queue could end up pointing at the
+# label printer. Recognising them by the name they report avoids that.
 setup_usb_queue() {
-  local name="$1" what="$2" uri="\${3:-}" n=0 pick=""
+  local name="$1" what="$2" uri="\${3:-}" prefer="\${4:-}" avoid="\${5:-}" n=0 pick=""
   if [ -z "$uri" ]; then
     echo "" >&2
     echo "  Looking for USB printers (make sure the $what is on and plugged in)…" >&2
     local list; list="$(lpinfo --include-schemes usb -v 2>/dev/null | awk '{print $2}')"
+    if [ -n "$list" ] && [ -n "$prefer" ]; then
+      local liked; liked="$(echo "$list" | grep -iE "$prefer" || true)"
+      if [ -n "$liked" ]; then
+        list="$liked"
+      elif [ -n "$avoid" ]; then
+        list="$(echo "$list" | grep -viE "$avoid" || true)"
+      fi
+    fi
     if [ -z "$list" ]; then
-      echo "  No USB printer found. Check the cable and power, then run this again." >&2
+      echo "  No $what found on USB. Check the cable and that it's switched on, then run this again." >&2
       return 1
     fi
     while IFS= read -r line; do n=$((n+1)); echo "    $n) $line" >&2; done <<< "$list"
@@ -231,7 +254,8 @@ if [ -z "$PRINTER" ]; then
   echo "    2) On the Wi-Fi or LAN     (not tied to any one laptop)"
   prompt CONN "  Choose 1 or 2 [1]: " "1"
   if [ "$CONN" = "1" ]; then
-    QUEUE="$(setup_usb_queue Tapas_Receipt "receipt printer" "\${RECEIPT_USB_URI:-}")" || exit 1
+    QUEUE="$(setup_usb_queue Tapas_Receipt "receipt printer" "\${RECEIPT_USB_URI:-}" \
+      "KP307|KPC307|Caysn|Posiflow|Receipt|Thermal|POS|Xprinter|Epson|Star" "Zebra|ZTC|ZD[0-9]")" || exit 1
     PRINTER="cups:\${QUEUE}"
   else
     echo ""
@@ -252,7 +276,8 @@ if [ -z "$LABELS" ]; then
   prompt LABELS "  Label printer [skip]: " ""
 fi
 if [ "$LABELS" = "usb" ]; then
-  LQ="$(setup_usb_queue Tapas_Labels "Zebra label printer" "\${LABEL_USB_URI:-}")" || exit 1
+  LQ="$(setup_usb_queue Tapas_Labels "Zebra label printer" "\${LABEL_USB_URI:-}" \
+    "Zebra|ZTC|ZD[0-9]" "KP307|KPC307|Caysn|Posiflow|Receipt|Thermal|POS")" || exit 1
   LABELS="cups:\${LQ}"
 fi
 
