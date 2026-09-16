@@ -49,7 +49,10 @@ const installer = `#!/bin/bash
 #
 # Sets up this Mac to print receipts and barcode labels for the dashboard.
 # Everything the till needs is here: no repo, no git, no pip install — the
-# station is one Python file and macOS already ships Python 3.
+# station is one standard-library Python file.
+#
+# Written to work on old Macs too (tested against macOS 12 Monterey, the last
+# release a 2015 MacBook Pro gets): Apple's bash 3.2, Python 3.8+.
 #
 # Run:  curl -fsSL https://dashboard.tapasreadingcafe.com/install-print-station.sh | bash
 
@@ -64,11 +67,31 @@ echo "  Tapas print station"
 echo "  ==================="
 echo ""
 
-command -v python3 >/dev/null 2>&1 || {
-  echo "  Python 3 is missing. Install Xcode command line tools first:"
-  echo "    xcode-select --install"
+# Find a Python 3 that actually RUNS. 'command -v python3' is not enough:
+# since macOS 12, /usr/bin/python3 exists on every Mac as a stub that only
+# offers to install Apple's developer tools. It passes that check, and then
+# the background service would call it, fail, and be restarted forever while
+# this script cheerfully printed "Done" and nothing ever printed.
+PY=""
+for cand in "$(command -v python3 2>/dev/null || true)" /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+  [ -n "$cand" ] && [ -x "$cand" ] || continue
+  # The stub: skip it unless the developer tools behind it are installed,
+  # otherwise merely running it pops the install dialog mid-script.
+  if [ "$cand" = "/usr/bin/python3" ] && ! xcode-select -p >/dev/null 2>&1; then continue; fi
+  if "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1; then
+    PY="$cand"; break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "  This Mac needs Python 3 first. It comes free with Apple's developer tools."
+  echo ""
+  echo "  A window is opening now — click Install and wait for it to finish"
+  echo "  (10-30 minutes on an older Mac). Then run this same command again."
+  echo ""
+  xcode-select --install >/dev/null 2>&1 || true
   exit 1
-}
+fi
+echo "  Using $("$PY" --version 2>&1) at $PY"
 
 mkdir -p "$DIR"
 echo "  Downloading the station…"
@@ -100,6 +123,89 @@ prompt() {                    # prompt <varname> <question> <default>
   printf -v "$__var" '%s' "\${__ans:-$__def}"
 }
 
+# Receipt and label printers speak their own command language (ESC/POS, ZPL),
+# so the bytes must reach them untouched. macOS no longer allows "raw" print
+# queues, and a normal driver queue from System Settings rewrites the job —
+# receipts come out as garbage or not at all. The fix that works (proven on
+# the counter Mac, Sept 2026) is a queue whose PPD declares a do-nothing
+# filter. This builds that queue.
+#
+#   setup_usb_queue <QueueName> <what it is> <URI from env, or empty>
+#   → prints the queue name on success
+setup_usb_queue() {
+  local name="$1" what="$2" uri="\${3:-}" n=0 pick=""
+  if [ -z "$uri" ]; then
+    echo "" >&2
+    echo "  Looking for USB printers (make sure the $what is on and plugged in)…" >&2
+    local list; list="$(lpinfo --include-schemes usb -v 2>/dev/null | awk '{print $2}')"
+    if [ -z "$list" ]; then
+      echo "  No USB printer found. Check the cable and power, then run this again." >&2
+      return 1
+    fi
+    while IFS= read -r line; do n=$((n+1)); echo "    $n) $line" >&2; done <<< "$list"
+    if [ "$n" = "1" ]; then
+      pick=1
+    else
+      prompt pick "  Which one is the $what? [1]: " "1"
+    fi
+    uri="$(echo "$list" | sed -n "\${pick}p")"
+    [ -n "$uri" ] || { echo "  That number isn't in the list." >&2; return 1; }
+  fi
+
+  cat > "$DIR/passthrough.ppd" <<'PPDEOF'
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "tapas-passthrough.ppd"
+*Manufacturer: "Tapas"
+*Product: "(Pass-through)"
+*ModelName: "Tapas pass-through (receipt / label printer)"
+*ShortNickName: "Tapas pass-through"
+*NickName: "Tapas pass-through (receipt / label printer)"
+*PSVersion: "(3010.000) 0"
+*LanguageLevel: "3"
+*ColorDevice: False
+*DefaultColorSpace: Gray
+*FileSystem: False
+*Throughput: "1"
+*LandscapeOrientation: Plus90
+*TTRasterizer: Type42
+*cupsVersion: 2.3
+*cupsFilter: "application/vnd.cups-raw 0 -"
+*OpenUI *PageSize/Media Size: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: Roll80
+*PageSize Roll80/80mm Roll: ""
+*CloseUI: *PageSize
+*OpenUI *PageRegion: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: Roll80
+*PageRegion Roll80/80mm Roll: ""
+*CloseUI: *PageRegion
+*DefaultImageableArea: Roll80
+*ImageableArea Roll80/80mm Roll: "0 0 227 842"
+*DefaultPaperDimension: Roll80
+*PaperDimension Roll80/80mm Roll: "227 842"
+PPDEOF
+
+  echo "  Setting up print queue $name for $uri …" >&2
+  # An admin account can usually do this without a password; if not, ask.
+  if ! lpadmin -p "$name" -E -v "$uri" -P "$DIR/passthrough.ppd" 2>/dev/null; then
+    if [ "$ASK" = "1" ]; then
+      echo "  macOS wants your Mac login password to add a printer:" >&2
+      sudo lpadmin -p "$name" -E -v "$uri" -P "$DIR/passthrough.ppd" < /dev/tty || return 1
+    else
+      echo "  Couldn't add the printer queue (needs an admin account)." >&2
+      return 1
+    fi
+  fi
+  cupsenable "$name" >/dev/null 2>&1 || true
+  cupsaccept "$name" >/dev/null 2>&1 || true
+  echo "$name"
+}
+
 STATION_KEY="\${STATION_KEY:-}"
 if [ -z "$STATION_KEY" ]; then
   echo ""
@@ -121,14 +227,11 @@ PRINTER="\${RECEIPT_PRINTER:-}"
 if [ -z "$PRINTER" ]; then
   echo ""
   echo "  How is the receipt printer connected?"
-  echo "    1) USB to this Mac      (set it up in System Settings -> Printers first)"
-  echo "    2) On the Wi-Fi or LAN  (recommended — not tied to any one laptop)"
-  prompt CONN "  Choose 1 or 2 [2]: " "2"
+  echo "    1) USB cable to this Mac   (no need to add it in System Settings — this sets it up)"
+  echo "    2) On the Wi-Fi or LAN     (not tied to any one laptop)"
+  prompt CONN "  Choose 1 or 2 [1]: " "1"
   if [ "$CONN" = "1" ]; then
-    echo ""
-    echo "  Printer queues on this Mac:"
-    lpstat -p 2>/dev/null | awk '{print "    - " $2}' || echo "    (none found)"
-    prompt QUEUE "  Queue name: " ""
+    QUEUE="$(setup_usb_queue Tapas_Receipt "receipt printer" "\${RECEIPT_USB_URI:-}")" || exit 1
     PRINTER="cups:\${QUEUE}"
   else
     echo ""
@@ -144,13 +247,13 @@ LABELS="\${LABEL_PRINTER:-}"
 if [ -z "$LABELS" ]; then
   echo ""
   echo "  Barcode label printer (Zebra). Leave blank if you don't print labels."
-  echo "    - on the Wi-Fi:  type its IP, e.g. 192.168.0.60"
-  echo "    - on USB:        type  cups:QUEUE_NAME"
-  if [ "$ASK" = "1" ]; then
-    echo "  Queues on this Mac:"
-    lpstat -p 2>/dev/null | awk '{print "    - cups:" $2}' || true
-  fi
+  echo "    - USB cable to this Mac:  type  usb"
+  echo "    - on the Wi-Fi:           type its IP, e.g. 192.168.0.60"
   prompt LABELS "  Label printer [skip]: " ""
+fi
+if [ "$LABELS" = "usb" ]; then
+  LQ="$(setup_usb_queue Tapas_Labels "Zebra label printer" "\${LABEL_USB_URI:-}")" || exit 1
+  LABELS="cups:\${LQ}"
 fi
 
 if [ -z "\${STATION_NAME:-}" ]; then
@@ -172,6 +275,8 @@ chmod 600 "$DIR/.env"
 # stopped printing after a reboot is the failure that actually costs money.
 # python3 -u: without it stdout is block-buffered when it is not a terminal and
 # station.log stays empty, which is exactly when someone needs to read it.
+# The full path to the Python found above, not 'env python3': launchd runs
+# with a bare PATH, where python3 is the macOS stub again.
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -181,8 +286,7 @@ cat > "$PLIST" <<PLISTEOF
   <key>Label</key><string>com.tapas.printstation</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/env</string>
-    <string>python3</string>
+    <string>$PY</string>
     <string>-u</string>
     <string>$DIR/receipt_printer.py</string>
     <string>--serve</string>
@@ -197,18 +301,37 @@ cat > "$PLIST" <<PLISTEOF
 PLISTEOF
 
 launchctl unload "$PLIST" >/dev/null 2>&1 || true
+: > "$DIR/station.log"
 launchctl load "$PLIST"
 
+# Don't take launchd's word for it. A station that crashes on start gets
+# restarted every few seconds and looks "loaded" the whole time, so wait,
+# then check it is really up and hasn't logged a crash.
 echo ""
-echo "  Done. The station is running and will start again by itself at login."
-echo ""
-echo "    Folder   $DIR"
-echo "    Log      $DIR/station.log"
-echo "    Stop     launchctl unload $PLIST"
-echo ""
-echo "  Check Settings -> Devices on the dashboard — this till should appear"
-echo "  as \\"$STATION_NAME\\" within about ten seconds."
-echo ""
+echo "  Starting the station…"
+sleep 8
+PID="$(launchctl list 2>/dev/null | awk '$3 == "com.tapas.printstation" {print $1}')"
+if [ -n "$PID" ] && [ "$PID" != "-" ] && ! grep -q "Traceback" "$DIR/station.log" 2>/dev/null; then
+  echo ""
+  echo "  Done. The station is running and will start again by itself at login."
+  echo ""
+  echo "    Folder   $DIR"
+  echo "    Log      $DIR/station.log"
+  echo "    Stop     launchctl unload $PLIST"
+  echo ""
+  echo "  Check Settings -> Devices on the dashboard — this till should appear"
+  echo "  as \"$STATION_NAME\" within about ten seconds."
+  echo ""
+else
+  echo ""
+  echo "  The station did NOT start. Last lines of its log:"
+  echo ""
+  tail -n 15 "$DIR/station.log" 2>/dev/null | sed 's/^/    /'
+  echo ""
+  echo "  Send a photo of this screen to whoever set up the dashboard."
+  echo ""
+  exit 1
+fi
 `;
 
 fs.writeFileSync(path.join(PUB, 'install-print-station.sh'), installer, { mode: 0o644 });
