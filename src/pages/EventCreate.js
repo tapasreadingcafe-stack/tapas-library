@@ -29,6 +29,9 @@ export default function EventCreate() {
   const [tierColsReady, setTierColsReady] = useState(true);
   const [contactColsReady, setContactColsReady] = useState(true);
   const [externalColReady, setExternalColReady] = useState(true);
+  // The direct/our-page choice arrives one migration later than the link
+  // itself, so it's probed separately — a half-applied database still saves.
+  const [externalModeReady, setExternalModeReady] = useState(true);
   React.useEffect(() => {
     supabase.from('events').select('payment_qr_url').limit(1)
       .then(({ error }) => setPaymentColsReady(!error));
@@ -38,6 +41,8 @@ export default function EventCreate() {
       .then(({ error }) => setContactColsReady(!error));
     supabase.from('events').select('external_url').limit(1)
       .then(({ error }) => setExternalColReady(!error));
+    supabase.from('events').select('external_link_mode').limit(1)
+      .then(({ error }) => setExternalModeReady(!error));
   }, []);
 
   // Reading an outside event page (Luma and the like) happens in an edge
@@ -63,7 +68,7 @@ export default function EventCreate() {
     payment_qr_url: '', payment_link: '', payment_note: '', payment_proof_enabled: false,
     ticket_tiers: [],
     // Set when the event lives on someone else's site (20260915_event_external_link.sql)
-    external_url: '',
+    external_url: '', external_link_mode: 'direct',
     contact_phone: '', contact_label: '',
     // CMS display fields — drive how the event appears on the customer site.
     slug: '', italic_accent: '',
@@ -86,6 +91,7 @@ export default function EventCreate() {
           ticket_tiers: Array.isArray(data.ticket_tiers) ? data.ticket_tiers.map(t => ({ label: t.label || '', price: t.price ?? '' })) : [],
           contact_phone: data.contact_phone || '', contact_label: data.contact_label || '',
           external_url: data.external_url || '',
+          external_link_mode: data.external_link_mode === 'page' ? 'page' : 'direct',
           slug: data.slug || '', italic_accent: data.italic_accent || '',
           category: data.category || 'book-club', badge: data.badge || '',
           cta_type: data.cta_type || 'rsvp', chip_color: data.chip_color || 'lavender',
@@ -325,6 +331,11 @@ export default function EventCreate() {
       } else {
         delete payload.external_url;
       }
+      if (externalModeReady) {
+        payload.external_link_mode = form.external_link_mode === 'page' ? 'page' : 'direct';
+      } else {
+        delete payload.external_link_mode;
+      }
       if (paymentColsReady) {
         payload.payment_qr_url = form.payment_qr_url || null;
         payload.payment_link = form.payment_link || null;
@@ -401,6 +412,20 @@ export default function EventCreate() {
         .ec-fetch-note.is-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
         .ec-ext-banner { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #f5f6ff;
                          border: 1px solid #d9ddfb; font-size: 13px; line-height: 1.55; color: #3a3f8f; }
+
+        /* Direct vs our-page. Two full rows rather than a switch: each option
+           needs a sentence to be choosable, and a switch gives one of them no
+           room to explain itself. */
+        .ec-choice-list { display: flex; flex-direction: column; gap: 10px; }
+        .ec-choice { display: flex; align-items: flex-start; gap: 11px; padding: 13px 15px; cursor: pointer;
+                     border: 1px solid #e6e8ec; border-radius: 10px; background: #fff;
+                     transition: border-color 140ms, background 140ms; }
+        .ec-choice:hover { border-color: #c3c9f5; }
+        .ec-choice.is-on { border-color: #667eea; background: #f5f6ff; }
+        .ec-choice input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: #667eea; cursor: pointer; flex-shrink: 0; }
+        .ec-choice span { min-width: 0; }
+        .ec-choice strong { display: block; font-size: 14px; font-weight: 600; color: #111827; }
+        .ec-choice em { display: block; margin-top: 3px; font-style: normal; font-size: 12.5px; line-height: 1.5; color: #6b7280; }
 
         .ec-check { display: flex; align-items: center; gap: 11px; padding: 13px 15px; border: 1px solid #eceef1; border-radius: 10px; background: #fafbfc; cursor: pointer; font-size: 14.5px; color: #374151; }
         .ec-check + .ec-check { margin-top: 10px; }
@@ -506,7 +531,41 @@ export default function EventCreate() {
                     </p>
                   )}
                 </div>
-                {(form.external_url || '').trim() && (
+                {(form.external_url || '').trim() && externalModeReady && (
+                  <div className="ec-field" style={{ marginTop: 18, marginBottom: 0 }}>
+                    <label>When someone taps this event on our website</label>
+                    <div className="ec-choice-list">
+                      <label className={`ec-choice${form.external_link_mode !== 'page' ? ' is-on' : ''}`}>
+                        <input type="radio" name="external_link_mode" value="direct"
+                          checked={form.external_link_mode !== 'page'}
+                          onChange={() => set('external_link_mode', 'direct')} disabled={isReadOnly} />
+                        <span>
+                          <strong>Take them straight to {hostOf(form.external_url)}</strong>
+                          <em>One tap to book. Our own event page is skipped, so the title, photo and
+                            price here are only what the listings show before they leave.</em>
+                        </span>
+                      </label>
+                      <label className={`ec-choice${form.external_link_mode === 'page' ? ' is-on' : ''}`}>
+                        <input type="radio" name="external_link_mode" value="page"
+                          checked={form.external_link_mode === 'page'}
+                          onChange={() => set('external_link_mode', 'page')} disabled={isReadOnly} />
+                        <span>
+                          <strong>Show our event page first</strong>
+                          <em>They get our cover, description, hosts and phone number, with a
+                            “Book on {hostOf(form.external_url)}” button in place of our register form.
+                            Worth it when our page says more than theirs.</em>
+                        </span>
+                      </label>
+                    </div>
+                    <p className="ec-hint" style={{ marginTop: 10 }}>
+                      Either way we don’t collect registrations for this one — the payment QR and
+                      waitlist settings stay hidden below.
+                    </p>
+                  </div>
+                )}
+                {/* Without the mode column there is no choice to offer, and the
+                    behaviour is the straight-to-host one. Say that much. */}
+                {(form.external_url || '').trim() && !externalModeReady && (
                   <div className="ec-ext-banner">
                     People who tap this event on the website go straight to{' '}
                     <strong>{hostOf(form.external_url)}</strong>, so our own register form never opens for it —

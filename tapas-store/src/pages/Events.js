@@ -6,7 +6,7 @@ import { useEvents } from '../cms/hooks';
 import PageRenderer from '../blocks/PageRenderer';
 import { useSiteContent } from '../context/SiteContent';
 import { formatTime12h } from '../utils/timeFormat';
-import { eventExternalUrl, eventHost } from '../utils/eventLink';
+import { eventExternalUrl, eventHost, eventOpensDirect } from '../utils/eventLink';
 
 const GREEN = '#3f6b1f';    // dark leaf green — titles, dots, links, month header
 const LIME = '#caf27e';     // brand lime — filled blocks (date box, "today")
@@ -30,10 +30,11 @@ function normalize(rows) {
         timeLabel: formatTime12h(e.start_time),
         isPaid: !!e.is_paid,
         price: Number(e.ticket_price) || 0,
-        // Set for an event booked on someone else's site — the card then
-        // links there rather than to our own detail page.
-        href: eventExternalUrl(e),
-        host: eventHost(e),
+        // Set for an event booked on someone else's site AND set to open
+        // there directly — the card then links out rather than to our own
+        // detail page. On 'page' mode both stay null and it behaves as ours.
+        href: eventOpensDirect(e) ? eventExternalUrl(e) : null,
+        host: eventOpensDirect(e) ? eventHost(e) : null,
       }));
   }
   return UPCOMING_EVENTS.map((e) => ({

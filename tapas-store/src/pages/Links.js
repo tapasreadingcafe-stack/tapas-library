@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useEvents } from '../cms/hooks';
 import { formatTime12h } from '../utils/timeFormat';
-import { eventExternalUrl, eventHost } from '../utils/eventLink';
+import { eventExternalUrl, eventHost, eventOpensDirect } from '../utils/eventLink';
 import {
   CAFE_ADDRESS, CAFE_PHONES, CAFE_EMAIL, CAFE_LINKS,
   CAFE_TAGLINE, CAFE_FOUNDER, CAFE_COORDS, CAFE_HOURS,
@@ -298,11 +298,14 @@ export default function Links() {
               const cover = e.cover_url || e.image_url;
               const time = formatTime12h(e.start_time);
               const price = e.is_paid && Number(e.ticket_price) > 0 ? `₹${Number(e.ticket_price)}` : 'Free';
-              // An event booked on Luma (or anywhere else) goes straight there.
-              // Routing it through our own page would only add a tap and a
-              // register form that can't take the booking.
-              const away = eventHost(e);
-              const href = eventExternalUrl(e);
+              // An event booked on Luma (or anywhere else) can go straight
+              // there — routing it through our own page would only add a tap
+              // and a register form that can't take the booking. Staff can
+              // choose our page instead per event, and then this card behaves
+              // like any of ours.
+              const direct = eventOpensDirect(e);
+              const away = direct ? eventHost(e) : null;
+              const href = direct ? eventExternalUrl(e) : null;
               const inner = (
                 <>
                   <div className="lk-ev-thumb-wrap">

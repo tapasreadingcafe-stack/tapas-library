@@ -20,6 +20,17 @@ export function eventExternalUrl(event) {
   return /^https?:\/\//i.test(raw) ? raw : null;
 }
 
+/* Whether our LISTINGS should jump straight to the host.
+ *
+ * The other setting ('page') keeps the listings pointing at our own event
+ * page, which is worth it when our cover, description and phone number say
+ * more than the host's page does; the link out then sits on that page, at
+ * the point of booking. Anything other than an explicit 'page' means direct,
+ * so rows written before this setting existed keep their behaviour. */
+export function eventOpensDirect(event) {
+  return !!eventExternalUrl(event) && event?.external_link_mode !== 'page';
+}
+
 /** "lu.ma" out of "https://lu.ma/abc" — what to show a visitor. Null if not external. */
 export function eventHost(event) {
   const url = eventExternalUrl(event);
