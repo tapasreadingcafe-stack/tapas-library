@@ -11,6 +11,10 @@ const DEVICE_TYPES = [
   { key: 'barcode_printer', icon: '🏷️', name: 'Barcode Label Printer', desc: 'Thermal printer for printing book barcode stickers (Zebra, TSC, TVS)', connectTip: null },
 ];
 
+// What a till computer runs to set itself up. Served by this app from public/,
+// generated on every build from printer_bridge/ (scripts/sync-print-station.js).
+const INSTALL_COMMAND = 'curl -fsSL https://dashboard.tapasreadingcafe.com/install-print-station.sh | bash';
+
 async function pingBridge() {
   try {
     const res = await fetch(`${BRIDGE_URL}/api/health`, { signal: AbortSignal.timeout(2000) });
@@ -152,12 +156,24 @@ export default function DeviceManager() {
     }
   };
 
+  // Just the key. The installer asks "Station key:" and writes the .env line
+  // itself — copying "STATION_KEY=…" would save STATION_KEY=STATION_KEY=… and
+  // the station would be refused with no obvious reason why.
   const copyStationKey = async () => {
     try {
-      await navigator.clipboard.writeText(`STATION_KEY=${stationKey}`);
-      toast.success('Copied — paste it into printer_bridge/.env on the counter computer');
+      await navigator.clipboard.writeText(stationKey);
+      toast.success('Station key copied — paste it when the installer asks');
     } catch {
       toast.error('Could not copy — click Show, then select and copy the key');
+    }
+  };
+
+  const copyInstallCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      toast.success('Command copied — paste it into Terminal on the till computer');
+    } catch {
+      toast.error('Could not copy — select the command and copy it');
     }
   };
 
@@ -165,6 +181,102 @@ export default function DeviceManager() {
   const panel = (bg, border) => ({ background: bg, border: `1px solid ${border}`, borderRadius: '6px', padding: '10px', fontSize: '12px', lineHeight: 1.6 });
   const command = (text) => (
     <div style={{ marginTop: '6px', background: '#1a1a2e', color: '#CFF389', borderRadius: '6px', padding: '9px 12px', fontFamily: 'monospace', fontSize: '12px', userSelect: 'all', overflowX: 'auto', whiteSpace: 'nowrap' }}>{text}</div>
+  );
+
+  /* One-command install on the till computer — no code folder, no git.
+   * The installer (scripts/sync-print-station.js → /install-print-station.sh)
+   * finds Python, builds the USB print queue, and starts the station at login.
+   * Written for the counter's old MacBook (macOS 12) as much as a new one. */
+  const step = (n, title, body) => (
+    <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+      <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%', background: '#1a1a2e', color: '#CFF389', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontWeight: 600, color: '#2d3748' }}>{title}</div>
+        {body}
+      </div>
+    </div>
+  );
+
+  const renderStationSetup = () => (
+    <div style={{ marginTop: '6px', color: '#4a5568' }}>
+      {step(1, 'Get the computer ready', (
+        <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+          <li>Plug it into power and connect it to the cafe Wi-Fi.</li>
+          <li>Plug the receipt printer in by USB (and the Zebra label printer, if it prints labels too).</li>
+          <li>
+            Stop it sleeping: <strong>System Preferences → Battery → Power Adapter →</strong> turn on
+            “Prevent computer from sleeping automatically when the display is off”.
+            A sleeping till doesn’t print.
+          </li>
+        </ul>
+      ))}
+
+      {step(2, 'Copy the station key', stationKey ? (
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+          <div style={{ flex: 1, minWidth: 0, background: '#1a1a2e', color: '#CFF389', borderRadius: '6px', padding: '9px 12px', fontFamily: 'monospace', fontSize: '12px', overflowX: 'auto', whiteSpace: 'nowrap', userSelect: 'all' }}>
+            {keyShown ? stationKey : '•'.repeat(24)}
+          </div>
+          <button onClick={() => setKeyShown(v => !v)} style={smallBtn}>{keyShown ? 'Hide' : 'Show'}</button>
+          <button onClick={copyStationKey} style={smallBtn}>Copy</button>
+        </div>
+      ) : (
+        <div style={{ color: '#999', marginTop: '4px' }}>Loading station key…</div>
+      ))}
+
+      {step(3, 'Open Terminal on that computer and paste this', (
+        <>
+          <div style={{ marginTop: '2px', fontSize: '11px', color: '#718096' }}>
+            Terminal is in <strong>Applications → Utilities</strong>.
+          </div>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>{command(INSTALL_COMMAND)}</div>
+            <button onClick={copyInstallCommand} style={{ ...smallBtn, marginTop: '6px' }}>Copy</button>
+          </div>
+          <div style={{ ...panel('#f7fafc', '#e2e8f0'), marginTop: '8px', fontSize: '11px' }}>
+            <strong>Says it needs Python first?</strong> Normal on an older Mac. Click <strong>Install</strong> in
+            the window that opens, wait for it to finish (10–30 minutes), then paste the command again.
+          </div>
+        </>
+      ))}
+
+      {step(4, 'Answer its questions', (
+        <table style={{ marginTop: '6px', borderCollapse: 'collapse', fontSize: '12px', width: '100%' }}>
+          <tbody>
+            {[
+              ['Station key', 'Paste the key from step 2'],
+              ['How is the receipt printer connected?', <>Press <strong>Enter</strong> for USB — it finds the printer and sets it up. No need to add it in System Settings.</>],
+              ['Label printer', <>Type <code>usb</code> if the Zebra is plugged in, or press <strong>Enter</strong> to skip</>],
+              ['A name for this till', <>Anything — e.g. <code>Counter</code></>],
+            ].map(([q, a]) => (
+              <tr key={q}>
+                <td style={{ padding: '5px 10px 5px 0', verticalAlign: 'top', fontFamily: 'monospace', fontSize: '11px', color: '#2d3748', whiteSpace: 'nowrap' }}>{q}</td>
+                <td style={{ padding: '5px 0', verticalAlign: 'top' }}>{a}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+
+      {step(5, 'Check it worked', (
+        <div style={{ marginTop: '4px' }}>
+          Wait for <strong>“Done. The station is running.”</strong> This card turns green within a few seconds —
+          then press <strong>Test Print</strong>. If Terminal says <strong>“did NOT start”</strong>, take a photo of
+          that screen and send it to whoever looks after the dashboard.
+          From then on it starts by itself whenever that computer logs in.
+        </div>
+      ))}
+
+      <div style={{ ...panel('#fff5f5', '#fed7d7'), marginTop: '14px', fontSize: '11px' }}>
+        <strong>Only one print station at a time.</strong> When moving the printer to a new computer, stop the
+        station on the old one first — otherwise both grab receipts, and the one without the printer fails them.
+        On the old computer, paste into Terminal:
+        {command('launchctl unload ~/Library/LaunchAgents/com.tapas.printstation.plist')}
+        <div style={{ marginTop: '6px' }}>
+          Receipts made while you switch aren’t lost: they wait in the queue for up to 30 minutes and print once
+          the new station is up.
+        </div>
+      </div>
+    </div>
   );
 
   const renderReceiptPanel = () => {
@@ -184,26 +296,17 @@ export default function DeviceManager() {
         <div style={panel('#fffaf0', '#fbd38d')}>
           <div style={{ color: '#975a16', fontWeight: 600 }}>
             {receipt.state === 'no-station'
-              ? '🖥️ Set up the print station on the counter computer (about 2 minutes)'
-              : `🖥️ The print station on ${receipt.station?.id || 'the counter computer'} has stopped — start it again`}
+              ? '🖥️ Set up the print station on the till computer (about 5 minutes)'
+              : `🖥️ The print station on ${receipt.station?.id || 'the till computer'} has stopped`}
           </div>
-          <div style={{ marginTop: '8px' }}><strong>1.</strong> Put this line in <code>printer_bridge/.env</code>:</div>
-          {stationKey ? (
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
-              <div style={{ flex: 1, minWidth: 0, background: '#1a1a2e', color: '#CFF389', borderRadius: '6px', padding: '9px 12px', fontFamily: 'monospace', fontSize: '12px', overflowX: 'auto', whiteSpace: 'nowrap', userSelect: 'all' }}>
-                STATION_KEY={keyShown ? stationKey : '•'.repeat(24)}
-              </div>
-              <button onClick={() => setKeyShown(v => !v)} style={smallBtn}>{keyShown ? 'Hide' : 'Show'}</button>
-              <button onClick={copyStationKey} style={smallBtn}>Copy</button>
+          {receipt.state === 'station-offline' && (
+            <div style={{ marginTop: '6px', color: '#744210' }}>
+              Usually that computer is asleep, logged out, or switched off — wake it and log in, and
+              it starts again by itself within a minute. If it still doesn't, run the steps below
+              on it again; your saved settings are kept.
             </div>
-          ) : (
-            <div style={{ color: '#999', marginTop: '4px' }}>Loading station key…</div>
           )}
-          <div style={{ marginTop: '8px' }}><strong>2.</strong> Start the print station:</div>
-          {command('cd ~/Desktop/tapas-library/printer_bridge && python3 print_bridge.py')}
-          <div style={{ marginTop: '6px', color: '#888', fontSize: '11px' }}>
-            Do this once, on the computer the printer is plugged into — nothing is needed on other phones or laptops. Leave it running, or set it to start at login — see printer_bridge/README.md.
-          </div>
+          {renderStationSetup()}
         </div>
       );
     }
@@ -226,6 +329,12 @@ export default function DeviceManager() {
           {receipt.station?.id ? ` · via ${receipt.station.id}` : ''}
         </span>
         <div style={{ color: '#2f855a', fontSize: '11px', marginTop: '4px' }}>Print Receipt on any phone or laptop now prints here directly.</div>
+        <details style={{ marginTop: '10px' }}>
+          <summary style={{ cursor: 'pointer', color: '#276749', fontWeight: 600, fontSize: '12px' }}>
+            Move the printer to another computer, or set up a new till
+          </summary>
+          {renderStationSetup()}
+        </details>
       </div>
     );
   };
@@ -370,7 +479,7 @@ export default function DeviceManager() {
         <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>🖨️ Printer Setup Tips</h4>
         <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#856404', lineHeight: '1.8' }}>
           <li><strong>Label printer stuck?</strong> If the Barcode Label Printer shows <em>Needs attention</em>, click <strong>Auto-Fix</strong> — it clears the queue and re-enables the printer.</li>
-          <li><strong>Receipt printer:</strong> No driver needed — plug it into the counter computer and keep the print station running there; every phone and laptop then prints to it. Use <strong>Test Print</strong> to check.</li>
+          <li><strong>Receipt printer:</strong> No driver needed — plug it into the till computer by USB and set up the print station there with one command (see the Receipt printer card). Every phone and laptop then prints to it. Use <strong>Test Print</strong> to check.</li>
           <li><strong>Barcode labels:</strong> Set paper size to 58mm or 80mm width in printer settings</li>
           <li><strong>Chrome:</strong> Go to chrome://settings → Printing → set default printer</li>
           <li><strong>Bluetooth scanner:</strong> Pair in System Settings → Bluetooth, then it works like a keyboard</li>
