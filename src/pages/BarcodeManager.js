@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { printLabel } from '../utils/labelPrinter';
+import { printLabel, useLabelPrinterStatus, labelStateText } from '../utils/labelPrinter';
 import { Link } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../components/Toast';
@@ -532,6 +532,8 @@ export default function BarcodeManager() {
   // bridge on this machine when there is one and the print queue otherwise —
   // so this works from a phone or a second laptop, not just the shop Mac.
   const [directPrinting, setDirectPrinting] = useState(false);
+  // Whether Direct Print will actually produce a label, said before it's pressed.
+  const labelPrinter = useLabelPrinterStatus();
 
   // Mark the just-printed copies as label-printed (from the confirm popup).
   const markPrinted = async () => {
@@ -692,6 +694,11 @@ export default function BarcodeManager() {
           <Link to="/barcodes/editor" style={buttonStyle}>
             Template Editor
           </Link>
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: labelStateText(labelPrinter.state).dot, flexShrink: 0 }} />
+          {labelStateText(labelPrinter.state).text}
+          {labelPrinter.state === 'online' && labelPrinter.station?.id ? ` · via ${labelPrinter.station.id}` : ''}
         </div>
       </div>
 

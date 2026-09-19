@@ -66,6 +66,9 @@ STATE = {
     "detail": "Receipt printing has not started",
     "station": None,
     "last_job": None,
+    "label_online": False,
+    "label_address": None,
+    "label_detail": "Label printing has not started",
 }
 
 
@@ -391,13 +394,37 @@ def discover():
     return found[0], ""
 
 
-def _cups_ready(queue):
+def _cups_state(queue):
+    """What macOS says about a print queue on this computer.
+
+    Returns (exists, ready, detail). The three cases are told apart on purpose:
+    a queue that was never created, a queue paused after a jam, and a queue
+    that is fine are three different things to do something about, and the
+    dashboard says which one it is.
+    """
     try:
         r = subprocess.run(["lpstat", "-p", queue], capture_output=True, text=True, timeout=5)
-        low = r.stdout.lower()
-        return r.returncode == 0 and ("idle" in low or "ready" in low or "printing" in low)
-    except Exception:
-        return False
+    except Exception as exc:
+        return False, False, "Could not ask this computer about the print queue (%s)" % exc
+    out = (r.stdout or "").strip()
+    if r.returncode != 0 or not out:
+        return False, False, "There is no print queue called %s on this computer" % queue
+    # lpstat puts the reason a queue stopped on the NEXT line, indented:
+    #   printer X disabled since Thu ... -
+    #           Unable to add document to print job.
+    # Flattened, it is the one piece of this that tells someone what happened.
+    flat = " ".join(line.strip() for line in out.splitlines() if line.strip())
+    low = flat.lower()
+    if "disabled" in low:
+        reason = flat.split(" - ", 1)[1].strip() if " - " in flat else ""
+        return True, False, "The %s queue is paused%s" % (queue, " - " + reason if reason else "")
+    ready = "idle" in low or "ready" in low or "printing" in low
+    return True, ready, "" if ready else "The %s queue is not ready" % queue
+
+
+def _cups_ready(queue):
+    exists, ready, _ = _cups_state(queue)
+    return exists and ready
 
 
 class ReceiptPrinter:
@@ -411,6 +438,12 @@ class ReceiptPrinter:
     @property
     def automatic(self):
         return self.cfg["printer"] in ("", "auto")
+
+    @property
+    def disabled(self):
+        # A till set up for labels only: there is no receipt printer to find,
+        # and hunting the network for one every 10s would be noise.
+        return self.cfg["printer"].strip().lower() in ("none", "skip", "off")
 
     def resolve(self, rescan=False):
         if not self.automatic:
@@ -439,6 +472,8 @@ class ReceiptPrinter:
 
     def check(self):
         """(online, address, detail)"""
+        if self.disabled:
+            return False, None, "This till prints barcode labels only - no receipt printer"
         target = self.resolve()
         if not target:
             return False, None, self.detail or "Printer not found"
@@ -457,6 +492,8 @@ class ReceiptPrinter:
 
     def send(self, data):
         """(ok, error)"""
+        if self.disabled:
+            return False, "This till has no receipt printer - it prints barcode labels only"
         target = self.resolve()
         if not target:
             return False, self.detail or "Printer not found"
@@ -583,15 +620,75 @@ def rpc(cfg, name, args, timeout=10):
 #                     belonging to whichever laptop it happens to be cabled to.
 
 
+def label_target(cfg):
+    """The label printer's address, or "" when this till doesn't print labels."""
+    target = (cfg.get("label_printer") or "").strip()
+    return "" if target.lower() in ("none", "skip", "off") else target
+
+
+def label_check(cfg):
+    """(online, address, detail) for the barcode label printer.
+
+    The same question the receipt printer answers every 10 seconds, asked of
+    the Zebra, so the dashboard can show the label printer as ready from a
+    phone in the next room instead of only on this Mac.
+    """
+    target = label_target(cfg)
+    if not target:
+        return False, None, "No label printer is set up on this till"
+    if target.startswith("cups:"):
+        queue = target[5:]
+        exists, ready, detail = _cups_state(queue)
+        if not exists:
+            return False, target, (
+                "No label printer is set up on this till - plug the Zebra in and "
+                "run the setup command again"
+            )
+        return ready, target, "" if ready else detail
+    host, port = _split_address(target)
+    if _tcp_open(host, port, timeout=1.5):
+        return True, target, ""
+    return False, target, (
+        "No answer from the label printer at %s - check it's on and on the Wi-Fi" % target
+    )
+
+
+def fix_label_printer(cfg):
+    """Clear the stuck jobs and un-pause the label queue. Returns (ok, error).
+
+    This is what someone used to walk over and type into Terminal after a jam.
+    It runs here so the Auto-Fix button works from wherever the person with
+    the phone happens to be standing.
+    """
+    target = label_target(cfg)
+    if not target:
+        return False, "No label printer is set up on this till"
+    if not target.startswith("cups:"):
+        return False, (
+            "Auto-Fix only works for a label printer plugged into the till by USB. "
+            "A Zebra on the Wi-Fi clears itself when you switch it off and on again."
+        )
+    queue = target[5:]
+    for cmd in (["cancel", "-a", queue], ["cupsenable", queue], ["cupsaccept", queue]):
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        except Exception:
+            pass
+    online, _, detail = label_check(cfg)
+    if online:
+        return True, None
+    return False, detail or "The label printer still isn't ready"
+
+
 def print_label(payload, cfg, log=print):
     """Send a queued label's ZPL to the Zebra. Returns (ok, error)."""
     zpl = (payload or {}).get("zpl") or ""
     if not zpl:
         return False, "No ZPL in the label job"
 
-    target = (cfg.get("label_printer") or "").strip()
+    target = label_target(cfg)
     if not target:
-        return False, "No label printer configured — set LABEL_PRINTER in the station's .env"
+        return False, "No label printer is set up on this till"
 
     if target.startswith("cups:"):
         return _label_via_cups(target[5:], zpl)
@@ -670,10 +767,15 @@ def start_worker(log=print):
             try:
                 if time.time() - last_beat >= 10:
                     online, address, detail = printer.check()
-                    STATE.update(online=online, address=address, detail=detail or "Printer ready")
+                    label_online, label_address, label_detail = label_check(cfg)
+                    STATE.update(online=online, address=address, detail=detail or "Printer ready",
+                                 label_online=label_online, label_address=label_address,
+                                 label_detail=label_detail or "Label printer ready")
                     rpc(cfg, "print_bridge_heartbeat", {
                         "p_token": cfg["station_key"], "p_station": cfg["station"],
                         "p_online": online, "p_address": address, "p_detail": detail,
+                        "p_label_online": label_online, "p_label_address": label_address,
+                        "p_label_detail": label_detail,
                     })
                     last_beat = time.time()
                     # Said once, and only after the dashboard has actually
@@ -695,6 +797,10 @@ def start_worker(log=print):
                             # A label goes to the Zebra via CUPS, not to the
                             # ESC/POS receipt printer.
                             ok, err = print_label(payload, cfg, log)
+                        elif kind == "label-fix":
+                            # The Auto-Fix button, pressed from any device.
+                            ok, err = fix_label_printer(cfg)
+                            last_beat = 0.0   # report the result without waiting 10s
                         else:
                             data = render_test(payload) if kind == "test" else render_receipt(payload)
                             ok, err = printer.send(data)
@@ -723,7 +829,8 @@ def start_worker(log=print):
     threading.Thread(target=loop, name="receipt-worker", daemon=True).start()
     STATE["running"] = True
     log("   Receipts       ON · station '%s' · printer %s" % (cfg["station"], cfg["printer"]))
-    log("   Labels         ON · printer %s" % cfg["label_printer"])
+    labels = label_target(cfg)
+    log("   Labels         " + ("ON · printer %s" % labels if labels else "OFF · no label printer on this till"))
     return STATE
 
 

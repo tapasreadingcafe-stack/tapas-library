@@ -102,8 +102,9 @@ printer is answering, which is what the 🟢 / 🔴 dot in the POS shows.
 
 ## One-time setup
 
-1. **Database.** Run `supabase/migrations/20260911_print_queue.sql` in the
-   Supabase SQL editor.
+1. **Database.** Run `supabase/migrations/20260911_print_queue.sql` and
+   `supabase/migrations/20260919_label_printer_status.sql` in the Supabase SQL
+   editor. The second one lets the station report the label printer too.
 
 2. **Printer on the network.** The KP307-UEWB has USB, LAN, Wi-Fi and
    Bluetooth. The steps below are the usual ones for this class of printer —
@@ -138,6 +139,10 @@ STATION_KEY=...              required
 RECEIPT_PRINTER=auto         default: find the printer on this Wi-Fi by itself
 RECEIPT_PRINTER=192.168.0.50 or a fixed address (port 9100)
 RECEIPT_PRINTER=cups:QUEUE   or a USB printer already added to macOS
+RECEIPT_PRINTER=none         or no receipt printer: this till only prints labels
+LABEL_PRINTER=cups:QUEUE     the Zebra on USB (the installer builds this queue)
+LABEL_PRINTER=192.168.0.60   or a Zebra on the Wi-Fi — raw ZPL, no driver at all
+LABEL_PRINTER=none           or no label printer on this till
 STATION_NAME=counter         default: this computer's name
 ```
 
@@ -147,6 +152,12 @@ If it finds more than one printer it **does not guess** — it tells you to set
 
 ## Good to know
 
+- **Barcode labels ride along.** The same station prints them: a label queued
+  from any phone goes to the Zebra in its own ZPL language, and the heartbeat
+  reports whether the Zebra is answering, so **Settings → Devices** shows the
+  label printer as ready (or not) from every device — not only from the till.
+  When a jam pauses the queue, the **Auto-Fix** button on that page asks the
+  station to clear the stuck labels and re-enable the printer.
 - **Keep one computer running the bridge.** It's the only piece that can reach
   the printer. Use the login auto-start above so it survives restarts.
 - **Printer off?** Receipts wait in the queue and print when it's back — for up

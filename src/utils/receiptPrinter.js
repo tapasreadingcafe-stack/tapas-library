@@ -104,12 +104,35 @@ export async function waitForJob(id, { timeoutMs = 12000, intervalMs = 800 } = {
   return last;
 }
 
+/** Has this till beaten recently enough to still be believed? */
+export const isStationLive = (station) =>
+  !!station && Date.now() - new Date(station.last_seen).getTime() <= STATION_STALE_MS;
+
+/** Every till that has ever reported, most recently seen first. */
+export async function fetchStations() {
+  const { data, error } = await supabase.from('print_stations').select('*').order('last_seen', { ascending: false });
+  if (error) return { error };
+  return { stations: data || [] };
+}
+
+/* Which till answers for a given printer.
+ *
+ * With one till this is simply "the only one". With two — the counter Mac and,
+ * say, a laptop in the back room that only prints labels — taking whichever
+ * heartbeat landed last would flip a card between them every few seconds. So
+ * each printer picks the till that actually has it, and falls back to the most
+ * recent only when none does. */
+export const pickStation = (stations, onlineKey) => {
+  const live = stations.filter(isStationLive);
+  return live.find((s) => s[onlineKey]) || live[0] || stations[0] || null;
+};
+
 export async function fetchPrinterStatus() {
-  const { data, error } = await supabase.from('print_stations').select('*').order('last_seen', { ascending: false }).limit(1);
+  const { stations, error } = await fetchStations();
   if (error) return { state: 'setup-needed', detail: error.message };
-  const station = data && data[0];
-  if (!station) return { state: 'no-station' };
-  if (Date.now() - new Date(station.last_seen).getTime() > STATION_STALE_MS) return { state: 'station-offline', station };
+  if (!stations.length) return { state: 'no-station' };
+  const station = pickStation(stations, 'printer_online');
+  if (!isStationLive(station)) return { state: 'station-offline', station };
   if (!station.printer_online) return { state: 'printer-offline', station };
   return { state: 'online', station };
 }

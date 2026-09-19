@@ -246,8 +246,15 @@ fi
   exit 1
 }
 
+# RECEIPT_PRINTER=none sets up a computer that only prints barcode labels.
+# Without it the installer would go looking for a receipt printer on USB, find
+# nothing, and stop — which is the wrong answer when the Zebra is the whole
+# point of this till.
 PRINTER="\${RECEIPT_PRINTER:-}"
-if [ -z "$PRINTER" ]; then
+if [ "$PRINTER" = "none" ]; then
+  echo ""
+  echo "  No receipt printer on this computer - setting it up for labels only."
+elif [ -z "$PRINTER" ]; then
   echo ""
   echo "  How is the receipt printer connected?"
   echo "    1) USB cable to this Mac   (no need to add it in System Settings — this sets it up)"
@@ -271,6 +278,8 @@ LABELS="\${LABEL_PRINTER:-}"
 if [ -z "$LABELS" ]; then
   echo ""
   echo "  Barcode label printer (Zebra). Leave blank if you don't print labels."
+  echo "  Once set up, any phone or laptop prints labels here - and the"
+  echo "  dashboard's Auto-Fix button clears a jammed queue on this Mac."
   echo "    - USB cable to this Mac:  type  usb"
   echo "    - on the Wi-Fi:           type its IP, e.g. 192.168.0.60"
   prompt LABELS "  Label printer [skip]: " ""
@@ -352,8 +361,14 @@ if [ "$CONNECTED" = "1" ] && [ -n "$PID" ] && [ "$PID" != "-" ]; then
   echo "    Log      $DIR/station.log"
   echo "    Stop     launchctl unload $PLIST"
   echo ""
-  echo "  In the dashboard, Settings -> Devices should now show the receipt"
-  echo "  printer as ready via \"$STATION_NAME\". Press Test Print."
+  WHAT="the receipt printer"
+  if [ "$PRINTER" = "none" ]; then
+    WHAT="the label printer"
+  elif [ -n "$LABELS" ]; then
+    WHAT="both printers"
+  fi
+  echo "  In the dashboard, Settings -> Devices should now show $WHAT"
+  echo "  as ready via \"$STATION_NAME\". Press Test Print."
   echo ""
 else
   echo ""
