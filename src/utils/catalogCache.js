@@ -11,11 +11,15 @@
 // mode lands (all-time history, writes + sync) this moves to IndexedDB, but the
 // read API here (readCachedBooks / writeCachedBooks) can stay the same.
 
-const KEY = 'tapas_catalog_books_v1';
+// v2 added isbn + is_borrowable; an older cached list is simply refetched.
+const KEY = 'tapas_catalog_books_v2';
 
 // Columns the POS/catalog needs — deliberately WITHOUT book_image.
+// isbn so a scanned or typed ISBN matches in the grid, is_borrowable so the
+// POS knows which books it may lend. Both are tiny next to book_image, which
+// stays out (covers load per tile — see utils/bookCovers).
 export const CATALOG_COLS =
-  'id, book_id, title, author, category, price, mrp, sales_price, quantity_available, quantity_total';
+  'id, book_id, isbn, title, author, category, price, mrp, sales_price, quantity_available, quantity_total, is_borrowable';
 
 export function readCachedBooks() {
   try {

@@ -8,9 +8,11 @@ import { useConfirm } from '../components/ConfirmModal';
 import BarcodeScanner from '../BarcodeScanner';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import BookCover from '../components/BookCover';
 import { useNavigate } from 'react-router-dom';
 import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID } from '../utils/membershipUtils';
 import { readCachedBooks, writeCachedBooks, CATALOG_COLS } from '../utils/catalogCache';
+import { fetchCopyIndex, readCachedCopyIndex, writeCachedCopyIndex, isSaleCopy } from '../utils/copyIndex';
 import { saveBillOffline } from '../offline/billing';
 import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
 import { lineGross, lineDisc, lineNet, lineDiscLabel } from '../utils/cartUtils';
@@ -42,9 +44,10 @@ const DEFAULT_SERVICES = [
 
 // Services are loaded from Supabase app_settings (synced across all devices)
 
-// Books and Cafe live as dedicated icon buttons next to the scanner (they're
-// the two things staff switch between constantly), so they're not repeated here.
-const CATS = ['All', 'Membership', 'Fines', 'Printing', 'Stationery', 'Donations', 'Other'];
+// In the order the counter actually uses them: books first (it's a bookshop
+// before it's anything else), then memberships, then stationery. 'All' sits at
+// the end as the catch-all rather than the opening screen.
+const CATS = ['Books', 'Membership', 'Stationery', 'Fines', 'Printing', 'Donations', 'Other', 'All'];
 // Cafe menu items are billable on the Book POS too; map category → tile emoji.
 const CAFE_EMOJI = { tea: '🍵', coffee: '☕', juice: '🧃', bakery: '🥐', snacks: '🍟', other: '🍽️' };
 // Fine rate loaded dynamically from settings
@@ -151,9 +154,18 @@ export default function POS({ mode = 'library' }) {
 
   // Catalog
   const [allBooks, setAllBooks]         = useState([]);
+  // Which copies of each book are sale stock and which are lending copies.
+  // Without it the sell grid lists the whole building at ₹0.
+  const [copyIndex, setCopyIndex]       = useState(() => readCachedCopyIndex() || {});
   const [booksLoading, setBooksLoading] = useState(false);
   const [itemSearch, setItemSearch]     = useState('');
   const [activeCat, setActiveCat]       = useState(mode === 'cafe' ? 'Cafe' : 'Books');
+  // Sell or lend — the two things that happen to a book at this counter. The
+  // till has to know which one before the + on a tile means anything, so it is
+  // a mode rather than a filter. It always opens on Sell: a loan recorded as a
+  // sale (or the reverse) is a mess to unpick.
+  const [posMode, setPosMode]           = useState('sell');
+  const isBorrowMode = !isCafeTill && posMode === 'borrow';
 
   // Restore cart state persisted across navigation
   const _saved = (() => { try { return JSON.parse(sessionStorage.getItem(CART_KEY) || '{}'); } catch { return {}; } })();
@@ -242,6 +254,13 @@ export default function POS({ mode = 'library' }) {
   // Family members
   const [familyMembers, setFamilyMembers] = useState([]);
 
+  // Books queued to go out on loan. Deliberately NOT the money cart: a loan
+  // isn't a line on a bill, and mixing the two would put a ₹0 row in front of
+  // whoever is taking the payment.
+  const [borrowCart, setBorrowCart]     = useState([]);
+  const [memberBorrows, setMemberBorrows] = useState(0);
+  const [issuingBooks, setIssuingBooks] = useState(false);
+
   // Copy picker modal
   const [copyPickerBook, setCopyPickerBook] = useState(null);
   const [copyPickerCopies, setCopyPickerCopies] = useState([]);
@@ -297,6 +316,7 @@ export default function POS({ mode = 'library' }) {
   // ── On mount ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchBooks();
+    fetchCopyIndexNow();
     fetchMembers();
     probeTables();
     getFineSettings().then(setFineSettings);
@@ -350,6 +370,17 @@ export default function POS({ mode = 'library' }) {
       writeCachedBooks(all);
     } catch (e) { console.error(e); }
     finally { setBooksLoading(false); }
+  };
+
+  // Cached first for an instant grid, then refreshed in the background — the
+  // same deal the catalog gets.
+  const fetchCopyIndexNow = async () => {
+    if (isCafeTill) return;
+    try {
+      const fresh = await fetchCopyIndex();
+      setCopyIndex(fresh);
+      writeCachedCopyIndex(fresh);
+    } catch (e) { console.error('copy index:', e); }
   };
 
   const fetchMembers = async () => {
@@ -463,15 +494,21 @@ export default function POS({ mode = 'library' }) {
     });
   }, []);
 
-  // Load cafe menu so cafe items can be billed on the Book POS (one cart).
+  // The cafe menu belongs to the cafe till. The library counter sells books
+  // and library services — a hot dog among the memberships was only ever in
+  // the way there, so this screen doesn't even fetch the menu.
   useEffect(() => {
-    supabase
-      .from('cafe_menu_items')
-      .select('id, name, price, category, image_url, tax_mode, gst_rate, hsn_code')
-      .eq('is_available', true)
-      .order('display_order')
-      .then(({ data }) => setCafeMenu(data || []));
-  }, []);
+    if (isCafeTill) {
+      supabase
+        .from('cafe_menu_items')
+        .select('id, name, price, category, image_url, tax_mode, gst_rate, hsn_code')
+        .eq('is_available', true)
+        .order('display_order')
+        .then(({ data }) => setCafeMenu(data || []));
+    } else {
+      setCafeMenu([]);
+    }
+  }, [isCafeTill]);
 
   // Handle barcode scan — find book by copy code, book_id, or ISBN and auto-add to cart
   const handlePosScan = async (code) => {
@@ -506,6 +543,14 @@ export default function POS({ mode = 'library' }) {
             return;
           }
           // Use copy-level pricing if set, fall back to book-level
+          if (isBorrowMode) {
+            // The scanner named a physical copy, so lend that exact one.
+            const no = whyCannotBorrow();
+            if (no) { showToast(no, 'error'); return; }
+            if (borrowCart.some(e => e.copy?.id === c.id)) { showToast(`${c.copy_code} is already in the lending list`, 'error'); return; }
+            queueBorrow(c.books, c);
+            return;
+          }
           const bookData = { ...c.books };
           if (c.copy_mrp != null) bookData.mrp = c.copy_mrp;
           if (c.copy_price != null) { bookData.sales_price = c.copy_price; bookData.price = c.copy_price; }
@@ -524,6 +569,7 @@ export default function POS({ mode = 'library' }) {
       b.title?.toLowerCase() === sl
     );
     if (localMatch) {
+      if (isBorrowMode) { handleBorrowBook(localMatch); return; }
       addToCart({ ...localMatch, cartType: 'book' });
       showToast(`Added: ${localMatch.title}`);
       return;
@@ -531,8 +577,9 @@ export default function POS({ mode = 'library' }) {
 
     // 3. Try database search by ISBN (might not be loaded in allBooks)
     try {
-      const { data: dbBooks } = await supabase.from('books').select('*').eq('isbn', trimmed).limit(1);
+      const { data: dbBooks } = await supabase.from('books').select(CATALOG_COLS).eq('isbn', trimmed).limit(1);
       if (dbBooks?.length) {
+        if (isBorrowMode) { handleBorrowBook(dbBooks[0]); return; }
         addToCart({ ...dbBooks[0], cartType: 'book' });
         showToast(`Added: ${dbBooks[0].title}`);
         return;
@@ -541,8 +588,9 @@ export default function POS({ mode = 'library' }) {
 
     // 4. Try database search by book_id
     try {
-      const { data: dbBooks } = await supabase.from('books').select('*').eq('book_id', trimmed).limit(1);
+      const { data: dbBooks } = await supabase.from('books').select(CATALOG_COLS).eq('book_id', trimmed).limit(1);
       if (dbBooks?.length) {
+        if (isBorrowMode) { handleBorrowBook(dbBooks[0]); return; }
         addToCart({ ...dbBooks[0], cartType: 'book' });
         showToast(`Added: ${dbBooks[0].title}`);
         return;
@@ -566,12 +614,174 @@ export default function POS({ mode = 'library' }) {
     showToast(`"${trimmed}" not found in catalog`, 'error');
   };
 
+  /* ── Lending, from the till ────────────────────────────────────────────
+   *
+   * The rules are the Borrow page's rules, not new ones: a loan needs a live
+   * membership, it runs to the end of that membership, and nobody holds more
+   * books than their plan allows. Anything else and the two screens would
+   * disagree about what a member is allowed — the sort of difference that only
+   * shows up in an argument at the counter.
+   */
+  const membershipState = (m) => {
+    if (!m) return 'none';
+    if (m.status && m.status !== 'active') return 'inactive';
+    if (!m.subscription_end) return 'none';
+    if (new Date(m.subscription_end) < new Date()) return 'expired';
+    return 'active';
+  };
+
+  // The Borrow page lends until the membership ends, so this does too.
+  const borrowDueDate = selectedMember?.subscription_end
+    ? String(selectedMember.subscription_end).split('T')[0]
+    : '';
+  const borrowLimit = selectedMember?.borrow_limit || 2;
+  const borrowRoom = Math.max(0, borrowLimit - memberBorrows - borrowCart.length);
+
+  const fetchMemberBorrows = async (memberId) => {
+    try {
+      const { count } = await supabase
+        .from('circulation')
+        .select('id', { count: 'exact', head: true })
+        .eq('member_id', memberId)
+        .eq('status', 'checked_out');
+      setMemberBorrows(count || 0);
+    } catch { setMemberBorrows(0); }
+  };
+
+  // Says no, in the words the person at the counter needs. Returns '' when fine.
+  const whyCannotBorrow = () => {
+    if (!selectedMember) return 'Pick the member first — a book can only go out to someone';
+    const state = membershipState(selectedMember);
+    if (state === 'expired') return `${selectedMember.name}'s membership has expired — renew it before lending`;
+    if (state === 'inactive') return `${selectedMember.name}'s account is not active`;
+    if (state === 'none') return `${selectedMember.name} has no membership — start one before lending`;
+    if (borrowRoom <= 0) return `${selectedMember.name} already has ${memberBorrows + borrowCart.length} of ${borrowLimit} books out`;
+    return '';
+  };
+
+  const queueBorrow = (book, copy) => {
+    setBorrowCart(prev => [...prev, { book, copy: copy || null }]);
+    showToast(`${book.title.substring(0, 22)} ready to lend${copy ? ` (${copy.copy_code})` : ''}`);
+  };
+
+  // Clicking + on a tile in Borrow mode. Picks a copy the way the shelf would:
+  // a lending copy first, a spare sale copy only if that's all there is.
+  const handleBorrowBook = async (book) => {
+    const no = whyCannotBorrow();
+    if (no) { showToast(no, 'error'); return; }
+    if (borrowCart.some(e => e.book.id === book.id && !e.copy)) {
+      showToast('That book is already in the lending list', 'error'); return;
+    }
+    try {
+      const { data: copies } = await supabase
+        .from('book_copies')
+        .select('id, copy_code, status, condition, copy_kind')
+        .eq('book_id', book.id)
+        .order('copy_code');
+
+      if (copies && copies.length > 0) {
+        const queued = new Set(borrowCart.map(e => e.copy?.id).filter(Boolean));
+        const free = copies.filter(c => c.status === 'available' && !queued.has(c.id));
+        if (free.length === 0) { showToast('Every copy of this book is already out', 'error'); return; }
+        const lending = free.find(c => !isSaleCopy(c));
+        queueBorrow(book, lending || free[0]);
+        return;
+      }
+    } catch {} // book_copies may not exist on an older install
+
+    // No copies tracked — fall back to the book's own count.
+    if ((book.quantity_available || 0) <= borrowCart.filter(e => e.book.id === book.id).length) {
+      showToast('No copy of this book is free right now', 'error'); return;
+    }
+    queueBorrow(book, null);
+  };
+
+  // Hand the queued books over. Mirrors Borrow.handleCheckout step for step.
+  const issueBorrowedBooks = async () => {
+    if (borrowCart.length === 0) return;
+    if (!selectedMember) { showToast('Pick the member first', 'error'); return; }
+    if (membershipState(selectedMember) !== 'active' || !borrowDueDate) {
+      showToast('This member cannot borrow right now', 'error'); return;
+    }
+    if (memberBorrows + borrowCart.length > borrowLimit) {
+      showToast(`That would be more than the ${borrowLimit} books ${selectedMember.name} is allowed`, 'error'); return;
+    }
+    setIssuingBooks(true);
+    try {
+      const today = todayYmd();
+      for (const entry of borrowCart) {
+        const record = {
+          member_id: selectedMember.id,
+          book_id: entry.book.id,
+          checkout_date: today,
+          due_date: borrowDueDate,
+          status: 'checked_out',
+        };
+        const { error } = await supabase.from('circulation').insert([record]);
+        if (error) throw error;
+
+        if (entry.copy) {
+          await supabase.from('book_copies')
+            .update({ status: 'issued', current_borrower_id: selectedMember.id })
+            .eq('id', entry.copy.id);
+          // A sale copy that goes out on loan becomes a lending copy, exactly as
+          // on the Borrow page — otherwise it would come back and still be for sale.
+          if (/^S-/i.test(entry.copy.copy_code || '')) {
+            try {
+              await supabase.from('book_copies').update({ copy_kind: 'library' }).eq('id', entry.copy.id);
+              if (entry.book.is_borrowable === false) {
+                await supabase.from('books').update({ is_borrowable: true }).eq('id', entry.book.id);
+              }
+            } catch (err) { console.warn('Sale→library convert:', err.message); }
+          }
+        }
+      }
+
+      // Take the lent copies off the shelf count, one write per book.
+      const perBook = {};
+      borrowCart.forEach(e => { perBook[e.book.id] = (perBook[e.book.id] || 0) + 1; });
+      for (const [id, n] of Object.entries(perBook)) {
+        const book = allBooks.find(b => b.id === id) || borrowCart.find(e => e.book.id === id).book;
+        await supabase.from('books')
+          .update({ quantity_available: Math.max(0, (book.quantity_available || 0) - n) })
+          .eq('id', id);
+      }
+      // Keep the grid honest without refetching the whole catalog.
+      setAllBooks(prev => {
+        const next = prev.map(b => perBook[b.id]
+          ? { ...b, quantity_available: Math.max(0, (b.quantity_available || 0) - perBook[b.id]) }
+          : b);
+        writeCachedBooks(next);
+        return next;
+      });
+
+      const n = borrowCart.length;
+      setBorrowCart([]);
+      fetchCopyIndexNow();
+      await fetchMemberBorrows(selectedMember.id);
+      showToast(`${n} book${n === 1 ? '' : 's'} issued to ${selectedMember.name} — due ${borrowDueDate}`);
+    } catch (err) {
+      showToast(`Could not issue: ${err.message || err}`, 'error');
+    } finally {
+      setIssuingBooks(false);
+    }
+  };
+
+  // Whoever is at the counter now: how many books they already hold, and a
+  // clean lending list. A queue left over from the last member would otherwise
+  // be handed to this one.
+  useEffect(() => {
+    setBorrowCart([]);
+    if (selectedMember?.id) fetchMemberBorrows(selectedMember.id);
+    else setMemberBorrows(0);
+  }, [selectedMember?.id]);
+
   // Handle clicking + on a book card — auto-add first available copy
   const handleAddBookToCart = async (book) => {
     try {
       const { data: allCopies } = await supabase
         .from('book_copies')
-        .select('id, copy_code, status, condition, copy_mrp, copy_price')
+        .select('id, copy_code, status, condition, copy_kind, copy_mrp, copy_price')
         .eq('book_id', book.id)
         .order('copy_code');
 
@@ -580,8 +790,7 @@ export default function POS({ mode = 'library' }) {
         // sale copy (S-) over a borrow copy (B-); fall back to any available.
         const inCartCodes = new Set(cart.filter(c => c.copyCode).map(c => c.copyCode));
         const isAvail = c => c.status === 'available' && !inCartCodes.has(c.copy_code);
-        const isSale = c => /^S-/i.test(c.copy_code);
-        const nextAvailable = allCopies.find(c => isAvail(c) && isSale(c)) || allCopies.find(isAvail);
+        const nextAvailable = allCopies.find(c => isAvail(c) && isSaleCopy(c)) || allCopies.find(isAvail);
 
         if (!nextAvailable) {
           showToast('No available copies left for this book', 'error');
@@ -614,6 +823,24 @@ export default function POS({ mode = 'library' }) {
         .order('copy_code');
       if (allCopies?.length) {
         setCopyPickerBook({ ...allBooks.find(b => b.id === cartItem.bookId), _swapCartId: cartItem.cartId });
+        setCopyPickerCopies(allCopies);
+      }
+    } catch {}
+  };
+
+  // Change which physical copy goes out — the same picker the bill uses, aimed
+  // at the lending list instead of the cart.
+  const openBorrowCopyPicker = async (idx) => {
+    const entry = borrowCart[idx];
+    if (!entry) return;
+    try {
+      const { data: allCopies } = await supabase
+        .from('book_copies')
+        .select('id, copy_code, status, condition, copy_kind')
+        .eq('book_id', entry.book.id)
+        .order('copy_code');
+      if (allCopies?.length) {
+        setCopyPickerBook({ ...entry.book, _borrowIdx: idx });
         setCopyPickerCopies(allCopies);
       }
     } catch {}
@@ -1128,6 +1355,7 @@ export default function POS({ mode = 'library' }) {
       fetchTodayStats();
       if (showHistory) fetchTodayTransactions();
       fetchBooks();
+      fetchCopyIndexNow();
     } catch (err) {
       console.error(err);
       showToast('Checkout failed: ' + (err.message || 'Unknown error'), 'error');
@@ -1351,25 +1579,59 @@ export default function POS({ mode = 'library' }) {
     gstRate: m.gst_rate ?? null,
     hsnCode: m.hsn_code || null,
     cat: 'Cafe',
+    cafeCategory: (m.category || 'other').toLowerCase(),
     isCafe: true,
-  }));
-  const visibleServices = [...SERVICES, ...cafeTiles].filter(s => {
-    // The cafe till is the cafe menu — memberships, fines and printing belong
-    // to the library counter and would only be noise here.
-    if (isCafeTill) return s.isCafe && (!sl || s.name.toLowerCase().includes(sl));
-    if (activeCat === 'Books') return false;
+  }))
+    // A to Z. The menu's own order is how the kitchen thinks about it; at the
+    // till you are hunting for one named thing, and alphabetical is the only
+    // order where you know where to look before you look. Case and accents are
+    // ignored, so "iced latte" sits with "Iced Americano" rather than after Z.
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+
+  /* The cafe till's own tabs, built from the menu itself rather than a list in
+   * the code — add a category to the menu and it appears here. Alphabetical,
+   * like the items under them, and 'Cafe' is the whole menu: the till opens
+   * showing everything and filters only when asked. */
+  const cafeCats = isCafeTill
+    ? [...new Set(cafeTiles.map(t => t.cafeCategory))].sort((a, b) => a.localeCompare(b))
+    : [];
+  const visibleServices = [...(isCafeTill ? [] : SERVICES), ...cafeTiles].filter(s => {
+    // Each till shows its own goods: the cafe screen is the menu, the library
+    // screen is books, memberships, fines and printing. Neither is noise on
+    // the other's counter.
+    if (isCafeTill) {
+      if (activeCat !== 'Cafe' && s.cafeCategory !== activeCat) return false;
+      return s.isCafe && (!sl || s.name.toLowerCase().includes(sl));
+    }
+    // Nothing on a services tile can be lent, so Borrow shows books only.
+    if (isBorrowMode) return false;
     if (activeCat !== 'All' && s.cat !== activeCat) return false;
     if (sl) return s.name.toLowerCase().includes(sl);
     return true;
   });
-  const visibleBooks = !isCafeTill && (activeCat === 'All' || activeCat === 'Books')
-    ? allBooks.filter(b =>
-        !sl ||
-        b.title?.toLowerCase().includes(sl) ||
-        b.author?.toLowerCase().includes(sl) ||
-        b.book_id?.toLowerCase().includes(sl) ||
-        b.isbn?.includes(sl)
-      )
+  const visibleBooks = !isCafeTill && (isBorrowMode || activeCat === 'All' || activeCat === 'Books')
+    ? allBooks.filter(b => {
+        const copies = copyIndex[b.id];
+        if (isBorrowMode) {
+          // Only what the library lends: a title whose copies are all sale
+          // stock belongs on the sell side, not the shelf.
+          if (b.is_borrowable === false) return false;
+          if (copies ? copies.library === 0 : false) return false;
+        } else {
+          // Only what is actually for sale. A book with no copy rows at all is
+          // from before copies were tracked — show it if it has a price, since
+          // nothing else can say whether it's stock.
+          if (copies) { if (copies.sale === 0) return false; }
+          else if (!(Number(b.sales_price) > 0 || Number(b.price) > 0)) return false;
+        }
+        if (!sl) return true;
+        return (
+          b.title?.toLowerCase().includes(sl) ||
+          b.author?.toLowerCase().includes(sl) ||
+          b.book_id?.toLowerCase().includes(sl) ||
+          b.isbn?.includes(sl)
+        );
+      })
     : [];
 
   const memberMatches = memberSearch.trim()
@@ -1468,57 +1730,70 @@ export default function POS({ mode = 'library' }) {
               type="text"
               placeholder={isCafeTill
                 ? (isMobile ? "🔍 Search menu…" : "🔍  Search the cafe menu… (F2)")
-                : (isMobile ? "🔍 Search books…" : "🔍  Search items, books, author… (F2)")}
+                : isBorrowMode
+                  ? (isMobile ? "🔍 Search books to lend…" : "🔍  Search books to lend… (F2)")
+                  : (isMobile ? "🔍 Search books…" : "🔍  Search items, books, author… (F2)")}
               value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
               style={{ flex: 1, minWidth: 0, padding: isMobile ? '12px' : '10px 14px', border: '2px solid #e0e0e0', borderRadius: '10px', fontSize: isMobile ? '16px' : '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.2s', WebkitAppearance: 'none' }}
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e  => e.target.style.borderColor = '#e0e0e0'}
             />
-            {/* Books / Cafe quick filters — the two catalogs staff flip between
-                all day, so they sit up here beside the scanner instead of being
-                two pills among nine below. */}
-            {(isCafeTill ? [] : [
-              { cat: 'Books', label: 'Books', Icon: BookIcon, tint: '#667eea', title: 'Show the book catalog' },
-              { cat: 'Cafe',  label: 'Cafe',  Icon: CafeIcon, tint: '#f59e0b', title: 'Show the cafe menu' },
-            ]).map(({ cat, label, Icon, tint, title }) => {
-              const on = activeCat === cat;
-              return (
-                <button key={cat} onClick={() => setActiveCat(cat)} title={title}
-                  style={{
-                    padding: isMobile ? '12px' : '10px 14px',
-                    background: on ? tint : '#f0f2f5',
-                    color: on ? 'white' : '#6b7280',
-                    border: `2px solid ${on ? tint : 'transparent'}`,
-                    borderRadius: '10px', cursor: 'pointer', fontWeight: '700',
-                    fontSize: isMobile ? '13px' : '13px', flexShrink: 0,
-                    minHeight: '48px', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', gap: '7px', whiteSpace: 'nowrap',
-                    transition: 'all 0.15s',
-                  }}>
-                  <Icon />
-                  {!isMobile && label}
-                </button>
-              );
-            })}
+            {/* Sell / Borrow — what this counter is doing with a book right now.
+                It used to be a Books / Cafe catalog switch, but staff were never
+                choosing between two catalogs; they were choosing between selling
+                a book and lending it, and the till had no idea which. Cafe food
+                went with it: that is the Cafe POS's counter, not this one. */}
+            {!isCafeTill && (
+              <div style={{ display: 'flex', background: '#f0f2f5', borderRadius: '10px', padding: '3px', gap: '3px', flexShrink: 0 }}>
+                {[
+                  { key: 'sell',   label: 'Sell',   Icon: CartIcon, tint: '#667eea', title: 'Sell a book — it goes on the bill' },
+                  { key: 'borrow', label: 'Borrow', Icon: BookIcon, tint: '#10b981', title: 'Lend a book to the member at the counter' },
+                ].map(({ key, label, Icon, tint, title }) => {
+                  const on = posMode === key;
+                  return (
+                    <button key={key} onClick={() => setPosMode(key)} title={title}
+                      style={{
+                        padding: isMobile ? '10px 12px' : '8px 16px',
+                        background: on ? tint : 'transparent',
+                        color: on ? 'white' : '#6b7280',
+                        border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700',
+                        fontSize: '13px', flexShrink: 0, minHeight: '42px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        gap: '7px', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                        boxShadow: on ? '0 1px 4px rgba(0,0,0,0.18)' : 'none',
+                      }}>
+                      <Icon />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <button onClick={() => setShowPosScanner(true)}
               style={{ padding: isMobile ? '12px 16px' : '10px 14px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', flexShrink: 0, minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Scan barcode"><ScannerIcon /></button>
           </div>
 
-          {/* Category tabs — library only. The cafe till's categories live in
-              the menu itself, so a second row of filters would be dead weight. */}
-          {!isCafeTill && (
-          <div style={{ padding: isMobile ? '8px 10px' : '10px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-            {CATS.map(cat => (
-              <button key={cat} onClick={() => setActiveCat(cat)} style={{
-                padding: isMobile ? '8px 14px' : '5px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
-                fontWeight: '700', fontSize: isMobile ? '13px' : '12px', whiteSpace: 'nowrap', transition: 'all 0.15s',
-                background: activeCat === cat ? '#667eea' : '#f0f2f5',
-                color:      activeCat === cat ? 'white'   : '#666',
-                flexShrink: 0,
+          {/* Category tabs. The library till lists its own departments; the
+              cafe till lists the parts of its menu. Not shown in Borrow mode —
+              the grid there is books, and Memberships or Fines would filter it
+              down to nothing. */}
+          {!isBorrowMode && (isCafeTill ? cafeCats.length > 1 : true) && (
+          <div style={{ padding: isMobile ? '10px' : '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+            {(isCafeTill
+              ? [{ value: 'Cafe', label: 'All' },
+                 ...cafeCats.map(c => ({ value: c, label: `${CAFE_EMOJI[c] || '🍽️'} ${c.charAt(0).toUpperCase()}${c.slice(1)}` }))]
+              : CATS.map(c => ({ value: c, label: c }))
+            ).map(({ value, label }) => (
+              <button key={value} onClick={() => setActiveCat(value)} style={{
+                padding: isMobile ? '11px 18px' : '9px 20px', borderRadius: '22px', border: 'none', cursor: 'pointer',
+                fontWeight: '700', fontSize: isMobile ? '14px' : '14px', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                background: activeCat === value ? '#667eea' : '#f0f2f5',
+                color:      activeCat === value ? 'white'   : '#666',
+                flexShrink: 0, minHeight: '42px', fontFamily: 'inherit',
               }}>
-                {cat}
+                {label}
               </button>
             ))}
           </div>
@@ -1559,31 +1834,46 @@ export default function POS({ mode = 'library' }) {
             )}
 
             {/* Books */}
-            {(activeCat === 'All' || activeCat === 'Books') && (
+            {(isBorrowMode || activeCat === 'All' || activeCat === 'Books') && (
               <div>
-                {activeCat === 'All' && visibleServices.length > 0 && (
+                {isBorrowMode ? (
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#059669', letterSpacing: '1px', marginBottom: '10px' }}>
+                    BOOKS TO LEND{selectedMember ? ` · ${selectedMember.name.split(' ')[0]} can take ${borrowRoom} more` : ' · pick a member first'}
+                  </div>
+                ) : activeCat === 'All' && visibleServices.length > 0 ? (
                   <div style={{ fontSize: '10px', fontWeight: '700', color: '#bbb', letterSpacing: '1px', marginBottom: '10px' }}>BOOKS FOR SALE</div>
-                )}
+                ) : null}
                 {booksLoading ? (
                   <div style={{ textAlign: 'center', color: '#ccc', padding: '30px' }}>Loading books...</div>
                 ) : visibleBooks.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#ccc', padding: '30px', fontSize: '13px' }}>
-                    {sl ? 'No books match your search' : 'No books in catalog'}
+                    {sl ? 'No books match your search' : isBorrowMode ? 'No lending copies are on the shelf' : 'No books are in stock to sell'}
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(130px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
                     {visibleBooks.slice(0, isMobile ? 30 : 60).map(book => {
-                      const inStock = book.quantity_available > 0;
+                      const copies = copyIndex[book.id];
+                      // What this tile is offering: a sale copy, or a lending
+                      // copy. The code shown is the one that leaves the shelf,
+                      // not the title's own book_id — those are different
+                      // numbers, and on some titles they collide.
+                      const onHand = copies
+                        ? (isBorrowMode ? copies.library : copies.sale)
+                        : (book.quantity_available || 0);
+                      const shelfCode = copies
+                        ? (isBorrowMode ? copies.libraryCode : copies.saleCode)
+                        : book.book_id;
+                      const inStock = onHand > 0 && book.quantity_available > 0;
+                      const queuedToLend = isBorrowMode && borrowCart.some(e => e.book.id === book.id);
                       return (
                         <div key={book.id} style={{ background: 'white', border: '1px solid #ebebeb', borderRadius: '8px', overflow: 'hidden', cursor: inStock ? 'pointer' : 'default', opacity: inStock ? 1 : 0.5, transition: 'box-shadow 0.15s' }}
                           onMouseEnter={e => { if (inStock) e.currentTarget.style.boxShadow = '0 4px 14px rgba(102,126,234,0.22)'; }}
                           onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
                         >
-                          <div style={{ width: '100%', height: '110px', background: '#f4f4f4', overflow: 'hidden', position: 'relative' }}>
-                            {book.book_image
-                              ? <img src={book.book_image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display = 'none'} />
-                              : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', color: '#ddd' }}>📖</div>
-                            }
+                          <div style={{ position: 'relative' }}>
+                            {/* The cover arrives when this tile does — the catalog
+                                itself is fetched without images. */}
+                            <BookCover bookId={book.id} height={110} />
                             {!inStock && (
                               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <span style={{ color: 'white', fontSize: '10px', fontWeight: '700', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px' }}>OUT OF STOCK</span>
@@ -1594,20 +1884,27 @@ export default function POS({ mode = 'library' }) {
                             <div style={{ fontSize: '11px', fontWeight: '700', color: '#333', lineHeight: 1.3, marginBottom: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{book.title}</div>
                             <div style={{ fontSize: '10px', color: '#999', marginBottom: '2px' }}>{(book.author || '').substring(0, 18)}</div>
                             <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                              {book.book_id && <span style={{ fontSize: '9px', fontFamily: 'monospace', color: '#667eea', background: '#f0f3ff', padding: '1px 4px', borderRadius: '3px' }}>{book.book_id}</span>}
-                              <span style={{ fontSize: '9px', color: inStock ? '#1dd1a1' : '#e74c3c', fontWeight: '600' }}>{book.quantity_available || 0} {(book.quantity_available || 0) === 1 ? 'copy' : 'copies'}</span>
+                              {shelfCode && <span style={{ fontSize: '9px', fontFamily: 'monospace', color: isBorrowMode ? '#059669' : '#667eea', background: isBorrowMode ? '#ecfdf5' : '#f0f3ff', padding: '1px 4px', borderRadius: '3px' }}>{shelfCode}</span>}
+                              <span style={{ fontSize: '9px', color: inStock ? '#1dd1a1' : '#e74c3c', fontWeight: '600' }}>{onHand} {onHand === 1 ? 'copy' : 'copies'}</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div>
-                                {book.mrp > 0 && book.sales_price > 0 && book.sales_price < book.mrp && (
-                                  <span style={{ fontSize: '10px', textDecoration: 'line-through', color: '#999', marginRight: '3px' }}>₹{book.mrp}</span>
-                                )}
-                                <span style={{ fontSize: '13px', fontWeight: '800', color: '#667eea' }}>{fmt(book.sales_price || book.price)}</span>
+                                {isBorrowMode ? (
+                                  <span style={{ fontSize: '11px', fontWeight: '700', color: queuedToLend ? '#059669' : '#9ca3af' }}>
+                                    {queuedToLend ? 'in lending list' : inStock ? 'on the shelf' : 'all out'}
+                                  </span>
+                                ) : (<>
+                                  {book.mrp > 0 && book.sales_price > 0 && book.sales_price < book.mrp && (
+                                    <span style={{ fontSize: '10px', textDecoration: 'line-through', color: '#999', marginRight: '3px' }}>₹{book.mrp}</span>
+                                  )}
+                                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#667eea' }}>{fmt(book.sales_price || book.price)}</span>
+                                </>)}
                               </div>
                               <button
-                                onClick={() => handleAddBookToCart(book)}
+                                onClick={() => (isBorrowMode ? handleBorrowBook(book) : handleAddBookToCart(book))}
                                 disabled={!inStock || isReadOnly || !canProcessOrders}
-                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: (inStock && !isReadOnly && canProcessOrders) ? '#667eea' : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: (inStock && !isReadOnly && canProcessOrders) ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
+                                title={isBorrowMode ? 'Lend this book to the member at the counter' : 'Add to the bill'}
+                                style={{ padding: isMobile ? '6px 12px' : '3px 8px', background: (inStock && !isReadOnly && canProcessOrders) ? (isBorrowMode ? '#10b981' : '#667eea') : '#ccc', color: 'white', border: 'none', borderRadius: '6px', cursor: (inStock && !isReadOnly && canProcessOrders) ? 'pointer' : 'not-allowed', fontSize: isMobile ? '16px' : '12px', fontWeight: '700', minWidth: isMobile ? '40px' : 'auto', minHeight: isMobile ? '36px' : 'auto' }}
                               >+</button>
                             </div>
                           </div>
@@ -1858,6 +2155,47 @@ export default function POS({ mode = 'library' }) {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* ── BOOKS GOING OUT ON LOAN ──
+              Sits with the member, above the bill, and stays put when the mode
+              is flipped back to Sell — a member paying a fine and taking two
+              books home is one visit, not two. */}
+          {borrowCart.length > 0 && (
+            <div style={{ padding: '10px 16px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', flexShrink: 0 }}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: '#166534', letterSpacing: '0.5px', marginBottom: '7px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>📚 LENDING ({borrowCart.length})</span>
+                {borrowDueDate && <span style={{ color: '#15803d' }}>due {borrowDueDate}</span>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '160px', overflowY: 'auto' }}>
+                {borrowCart.map((entry, idx) => (
+                  <div key={`${entry.book.id}_${entry.copy?.id || idx}`}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderRadius: '6px', padding: '6px 10px', border: '1px solid #bbf7d0' }}>
+                    <div style={{ flex: 1, marginRight: '8px', minWidth: 0 }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.book.title}</div>
+                      <div style={{ fontSize: '10px', color: '#16a34a', fontFamily: entry.copy ? 'monospace' : 'inherit' }}>
+                        {entry.copy ? entry.copy.copy_code : 'any copy'}
+                      </div>
+                    </div>
+                    {entry.copy && (
+                      <button onClick={() => openBorrowCopyPicker(idx)} title="Choose a different copy"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '13px', padding: '0 6px' }}>↻</button>
+                    )}
+                    <button onClick={() => setBorrowCart(prev => prev.filter((_, i) => i !== idx))} title="Take off the list"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '15px', lineHeight: 1 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={issueBorrowedBooks} disabled={issuingBooks || isReadOnly || !canProcessOrders}
+                style={{ width: '100%', marginTop: '8px', padding: '10px', background: issuingBooks ? '#86efac' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: issuingBooks ? 'default' : 'pointer', fontWeight: '800', fontSize: '13px', fontFamily: 'inherit' }}>
+                {issuingBooks ? 'Issuing…' : `📚 Issue ${borrowCart.length} book${borrowCart.length === 1 ? '' : 's'}`}
+              </button>
+              <div style={{ fontSize: '10px', color: '#15803d', marginTop: '5px', textAlign: 'center' }}>
+                {selectedMember
+                  ? `${selectedMember.name} has ${memberBorrows} out · limit ${borrowLimit}`
+                  : 'Pick the member before issuing'}
               </div>
             </div>
           )}
@@ -2501,16 +2839,24 @@ export default function POS({ mode = 'library' }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
           onClick={() => setCopyPickerBook(null)}>
           <div style={{ background: 'white', borderRadius: '14px', padding: '22px', maxWidth: '480px', width: '100%', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>{copyPickerBook._swapCartId ? '🔄 Change Copy' : '📋 Select Copy to Sell'}</h3>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>
+              {copyPickerBook._borrowIdx != null ? '📚 Which copy goes out?' : copyPickerBook._swapCartId ? '🔄 Change Copy' : '📋 Select Copy to Sell'}
+            </h3>
             <div style={{ fontSize: '13px', color: '#666', marginBottom: '14px' }}>
               <strong>{copyPickerBook.title}</strong> — {copyPickerCopies.filter(c => c.status === 'available').length} available of {copyPickerCopies.length} total
             </div>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {copyPickerCopies.map(copy => {
+                const borrowIdx = copyPickerBook._borrowIdx;
+                const isBorrowPick = borrowIdx != null;
                 const isSwapMode = !!copyPickerBook._swapCartId;
                 const currentSwapItem = isSwapMode ? cart.find(c => c.cartId === copyPickerBook._swapCartId) : null;
-                const isCurrent = isSwapMode && currentSwapItem?.copyCode === copy.copy_code;
-                const alreadyInCart = !isCurrent && cart.some(c => c.copyCode === copy.copy_code);
+                const isCurrent = isBorrowPick
+                  ? borrowCart[borrowIdx]?.copy?.id === copy.id
+                  : isSwapMode && currentSwapItem?.copyCode === copy.copy_code;
+                const alreadyInCart = !isCurrent && (isBorrowPick
+                  ? borrowCart.some(e => e.copy?.id === copy.id)
+                  : cart.some(c => c.copyCode === copy.copy_code));
                 const isAvailable = copy.status === 'available';
                 const canSelect = isAvailable && !alreadyInCart && !isCurrent;
                 const statusLabel = copy.status === 'issued' ? '📤 Issued' : copy.status === 'sold' ? '💰 Sold' : copy.status === 'lost' ? '❌ Lost' : copy.status === 'damaged' ? '⚠️ Damaged' : null;
@@ -2520,6 +2866,12 @@ export default function POS({ mode = 'library' }) {
                     disabled={!canSelect}
                     onClick={() => {
                       if (!canSelect) return;
+                      if (isBorrowPick) {
+                        setBorrowCart(prev => prev.map((e, i) => i === borrowIdx ? { ...e, copy } : e));
+                        showToast(`Lending ${copy.copy_code}`);
+                        setCopyPickerBook(null);
+                        return;
+                      }
                       if (isSwapMode) {
                         // Swap: replace the copy in cart
                         setCart(prev => prev.map(c => c.cartId === copyPickerBook._swapCartId
@@ -2796,14 +3148,16 @@ function BookIcon({ size = 20 }) {
   );
 }
 
-function CafeIcon({ size = 20 }) {
+// The Sell half of the mode switch: a till's shopping bag, next to the book
+// that means Borrow. (This replaced the cafe cup, which went with the Cafe
+// button — cafe items are reached by searching for them now.)
+function CartIcon({ size = 20 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
       style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
-      <path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" />
-      <path d="M17 10.5h1.4a2.5 2.5 0 0 1 0 5H17" />
-      <path d="M7.5 2.6c-.6 1-.6 2 0 3M11 2.6c-.6 1-.6 2 0 3M14.5 2.6c-.6 1-.6 2 0 3" />
+      <path d="M5.5 7.5h13l-1.1 10a2 2 0 0 1-2 1.8H8.6a2 2 0 0 1-2-1.8z" />
+      <path d="M9 7.5V6a3 3 0 0 1 6 0v1.5" />
     </svg>
   );
 }
