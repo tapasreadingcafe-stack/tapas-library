@@ -261,6 +261,19 @@ export default function POS({ mode = 'library' }) {
   const [memberBorrows, setMemberBorrows] = useState(0);
   const [issuingBooks, setIssuingBooks] = useState(false);
 
+  // The promo box, the discount box, the tax breakdown and the bill date fill
+  // the bottom of the panel and push the cart items out of sight. They can be
+  // folded away; the total and the checkout button never are. Remembered, so
+  // it stays how the counter left it.
+  const [billDetailsOpen, setBillDetailsOpen] = useState(() => {
+    try { return localStorage.getItem('pos_bill_details') !== 'closed'; } catch { return true; }
+  });
+  const toggleBillDetails = () => setBillDetailsOpen(open => {
+    const next = !open;
+    try { localStorage.setItem('pos_bill_details', next ? 'open' : 'closed'); } catch {}
+    return next;
+  });
+
   // Copy picker modal
   const [copyPickerBook, setCopyPickerBook] = useState(null);
   const [copyPickerCopies, setCopyPickerCopies] = useState([]);
@@ -2322,8 +2335,51 @@ export default function POS({ mode = 'library' }) {
           {/* ── CHECKOUT SECTION ── */}
           <div style={{ borderTop: '2px solid #f0f0f0', padding: '12px 16px 14px', background: '#fafafa', flexShrink: 0 }}>
 
-            {/* Promo Code */}
+            {/* Discount — above the fold, and first in this block. It is
+                typed on a good share of bills, so hiding the one control staff
+                reach for would be a strange way to save space. */}
             {cart.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', whiteSpace: 'nowrap' }}>Discount</span>
+                <select
+                  value={appliedPromo ? addlDiscType : discountType}
+                  onChange={e => appliedPromo ? setAddlDiscType(e.target.value) : setDiscountType(e.target.value)}
+                  style={{ padding: '4px 6px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '12px', background: 'white', fontWeight: '700' }}>
+                  <option value="pct">%</option>
+                  <option value="fixed">₹</option>
+                </select>
+                <input type="number"
+                  value={appliedPromo ? addlDiscVal : discountVal}
+                  min="0" placeholder="0"
+                  onChange={e => appliedPromo
+                    ? setAddlDiscVal(parseFloat(e.target.value) || 0)
+                    : setDiscountVal(parseFloat(e.target.value) || 0)}
+                  style={{ flex: 1, padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '13px', background: 'white' }} />
+              </div>
+            )}
+
+            {/* Fold the bill's working-out away to get the items back on screen */}
+            {cart.length > 0 && (
+              <button onClick={toggleBillDetails}
+                title={billDetailsOpen ? 'Hide promo, discount and tax lines' : 'Show promo, discount and tax lines'}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '4px 0 8px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <span style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', letterSpacing: '1px' }}>
+                  {billDetailsOpen ? '▾' : '▸'} BILL DETAILS
+                </span>
+                {/* Folded away is not the same as gone — say what's in there. */}
+                <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>
+                  {billDetailsOpen ? 'hide' : [
+                    appliedPromo ? appliedPromo.code : null,
+                    discountAmount > 0 ? `−${fmt(discountAmount)}` : null,
+                    billTax && billTax.totalTax > 0 ? `GST ${fmtTax(billTax.totalTax)}` : null,
+                    isBackdated(billDate) ? `dated ${billDate}` : null,
+                  ].filter(Boolean).join(' · ') || 'show'}
+                </span>
+              </button>
+            )}
+
+            {/* Promo Code */}
+            {cart.length > 0 && billDetailsOpen && (
               <div style={{ marginBottom: '10px' }}>
                 {appliedPromo ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '6px' }}>
@@ -2358,31 +2414,10 @@ export default function POS({ mode = 'library' }) {
               </div>
             )}
 
-            {/* Discount */}
-            {cart.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', whiteSpace: 'nowrap' }}>Discount</span>
-                <select
-                  value={appliedPromo ? addlDiscType : discountType}
-                  onChange={e => appliedPromo ? setAddlDiscType(e.target.value) : setDiscountType(e.target.value)}
-                  style={{ padding: '4px 6px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '12px', background: 'white', fontWeight: '700' }}>
-                  <option value="pct">%</option>
-                  <option value="fixed">₹</option>
-                </select>
-                <input type="number"
-                  value={appliedPromo ? addlDiscVal : discountVal}
-                  min="0" placeholder="0"
-                  onChange={e => appliedPromo
-                    ? setAddlDiscVal(parseFloat(e.target.value) || 0)
-                    : setDiscountVal(parseFloat(e.target.value) || 0)}
-                  style={{ flex: 1, padding: '4px 8px', border: '1px solid #e0e0e0', borderRadius: '5px', fontSize: '13px', background: 'white' }} />
-              </div>
-            )}
-
             {/* Totals */}
             {cart.length > 0 && (
               <div style={{ marginBottom: '10px' }}>
-                {discountAmount > 0 && (
+                {billDetailsOpen && discountAmount > 0 && (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#9ca3af', marginBottom: '3px' }}>
                       <span>Subtotal</span><span>{fmt(subtotal)}</span>
@@ -2420,7 +2455,7 @@ export default function POS({ mode = 'library' }) {
                     )}
                   </>
                 )}
-                {billTax && billTax.totalTax > 0 && (() => {
+                {billDetailsOpen && billTax && billTax.totalTax > 0 && (() => {
                   // One slab on the bill (the usual cafe-only case): show the
                   // rate beside each half, e.g. "CGST @ 2.5%".
                   const half = billTax.bySlab.length === 1 ? ` @ ${billTax.bySlab[0].rate / 2}%` : '';
@@ -2442,7 +2477,7 @@ export default function POS({ mode = 'library' }) {
                     </div>
                   );
                 })()}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: (discountAmount > 0 || (billTax && billTax.totalTax > 0)) ? '1px solid #e5e7eb' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: (billDetailsOpen && (discountAmount > 0 || (billTax && billTax.totalTax > 0))) ? '1px solid #e5e7eb' : 'none' }}>
                   <span style={{ fontSize: '15px', fontWeight: '800', color: '#111827' }}>
                     TOTAL{billTax && billTax.totalTax > 0 && <span style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280' }}> (incl. GST)</span>}
                   </span>
@@ -2452,7 +2487,7 @@ export default function POS({ mode = 'library' }) {
             )}
 
             {/* Bill date — admins only; staff always bill today */}
-            {cart.length > 0 && (
+            {cart.length > 0 && billDetailsOpen && (
               <DateOverride
                 label="Bill date"
                 value={billDate}
