@@ -128,7 +128,7 @@ export default function Borrow() {
   }, []);
 
   const { isReadOnly } = usePermission();
-  const { isAdmin } = useAuth();
+  const { isSuperAdmin } = useAuth();
 
   // Toast
   const toast = useToast();
@@ -1152,8 +1152,8 @@ export default function Borrow() {
             </div>
           )}
 
-          {/* Issue + due dates — admins only */}
-          {selectedMember && isAdmin() && (
+          {/* Issue + due dates — super admins only */}
+          {selectedMember && isSuperAdmin() && (
             <div style={{ gridColumn: '1 / -1', background: 'white', borderRadius: '8px', padding: isMobile ? '14px' : '14px 20px' }}>
               <DateOverride
                 label="Issued on"

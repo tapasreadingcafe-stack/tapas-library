@@ -8,7 +8,7 @@ import ViewOnlyBanner from '../components/ViewOnlyBanner';
 export default function CafeOrders() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { isReadOnly } = usePermission();
+  const { isReadOnly, canDeleteRecords } = usePermission();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableReady, setTableReady] = useState(true);
@@ -165,7 +165,7 @@ export default function CafeOrders() {
                         {order.status === 'completed' && (
                           <button onClick={() => cancelOrder(order.id)} disabled={isReadOnly} style={{ padding: '4px 8px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Cancel</button>
                         )}
-                        {order.status !== 'completed' && (
+                        {order.status !== 'completed' && canDeleteRecords && (
                           <button onClick={() => deleteOrder(order.id)} disabled={isReadOnly} style={{ padding: '4px 8px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '4px', cursor: isReadOnly ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: isReadOnly ? 0.5 : 1 }}>Delete</button>
                         )}
                       </div>

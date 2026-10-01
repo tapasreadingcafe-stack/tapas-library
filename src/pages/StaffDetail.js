@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { ROLE_LABELS, SUPER_ADMIN_ONLY_PAGES, SUPER_ADMIN_ONLY_FEATURES } from '../utils/permissions';
 
 const PAGE_PERMISSIONS = [
   { key: 'dashboard',  label: 'Dashboard',        icon: '📊', desc: 'Main overview' },
@@ -37,6 +38,17 @@ const FEATURE_TOGGLES = [
   { key: 'can_manage_reservations',label: 'Can manage reservations',   icon: '📋' },
   { key: 'can_process_orders',     label: 'Can process POS orders',    icon: '🛒' },
 ];
+
+// Super-admin-only pages and features can't be granted to anyone else, so
+// they aren't offered here.
+const GRANTABLE_PAGES = PAGE_PERMISSIONS.filter(p => !SUPER_ADMIN_ONLY_PAGES.includes(p.key));
+const GRANTABLE_FEATURES = FEATURE_TOGGLES.filter(f => !SUPER_ADMIN_ONLY_FEATURES.includes(f.key));
+
+const ROLE_BADGE = {
+  super_admin: { bg: '#fef3c7', color: '#b45309', icon: '⭐', avatar: 'linear-gradient(135deg, #D4A853, #C49040)' },
+  admin:       { bg: '#ede9fe', color: '#7c3aed', icon: '👑', avatar: 'linear-gradient(135deg, #667eea, #764ba2)' },
+  staff:       { bg: '#e0f2fe', color: '#0284c7', icon: '👤', avatar: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
+};
 
 const ACCESS_LEVELS = ['none', 'view', 'full'];
 const LEVEL_LABELS = { none: 'No Access', view: 'View Only', full: 'Full Access' };
@@ -90,13 +102,13 @@ export default function StaffDetail() {
       const perms = data.permissions || {};
       const pagePerms = {};
       PAGE_PERMISSIONS.forEach(p => {
-        pagePerms[p.key] = perms[p.key] || (data.role === 'admin' ? 'full' : 'view');
+        pagePerms[p.key] = perms[p.key] || (data.role === 'staff' ? 'view' : 'full');
       });
       setPermissions(pagePerms);
 
       const feats = perms.features || {};
       FEATURE_TOGGLES.forEach(f => {
-        if (feats[f.key] === undefined) feats[f.key] = data.role === 'admin';
+        if (feats[f.key] === undefined) feats[f.key] = data.role !== 'staff';
       });
       setFeatures(feats);
     } catch (err) {
@@ -194,7 +206,7 @@ export default function StaffDetail() {
         <div style={{ position: 'relative' }}>
           <div style={{
             width: '80px', height: '80px', borderRadius: '50%',
-            background: staff.role === 'admin' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'linear-gradient(135deg, #06b6d4, #0891b2)',
+            background: (ROLE_BADGE[staff.role] || ROLE_BADGE.staff).avatar,
             color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: '800', fontSize: '28px',
           }}>
@@ -215,10 +227,10 @@ export default function StaffDetail() {
             <h1 style={{ margin: 0, fontSize: '22px' }}>{staff.name}</h1>
             <span style={{
               padding: '3px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
-              background: staff.role === 'admin' ? '#ede9fe' : '#e0f2fe',
-              color: staff.role === 'admin' ? '#7c3aed' : '#0284c7',
+              background: (ROLE_BADGE[staff.role] || ROLE_BADGE.staff).bg,
+              color: (ROLE_BADGE[staff.role] || ROLE_BADGE.staff).color,
             }}>
-              {staff.role === 'admin' ? '👑 Admin' : '👤 Staff'}
+              {(ROLE_BADGE[staff.role] || ROLE_BADGE.staff).icon} {ROLE_LABELS[staff.role] || 'Staff'}
             </span>
             <span style={{
               padding: '3px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
@@ -255,12 +267,17 @@ export default function StaffDetail() {
         </div>
       </div>
 
+      {staff.role === 'super_admin' ? (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '14px', padding: '20px 24px', marginBottom: '20px', fontSize: '13px', color: '#92400e' }}>
+          ⭐ <strong>Super Admin</strong> has full access to every page and action. There are no permissions to set.
+        </div>
+      ) : (<>
       {/* ── PAGE PERMISSIONS ── */}
       <div style={{ background: 'white', borderRadius: '14px', padding: '24px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px', fontSize: '17px' }}>🔐 Page Permissions</h2>
-            <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>Control which pages this staff member can access</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>Control which pages this {staff.role === 'admin' ? 'admin' : 'staff member'} can access. Staff, Settings, Accounts and Reports are Super Admin only.</p>
           </div>
           <button onClick={handleSavePermissions} disabled={saving || isReadOnly}
             style={{
@@ -280,7 +297,7 @@ export default function StaffDetail() {
             <span style={{ fontSize: '10px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'center' }}>Access Level</span>
           </div>
 
-          {PAGE_PERMISSIONS.map(page => (
+          {GRANTABLE_PAGES.map(page => (
             <div key={page.key} style={{
               display: 'grid', gridTemplateColumns: '1fr 300px', gap: '12px',
               padding: '10px 12px', borderRadius: '8px', alignItems: 'center',
@@ -324,10 +341,10 @@ export default function StaffDetail() {
       {/* ── FEATURE TOGGLES ── */}
       <div style={{ background: 'white', borderRadius: '14px', padding: '24px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
         <h2 style={{ margin: '0 0 4px', fontSize: '17px' }}>🎛️ Feature Toggles</h2>
-        <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#9ca3af' }}>Fine-grained control over specific actions</p>
+        <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#9ca3af' }}>Fine-grained control over specific actions. Deleting records, back-dating and managing staff are Super Admin only.</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
-          {FEATURE_TOGGLES.map(feat => {
+          {GRANTABLE_FEATURES.map(feat => {
             const enabled = features[feat.key] !== false;
             return (
               <div key={feat.key}
@@ -360,6 +377,8 @@ export default function StaffDetail() {
           })}
         </div>
       </div>
+
+      </>)}
 
       {/* ── ACTIVITY LOG ── */}
       <div style={{ background: 'white', borderRadius: '14px', padding: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>

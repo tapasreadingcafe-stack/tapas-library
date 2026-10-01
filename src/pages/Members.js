@@ -33,8 +33,8 @@ function Members() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
-  const { isReadOnly, canManageMembers } = usePermission();
-  const { isAdmin } = useAuth();
+  const { isReadOnly, canManageMembers, canDeleteRecords } = usePermission();
+  const { isSuperAdmin } = useAuth();
   const [members, setMembers] = useState([]);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
@@ -691,7 +691,7 @@ function Members() {
                       if (result.success) toast.success(result.mode === 'link' ? 'WhatsApp opened' : 'WhatsApp sent!');
                       else toast.error(result.error || 'Failed');
                     }} title="WhatsApp Renewal Reminder"><ActionIcon name="phone" /></button>}
-                    {!isReadOnly && canManageMembers && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete"><ActionIcon name="delete" /></button>}
+                    {!isReadOnly && canDeleteRecords && <button className="btn-icon btn-delete-icon" onClick={() => handleDeleteMember(member.id)} title="Delete"><ActionIcon name="delete" /></button>}
                   </td>
                 </tr>
               ))
@@ -859,7 +859,7 @@ function Members() {
                     disabled={isReadOnly}
                     hint="Expiry follows the start date and duration. Change it to enter a membership that began earlier."
                   />
-                  {isAdmin() && (
+                  {isSuperAdmin() && (
                     <div className="form-row">
                       <div className="form-group">
                         <label>Membership expires</label>

@@ -50,6 +50,25 @@ export const STAFF_DEFAULT_PERMISSIONS = {
   store: 'none',
 };
 
+// Roles, highest first. super_admin has every power; admin has everything
+// except the areas below, and a super_admin can switch individual pages off
+// for a particular admin (same per-page controls staff get).
+export const ROLE_LABELS = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  staff: 'Staff',
+};
+
+export const isSuperAdmin = (staff) => staff?.role === 'super_admin';
+
+// Pages only a super_admin can open: staff & roles, settings & devices,
+// accounts and reports.
+export const SUPER_ADMIN_ONLY_PAGES = ['staff', 'settings', 'accounts', 'reports'];
+
+// Feature toggles only a super_admin has: deleting records (books, members,
+// bills), managing staff, and reports.
+export const SUPER_ADMIN_ONLY_FEATURES = ['can_delete_books', 'can_delete_records', 'can_manage_staff', 'can_access_reports'];
+
 export function getPermissionForPath(pathname) {
   // Exact match first
   if (ROUTE_PERMISSION_MAP[pathname]) return ROUTE_PERMISSION_MAP[pathname];
@@ -63,9 +82,12 @@ export function getPermissionForPath(pathname) {
 }
 
 export function getStaffPermission(staff, permKey) {
-  if (staff?.role === 'admin') return 'full';
+  if (isSuperAdmin(staff)) return 'full';
+  if (SUPER_ADMIN_ONLY_PAGES.includes(permKey)) return 'none';
   const perms = staff?.permissions || {};
-  // Explicit permission wins. Otherwise use staff defaults.
+  // Explicit permission wins. Otherwise admins get full access and staff
+  // get the staff defaults.
   if (perms[permKey]) return perms[permKey];
+  if (staff?.role === 'admin') return 'full';
   return STAFF_DEFAULT_PERMISSIONS[permKey] || 'full';
 }

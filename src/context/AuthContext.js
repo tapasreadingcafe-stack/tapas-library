@@ -276,12 +276,15 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   };
 
-  const isAdmin = () => staff?.role === 'admin';
+  // isAdmin is true for admins and super admins; back-dating and other
+  // super-admin-only powers check isSuperAdmin.
+  const isAdmin = () => staff?.role === 'admin' || staff?.role === 'super_admin';
+  const isSuperAdmin = () => staff?.role === 'super_admin';
 
   return (
     <AuthContext.Provider value={{
       user, staff, loading, sessionExpired,
-      login, logout, sendPasswordReset, changePassword, isAdmin, refreshStaff,
+      login, logout, sendPasswordReset, changePassword, isAdmin, isSuperAdmin, refreshStaff,
     }}>
       {children}
     </AuthContext.Provider>

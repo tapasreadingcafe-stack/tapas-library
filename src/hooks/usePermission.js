@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getPermissionForPath, getStaffPermission } from '../utils/permissions';
+import { getPermissionForPath, getStaffPermission, isSuperAdmin, SUPER_ADMIN_ONLY_FEATURES } from '../utils/permissions';
 
 export function usePermission() {
   const { staff } = useAuth();
@@ -11,7 +11,8 @@ export function usePermission() {
 
   // Feature toggle helper — returns false if toggle is explicitly off
   const can = (featureKey) => {
-    if (staff?.role === 'admin') return true;
+    if (isSuperAdmin(staff)) return true;
+    if (SUPER_ADMIN_ONLY_FEATURES.includes(featureKey)) return false;
     return features[featureKey] !== false;
   };
 
@@ -21,7 +22,9 @@ export function usePermission() {
     canEdit: level === 'full',
     can,
     // Convenience accessors for feature toggles
+    isSuperAdmin: isSuperAdmin(staff),
     canDeleteBooks: can('can_delete_books'),
+    canDeleteRecords: can('can_delete_records'),
     canExportData: can('can_export_data'),
     canManageMembers: can('can_manage_members'),
     canProcessFines: can('can_process_fines'),

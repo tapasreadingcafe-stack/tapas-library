@@ -5,9 +5,9 @@ import { useToast } from './Toast';
 import { logActivity } from '../utils/activityLog';
 import { tsToYmd, ymdToTs, prettyYmd } from '../utils/backdate';
 
-/* Admin-only "correct the date on a record that is already saved".
+/* Super-admin-only "correct the date on a record that is already saved".
  *
- * The trigger renders as a small calendar button next to a row; non-admins see
+ * The trigger renders as a small calendar button next to a row; everyone else sees
  * nothing, so a staff-facing list is unchanged. Every correction is written to
  * the activity log with both the old and the new day — moving a sale between
  * days changes what the books say for both of them, and that needs a trail.
@@ -27,13 +27,13 @@ export default function EditRecordDate({
   onSaved,
   buttonStyle,
 }) {
-  const { isAdmin } = useAuth();
+  const { isSuperAdmin } = useAuth();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState({});
 
-  if (!isAdmin()) return null;
+  if (!isSuperAdmin()) return null;
 
   const start = () => {
     const next = {};

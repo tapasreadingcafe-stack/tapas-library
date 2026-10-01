@@ -12,7 +12,7 @@ import { WebsiteFormsBell, EventRsvpBell } from './components/InboxBell';
 import SyncStatus from './components/SyncStatus';
 import CommandPalette from './components/CommandPalette';
 import CustomerDisplay from './pages/CustomerDisplay';
-import { ROUTE_PERMISSION_MAP, STAFF_DEFAULT_PERMISSIONS, getPermissionForPath, getStaffPermission } from './utils/permissions';
+import { ROUTE_PERMISSION_MAP, STAFF_DEFAULT_PERMISSIONS, ROLE_LABELS, getPermissionForPath, getStaffPermission } from './utils/permissions';
 import Login from './pages/Login';
 import './App.css';
 
@@ -447,8 +447,9 @@ function ProfileDropdown() {
   const [open, setOpen] = useState(false);
   const name = staff?.name || 'Staff';
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-  const isAdmin = staff?.role === 'admin';
-  // Admin = gold, Staff = blue
+  const isAdmin = staff?.role === 'admin' || staff?.role === 'super_admin';
+  const isSuper = staff?.role === 'super_admin';
+  // Admins = gold, Staff = blue
   const avatarBg = isAdmin
     ? 'linear-gradient(135deg, #D4A853, #C49040)'
     : 'linear-gradient(135deg, #667eea, #764ba2)';
@@ -490,7 +491,7 @@ function ProfileDropdown() {
                 display: 'inline-block', padding: '2px 8px', borderRadius: '4px',
                 background: isAdmin ? '#fef3c7' : '#dbeafe',
                 color: isAdmin ? '#92400e' : '#1e40af',
-              }}>{staff?.role}</div>
+              }}>{ROLE_LABELS[staff?.role] || 'Staff'}</div>
             </div>
             <a href="/settings/profile" style={{
               display: 'flex', alignItems: 'center', gap: '8px',
@@ -502,7 +503,7 @@ function ProfileDropdown() {
             >
               👤 My Profile
             </a>
-            {isAdmin && (
+            {isSuper && (
               <a href="/settings/app" style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '8px 12px', borderRadius: '6px', textDecoration: 'none',
@@ -538,7 +539,7 @@ function PermissionGate({ children }) {
   const { staff } = useAuth();
   const location = useLocation();
 
-  if (staff?.role === 'admin') return children;
+  if (staff?.role === 'super_admin') return children;
 
   const needed = getPermissionForPath(location.pathname);
   const level = getStaffPermission(staff, needed);

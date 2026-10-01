@@ -5,8 +5,22 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmModal';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
+import { ROLE_LABELS } from '../utils/permissions';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'staff', phone: '' };
+
+const ROLE_STYLE = {
+  super_admin: { bg: '#fef3c7', color: '#b45309', avatar: '#C49040', icon: '⭐' },
+  admin:       { bg: '#f3e8ff', color: '#9b59b6', avatar: '#9b59b6', icon: '🔐' },
+  staff:       { bg: '#e8f0ff', color: '#667eea', avatar: '#667eea', icon: '👤' },
+};
+const roleStyle = (role) => ROLE_STYLE[role] || ROLE_STYLE.staff;
+
+const ROLE_DESCRIPTIONS = {
+  super_admin: '⭐ Super Admin: Everything an Admin can do, plus Staff & roles, Settings & Devices, Accounts, Reports, deleting records and back-dating. Can limit what each Admin sees.',
+  admin: '🔐 Admin: Full access to day-to-day pages (Books, Members, Borrow, POS, Cafe, Events, Inventory, Marketing). No Staff, Settings, Accounts, Reports, deleting or back-dating.',
+  staff: '👤 Staff: Access to Dashboard, Books, Members, Borrow, Overdue, Availability, Reservations, Reviews, Recommendations, and Wishlist. No access to POS financials or staff management.',
+};
 
 function initials(name) {
   return (name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -82,6 +96,10 @@ export default function StaffManagement() {
       showToast('Password must be at least 6 characters', 'error'); return;
     }
 
+    if (editingStaff?.role === 'super_admin' && form.role !== 'super_admin' && isLastSuperAdmin(editingStaff)) {
+      showToast('This is the only Super Admin. Make someone else Super Admin first.', 'error'); return;
+    }
+
     setSaving(true);
     try {
       if (editingStaff) {
@@ -126,7 +144,14 @@ export default function StaffManagement() {
     }
   };
 
+  const isLastSuperAdmin = (member) =>
+    member.role === 'super_admin' &&
+    staffList.filter(s => s.role === 'super_admin' && s.is_active && s.id !== member.id).length === 0;
+
   const toggleActive = async (member) => {
+    if (member.is_active && isLastSuperAdmin(member)) {
+      showToast('This is the only Super Admin. Make someone else Super Admin first.', 'error'); return;
+    }
     const action = member.is_active ? 'deactivate' : 'activate';
     if (!await confirm({ title: `${action.charAt(0).toUpperCase() + action.slice(1)} Staff`, message: `${action.charAt(0).toUpperCase() + action.slice(1)} ${member.name}?`, variant: 'warning' })) return;
     try {
@@ -159,7 +184,7 @@ CREATE TABLE IF NOT EXISTS staff (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   role TEXT NOT NULL DEFAULT 'staff'
-    CHECK (role IN ('admin', 'staff')),
+    CHECK (role IN ('super_admin', 'admin', 'staff')),
   phone TEXT,
   avatar_url TEXT,
   is_active BOOLEAN DEFAULT true,
@@ -201,7 +226,7 @@ ON CONFLICT (email) DO NOTHING;`;
   }
 
   const activeCount   = staffList.filter(s => s.is_active).length;
-  const adminCount    = staffList.filter(s => s.role === 'admin').length;
+  const adminCount    = staffList.filter(s => s.role === 'admin' || s.role === 'super_admin').length;
   const staffOnlyCount = staffList.filter(s => s.role === 'staff').length;
 
   return (
@@ -210,7 +235,7 @@ ON CONFLICT (email) DO NOTHING;`;
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>👥 Staff Management</h1>
-          <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>Admin only — manage library staff accounts</p>
+          <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>Super Admin only — manage library staff accounts and roles</p>
         </div>
         {!isReadOnly && (
           <button onClick={openAdd} style={{ padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
@@ -262,7 +287,7 @@ ON CONFLICT (email) DO NOTHING;`;
                       ) : (
                         <div style={{
                           width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                          background: member.role === 'admin' ? '#9b59b6' : '#667eea',
+                          background: roleStyle(member.role).avatar,
                           color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontWeight: '700', fontSize: '13px',
                         }}>
@@ -275,11 +300,11 @@ ON CONFLICT (email) DO NOTHING;`;
                   <td style={{ padding: '12px 16px', fontSize: '13px', color: '#555' }}>{member.email}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{
-                      background: member.role === 'admin' ? '#f3e8ff' : '#e8f0ff',
-                      color: member.role === 'admin' ? '#9b59b6' : '#667eea',
+                      background: roleStyle(member.role).bg,
+                      color: roleStyle(member.role).color,
                       padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '700',
                     }}>
-                      {member.role === 'admin' ? '🔐 Admin' : '👤 Staff'}
+                      {roleStyle(member.role).icon} {ROLE_LABELS[member.role] || 'Staff'}
                     </span>
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: '13px', color: '#777' }}>{member.phone || '—'}</td>
@@ -378,6 +403,7 @@ ON CONFLICT (email) DO NOTHING;`;
                   style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e0e0e0', borderRadius: '7px', fontSize: '14px' }}>
                   <option value="staff">Staff</option>
                   <option value="admin">Admin</option>
+                  <option value="super_admin">Super Admin</option>
                 </select>
               </div>
 
@@ -389,10 +415,8 @@ ON CONFLICT (email) DO NOTHING;`;
             </div>
 
             {/* Role description */}
-            <div style={{ background: form.role === 'admin' ? '#f3e8ff' : '#e8f0ff', borderRadius: '7px', padding: '10px 14px', marginBottom: '20px', fontSize: '12px', color: form.role === 'admin' ? '#7c3aed' : '#4a5568' }}>
-              {form.role === 'admin'
-                ? '🔐 Admin: Full access to all features including POS, Fines, Reports, Staff Management, and delete operations.'
-                : '👤 Staff: Access to Dashboard, Books, Members, Borrow, Overdue, Availability, Reservations, Reviews, Recommendations, and Wishlist. No access to POS financials or staff management.'}
+            <div style={{ background: roleStyle(form.role).bg, borderRadius: '7px', padding: '10px 14px', marginBottom: '20px', fontSize: '12px', color: roleStyle(form.role).color }}>
+              {ROLE_DESCRIPTIONS[form.role] || ROLE_DESCRIPTIONS.staff}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>

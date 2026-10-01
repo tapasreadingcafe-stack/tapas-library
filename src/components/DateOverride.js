@@ -2,10 +2,10 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { todayYmd, isBackdated, daysFromToday, prettyYmd } from '../utils/backdate';
 
-/* Admin-only date picker for recording something on a day other than today.
+/* Super-admin-only date picker for recording something on a day other than today.
  *
- * Renders nothing at all for non-admin staff — they keep the old behaviour of
- * everything landing on today, with no field to get wrong. For an admin it is
+ * Renders nothing at all for everyone but a super admin — they keep the old behaviour of
+ * everything landing on today, with no field to get wrong. For a super admin it is
  * deliberately loud once the date leaves today, because a backdated entry
  * moves money between days in Reports, Accounts and the GST return.
  */
@@ -19,8 +19,8 @@ export default function DateOverride({
   disabled = false,
   compact = false,
 }) {
-  const { isAdmin } = useAuth();
-  if (!isAdmin()) return null;
+  const { isSuperAdmin } = useAuth();
+  if (!isSuperAdmin()) return null;
 
   const off = isBackdated(value);
   const days = daysFromToday(value);

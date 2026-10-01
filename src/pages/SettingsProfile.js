@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
+import { ROLE_LABELS } from '../utils/permissions';
 
 export default function SettingsProfile() {
   const { staff, user, changePassword } = useAuth();
@@ -83,11 +84,11 @@ export default function SettingsProfile() {
             <p style={{ margin: '0 0 2px', color: '#64748b', fontSize: '14px' }}>{email}</p>
             <span style={{
               display: 'inline-block', padding: '2px 10px', borderRadius: '99px',
-              background: staff?.role === 'admin' ? '#dbeafe' : '#f1f5f9',
-              color: staff?.role === 'admin' ? '#1e40af' : '#475569',
+              background: staff?.role === 'super_admin' ? '#fef3c7' : staff?.role === 'admin' ? '#dbeafe' : '#f1f5f9',
+              color: staff?.role === 'super_admin' ? '#92400e' : staff?.role === 'admin' ? '#1e40af' : '#475569',
               fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
             }}>
-              {staff?.role || 'staff'}
+              {ROLE_LABELS[staff?.role] || 'Staff'}
             </span>
           </div>
         </div>

@@ -1520,7 +1520,7 @@ export default function Books() {
                                 >
                                   {copy.saving ? '…' : mismatch ? 'Fix' : 'Save'}
                                 </button>
-                                <button
+                                {canDeleteBooks && <button
                                   type="button"
                                   disabled={copy.saving}
                                   onClick={() => deleteCopy(copy)}
@@ -1528,7 +1528,7 @@ export default function Books() {
                                   style={{ flex: '0 0 auto', padding: '8px 10px', background: '#fff', color: '#e53e3e', border: '1px solid #feb2b2', borderRadius: '6px', cursor: copy.saving ? 'default' : 'pointer', fontWeight: '600', fontSize: '13px' }}
                                 >
                                   🗑️
-                                </button>
+                                </button>}
                               </div>
                             );
                           })}
@@ -2252,10 +2252,10 @@ export default function Books() {
                           }} style={{ fontSize: '11px', color: '#2980b9', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             🖨 Print barcode
                           </button>}
-                          <button onClick={e => { e.stopPropagation(); handleDeleteSet(set.id); }}
+                          {canDeleteBooks && <button onClick={e => { e.stopPropagation(); handleDeleteSet(set.id); }}
                             style={{ fontSize: '11px', color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             🗑 Delete set
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     );
