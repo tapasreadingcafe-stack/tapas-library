@@ -69,6 +69,7 @@ const CustomPage      = lazyWithRetry(() => import('./pages/CustomPage'));
 // const Shop            = lazyWithRetry(() => import('./pages/Shop'));
 const Contact         = lazyWithRetry(() => import('./pages/Contact'));
 const Events          = lazyWithRetry(() => import('./pages/Events'));
+const BookCatalog     = lazyWithRetry(() => import('./pages/BookCatalog'));
 const EventDetail     = lazyWithRetry(() => import('./pages/EventDetail'));
 const SignIn          = lazyWithRetry(() => import('./pages/SignIn'));
 const SignUp          = lazyWithRetry(() => import('./pages/SignUp'));
@@ -140,6 +141,7 @@ function AppShell() {
             <Route path="/search"        element={<Navigate to="/" replace />} />
             <Route path="/shop"          element={<Navigate to="/" replace />} />
             <Route path="/contact"       element={<Contact />} />
+            <Route path="/library"       element={<BookCatalog />} />
             <Route path="/events"        element={<Events />} />
             <Route path="/events/:slug"  element={<EventDetail />} />
             <Route path="/sign-in"       element={<SignIn />} />

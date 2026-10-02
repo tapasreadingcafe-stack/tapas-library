@@ -17,6 +17,7 @@ const LIME      = '#caf27e';
 const EXPLORE_LINKS = [
   { label: 'Home',    to: '/' },
   { label: 'About',   to: '/about' },
+  { label: 'Library', to: '/library' },
   { label: 'Events',  to: '/events' },
   { label: 'Blogs',   to: '/blog' },
   { label: 'Contact', to: '/contact' },
