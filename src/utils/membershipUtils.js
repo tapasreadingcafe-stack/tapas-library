@@ -37,6 +37,8 @@ export const getCustomerIDPrefix = (dateOfBirth) => {
 
 // Refundable deposit (collected once, not a subscription plan)
 export const DEPOSIT_AMOUNT = 1000;
+// The casual plan carries a smaller deposit, since only one book is ever out.
+export const CASUAL_DEPOSIT_AMOUNT = 500;
 
 // Default plan values
 export const PLAN_DEFAULTS = {
@@ -53,8 +55,31 @@ export const PLAN_DEFAULTS = {
     duration_days: 365,
     borrow_limit: 2,
     discount_percent: 10
+  },
+  // Walk-in borrowing: one book for a fortnight against a ₹500 deposit.
+  // A borrowed book falls due when the plan ends, so the duration is also
+  // the loan period.
+  casual: {
+    name: 'Casual Borrowing',
+    price: 70,
+    duration_days: 14,
+    borrow_limit: 1,
+    discount_percent: 0
   }
 };
+
+// Short label for a plan key, for badges, pickers and messages. Unknown keys
+// (legacy imports) fall back to a readable version of the key itself.
+export const PLAN_LABELS = {
+  individual_monthly: 'Monthly',
+  individual_annual: 'Annual',
+  casual: 'Casual'
+};
+
+export function planLabel(plan, fallback = 'No Plan') {
+  if (!plan) return fallback;
+  return PLAN_LABELS[plan] || String(plan).replace(/_/g, ' ');
+}
 
 // Calculate status color based on subscription dates
 export function calculateStatusColor(member) {

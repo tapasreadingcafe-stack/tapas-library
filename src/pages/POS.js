@@ -9,7 +9,7 @@ import BarcodeScanner from '../BarcodeScanner';
 import { usePermission } from '../hooks/usePermission';
 import ViewOnlyBanner from '../components/ViewOnlyBanner';
 import { useNavigate } from 'react-router-dom';
-import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID } from '../utils/membershipUtils';
+import { PLAN_DEFAULTS, calculateEndDate, generateCustomerID, planLabel } from '../utils/membershipUtils';
 import { readCachedBooks, writeCachedBooks, CATALOG_COLS } from '../utils/catalogCache';
 import { saveBillOffline } from '../offline/billing';
 import { membershipDetailsWhatsAppMsg } from '../utils/whatsappUtils';
@@ -29,6 +29,11 @@ const DEFAULT_SERVICES = [
   { id: 'svc_mem_renew_monthly',  emoji: '🔄', name: 'Renew Monthly',        price: 600,  cat: 'Membership' },
   { id: 'svc_mem_new_annual',     emoji: '🥇', name: 'New Yearly',           price: 6000, cat: 'Membership' },
   { id: 'svc_mem_renew_annual',   emoji: '♻️', name: 'Renew Yearly',         price: 6000, cat: 'Membership' },
+  // Walk-in plan: one book for 14 days. Its deposit is smaller than the
+  // members' ₹1000, and keeps "Deposit" in the name so Accounts holds it
+  // rather than counting it as income.
+  { id: 'svc_mem_casual_deposit', emoji: '🔐', name: 'Casual Deposit (Refundable)', price: 500, cat: 'Membership' },
+  { id: 'svc_mem_casual',         emoji: '📖', name: 'Casual Borrowing (14 days)',  price: 70,  cat: 'Membership' },
   { id: 'svc_late_fine',  emoji: '⚠️', name: 'Late Fine / day',    price: 5,    cat: 'Fines' },
   { id: 'svc_damage',     emoji: '📦', name: 'Book Damage Fee',     price: 100,  cat: 'Fines' },
   { id: 'svc_print_bw',   emoji: '📄', name: 'Printing B&W /page', price: 2,    cat: 'Printing' },
@@ -1044,12 +1049,15 @@ export default function POS({ mode = 'library' }) {
       // Activate or extend membership when a membership item is in the cart
       if (selectedMember) {
         const memItem = cart.find(c =>
-          ['svc_mem_new_monthly', 'svc_mem_renew_monthly', 'svc_mem_new_annual', 'svc_mem_renew_annual'].includes(c.cartId)
+          ['svc_mem_new_monthly', 'svc_mem_renew_monthly', 'svc_mem_new_annual', 'svc_mem_renew_annual', 'svc_mem_casual'].includes(c.cartId)
         );
         if (memItem) {
+          const isCasual = memItem.cartId === 'svc_mem_casual';
           const isAnnual = memItem.cartId.includes('annual');
-          const isRenew  = memItem.cartId.includes('renew');
-          const planKey  = isAnnual ? 'individual_annual' : 'individual_monthly';
+          const planKey  = isCasual ? 'casual' : isAnnual ? 'individual_annual' : 'individual_monthly';
+          // Casual has no separate renew button: paying again while a casual
+          // fortnight is still running stacks onto its end, like a renewal.
+          const isRenew  = memItem.cartId.includes('renew') || (isCasual && selectedMember.plan === 'casual');
           const defaults = PLAN_DEFAULTS[planKey];
           const today    = billDay;
           let startDate  = today;
@@ -1792,7 +1800,7 @@ export default function POS({ mode = 'library' }) {
                         onMouseLeave={e => e.currentTarget.style.background = 'white'}
                       >
                         <div style={{ fontWeight: '600', color: '#333' }}>{m.name}</div>
-                        <div style={{ fontSize: '11px', color: '#999', marginTop: '1px' }}>{m.phone}{m.plan ? ` · ${m.plan === 'individual_monthly' ? 'Monthly' : m.plan === 'individual_annual' ? 'Annual' : m.plan.replace('_', ' ')}` : ''}</div>
+                        <div style={{ fontSize: '11px', color: '#999', marginTop: '1px' }}>{m.phone}{m.plan ? ` · ${planLabel(m.plan)}` : ''}</div>
                       </div>
                     ))}
                   </div>
@@ -1806,7 +1814,7 @@ export default function POS({ mode = 'library' }) {
                 <div>
                   <div style={{ fontWeight: '700', fontSize: '13px', color: '#5b21b6' }}>{selectedMember.name}</div>
                   <div style={{ fontSize: '11px', color: '#8b5cf6', marginTop: '2px' }}>
-                    {selectedMember.plan === 'individual_monthly' ? 'Monthly' : selectedMember.plan === 'individual_annual' ? 'Annual' : (selectedMember.plan || 'Guest').replace('_', ' ')} · {selectedMember.phone}
+                    {planLabel(selectedMember.plan, 'Guest')} · {selectedMember.phone}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>

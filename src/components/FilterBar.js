@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { PLAN_DEFAULTS } from '../utils/membershipUtils';
+
+const ALL_PLANS = Object.keys(PLAN_DEFAULTS);
 
 function FilterBar({ onFilterChange, onClose }) {
   const [search, setSearch] = useState('');
@@ -31,10 +34,10 @@ function FilterBar({ onFilterChange, onClose }) {
 
     if (filters.membershipCategory === 'all') {
       membershipStatus = ['active', 'expiring', 'expired', 'guest'];
-      membershipPlan = ['individual_monthly', 'individual_annual', 'no_plan'];
+      membershipPlan = [...ALL_PLANS, 'no_plan'];
     } else if (filters.membershipCategory === 'subscription') {
       membershipStatus = ['active', 'expiring', 'expired'];
-      membershipPlan = ['individual_monthly', 'individual_annual'];
+      membershipPlan = ALL_PLANS;
     } else if (filters.membershipCategory === 'non_subscription') {
       membershipStatus = ['guest'];
       membershipPlan = ['no_plan'];

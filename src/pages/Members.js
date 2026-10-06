@@ -23,6 +23,7 @@ import {
   sortMembers,
   formatDate,
   PLAN_DEFAULTS,
+  planLabel,
   calculateEndDate,
   calculateAge,
   isMinor,
@@ -49,7 +50,7 @@ function Members() {
   const [currentFilters, setCurrentFilters] = useState({
     search: '',
     membershipStatus: ['active', 'expiring', 'expired', 'guest'],
-    membershipPlan: ['individual_monthly', 'individual_annual', 'no_plan'],
+    membershipPlan: [...Object.keys(PLAN_DEFAULTS), 'no_plan'],
     sortBy: 'expiry_date',
     sortOrder: 'asc'
   });
@@ -483,10 +484,7 @@ function Members() {
 
   const getPlanBadge = (member) => {
     if (!member.plan) return 'NO PLAN';
-    if (member.plan === 'individual_monthly') return 'Monthly';
-    if (member.plan === 'individual_annual') return 'Annual';
-    const planName = member.plan.replace(/_/g, ' ').toUpperCase();
-    return planName;
+    return planLabel(member.plan);
   };
 
   const getGeneratedCustomerID = (member) => {
