@@ -99,6 +99,28 @@ export default function Books() {
   const [streaming, setStreaming] = useState(false);
   // Token to discard stale fetches when the filter changes mid-stream.
   const fetchTokenRef = useRef(0);
+  // Newest first by when stock last arrived (a new title OR another copy of
+  // one we have). Falls back to created_at until the last_added_at column
+  // exists — see supabase/migrations/20261002_books_last_added_at.sql.
+  const sortColRef = useRef('last_added_at');
+  // Covers, by book id, fetched only for books actually shown with a cover.
+  const [covers, setCovers] = useState({});
+  const coversRequested = useRef(new Set());
+  const fetchCovers = async (ids) => {
+    const wanted = ids.filter(id => !coversRequested.current.has(id));
+    if (!wanted.length) return;
+    wanted.forEach(id => coversRequested.current.add(id));
+    const { data } = await supabase.from('books').select('id, book_image').in('id', wanted);
+    if (data) setCovers(prev => {
+      const next = { ...prev };
+      data.forEach(r => { next[r.id] = r.book_image || ''; });
+      return next;
+    });
+  };
+  const fetchCover = async (id) => {
+    const { data } = await supabase.from('books').select('book_image').eq('id', id).single();
+    return data?.book_image || '';
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -348,19 +370,32 @@ export default function Books() {
       // round trip instead of waiting for the whole catalog to download.
       // A small first page paints almost immediately; the rest fill in behind
       // it. Each batch is appended to state as it arrives.
-      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, book_image, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_url, cover_color, sort_order, status, set_id';
+      // No book_image / cover_url here: ~770 books still keep their cover as
+      // inline base64 (~120 KB each), and a 1000-row batch carrying them hit
+      // the statement timeout, so only the first 50 books ever loaded (and
+      // search / export silently missed the rest). Covers are fetched on
+      // demand instead — see fetchCovers and handleEditBook.
+      const cols = 'id, book_id, title, author, isbn, category, condition, price, sales_price, mrp, discount_percent, quantity_total, quantity_available, created_at, store_visible, is_borrowable, is_staff_pick, staff_pick_blurb, slug, shelf_id, cover_color, sort_order, status, set_id';
       const FIRST_PAGE = 50;
       const PAGE = 1000;
       let offset = 0;
       let pageSize = FIRST_PAGE;
       for (;;) {
+        const sortCol = sortColRef.current;
         let q = supabase
           .from('books')
           .select(cols)
+          .order(sortCol, { ascending: false })
           .order('created_at', { ascending: false })
           .range(offset, offset + pageSize - 1);
         if (filterCategory !== 'all') q = q.eq('category', filterCategory);
         const { data, error } = await q;
+        // Judge by the column THIS query used — a parallel fetch may already
+        // have switched the ref, and this one still needs its retry.
+        if (error && sortCol !== 'created_at' && /last_added_at/.test(error.message || '')) {
+          sortColRef.current = 'created_at';
+          continue;
+        }
         if (error) throw error;
         // A newer fetch superseded this one — abandon without touching state.
         if (token !== fetchTokenRef.current) return;
@@ -608,9 +643,10 @@ export default function Books() {
         if (existing.title)      newForm.title    = existing.title;
         if (existing.author)     newForm.author   = existing.author;
         if (existing.category)   newForm.category = existing.category;
-        if (existing.book_image) {
-          newForm.book_image = existing.book_image;
-          setImagePreview(existing.book_image);
+        const existingCover = await fetchCover(existing.id).catch(() => '');
+        if (existingCover) {
+          newForm.book_image = existingCover;
+          setImagePreview(existingCover);
         }
         setFormData(newForm);
         toast.success('Pre-filled from existing book in your catalog');
@@ -862,7 +898,14 @@ export default function Books() {
 
   const handleEditBook = (book) => {
     setFormData(book);
-    setImagePreview(book.book_image || '');
+    setImagePreview(covers[book.id] || '');
+    // The list doesn't carry covers; pull this one so the form shows it and
+    // a save keeps it.
+    supabase.from('books').select('book_image, cover_url').eq('id', book.id).single().then(({ data }) => {
+      if (!data) return;
+      setFormData(prev => (prev.id === book.id ? { ...prev, book_image: data.book_image, cover_url: data.cover_url } : prev));
+      setImagePreview(prev => prev || data.book_image || '');
+    });
     setEditingId(book.id);
     setShowAddForm(true);
     setNotForSale(!book.mrp && !book.sales_price);
@@ -1167,6 +1210,13 @@ export default function Books() {
     const matchCondition = filterCondition === 'all' || book.condition === filterCondition;
     return matchSearch && matchCondition;
   });
+
+  // Phone layout shows a cover thumbnail; fetch covers for the first rows only.
+  const mobileCoverIds = isMobile ? filteredBooks.slice(0, 40).map(b => b.id).join(',') : '';
+  useEffect(() => {
+    if (mobileCoverIds) fetchCovers(mobileCoverIds.split(','));
+    // eslint-disable-next-line
+  }, [mobileCoverIds]);
 
   return (
     <div style={{ padding: isMobile ? '12px' : '20px' }}>
@@ -1963,8 +2013,8 @@ export default function Books() {
               return (
                 <div key={book.id} style={{ background: 'white', borderRadius: '10px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid #f0f0f0' }}>
                   <div style={{ width: '50px', height: '70px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {book.book_image ? (
-                      <img src={book.book_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
+                    {covers[book.id] ? (
+                      <img src={covers[book.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
                     ) : (
                       <span style={{ fontSize: '20px' }}>📚</span>
                     )}
