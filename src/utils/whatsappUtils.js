@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { planLabel as planLabelOf } from './membershipUtils';
 
 /**
  * Clean phone number and format for WhatsApp (Indian numbers)
@@ -109,7 +110,7 @@ Please return it at your earliest convenience to avoid additional fines.
 }
 
 export function membershipExpiryWhatsAppMsg({ memberName, plan, expiryDate, libraryName }) {
-  const planLabel = plan === 'individual_monthly' ? 'Monthly' : plan === 'individual_annual' ? 'Annual' : plan || 'library';
+  const planLabel = planLabelOf(plan, 'library');
   return `*Membership Expiring Soon*
 Hi *${memberName}*!
 Your *${planLabel}* membership expires on *${expiryDate}*.
@@ -145,7 +146,7 @@ Enjoy your read! 😊`;
 }
 
 export function membershipDetailsWhatsAppMsg({ memberName, memberId, plan, expiryDate, borrowLimit, discount, libraryName }) {
-  const planLabel = plan === 'individual_monthly' ? 'Monthly' : plan === 'individual_annual' ? 'Annual' : plan || 'Standard';
+  const planLabel = planLabelOf(plan, 'Standard');
   return `*Welcome to ${libraryName || 'Tapas Reading Cafe'}!*
 
 Hi *${memberName}*!

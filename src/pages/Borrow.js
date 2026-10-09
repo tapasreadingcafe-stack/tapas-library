@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import DateOverride from '../components/DateOverride';
 import { todayYmd, ymdToTs } from '../utils/backdate';
 import EditRecordDate from '../components/EditRecordDate';
+import { planLabel } from '../utils/membershipUtils';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 // How many members the picker preloads for browsing. Typing searches the
@@ -913,7 +914,7 @@ export default function Borrow() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '700', fontSize: '16px' }}>{selectedMember.name}</div>
                       <div style={{ fontSize: '12px', color: '#666' }}>
-                        {selectedMember.phone} · {selectedMember.plan === 'individual_monthly' ? 'Monthly' : selectedMember.plan === 'individual_annual' ? 'Annual' : (selectedMember.plan || 'No Plan').replace('_', ' ')}
+                        {selectedMember.phone} · {planLabel(selectedMember.plan)}
                       </div>
                     </div>
                     <button onClick={() => { setSelectedMember(null); setMemberSearch(''); setDueDate(''); }}

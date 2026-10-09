@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { PLAN_DEFAULTS, planLabel } from '../utils/membershipUtils';
 
-const PLANS = ['individual_monthly', 'individual_annual'];
+const PLANS = Object.keys(PLAN_DEFAULTS);
 const PLAN_COLORS = {
-  individual_monthly: '#667eea', individual_annual: '#9b59b6',
+  individual_monthly: '#667eea', individual_annual: '#9b59b6', casual: '#e67e22',
 };
 const STATUS_STYLES = {
   active: { bg: '#d4edda', color: '#155724', label: 'Active' },
@@ -165,7 +166,7 @@ export default function AccountsMemberPayments() {
                     borderRadius: '10px', padding: '14px', textAlign: 'center',
                   }}>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: PLAN_COLORS[p.plan], textTransform: 'capitalize', marginBottom: '6px' }}>
-                      {p.plan.replace('_', ' ')}
+                      {planLabel(p.plan)}
                     </div>
                     <div style={{ fontSize: '20px', fontWeight: '700', color: '#333' }}>₹{p.revenue.toLocaleString('en-IN')}</div>
                     <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{p.count} member{p.count !== 1 ? 's' : ''}</div>
@@ -201,7 +202,7 @@ export default function AccountsMemberPayments() {
               <select value={planFilter} onChange={e => setPlanFilter(e.target.value)}
                 style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px' }}>
                 <option value="all">All Plans</option>
-                {PLANS.map(p => <option key={p} value={p}>{p.replace('_', ' ')}</option>)}
+                {PLANS.map(p => <option key={p} value={p}>{planLabel(p)}</option>)}
               </select>
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                 style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px' }}>
@@ -240,7 +241,7 @@ export default function AccountsMemberPayments() {
                           <td style={{ padding: '10px 8px', color: '#555' }}>{m.phone || '—'}</td>
                           <td style={{ padding: '10px 8px' }}>
                             <span style={{ background: `${PLAN_COLORS[m.plan] || '#667eea'}20`, color: PLAN_COLORS[m.plan] || '#667eea', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', textTransform: 'capitalize' }}>
-                              {(m.plan || '—').replace('_', ' ')}
+                              {planLabel(m.plan, '—')}
                             </span>
                           </td>
                           <td style={{ padding: '10px 8px', fontWeight: '600' }}>₹{(m.plan_price || 0).toLocaleString('en-IN')}</td>

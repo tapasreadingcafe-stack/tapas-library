@@ -469,7 +469,7 @@ export default function MemberProfile() {
 
           <div style={{ textAlign: 'right' }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>Current Plan</p>
-            <h2 style={{ margin: '0 0 10px 0', color: '#667eea', textTransform: 'capitalize' }}>{member.plan || 'No Plan'}</h2>
+            <h2 style={{ margin: '0 0 10px 0', color: '#667eea', textTransform: 'capitalize' }}>{PLAN_DEFAULTS[member.plan]?.name || member.plan || 'No Plan'}</h2>
             <p style={{
               padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', margin: '0',
               background: statusColor === 'gold' ? '#fff3cd' : statusColor === 'orange' ? '#fff9e6' : statusColor === 'red' ? '#ffebee' : '#f0f0f0',

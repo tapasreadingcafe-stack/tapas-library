@@ -26,7 +26,7 @@ export const STREAMS = {
 export const REVENUE_STREAMS = ['library', 'cafe', 'membership', 'fines'];
 
 const DEPOSIT_RE    = /deposit/i;
-const MEMBERSHIP_RE = /member|monthly|yearly|annual|renew/i;
+const MEMBERSHIP_RE = /member|monthly|yearly|annual|renew|casual/i;
 const FINE_RE       = /fine|damage|lost/i;
 
 // Classify a name that arrived with a generic type.
