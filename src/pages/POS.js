@@ -1069,7 +1069,7 @@ export default function POS({ mode = 'library' }) {
           }
           const endDate = calculateEndDate(startDate, defaults.duration_days);
           try {
-            await supabase.from('members').update({
+            const { data: memRows, error: memErr } = await supabase.from('members').update({
               plan: planKey,
               plan_price: defaults.price,
               plan_duration_days: defaults.duration_days,
@@ -1079,7 +1079,11 @@ export default function POS({ mode = 'library' }) {
               subscription_end: endDate,
               membership_type: 'standard',
               status: 'active',
-            }).eq('id', selectedMember.id);
+            }).eq('id', selectedMember.id).select('id');
+            // A refused update must not pass silently: the bill is already
+            // saved, so tell the cashier the plan didn't start.
+            if (memErr) throw memErr;
+            if (!memRows || memRows.length === 0) throw new Error('the member record could not be updated');
             // Also extend due_date on all active borrows to match new subscription end
             await supabase.from('circulation')
               .update({ due_date: endDate })
@@ -1087,7 +1091,10 @@ export default function POS({ mode = 'library' }) {
               .is('return_date', null);
             setSelectedMember(prev => prev ? { ...prev, plan: planKey, subscription_end: endDate } : prev);
             setActivatedMembership({ planKey, endDate, defaults });
-          } catch (e) { console.error('Membership update failed:', e); }
+          } catch (e) {
+            console.error('Membership update failed:', e);
+            showToast(`Payment saved, but the ${planLabel(planKey)} plan didn't start: ${e.message}`, 'error');
+          }
         }
       }
 

@@ -12,7 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import DateOverride from '../components/DateOverride';
 import { todayYmd, ymdToTs } from '../utils/backdate';
 import EditRecordDate from '../components/EditRecordDate';
-import { planLabel } from '../utils/membershipUtils';
+import { planLabel, PLAN_DEFAULTS, CASUAL_DEPOSIT_AMOUNT } from '../utils/membershipUtils';
+import { casualTotal, sellCasualPlan, fetchCasualBorrowers, applyCasualPlan } from '../utils/casualBorrow';
 const TIER_DAYS = { basic: 7, silver: 14, gold: 21, premium: 21 };
 const CONDITIONS = ['New', 'Good', 'Fair', 'Poor', 'Damaged'];
 // How many members the picker preloads for browsing. Typing searches the
@@ -114,6 +115,16 @@ export default function Borrow() {
   const [receiptModal, setReceiptModal] = useState(null);
   const [renewalModal, setRenewalModal] = useState(null);
   const [renewalDueDate, setRenewalDueDate] = useState('');
+  // Casual Borrowing sold from this screen (₹70 for 14 days, one book).
+  const [casualOpen, setCasualOpen] = useState(false);
+  const [casualDeposit, setCasualDeposit] = useState(false);
+  const [casualPay, setCasualPay] = useState('cash');
+  const [casualAmount, setCasualAmount] = useState(null);
+  const [casualSaving, setCasualSaving] = useState(false);
+  // The Casual tab: everyone who has paid for casual borrowing, from the bills.
+  const [casualRows, setCasualRows] = useState(null);
+  const [casualListError, setCasualListError] = useState('');
+  const [casualFixing, setCasualFixing] = useState(null);
 
   // Scanner
   const [showScanner, setShowScanner] = useState(false);
@@ -136,6 +147,84 @@ export default function Borrow() {
   const showToast = (msg, type = 'success') => {
     if (type === 'error') toast.error(msg);
     else toast.success(msg);
+  };
+
+  // What the casual bill comes to, GST included when it's on.
+  useEffect(() => {
+    if (!casualOpen) return;
+    let live = true;
+    setCasualAmount(null);
+    casualTotal(casualDeposit).then(r => { if (live) setCasualAmount(r.total); }).catch(() => {});
+    return () => { live = false; };
+  }, [casualOpen, casualDeposit]);
+
+  const loadCasualList = async () => {
+    setCasualListError('');
+    try {
+      setCasualRows(await fetchCasualBorrowers());
+    } catch (e) {
+      setCasualListError(e.message || 'Could not load casual borrowers');
+      setCasualRows([]);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'casual') loadCasualList();
+    // eslint-disable-next-line
+  }, [activeTab]);
+
+  // Paid, but the member record never got the plan (e.g. the update was
+  // refused): set it from what the bills paid for.
+  const fixCasualPlan = async (row) => {
+    setCasualFixing(row.member.id);
+    try {
+      await applyCasualPlan(row.member.id, row.lastPay.day, row.fallbackEnd);
+      showToast(`${row.member.name} is on Casual Borrowing until ${new Date(row.fallbackEnd).toLocaleDateString('en-IN')}`);
+      await loadCasualList();
+    } catch (e) {
+      showToast(`Couldn't switch the plan on: ${e.message}`, 'error');
+    } finally {
+      setCasualFixing(null);
+    }
+  };
+
+  const lendToCasual = (row) => {
+    selectMember({ ...row.member });
+    setActiveTab('checkout');
+  };
+
+  // Brought the last book back: the next one is another ₹70.
+  const nextCasualBook = (row) => {
+    selectMember({ ...row.member });
+    setActiveTab('checkout');
+    setCasualDeposit(false);
+    setCasualPay('cash');
+    setCasualOpen(true);
+  };
+
+  const handleStartCasual = async () => {
+    if (!selectedMember || casualSaving) return;
+    setCasualSaving(true);
+    try {
+      const { txnRef, total, startDate, endDate } = await sellCasualPlan({
+        member: selectedMember,
+        withDeposit: casualDeposit,
+        payMethod: casualPay,
+        billDate: checkoutDate,
+      });
+      const d = PLAN_DEFAULTS.casual;
+      const patch = { plan: 'casual', borrow_limit: d.borrow_limit, subscription_start: startDate, subscription_end: endDate, status: 'active' };
+      setSelectedMember(m => (m ? { ...m, ...patch } : m));
+      setMembers(list => list.map(m => (m.id === selectedMember.id ? { ...m, ...patch } : m)));
+      setDueDate(endDate);
+      setCasualOpen(false);
+      setCasualRows(null);
+      showToast(`₹${total} received (bill ${txnRef}). Casual Borrowing active until ${new Date(endDate).toLocaleDateString('en-IN')} — pick the book.`);
+    } catch (e) {
+      showToast(e.message || 'Could not take the payment', 'error');
+    } finally {
+      setCasualSaving(false);
+    }
   };
 
   // Keyboard shortcuts: Ctrl+B = checkout, Ctrl+R = active, / = scanner
@@ -778,7 +867,7 @@ export default function Borrow() {
 
       {/* Tabs */}
       <div style={{ background: 'white', borderRadius: '8px', padding: '6px', width: 'fit-content', marginBottom: '20px', display: 'flex', gap: '4px' }}>
-        {[['checkout', '➕ New Checkout'], ['active', `📚 Active (${circulationData.length})`]].map(([tab, label]) => (
+        {[['checkout', '➕ New Checkout'], ['active', `📚 Active (${circulationData.length})`], ['casual', `📖 Casual${casualRows ? ` (${casualRows.length})` : ''}`]].map(([tab, label]) => (
           <button key={tab} data-tour={tab === 'checkout' ? 'checkout-tab' : tab === 'active' ? 'active-tab' : undefined} onClick={() => setActiveTab(tab)} style={{
             padding: '8px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px',
             background: activeTab === tab ? '#667eea' : 'transparent',
@@ -944,6 +1033,13 @@ export default function Borrow() {
                       </span>
                     )}
                   </div>
+                  {(membership === 'none' || membership === 'expired') && !isReadOnly && (
+                    <button
+                      onClick={() => { setCasualDeposit(false); setCasualPay('cash'); setCasualOpen(true); }}
+                      style={{ marginTop: '12px', width: '100%', padding: '11px', background: '#0f766e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+                      📖 Casual Borrowing — ₹{PLAN_DEFAULTS.casual.price} for {PLAN_DEFAULTS.casual.duration_days} days
+                    </button>
+                  )}
                 </div>
               );
             })()}
@@ -1208,6 +1304,112 @@ export default function Borrow() {
           </div>
         </div>
       )}
+
+      {/* ─── CASUAL BORROWING TAB ─── */}
+      {activeTab === 'casual' && (() => {
+        const fmt = (ymd) => (ymd ? new Date(`${String(ymd).slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—');
+        const cell = { padding: '12px 14px', fontSize: '13px', verticalAlign: 'top', borderBottom: '1px solid #f0f0f0' };
+        return (
+          <div style={{ background: 'white', borderRadius: '8px', padding: isMobile ? '12px' : '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '10px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px' }}>📖 Casual Borrowing</h3>
+                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>Everyone who has paid for casual borrowing, from their bills.</div>
+              </div>
+              <button onClick={loadCasualList} style={{ padding: '7px 14px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>🔄 Refresh</button>
+            </div>
+            {casualListError && <div style={{ background: '#f8d7da', color: '#721c24', padding: '10px 14px', borderRadius: '6px', marginBottom: '12px', fontSize: '13px' }}>{casualListError}</div>}
+            {casualRows === null ? (
+              <div style={{ padding: '30px', textAlign: 'center', color: '#999' }}>Loading…</div>
+            ) : casualRows.length === 0 ? (
+              <div style={{ padding: '30px', textAlign: 'center', color: '#999' }}>No one has paid for casual borrowing yet.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8f9fa' }}>
+                      {['Customer', 'Paid', 'Deposit', 'Covered until', 'Book', ''].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {casualRows.map(row => {
+                      const last = row.lastPay;
+                      const live = row.state === 'out' || row.state === 'ready' || row.state === 'fix';
+                      return (
+                        <tr key={row.member.id} style={{ opacity: live || row.state === 'returned' ? 1 : 0.6 }}>
+                          <td style={cell}>
+                            <div style={{ fontWeight: '700' }}>{row.member.name}</div>
+                            <div style={{ color: '#888', fontSize: '12px' }}>{row.member.phone || ''}</div>
+                          </td>
+                          <td style={cell}>
+                            ₹{PLAN_DEFAULTS.casual.price} × {row.payments.length}
+                            {last && <div style={{ color: '#888', fontSize: '12px' }}>last {fmt(last.day)} · {(last.method || '').toUpperCase()}</div>}
+                          </td>
+                          <td style={cell}>
+                            {row.depositPaid > 0
+                              ? <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>₹{row.depositPaid} paid</span>
+                              : <span style={{ color: '#b45309' }}>Not paid</span>}
+                          </td>
+                          <td style={cell}>
+                            {row.state === 'returned' ? (
+                              <span style={{ fontWeight: '600', color: '#92400e' }}>○ Ended {fmt(row.lastReturn.day)} (book returned)</span>
+                            ) : row.coveredUntil ? (
+                              <span style={{ fontWeight: '600', color: live ? '#15803d' : '#991b1b' }}>
+                                {live ? '● ' : '○ '}{fmt(row.coveredUntil)}{live ? '' : ' (ended)'}
+                              </span>
+                            ) : '—'}
+                            {row.state === 'fix' && (
+                              <div style={{ marginTop: '6px' }}>
+                                <div style={{ color: '#b91c1c', fontSize: '12px', marginBottom: '4px' }}>⚠️ Paid, but the plan isn't switched on — Borrow will refuse them.</div>
+                                {!isReadOnly && (
+                                  <button onClick={() => fixCasualPlan(row)} disabled={casualFixing === row.member.id}
+                                    style={{ padding: '5px 10px', background: '#b91c1c', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                                    {casualFixing === row.member.id ? 'Fixing…' : 'Switch plan on'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td style={cell}>
+                            {row.loans.length ? row.loans.map(l => (
+                              <div key={l.id} style={{ marginBottom: '4px' }}>
+                                📕 <strong>{l.title}</strong>
+                                <div style={{ fontSize: '12px', color: isOverdue(l.due_date) ? '#b91c1c' : '#888' }}>
+                                  out since {fmt(l.checkout_date)} · due {fmt(l.due_date)}{isOverdue(l.due_date) ? ' (overdue)' : ''}
+                                </div>
+                              </div>
+                            )) : row.state === 'returned' ? (
+                              <span style={{ color: '#555' }}>Returned <strong>{row.lastReturn.title}</strong> on {fmt(row.lastReturn.day)}</span>
+                            ) : (
+                              <span style={{ color: row.state === 'ready' ? '#0f766e' : '#aaa' }}>{row.state === 'ready' ? 'No book yet — ready to take one' : 'No book out'}</span>
+                            )}
+                          </td>
+                          <td style={{ ...cell, textAlign: 'right' }}>
+                            {!isReadOnly && row.state === 'ready' && (
+                              <button onClick={() => lendToCasual(row)}
+                                style={{ padding: '7px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                                ➕ Lend a book
+                              </button>
+                            )}
+                            {!isReadOnly && (row.state === 'returned' || row.state === 'ended') && (
+                              <button onClick={() => nextCasualBook(row)}
+                                style={{ padding: '7px 12px', background: '#0f766e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                                📖 Next book — ₹{PLAN_DEFAULTS.casual.price}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── ACTIVE BORROWS TAB ─── */}
       {activeTab === 'active' && (
@@ -1503,6 +1705,53 @@ export default function Borrow() {
       )}
 
       {/* ─── RENEWAL MODAL ─── */}
+      {casualOpen && selectedMember && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
+          onClick={() => !casualSaving && setCasualOpen(false)}>
+          <div style={{ background: 'white', borderRadius: '10px', padding: isMobile ? '20px' : '28px', maxWidth: '420px', width: isMobile ? '95%' : '90%' }}
+            onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>📖 Casual Borrowing</h2>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#666' }}>
+              {selectedMember.name} can take <strong>1 book for {PLAN_DEFAULTS.casual.duration_days} days</strong>. The book is due back when the {PLAN_DEFAULTS.casual.duration_days} days end.
+            </p>
+            <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px', fontSize: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                <span>Casual Borrowing ({PLAN_DEFAULTS.casual.duration_days} days)</span><strong>₹{PLAN_DEFAULTS.casual.price}</strong>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', cursor: 'pointer' }}>
+                <input type="checkbox" checked={casualDeposit} onChange={e => setCasualDeposit(e.target.checked)} />
+                <span style={{ flex: 1 }}>Refundable deposit</span><strong style={{ color: casualDeposit ? '#333' : '#bbb' }}>₹{CASUAL_DEPOSIT_AMOUNT}</strong>
+              </label>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>Tick this the first time they borrow; it's returned when they stop.</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e5e5e5', paddingTop: '8px', fontSize: '16px' }}>
+                <strong>Total</strong><strong>{casualAmount === null ? '…' : `₹${casualAmount}`}</strong>
+              </div>
+            </div>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '6px', letterSpacing: '0.5px' }}>PAID BY</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+              {[['cash', '💵 Cash'], ['upi', '📱 UPI'], ['card', '💳 Card']].map(([k, label]) => (
+                <button key={k} onClick={() => setCasualPay(k)}
+                  style={{ flex: 1, padding: '9px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px',
+                    border: `2px solid ${casualPay === k ? '#0f766e' : '#e5e5e5'}`, background: casualPay === k ? '#ecfdf5' : 'white', color: casualPay === k ? '#0f766e' : '#555' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setCasualOpen(false)} disabled={casualSaving}
+                style={{ flex: 1, padding: '10px', background: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleStartCasual} disabled={casualSaving || casualAmount === null}
+                style={{ flex: 2, padding: '10px', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '700',
+                  background: casualSaving || casualAmount === null ? '#9ca3af' : '#0f766e', cursor: casualSaving ? 'wait' : 'pointer' }}>
+                {casualSaving ? 'Saving…' : `✓ Received ${casualAmount === null ? '' : `₹${casualAmount}`} — start`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {renewalModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
           onClick={() => setRenewalModal(null)}>
