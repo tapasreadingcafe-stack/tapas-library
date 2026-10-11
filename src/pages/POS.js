@@ -137,6 +137,11 @@ function ServiceCard({ svc, onClick, onEdit, fmt }) {
       <div style={{ fontSize: '13px', fontWeight: '800', color: hovered ? 'rgba(255,255,255,0.92)' : '#667eea' }}>
         {svc.price === 0 ? 'Custom' : fmt(svc.price)}
       </div>
+      {svc.stock !== undefined && (
+        <div style={{ fontSize: '10px', fontWeight: '700', marginTop: '3px', color: hovered ? 'rgba(255,255,255,0.85)' : svc.stock <= 0 ? '#dc2626' : svc.stock <= svc.lowAt ? '#b45309' : '#16a34a' }}>
+          {svc.stock <= 0 ? 'Out of stock' : `${svc.stock} left`}
+        </div>
+      )}
     </div>
   );
 }
@@ -259,6 +264,7 @@ export default function POS({ mode = 'library' }) {
   // Editable services
   const [SERVICES, setSERVICES]         = useState(DEFAULT_SERVICES);
   const [cafeMenu, setCafeMenu]         = useState([]); // cafe menu items, billable on the Book POS
+  const [stationery, setStationery]     = useState([]); // stationery_items on sale, with stock
   const [servicesLoaded, setServicesLoaded] = useState(false);
   const [editSvcModal, setEditSvcModal] = useState(null);
   const [editSvcForm, setEditSvcForm]   = useState({ emoji: '', name: '', price: '', cat: '' });
@@ -459,6 +465,7 @@ export default function POS({ mode = 'library' }) {
         qty:    1,
         bookId: item.cartType === 'book' ? item.id : null,
         menuItemId: item.cartType === 'cafe' ? item.id : null, // cafe_menu_items.id for the cafe order
+        stationeryId: item.stationeryId || null, // stationery_items.id, so the sale comes off stock
         // Carried onto the line so the tax engine can override the stream's
         // inclusive/exclusive answer and rate for this one item.
         taxMode: item.taxMode || null,
@@ -467,6 +474,16 @@ export default function POS({ mode = 'library' }) {
       }];
     });
   }, []);
+
+  // Stationery stock (Stationery page). Missing table → none, and the old
+  // fixed Stationery / Notebook buttons keep working.
+  const fetchStationery = useCallback(() => {
+    supabase.from('stationery_items')
+      .select('id, name, emoji, price, stock, low_stock_at')
+      .eq('is_active', true).order('name')
+      .then(({ data, error }) => { if (!error) setStationery(data || []); });
+  }, []);
+  useEffect(() => { if (mode !== 'cafe') fetchStationery(); }, [mode, fetchStationery]);
 
   // Load cafe menu so cafe items can be billed on the Book POS (one cart).
   useEffect(() => {
@@ -978,6 +995,22 @@ export default function POS({ mode = 'library' }) {
         }
       }
 
+      // Stationery sold → off the shelf count, with the bill on the history row.
+      const stationeryLines = cart.filter(c => c.stationeryId);
+      if (stationeryLines.length) {
+        const results = await Promise.all(stationeryLines.map(c =>
+          supabase.rpc('stationery_move', {
+            p_item_id: c.stationeryId, p_change: -(c.qty || 1), p_reason: 'sale',
+            p_bill_id: txnId, p_note: null, p_unit_cost: null,
+          })));
+        const failed = results.filter(r => r.error);
+        if (failed.length) {
+          console.error('Stationery stock update failed:', failed.map(r => r.error));
+          showToast(`Sale saved, but stationery stock wasn't updated: ${failed[0].error.message}`, 'error');
+        }
+        fetchStationery();
+      }
+
       // Cafe items → also create a cafe order so the kitchen Orders screen,
       // cafe inventory, and Cafe Reports stay in sync (mirrors CafePOS.placeOrder).
       const cafeItems = cart.filter(c => c.type === 'cafe');
@@ -1368,7 +1401,22 @@ export default function POS({ mode = 'library' }) {
     cat: 'Cafe',
     isCafe: true,
   }));
-  const visibleServices = [...SERVICES, ...cafeTiles].filter(s => {
+  // Stationery from the Stationery page. Once any exist they replace the two
+  // fixed placeholder buttons, which had no stock behind them.
+  const stationeryTiles = stationery.map(i => ({
+    id: `stn_${i.id}`,
+    stationeryId: i.id,
+    name: i.name,
+    emoji: i.emoji || '🖊️',
+    price: Number(i.price) || 0,
+    stock: i.stock,
+    lowAt: i.low_stock_at ?? 5,
+    cat: 'Stationery',
+  }));
+  const baseServices = stationeryTiles.length
+    ? SERVICES.filter(s => s.id !== 'svc_station' && s.id !== 'svc_notebook')
+    : SERVICES;
+  const visibleServices = [...baseServices, ...stationeryTiles, ...cafeTiles].filter(s => {
     // The cafe till is the cafe menu — memberships, fines and printing belong
     // to the library counter and would only be noise here.
     if (isCafeTill) return s.isCafe && (!sl || s.name.toLowerCase().includes(sl));
@@ -1490,12 +1538,13 @@ export default function POS({ mode = 'library' }) {
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e  => e.target.style.borderColor = '#e0e0e0'}
             />
-            {/* Books / Cafe quick filters — the two catalogs staff flip between
-                all day, so they sit up here beside the scanner instead of being
-                two pills among nine below. */}
+            {/* Books / Stationery quick filters — the two things the library
+                counter sells all day, so they sit up here beside the scanner
+                instead of being two pills among the row below. (The cafe has
+                its own till.) */}
             {(isCafeTill ? [] : [
-              { cat: 'Books', label: 'Books', Icon: BookIcon, tint: '#667eea', title: 'Show the book catalog' },
-              { cat: 'Cafe',  label: 'Cafe',  Icon: CafeIcon, tint: '#f59e0b', title: 'Show the cafe menu' },
+              { cat: 'Books',      label: 'Books',      Icon: BookIcon,       tint: '#667eea', title: 'Show the book catalog' },
+              { cat: 'Stationery', label: 'Stationery', Icon: StationeryIcon, tint: '#f59e0b', title: 'Show stationery' },
             ]).map(({ cat, label, Icon, tint, title }) => {
               const on = activeCat === cat;
               return (
@@ -1557,6 +1606,8 @@ export default function POS({ mode = 'library' }) {
                         if (svc.custom) {
                           setCustomAmtModal(svc);
                           setCustomAmtVal('');
+                        } else if (svc.stationeryId && (cart.find(c => c.cartId === svc.id)?.qty || 0) >= svc.stock) {
+                          showToast(svc.stock <= 0 ? `${svc.name} is out of stock` : `Only ${svc.stock} ${svc.name} left`, 'error');
                         } else {
                           addToCart({ ...svc, cartType: svc.isCafe ? 'cafe' : 'service' });
                           showToast(`${svc.name} added to cart`);
@@ -2811,14 +2862,13 @@ function BookIcon({ size = 20 }) {
   );
 }
 
-function CafeIcon({ size = 20 }) {
+function StationeryIcon({ size = 20 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
       style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
-      <path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" />
-      <path d="M17 10.5h1.4a2.5 2.5 0 0 1 0 5H17" />
-      <path d="M7.5 2.6c-.6 1-.6 2 0 3M11 2.6c-.6 1-.6 2 0 3M14.5 2.6c-.6 1-.6 2 0 3" />
+      <path d="M15.5 4.5l4 4L9 19H5v-4L15.5 4.5z" />
+      <path d="M13.5 6.5l4 4" />
     </svg>
   );
 }

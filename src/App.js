@@ -86,6 +86,7 @@ const EventManage      = lazyWithRetry(() => import('./pages/EventManage'));
 // ── Lazy-loaded pages (New - Phase 4: Inventory, Accounts, Vendors, Settings)
 const InventoryLibrary      = lazyWithRetry(() => import('./pages/InventoryLibrary'));
 const InventoryCafe         = lazyWithRetry(() => import('./pages/InventoryCafe'));
+const Stationery            = lazyWithRetry(() => import('./pages/Stationery'));
 const VendorList            = lazyWithRetry(() => import('./pages/VendorList'));
 const PurchaseOrders        = lazyWithRetry(() => import('./pages/PurchaseOrders'));
 const AccountsOverview      = lazyWithRetry(() => import('./pages/AccountsOverview'));
@@ -94,6 +95,7 @@ const AccountsTransactions  = lazyWithRetry(() => import('./pages/AccountsTransa
 const AccountsExpenses      = lazyWithRetry(() => import('./pages/AccountsExpenses'));
 const AccountsPnL           = lazyWithRetry(() => import('./pages/AccountsPnL'));
 const AccountsInvoices      = lazyWithRetry(() => import('./pages/AccountsInvoices'));
+const AccountsDeposits      = lazyWithRetry(() => import('./pages/AccountsDeposits'));
 const AccountsMemberPayments = lazyWithRetry(() => import('./pages/AccountsMemberPayments'));
 const AccountsVendorPayments = lazyWithRetry(() => import('./pages/AccountsVendorPayments'));
 const SettingsApp           = lazyWithRetry(() => import('./pages/SettingsApp'));
@@ -277,6 +279,7 @@ const NAV_CONFIG = [
       { to: '/accounts/overview',        icon: '📊', label: 'Overview' },
       { to: '/accounts/pnl',             icon: '📑', label: 'Profit & Loss' },
       { to: '/accounts/invoices',        icon: '🧾', label: 'Invoices' },
+      { to: '/accounts/deposits',        icon: '🔐', label: 'Deposits' },
       { to: '/accounts/expenses',        icon: '📤', label: 'Expenses' },
       { to: '/accounts/transactions',    icon: '💸', label: 'Transactions' },
       { to: '/accounts/member-payments', icon: '💳', label: 'Member Payments' },
@@ -327,6 +330,7 @@ const NAV_CONFIG = [
       { to: '/cafe/reports', icon: '📊', label: 'Cafe Reports' },
     ],
   },
+  { to: '/stationery', icon: '✏️', label: 'Stationery' },
   {
     icon: '📦', label: 'Stock', key: 'inventory',
     children: [
@@ -821,6 +825,7 @@ function DashboardShell() {
             {/* Inventory */}
             <Route path="/inventory/library"                  element={<InventoryLibrary />} />
             <Route path="/inventory/cafe"                     element={<InventoryCafe />} />
+            <Route path="/stationery"                         element={<Stationery />} />
 
             {/* Events */}
             <Route path="/events"                             element={<EventListing />} />
@@ -837,6 +842,7 @@ function DashboardShell() {
             <Route path="/accounts/pnl"                       element={<AccountsPnL />} />
             <Route path="/accounts/transactions"              element={<AccountsTransactions />} />
             <Route path="/accounts/invoices"                  element={<AccountsInvoices />} />
+            <Route path="/accounts/deposits"                  element={<AccountsDeposits />} />
             <Route path="/accounts/expenses"                  element={<AccountsExpenses />} />
             <Route path="/accounts/member-payments"           element={<AccountsMemberPayments />} />
             <Route path="/accounts/vendor-payments"           element={<AccountsVendorPayments />} />

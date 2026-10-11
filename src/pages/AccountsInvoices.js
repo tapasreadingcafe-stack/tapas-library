@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import { buildBillNumbers } from '../utils/invoiceNumber';
-import { STREAMS, splitByStream } from '../utils/revenueStreams';
+import { STREAMS, splitByStream, streamOf } from '../utils/revenueStreams';
 import { useToast } from '../components/Toast';
 import { useReactToPrint } from 'react-to-print';
+import { exportToCSV, exportRowsToCSV } from '../utils/exportCSV';
 
 const fmt = (n) => `₹${(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
@@ -25,6 +26,8 @@ const paymentBadge = (method) => {
 export default function AccountsInvoices() {
   const toast = useToast();
   const printRef = useRef();
+  const listPrintRef = useRef();
+  const [exportOpen, setExportOpen] = useState(false);
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +82,7 @@ export default function AccountsInvoices() {
   };
 
   const handleReactToPrint = useReactToPrint({ contentRef: printRef });
+  const printList = useReactToPrint({ contentRef: listPrintRef, documentTitle: `Invoices ${dateFrom} to ${dateTo}` });
 
   const deleteInvoice = async (inv) => {
     try {
@@ -179,6 +183,147 @@ export default function AccountsInvoices() {
   const taxCollected = filtered.reduce((s, i) => s + taxOnBill(i) + (Number(i.round_off) || 0), 0);
   const netRevenue = totalBilled - depositsHeld - taxCollected;
 
+  // ── Exports — all follow the filters on screen ──────────────────────
+  const num = (n) => Math.round((Number(n) || 0) * 100) / 100;
+  const ymdOf = (ts) => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const fileTag = `${dateFrom || 'start'}_to_${dateTo || 'today'}`;
+  const streamTotals = (inv) => {
+    const lines = inv.pos_transaction_items || [];
+    return lines.length ? splitByStream(forSplit(lines), { [inv.id]: preTax(inv) }) : null;
+  };
+
+  const exportInvoices = () => {
+    exportToCSV(filtered.map(inv => {
+      const t = streamTotals(inv) || {};
+      return {
+        'Invoice #': invoiceNumber(inv),
+        Date: ymdOf(inv.created_at),
+        Customer: inv.members?.name || 'Walk-in',
+        Phone: inv.members?.phone || '',
+        Payment: (inv.payment_method || '').toUpperCase(),
+        Library: num(t.library), Cafe: num(t.cafe), Memberships: num(t.membership), Fines: num(t.fines),
+        'Deposits (refundable)': num(t.deposit),
+        Discount: num(inv.discount_amount),
+        'Taxable value': num(inv.taxable_value),
+        CGST: num(inv.cgst_amount), SGST: num(inv.sgst_amount), IGST: num(inv.igst_amount),
+        'Round off': num(inv.round_off),
+        Total: num(inv.total_amount),
+      };
+    }), `invoices_${fileTag}`);
+  };
+
+  const exportLineItems = () => {
+    const rows = [];
+    filtered.forEach(inv => (inv.pos_transaction_items || []).forEach(l => {
+      rows.push({
+        'Invoice #': invoiceNumber(inv),
+        Date: ymdOf(inv.created_at),
+        Customer: inv.members?.name || 'Walk-in',
+        Item: l.item_name,
+        Category: STREAMS[streamOf(l)]?.label || '',
+        Qty: l.quantity,
+        'Unit price': num(l.unit_price),
+        'Line total': num(l.total_price),
+        HSN: l.hsn_code || '',
+        'GST %': l.gst_rate ?? '',
+        'Taxable value': l.taxable_value ?? '',
+        CGST: l.cgst_amount ?? '', SGST: l.sgst_amount ?? '', IGST: l.igst_amount ?? '',
+        Payment: (inv.payment_method || '').toUpperCase(),
+      });
+    }));
+    exportToCSV(rows, `invoice_items_${fileTag}`);
+  };
+
+  const exportDaily = () => {
+    const days = {};
+    filtered.forEach(inv => {
+      const k = ymdOf(inv.created_at);
+      const d = days[k] || (days[k] = { Date: k, Bills: 0, Library: 0, Cafe: 0, Memberships: 0, Fines: 0, 'Deposits (refundable)': 0, GST: 0, Cash: 0, UPI: 0, Card: 0, Other: 0, Total: 0 });
+      const t = streamTotals(inv) || {};
+      d.Bills += 1;
+      d.Library += t.library || 0; d.Cafe += t.cafe || 0; d.Memberships += t.membership || 0;
+      d.Fines += t.fines || 0; d['Deposits (refundable)'] += t.deposit || 0;
+      d.GST += taxOnBill(inv);
+      const total = Number(inv.total_amount) || 0;
+      const m = (inv.payment_method || '').toLowerCase();
+      if (m === 'cash') d.Cash += total; else if (m === 'upi') d.UPI += total; else if (m === 'card') d.Card += total; else d.Other += total;
+      d.Total += total;
+    });
+    exportToCSV(Object.values(days).sort((a, b) => a.Date.localeCompare(b.Date))
+      .map(d => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'number' && k !== 'Bills' ? num(v) : v]))),
+      `daily_summary_${fileTag}`);
+  };
+
+  // Plain-language names for the HSN / SAC codes the GST settings use.
+  const HSN_NAMES = {
+    '996331': 'Café food & drinks',
+    '4901': 'Books',
+    '999723': 'Library memberships',
+    '999799': 'Fines & other charges',
+    '999293': 'Events & workshops',
+  };
+  const prettyDate = (ymd) => (ymd ? new Date(`${ymd}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '…');
+
+  const exportGst = () => {
+    const groups = {};
+    filtered.forEach(inv => (inv.pos_transaction_items || []).forEach(l => {
+      const stream = streamOf(l);
+      const exempt = l.is_exempt || stream === 'deposit';
+      const hasRate = l.gst_rate !== null && l.gst_rate !== undefined;
+      const rateKey = exempt ? 'exempt' : hasRate ? String(l.gst_rate) : 'off';
+      const key = `${stream}|${l.hsn_code || ''}|${rateKey}`;
+      const g = groups[key] || (groups[key] = {
+        what: stream === 'deposit' ? 'Refundable deposits' : (HSN_NAMES[l.hsn_code] || STREAMS[stream]?.label || 'Other'),
+        hsn: l.hsn_code || '',
+        rate: exempt ? 'Exempt (refundable deposit, not a sale)' : hasRate ? `${Number(l.gst_rate)}%` : 'Not charged (GST off for this)',
+        sortRate: exempt ? -2 : hasRate ? Number(l.gst_rate) : -1,
+        items: 0, value: 0, cgst: 0, sgst: 0, igst: 0,
+      });
+      const value = l.taxable_value !== null && l.taxable_value !== undefined ? Number(l.taxable_value) : Number(l.total_price) || 0;
+      g.items += Number(l.quantity) || 1;
+      g.value += value;
+      g.cgst += Number(l.cgst_amount) || 0;
+      g.sgst += Number(l.sgst_amount) || 0;
+      g.igst += Number(l.igst_amount) || 0;
+    }));
+    const list = Object.values(groups).sort((a, b) => b.sortRate - a.sortRate || b.value - a.value);
+    const sum = (k) => list.reduce((s, g) => s + g[k], 0);
+    const rowOf = (g) => {
+      const tax = g.cgst + g.sgst + g.igst;
+      return [g.what, g.hsn, g.rate, g.items, num(g.value), num(g.cgst), num(g.sgst), num(g.igst), num(tax), num(g.value + tax)];
+    };
+    const totalTax = sum('cgst') + sum('sgst') + sum('igst');
+    exportRowsToCSV([
+      ['GST summary — Tapas Reading Cafe'],
+      ['Period', `${prettyDate(dateFrom)} to ${prettyDate(dateTo)}`],
+      ['Bills', filtered.length],
+      ['GST collected', num(totalTax)],
+      [],
+      ['What was sold', 'HSN / SAC code', 'GST rate', 'Items', 'Value before GST (₹)', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total GST (₹)', 'Total collected (₹)'],
+      ...list.map(rowOf),
+      ['TOTAL', '', '', sum('items'), num(sum('value')), num(sum('cgst')), num(sum('sgst')), num(sum('igst')), num(totalTax), num(sum('value') + totalTax)],
+      [],
+      ['What the columns mean'],
+      ['Value before GST', 'The price of what was sold, with no tax in it (the "taxable value" in GST returns).'],
+      ['CGST / SGST', 'GST on a sale inside Karnataka is split half-and-half: CGST goes to the central government, SGST to the state.'],
+      ['IGST', 'GST on a sale to a customer outside Karnataka. Normally zero for a café.'],
+      ['Total GST', 'The tax collected from customers, which is owed to the government.'],
+      ['Not charged', 'GST is switched off for this type of sale in Accounts → GST Settings, so no tax was added.'],
+      ['Exempt', 'Refundable deposits are not sales, so GST never applies and they are not income.'],
+    ], `gst_summary_${fileTag}`);
+  };
+
+  const EXPORTS = [
+    { icon: '🧾', label: 'Invoices', hint: 'One row per bill, split by category, with GST', run: exportInvoices },
+    { icon: '📋', label: 'Line items', hint: 'Every item on every bill', run: exportLineItems },
+    { icon: '📅', label: 'Daily summary', hint: 'Totals per day, by category and Cash / UPI / Card', run: exportDaily },
+    { icon: '🏛️', label: 'GST summary', hint: 'Taxable value and tax by HSN and rate, for your accountant', run: exportGst },
+    { icon: '🖨️', label: 'Print / Save as PDF', hint: 'The list as shown, ready to print', run: () => printList() },
+  ];
+
   // GST from localStorage
   const gstRate = Number(localStorage.getItem('gst_rate') || 0);
 
@@ -208,7 +353,37 @@ export default function AccountsInvoices() {
         @media print { .no-print { display: none !important; } }
       `}</style>
 
-      <h1 style={{ fontSize: '28px', marginBottom: '20px' }}>Invoices</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: '28px', margin: 0 }}>Invoices</h1>
+        <div style={{ position: 'relative' }} className="no-print">
+          <button onClick={() => setExportOpen(o => !o)} disabled={loading || filtered.length === 0}
+            style={{ padding: '10px 18px', background: filtered.length === 0 ? '#c7cbd1' : '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: filtered.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '14px' }}>
+            📥 Export ▾
+          </button>
+          {exportOpen && (
+            <>
+              <div onClick={() => setExportOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
+              <div style={{ position: 'absolute', right: 0, top: '46px', zIndex: 51, background: 'white', borderRadius: '10px', boxShadow: '0 12px 36px rgba(0,0,0,0.18)', padding: '6px', width: '300px' }}>
+                <div style={{ padding: '8px 10px 6px', fontSize: '11px', color: '#9ca3af' }}>
+                  {filtered.length} invoice{filtered.length === 1 ? '' : 's'} · {dateFrom || '…'} to {dateTo || '…'} · opens in Excel
+                </div>
+                {EXPORTS.map(x => (
+                  <button key={x.label} onClick={() => { setExportOpen(false); x.run(); }}
+                    style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', width: '100%', padding: '9px 10px', border: 'none', background: 'transparent', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <span style={{ fontSize: '18px' }}>{x.icon}</span>
+                    <span>
+                      <div style={{ fontWeight: 600, fontSize: '13px', color: '#333' }}>{x.label}</div>
+                      <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{x.hint}</div>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Stats bar */}
       <div className="inv-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
@@ -379,6 +554,35 @@ export default function AccountsInvoices() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Print / Save as PDF of the filtered list (hidden on screen) */}
+      <div style={{ display: 'none' }}>
+        <div ref={listPrintRef} style={{ padding: '24px', fontFamily: 'sans-serif', color: '#222' }}>
+          <h2 style={{ margin: '0 0 2px' }}>Tapas Reading Cafe — Invoices</h2>
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '14px' }}>
+            {dateFrom} to {dateTo} · {filtered.length} invoices · Billed {fmt(totalBilled)} · Revenue {fmt(netRevenue)} (excl. {fmt(depositsHeld)} deposits, {fmt(taxCollected)} GST)
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+            <thead>
+              <tr>{['Invoice #', 'Date', 'Customer', 'Category', 'Payment', 'Amount'].map(h => (
+                <th key={h} style={{ textAlign: h === 'Amount' ? 'right' : 'left', borderBottom: '2px solid #333', padding: '5px 6px' }}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {filtered.map(inv => (
+                <tr key={inv.id}>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '4px 6px', fontFamily: 'monospace' }}>{invoiceNumber(inv)}</td>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '4px 6px' }}>{new Date(inv.created_at).toLocaleDateString('en-IN')}</td>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '4px 6px' }}>{inv.members?.name || 'Walk-in'}</td>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '4px 6px' }}>{categoriesOf(inv).map(c => `${c.label} ${fmt(c.amount)}`).join(', ')}</td>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '4px 6px' }}>{(inv.payment_method || '').toUpperCase()}</td>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '4px 6px', textAlign: 'right' }}>{fmt(inv.total_amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Detail Modal */}
