@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
+import { useAuth } from '../context/AuthContext';
 
 // =====================================================================
 // /store/inbox — Submissions from the Contact Form block.
@@ -10,7 +11,7 @@ import { supabase } from '../utils/supabase';
 //   - Expand a row to see the full message
 //   - Mark as read / replied / archived
 //   - Click an email to open their mail client with a prefilled reply
-//   - Delete (with confirm)
+//   - Delete (with confirm) — Super Admin only
 // =====================================================================
 
 const STATUS_META = {
@@ -42,6 +43,8 @@ function fmtDate(iso) {
 }
 
 export default function ContactInbox() {
+  const { isSuperAdmin } = useAuth();
+  const canDelete = isSuperAdmin();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('inbox');
@@ -118,6 +121,7 @@ export default function ContactInbox() {
   };
 
   const deleteRow = async (row) => {
+    if (!canDelete) return;
     if (!window.confirm(`Permanently delete submission from ${row.name}? This cannot be undone.`)) return;
     if (actioning) return;
     setActioning(row.id);
@@ -326,7 +330,7 @@ export default function ContactInbox() {
                   style={{
                     padding: '14px 20px', cursor: 'pointer',
                     display: 'grid',
-                    gridTemplateColumns: '1fr 2fr auto auto',
+                    gridTemplateColumns: canDelete ? '1fr 2fr auto auto auto' : '1fr 2fr auto auto',
                     gap: '16px', alignItems: 'center',
                   }}
                 >
@@ -353,6 +357,20 @@ export default function ContactInbox() {
                   <span style={{ fontSize: '11px', color: '#9ca3af', whiteSpace: 'nowrap' }}>
                     {fmtDate(row.created_at)}
                   </span>
+                  {canDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteRow(row); }}
+                      disabled={actioning === row.id}
+                      title="Delete this submission (Super Admin)"
+                      aria-label={`Delete submission from ${disp.name}`}
+                      style={{
+                        padding: '6px 9px', background: 'white', color: '#dc2626',
+                        border: '1px solid #fecaca', borderRadius: '6px',
+                        fontSize: '13px', cursor: 'pointer', lineHeight: 1,
+                        opacity: actioning === row.id ? 0.6 : 1,
+                      }}
+                    >🗑</button>
+                  )}
                 </div>
 
                 {/* Expanded content */}
@@ -510,7 +528,7 @@ export default function ContactInbox() {
                           }}
                         >Restore</button>
                       )}
-                      <button
+                      {canDelete && <button
                         onClick={(e) => { e.stopPropagation(); deleteRow(row); }}
                         disabled={actioning === row.id}
                         style={{
@@ -520,7 +538,7 @@ export default function ContactInbox() {
                           fontSize: '13px', fontWeight: '600', cursor: 'pointer',
                           opacity: actioning === row.id ? 0.6 : 1,
                         }}
-                      >🗑 Delete</button>
+                      >🗑 Delete</button>}
                     </div>
                   </div>
                 )}
