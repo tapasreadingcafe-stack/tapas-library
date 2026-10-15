@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import jsQR from 'jsqr';
+import { makeZxingDecoder, frameToImageData } from './utils/zxingDecode';
 
 export default function BarcodeScanner({ onScan, onClose, continuous = false, embedded = false }) {
   const videoRef = useRef(null);
@@ -8,6 +9,33 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
   const [found, setFound] = useState(false);
   const [lastScanned, setLastScanned] = useState('');
   const hasBarcodeDetector = typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  // How book (1D) barcodes get read: the browser's own detector when it knows
+  // EAN-13, otherwise ZXing in JavaScript. Safari on iPhone/iPad has a
+  // BarcodeDetector that only reads QR, so "has a detector" isn't enough.
+  const [reader1D, setReader1D] = useState('checking'); // 'native' | 'zxing' | 'none'
+  const zxingRef = useRef(null);
+  const busyRef = useRef(false);
+  const pendingRef = useRef({ code: null, hits: 0 });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let native = false;
+      if (hasBarcodeDetector && window.BarcodeDetector.getSupportedFormats) {
+        try { native = (await window.BarcodeDetector.getSupportedFormats()).includes('ean_13'); } catch {}
+      }
+      if (native) { if (!cancelled) setReader1D('native'); return; }
+      try {
+        const Z = await import('@zxing/library');
+        zxingRef.current = makeZxingDecoder(Z);
+        if (!cancelled) setReader1D('zxing');
+      } catch (e) {
+        console.error('Could not load the barcode reader', e);
+        if (!cancelled) setReader1D('none');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hasBarcodeDetector]);
 
   useEffect(() => {
     let stream = null;
@@ -34,11 +62,11 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
   }, []);
 
   useEffect(() => {
-    if (found) return;
+    if (found || reader1D === 'checking') return;
     let detector = null;
 
-    // Use native BarcodeDetector if available (reads EAN-13, CODE_128, QR, etc.)
-    if (hasBarcodeDetector) {
+    // Use native BarcodeDetector if it reads book barcodes (EAN-13, CODE_128, QR, etc.)
+    if (reader1D === 'native') {
       try {
         detector = new window.BarcodeDetector({
           formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
@@ -48,6 +76,7 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
 
     const interval = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) return;
+      if (busyRef.current) return; // the JS reader can take longer than one tick
 
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -84,6 +113,23 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
         } catch {}
       }
 
+      // No native book-barcode support: decode in JavaScript. A blurry frame
+      // can decode to a wrong number that still passes the check digit, so a
+      // code only counts once two frames in a row agree on it.
+      if (!code && reader1D === 'zxing' && zxingRef.current) {
+        busyRef.current = true;
+        try {
+          const read = zxingRef.current(frameToImageData(videoRef.current, document.createElement('canvas')));
+          if (read) {
+            const p = pendingRef.current;
+            pendingRef.current = { code: read, hits: p.code === read ? p.hits + 1 : 1 };
+            if (pendingRef.current.hits >= 2) code = read;
+          }
+        } finally {
+          busyRef.current = false;
+        }
+      }
+
       // Fallback to jsQR for QR codes only
       if (!code) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -92,6 +138,7 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
       }
 
       if (code && code !== lastScanned) {
+        pendingRef.current = { code: null, hits: 0 };
         setFound(true);
         setLastScanned(code);
         onScan(code);
@@ -111,7 +158,7 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
     }, 200);
 
     return () => clearInterval(interval);
-  }, [found, onScan, onClose, hasBarcodeDetector, lastScanned, continuous]);
+  }, [found, onScan, onClose, reader1D, lastScanned, continuous]);
 
   // Embedded mode: render the camera inline (no full-screen overlay) so it can
   // sit inside a small floating panel instead of covering the whole screen.
@@ -137,9 +184,9 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
             <p style={{ textAlign: 'center', color: found ? '#1dd1a1' : '#999', fontSize: '11px', margin: '6px 0 0' }}>
               {found ? `✅ ${lastScanned}` : 'Point camera at the barcode'}
             </p>
-            {!hasBarcodeDetector && (
+            {reader1D === 'none' && (
               <p style={{ textAlign: 'center', color: '#f39c12', fontSize: '10px', margin: '4px 0 0', background: '#fff3cd', padding: '4px', borderRadius: '4px' }}>
-                ⚠️ This browser reads QR only. For ISBN barcodes use Chrome/Android or type the code instead.
+                ⚠️ The barcode reader didn't load — check the connection, or type the code instead.
               </p>
             )}
           </>
@@ -196,9 +243,12 @@ export default function BarcodeScanner({ onScan, onClose, continuous = false, em
               </p>
             )}
 
-            {!hasBarcodeDetector && (
+            {reader1D === 'checking' && (
+              <p style={{ textAlign: 'center', color: '#999', fontSize: '11px', margin: '4px 0' }}>Starting the barcode reader…</p>
+            )}
+            {reader1D === 'none' && (
               <p style={{ textAlign: 'center', color: '#f39c12', fontSize: '11px', margin: '4px 0', background: '#fff3cd', padding: '6px', borderRadius: '4px' }}>
-                ⚠️ Your browser only supports QR codes. For ISBN barcodes, use Chrome on Android or type the number manually below.
+                ⚠️ The barcode reader didn't load — check the connection, or type the number manually below.
               </p>
             )}
           </>
